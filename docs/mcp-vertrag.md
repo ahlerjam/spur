@@ -26,7 +26,8 @@ Stand: Entwurf vor Lauf 0. Änderungen an Namen und Fehlercodes gelten als Bruch
 | `doc_edit` | P1 | Änderung als Track Change, mit erwartetem Alttext und Idempotenz-Schlüssel |
 | `doc_create` | P1 | Leeres Dokument anlegen, Inhalt folgt über `doc_edit` |
 | `run_status`, `run_finish` | P1 | Lauf abfragen und mit Zusammenfassung beenden |
-| `events_since`, `reply` | P1 | Aufträge aus der Inbox holen und antworten |
+| `wait_for_event` | P1 | Long-Poll: wartet auf den nächsten Auftrag, sendet alle 30 s Fortschritt |
+| `events_since`, `reply` | P1 | Verpasste Ereignisse per Cursor holen und antworten |
 | `paper_search`, `paper_lookup`, `paper_citations` | P2 | Recherche |
 | `source_add`, `acquisition_add` | P2 | Quelle aufnehmen oder auf die Beschaffungsliste setzen |
 | `job_status`, `compile`, `compile_log`, `page_image` | P2 | Kompilieren und Ergebnis sehen |

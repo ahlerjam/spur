@@ -44,9 +44,11 @@ Forschende und Studierende, allein oder im kleinen Team. Betreiber installieren 
 - Token: 90 Tage, widerrufbar, Hash in `oauthAccessTokens`, Aufräumen über `expireDeletedUser`. Ablauf zeigt spur im Browser an.
 - Zeiten in UTC, Anzeige lokal.
 - Änderungen an der Mongo-Struktur laufen über `tools/migrations` mit `down`. `SPUR_*`-Testschalter sind im Produktivbetrieb wirkungslos.
-- Der Weckweg für Aufträge steht nach Lauf 0 fest. Bis dahin gilt die Rückfallebene `/spur:lauf`.
+- Weckweg: Long-Poll-Tool `wait_for_event` mit Fortschritt alle 30 Sekunden, in Lauf 0 mit echtem Claude Code belegt (siehe ADR 0003). Laufende Aufrufe sind der Herzschlag für „Claude verbunden“.
+- `make start` erzeugt beim ersten Start ein `.env` mit `OVERLEAF_INVITE_TOKEN_SECRET`; ohne dieses Secret startet der Container nicht.
 
 ## Testbarkeit
+- Fertiges Image aus Lauf 0: `ghcr.io/ahlerjam/spur:dev-arm64` und `dev-amd64`, Workflow `Dev image`.
 - `make start` startet den Stack auf `http://localhost:8080`, `make test` die Unit-Tests, `make e2e` Playwright gegen den Stack, `make seed` legt Demo-Daten an.
 - `SPUR_FAKE_AGENT=1` ersetzt Claude durch einen gescripteten MCP-Client, `SPUR_PAPER_API_BASE` zeigt auf den Fake mit aufgezeichneten Crossref-Antworten, `SPUR_NOW` fixiert die Zeit.
 - Kein Schritt braucht ein echtes Claude. Das Plugin prüft `claude plugin validate`, der Smoke-Test läuft je Meilenstein von Hand.

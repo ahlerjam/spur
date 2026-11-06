@@ -1,119 +1,213 @@
-{"features": [
-{"id": "f1", "title": "spur startet mit einem Befehl und trägt seinen eigenen Namen", "steps": [
-"Betreiber führt `make start` aus und ruft http://localhost:8080/login auf: Der Seitentitel enthält „spur“, das Overleaf-Logo fehlt",
-"Der Footer verlinkt https://github.com/ahlerjam/spur",
-"`make e2e` läuft gegen den Stack und meldet Exit-Code 0 mit dem Fake-Server für Crossref",
-"Ein Projekt mit biblatex, `style=apa`, csquotes und einer `.bib` kompiliert ohne Fehler zu einem PDF mit Literaturverzeichnis",
-"Ein Projekt mit natbib kompiliert ebenfalls"
-], "passes": false, "ui": true},
-{"id": "f2", "title": "Eine gesäte Quelle läuft bis zum geprüften Zitat", "steps": [
-"`make seed` legt das Projekt „Demo“ mit `smith2024.pdf` an, `main.tex` enthält `\\enquote{Sleep supports the consolidation of declarative memory.} \\autocite[347]{smith2024}`",
-"Nutzer öffnet „Demo“ und klickt in der Rail auf „Quellen“: Das Panel zeigt „smith2024.pdf“",
-"Nutzer öffnet „Prüfbericht“: Die Zeile zeigt „Wortlaut: exakt“",
-"Nutzer ändert im Editor „Sleep“ zu „Rest“: Nach der Prüfung zeigt die Zeile „Wortlaut: abweichend“ und der Text ist im Editor markiert",
-"Eine Laufzeitmessung des Parsers für ein 2-MB-Dokument steht im Testprotokoll",
-"Das Kompilieren erzeugt weiter ein PDF"
-], "passes": false, "ui": true},
-{"id": "f3", "title": "Quellen hochladen und ansehen", "steps": [
-"Ein leeres Projekt zeigt im Panel „Noch keine Quellen“",
-"Nutzer lädt `smith2024.pdf` hoch: Die Zeile zeigt Dateiname, 8 Seiten und den Status „Text erkannt“",
-"Nutzer klickt die Zeile: Die Vorschau zeigt Seite 1",
-"Nutzer lädt `interview.vtt` hoch: Status „Text erkannt“, Fundstellen als Zeitmarken",
-"Nutzer lädt `scan.pdf` hoch: Status „Kein Text, nicht prüfbar“",
-"Eine Datei über 50 MB zeigt „Datei ist größer als 50 MB. Bitte verkleinern.“ und nichts wird gespeichert",
-"Ein Compile nach dem Upload zeigt keinen vollen Sync durch die Quelle; Mitglieder mit `read` sehen die Vorschau, Nutzer mit Edit-Link können das PDF nicht herunterladen"
-], "passes": false, "ui": true},
-{"id": "f4", "title": "Quellen durchsuchen und Fassung festhalten", "steps": [
-"Nutzer sucht in „Quellen“ nach „declarative memory“: Der Treffer zeigt Datei und „S. 347“",
-"Suche nach „xyzzy“ zeigt „Keine Treffer“",
-"Nutzer trägt bei einer Quelle die Fassung „Preprint v1“ ein: Der Wert bleibt nach dem Neuladen erhalten",
-"Mit 300 gesäten Quellen bleibt die Liste bedienbar, und die Suche antwortet in unter 2 Sekunden"
-], "passes": false, "ui": true},
-{"id": "f5", "title": "Quellen übernehmen, exportieren und löschen", "steps": [
-"Nutzer klickt „Aus anderem Projekt holen“ und wählt „Demo“: `smith2024.pdf` erscheint samt Markierungen",
-"„Quellen exportieren“ lädt ein ZIP mit allen Dateien",
-"Beim Klonen von „Demo“ zeigt das neue Projekt den Hinweis „Quellen wurden nicht mitkopiert“ mit dem Knopf „Holen“",
-"Nutzer löscht eine zitierte Quelle: Ein Dialog nennt die Zahl der Zitate, nach Bestätigung zeigt der Prüfbericht „Quelle fehlt“",
-"Nach dem Hook `projectExpired` liegen keine Dateien des Projekts mehr im Daten-Volume",
-"Ein Mongo-Dump plus Rücksicherung stellt die Quellen wieder her, die Migration hat ein funktionierendes `down`"
-], "passes": false, "ui": true},
-{"id": "f6", "title": "Zitat markieren und einfügen", "steps": [
-"Nutzer markiert in der Vorschau den Satz auf S. 347 und klickt „Zitat speichern“: Das Zitat erscheint in der Liste",
-"Nutzer klickt im Editor an einer Stelle auf „Einfügen“ in einem biblatex-Projekt: Es entsteht `\\enquote{…} \\autocite[347]{smith2024}`",
-"Im natbib-Projekt entsteht `\\enquote{…} \\citep[S.~347]{smith2024}`",
-"`references.bib` enthält danach einen Eintrag mit Titel und DOI aus den Crossref-Daten des Fakes",
-"Ist das Dokument nicht beschreibbar, bleibt „Einfügen“ deaktiviert mit dem Hinweis „Keine Schreibrechte“",
-"Ein zweites Einfügen erzeugt keinen doppelten `.bib`-Eintrag"
-], "passes": false, "ui": true},
-{"id": "f7", "title": "Prüfbericht für das ganze Projekt", "steps": [
-"Ein Projekt mit Zitaten in zwei Dateien, verbunden über `\\input`, zeigt beide im Bericht",
-"Ein Zitat mit `[…]`-Auslassung, dessen Teile in der Quelle stehen, zeigt „Wortlaut: exakt“; ein eingefügtes Wort ohne Klammern zeigt „abweichend“",
-"Ein über eine Zeilentrennung laufendes Wort zeigt „Wortlaut: mit Trennungstoleranz“",
-"Eine Quelle mit bestätigtem Versatz zeigt „Seite: bestätigt“, `\\autocite[999]{smith2024}` zeigt „gefunden auf S. 347“, ohne Versatz steht „Seite nicht prüfbar“",
-"Für `retracted.pdf` zeigt der Bericht „Zurückgezogen“ rot; eine Korrektur zeigt „Korrektur vorhanden“; ohne Eintrag steht „Keine Meldung in Crossref“",
-"Ein DOI, den Crossref nicht kennt, zeigt „Referenz nicht gefunden“",
-"Eine nicht erkannte Form zeigt „Nicht prüfbar“; eine per Upload ersetzte `.tex`-Datei wird ebenfalls geprüft",
-"Der Filter „Nur Probleme“ blendet grüne Zeilen aus; die Prüfung läuft auf berührte Abschnitte begrenzt"
-], "passes": false, "ui": true},
-{"id": "f8", "title": "Token anlegen und Bot erhalten", "steps": [
-"Nutzer öffnet Einstellungen und „Claude verbinden“, klickt „Token erzeugen“: Das Token erscheint einmalig mit dem kopierbaren Befehl",
-"Mongo enthält nur den Hash; das Token gilt 90 Tage",
-"Der Bot „Claude (Name)“ existiert, ist kein Projektmitglied und erscheint nicht im Teilen-Dialog",
-"Widerruf: Ein Aufruf mit dem Token ergibt 401",
-"Ein abgelaufenes Token zeigt im Browser „Token abgelaufen, bitte erneuern“",
-"Beim Löschen des Kontos verschwinden Token und Bot"
-], "passes": false, "ui": true},
-{"id": "f9", "title": "MCP-Tools lesen Projekte und Quellen", "steps": [
-"`curl` mit Token listet per `tools/list` alle P1-Tools aus `docs/mcp-vertrag.md`",
-"Ohne Token kommt 401; mit ungültigem `Origin` kommt 403",
-"`doc_read` auf ein fremdes Projekt liefert `keine_rechte`",
-"`source_search` liefert Quelle, Seite und Position, keinen ganzen Absatz",
-"`check_report` entspricht dem Bericht im Browser",
-"Das Plugin in `plugins/spur` besteht `claude plugin validate`"
-], "passes": false, "ui": false},
-{"id": "f10", "title": "Aufträge erreichen Claude über die Inbox", "steps": [
-"Ohne Herzschlag zeigt der Editor „Claude nicht verbunden“ samt Startbefehl",
-"Der Fake-Client ruft die Inbox ab: Die Anzeige wechselt zu „Claude verbunden“",
-"Nutzer schreibt im Panel einen Auftrag: `events_since` liefert genau ein `task_created`, ein zweiter Abruf mit Cursor nichts",
-"`reply` des Fake-Clients erscheint im Panel",
-"Ein Bot sieht keine Ereignisse eines anderen Bots"
-], "passes": false, "ui": true},
-{"id": "f11", "title": "Claude schreibt als Track Change neben Live-Nutzern", "steps": [
-"Nutzer A hat das Dokument offen. Der Fake-Client ruft `doc_edit` auf: Der Text erscheint ohne Modal als Track Change von „Claude (A)“",
-"Tippt A dabei an anderer Stelle, bleiben beide Änderungen erhalten",
-"Stimmt der erwartete Alttext nicht, kommt `konflikt`",
-"Derselbe Idempotenz-Schlüssel erzeugt keine zweite Änderung",
-"Vor dem ersten Schreiben gibt es ein History-Label „Claude: Lauf“; die History zeigt die Herkunft „Claude“",
-"Ein gelöschtes Dokument liefert `doc_fehlt`; bei 1990 offenen Changes kommt `grenze_changes` und kein Client wird getrennt",
-"`doc_create` legt ein Dokument an, dessen Inhalt als Track Change erscheint"
-], "passes": false, "ui": true},
-{"id": "f12", "title": "Die Prüf-Sperre hält erfundene Zitate auf", "steps": [
-"`doc_edit` mit dem exakten Satz aus `smith2024.pdf` und `\\autocite[347]{smith2024}` gelingt",
-"Mit erfundenem Satz kommt `zitat_abweichend`, das Dokument bleibt unverändert",
-"Mit neuem Key ohne Quelle kommt `quelle_fehlt`",
-"Eine nicht erkannte Zitatform wird angenommen und auf der Lauf-Karte rot",
-"Liegt der Fehler in fremdem Text außerhalb des berührten Bereichs, wird Claude nicht blockiert"
-], "passes": false, "ui": true},
-{"id": "f13", "title": "Lauf-Karte zeigt, annehmen geht nur für Menschen", "steps": [
-"Nach zwei Änderungen zeigt die Karte Lauf, Dateien, Anzahl, Zusammenfassung",
-"Nutzer klickt „Alle annehmen“: Der Text ist übernommen, die Karte zeigt „Angenommen“",
-"Eine einzelne Annahme entfernt nur diese Zeile; in einen Claude-Einschub getippter Text bleibt erhalten",
-"`read`-Nutzer erhält beim POST auf Annehmen 403; `review`-Nutzer sieht keinen Knopf „Annehmen“",
-"In `tools/list` gibt es kein Tool zum Annehmen",
-"Ist eine Datei gelöscht, zeigt die Karte „Datei gelöscht“"
-], "passes": false, "ui": true},
-{"id": "f14", "title": "Claudes Lauf ablehnen", "steps": [
-"Nutzer klickt „Lauf ablehnen“ ohne geöffneten Editor: Der Originaltext ist wieder da",
-"Ein Einschub neben einer getrackten Löschung wird korrekt zurückgesetzt, ohne Doppeltext",
-"Eine veraltete Change-ID ist wirkungslos; ein gespaltener Einschub wird ganz abgelehnt, Nutzertext bleibt",
-"`review`-Nutzer lehnt Changes des eigenen Bots ab, fremde nicht"
-], "passes": false, "ui": true},
-{"id": "f15", "title": "Automatisch annehmen und Rücknahme angenommener Läufe", "steps": [
-"Nutzer schaltet im Browser „Automatisch annehmen“ ein: Nach `run_finish` ist ein grüner Lauf übernommen",
-"Ein Lauf mit roten Status bleibt offen mit „Bitte prüfen“",
-"Per Token lässt sich der Schalter nicht setzen; für `review`-Nutzer fehlt er",
-"„Lauf rückgängig“ erzeugt bei einem angenommenen Lauf neue Track Changes",
-"Bei Überschneidung mit späteren Edits zeigt die Karte „Konflikt in Zeile …“ und ändert nichts",
-"Die Karte erklärt beim Label als letzten Ausweg, dass die Wiederherstellung spätere Änderungen in der Datei verwirft"
-], "passes": false, "ui": true}
-]}
+{
+ "features": [
+  {
+   "id": "f1",
+   "title": "spur startet mit einem Befehl und trägt seinen eigenen Namen",
+   "steps": [
+    "In einem frischen Klon legt `make start` ein `.env` mit zufälligem `OVERLEAF_INVITE_TOKEN_SECRET` an, beim zweiten Start bleibt der Wert gleich",
+    "Betreiber führt `make start` aus und ruft http://localhost:8080/login auf: Der Seitentitel enthält „spur“, das Overleaf-Logo fehlt",
+    "Der Footer verlinkt https://github.com/ahlerjam/spur",
+    "`make e2e` läuft gegen den Stack und meldet Exit-Code 0 mit dem Fake-Server für Crossref",
+    "Ein Projekt mit biblatex, `style=apa`, csquotes und einer `.bib` kompiliert ohne Fehler zu einem PDF mit Literaturverzeichnis",
+    "Ein Projekt mit natbib kompiliert ebenfalls"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f2",
+   "title": "Eine gesäte Quelle läuft bis zum geprüften Zitat",
+   "steps": [
+    "`make seed` legt das Projekt „Demo“ mit `smith2024.pdf` an, `main.tex` enthält `\\enquote{Sleep supports the consolidation of declarative memory.} \\autocite[347]{smith2024}`",
+    "Nutzer öffnet „Demo“ und klickt in der Rail auf „Quellen“: Das Panel zeigt „smith2024.pdf“",
+    "Nutzer öffnet „Prüfbericht“: Die Zeile zeigt „Wortlaut: exakt“",
+    "Nutzer ändert im Editor „Sleep“ zu „Rest“: Nach der Prüfung zeigt die Zeile „Wortlaut: abweichend“ und der Text ist im Editor markiert",
+    "Eine Laufzeitmessung des Parsers für ein 2-MB-Dokument steht im Testprotokoll",
+    "Das Kompilieren erzeugt weiter ein PDF"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f3",
+   "title": "Quellen hochladen und ansehen",
+   "steps": [
+    "Ein leeres Projekt zeigt im Panel „Noch keine Quellen“",
+    "Nutzer lädt `smith2024.pdf` hoch: Die Zeile zeigt Dateiname, 8 Seiten und den Status „Text erkannt“",
+    "Nutzer klickt die Zeile: Die Vorschau zeigt Seite 1",
+    "Nutzer lädt `interview.vtt` hoch: Status „Text erkannt“, Fundstellen als Zeitmarken",
+    "Nutzer lädt `scan.pdf` hoch: Status „Kein Text, nicht prüfbar“",
+    "Eine Datei über 50 MB zeigt „Datei ist größer als 50 MB. Bitte verkleinern.“ und nichts wird gespeichert",
+    "Ein Compile nach dem Upload zeigt keinen vollen Sync durch die Quelle; Mitglieder mit `read` sehen die Vorschau, Nutzer mit Edit-Link können das PDF nicht herunterladen"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f4",
+   "title": "Quellen durchsuchen und Fassung festhalten",
+   "steps": [
+    "Nutzer sucht in „Quellen“ nach „declarative memory“: Der Treffer zeigt Datei und „S. 347“",
+    "Suche nach „xyzzy“ zeigt „Keine Treffer“",
+    "Nutzer trägt bei einer Quelle die Fassung „Preprint v1“ ein: Der Wert bleibt nach dem Neuladen erhalten",
+    "Mit 300 gesäten Quellen bleibt die Liste bedienbar, und die Suche antwortet in unter 2 Sekunden"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f5",
+   "title": "Quellen übernehmen, exportieren und löschen",
+   "steps": [
+    "Nutzer klickt „Aus anderem Projekt holen“ und wählt „Demo“: `smith2024.pdf` erscheint samt Markierungen",
+    "„Quellen exportieren“ lädt ein ZIP mit allen Dateien",
+    "Beim Klonen von „Demo“ zeigt das neue Projekt den Hinweis „Quellen wurden nicht mitkopiert“ mit dem Knopf „Holen“",
+    "Nutzer löscht eine zitierte Quelle: Ein Dialog nennt die Zahl der Zitate, nach Bestätigung zeigt der Prüfbericht „Quelle fehlt“",
+    "Nach dem Hook `projectExpired` liegen keine Dateien des Projekts mehr im Daten-Volume",
+    "Ein Mongo-Dump plus Rücksicherung stellt die Quellen wieder her, die Migration hat ein funktionierendes `down`"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f6",
+   "title": "Zitat markieren und einfügen",
+   "steps": [
+    "Nutzer markiert in der Vorschau den Satz auf S. 347 und klickt „Zitat speichern“: Das Zitat erscheint in der Liste",
+    "Nutzer klickt im Editor an einer Stelle auf „Einfügen“ in einem biblatex-Projekt: Es entsteht `\\enquote{…} \\autocite[347]{smith2024}`",
+    "Im natbib-Projekt entsteht `\\enquote{…} \\citep[S.~347]{smith2024}`",
+    "`references.bib` enthält danach einen Eintrag mit Titel und DOI aus den Crossref-Daten des Fakes",
+    "Ist das Dokument nicht beschreibbar, bleibt „Einfügen“ deaktiviert mit dem Hinweis „Keine Schreibrechte“",
+    "Ein zweites Einfügen erzeugt keinen doppelten `.bib`-Eintrag"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f7",
+   "title": "Prüfbericht für das ganze Projekt",
+   "steps": [
+    "Ein Projekt mit Zitaten in zwei Dateien, verbunden über `\\input`, zeigt beide im Bericht",
+    "Ein Zitat mit `[…]`-Auslassung, dessen Teile in der Quelle stehen, zeigt „Wortlaut: exakt“; ein eingefügtes Wort ohne Klammern zeigt „abweichend“",
+    "Ein über eine Zeilentrennung laufendes Wort zeigt „Wortlaut: mit Trennungstoleranz“",
+    "Eine Quelle mit bestätigtem Versatz zeigt „Seite: bestätigt“, `\\autocite[999]{smith2024}` zeigt „gefunden auf S. 347“, ohne Versatz steht „Seite nicht prüfbar“",
+    "Für `retracted.pdf` zeigt der Bericht „Zurückgezogen“ rot; eine Korrektur zeigt „Korrektur vorhanden“; ohne Eintrag steht „Keine Meldung in Crossref“",
+    "Ein DOI, den Crossref nicht kennt, zeigt „Referenz nicht gefunden“",
+    "Eine nicht erkannte Form zeigt „Nicht prüfbar“; eine per Upload ersetzte `.tex`-Datei wird ebenfalls geprüft",
+    "Der Filter „Nur Probleme“ blendet grüne Zeilen aus; die Prüfung läuft auf berührte Abschnitte begrenzt"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f8",
+   "title": "Token anlegen und Bot erhalten",
+   "steps": [
+    "Nutzer öffnet Einstellungen und „Claude verbinden“, klickt „Token erzeugen“: Das Token erscheint einmalig mit dem kopierbaren Befehl",
+    "Mongo enthält nur den Hash; das Token gilt 90 Tage",
+    "Der Bot „Claude (Name)“ existiert, ist kein Projektmitglied und erscheint nicht im Teilen-Dialog",
+    "Widerruf: Ein Aufruf mit dem Token ergibt 401",
+    "Ein abgelaufenes Token zeigt im Browser „Token abgelaufen, bitte erneuern“",
+    "Beim Löschen des Kontos verschwinden Token und Bot"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f9",
+   "title": "MCP-Tools lesen Projekte und Quellen",
+   "steps": [
+    "`curl` mit Token listet per `tools/list` alle P1-Tools aus `docs/mcp-vertrag.md`",
+    "Ohne Token kommt 401; mit ungültigem `Origin` kommt 403",
+    "`doc_read` auf ein fremdes Projekt liefert `keine_rechte`",
+    "`source_search` liefert Quelle, Seite und Position, keinen ganzen Absatz",
+    "`check_report` entspricht dem Bericht im Browser",
+    "Das Plugin in `plugins/spur` besteht `claude plugin validate`"
+   ],
+   "passes": false,
+   "ui": false
+  },
+  {
+   "id": "f10",
+   "title": "Aufträge erreichen Claude über die Inbox",
+   "steps": [
+    "Ohne Herzschlag zeigt der Editor „Claude nicht verbunden“ samt Startbefehl",
+    "Der Fake-Client ruft `wait_for_event` auf: Die Anzeige wechselt zu „Claude verbunden“; bricht er ab, wechselt sie binnen 60 Sekunden zurück",
+    "Nutzer schreibt im Panel einen Auftrag: `events_since` liefert genau ein `task_created`, ein zweiter Abruf mit Cursor nichts",
+    "Wartet der Fake-Client in `wait_for_event`, liefert ein Auftrag im Panel das Ergebnis in unter 2 Sekunden, und währenddessen kommt alle 30 Sekunden eine Fortschrittsmeldung",
+    "`reply` des Fake-Clients erscheint im Panel",
+    "Ein Bot sieht keine Ereignisse eines anderen Bots"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f11",
+   "title": "Claude schreibt als Track Change neben Live-Nutzern",
+   "steps": [
+    "Nutzer A hat das Dokument offen. Der Fake-Client ruft `doc_edit` auf: Der Text erscheint ohne Modal als Track Change von „Claude (A)“",
+    "Tippt A dabei an anderer Stelle, bleiben beide Änderungen erhalten",
+    "Stimmt der erwartete Alttext nicht, kommt `konflikt`",
+    "Derselbe Idempotenz-Schlüssel erzeugt keine zweite Änderung",
+    "Vor dem ersten Schreiben gibt es ein History-Label „Claude: Lauf“; die History zeigt die Herkunft „Claude“",
+    "Ein gelöschtes Dokument liefert `doc_fehlt`; bei 1990 offenen Changes kommt `grenze_changes` und kein Client wird getrennt",
+    "`doc_create` legt ein Dokument an, dessen Inhalt als Track Change erscheint"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f12",
+   "title": "Die Prüf-Sperre hält erfundene Zitate auf",
+   "steps": [
+    "`doc_edit` mit dem exakten Satz aus `smith2024.pdf` und `\\autocite[347]{smith2024}` gelingt",
+    "Mit erfundenem Satz kommt `zitat_abweichend`, das Dokument bleibt unverändert",
+    "Mit neuem Key ohne Quelle kommt `quelle_fehlt`",
+    "Eine nicht erkannte Zitatform wird angenommen und auf der Lauf-Karte rot",
+    "Liegt der Fehler in fremdem Text außerhalb des berührten Bereichs, wird Claude nicht blockiert"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f13",
+   "title": "Lauf-Karte zeigt, annehmen geht nur für Menschen",
+   "steps": [
+    "Nach zwei Änderungen zeigt die Karte Lauf, Dateien, Anzahl, Zusammenfassung",
+    "Nutzer klickt „Alle annehmen“: Der Text ist übernommen, die Karte zeigt „Angenommen“",
+    "Eine einzelne Annahme entfernt nur diese Zeile; in einen Claude-Einschub getippter Text bleibt erhalten",
+    "`read`-Nutzer erhält beim POST auf Annehmen 403; `review`-Nutzer sieht keinen Knopf „Annehmen“",
+    "In `tools/list` gibt es kein Tool zum Annehmen",
+    "Ist eine Datei gelöscht, zeigt die Karte „Datei gelöscht“"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f14",
+   "title": "Claudes Lauf ablehnen",
+   "steps": [
+    "Nutzer klickt „Lauf ablehnen“ ohne geöffneten Editor: Der Originaltext ist wieder da",
+    "Ein Einschub neben einer getrackten Löschung wird korrekt zurückgesetzt, ohne Doppeltext",
+    "Eine veraltete Change-ID ist wirkungslos; ein gespaltener Einschub wird ganz abgelehnt, Nutzertext bleibt",
+    "`review`-Nutzer lehnt Changes des eigenen Bots ab, fremde nicht"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f15",
+   "title": "Automatisch annehmen und Rücknahme angenommener Läufe",
+   "steps": [
+    "Nutzer schaltet im Browser „Automatisch annehmen“ ein: Nach `run_finish` ist ein grüner Lauf übernommen",
+    "Ein Lauf mit roten Status bleibt offen mit „Bitte prüfen“",
+    "Per Token lässt sich der Schalter nicht setzen; für `review`-Nutzer fehlt er",
+    "„Lauf rückgängig“ erzeugt bei einem angenommenen Lauf neue Track Changes",
+    "Bei Überschneidung mit späteren Edits zeigt die Karte „Konflikt in Zeile …“ und ändert nichts",
+    "Die Karte erklärt beim Label als letzten Ausweg, dass die Wiederherstellung spätere Änderungen in der Datei verwirft"
+   ],
+   "passes": false,
+   "ui": true
+  }
+ ]
+}

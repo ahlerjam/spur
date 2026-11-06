@@ -19,7 +19,7 @@ Chat: nicht verbunden, wartet, antwortet, lange Unterhaltung. Vorschläge: aus, 
 
 ## Decisions
 - Es gelten `docs/adr`, `docs/mcp-vertrag.md` und die Entscheidungen aus P1 und P2.
-- Der Weckweg ist das Ergebnis von Lauf 0. Gibt es keinen Sofort-Weg, läuft der Chat über die Inbox mit dem Hinweis „Claude liest beim nächsten Abruf“.
+- Weckweg ist `wait_for_event` aus P1. Ein Channel ist nicht nötig.
 - Nur zwei Schalter: Compile-Fehler und belegloses Argument, je Aus oder Vorschlag, Standard Aus, pro Nutzer mit Projekt-Standard. Keine Stufe Auto. Weitere Schalter stehen in `docs/backlog.md`.
 - Auslöser: 60 Sekunden Tipp-Pause oder Kompilieren. Standardlimit 50 pro Tag, einstellbar.
 - Vorschläge liegen nur im Panel. Übernehmen startet einen normalen Lauf.

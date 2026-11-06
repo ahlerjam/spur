@@ -36,4 +36,3 @@ Zurückgestellt, nicht verworfen. Vor neuen Plänen hier nachsehen.
 - Link-Resolver für TIB und LUH
 - Marken- und Logo-Regeln von Overleaf für Forks; rechtlich prüfen lassen
 - Consumer Terms Abschnitt 11 für EWR-Nutzer in der Hochschulforschung
-- biber auf arm64
