@@ -76,6 +76,13 @@ RUN mkdir /install-tl-unx \
       synctex \
       etoolbox \
       xetex \
+      biblatex \
+      biber \
+      biblatex-apa \
+      csquotes \
+      natbib \
+      beamer \
+      latexdiff \
 &&  tlmgr path add \
 &&  rm -rf /install-tl-unx
 
