@@ -23,6 +23,7 @@ jobs:
     env:
       BASE: ghcr.io/${{ github.repository_owner }}/spur-base:dev-${{ matrix.arch }}
       IMAGE: ghcr.io/${{ github.repository_owner }}/spur:dev-${{ matrix.arch }}
+      DEV: ghcr.io/${{ github.repository_owner }}/spur-dev:${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -49,9 +50,20 @@ jobs:
           '
       - name: Image bauen
         run: time docker build --progress=plain -f server-ce/Dockerfile --build-arg OVERLEAF_BASE_TAG="$BASE" -t "$IMAGE" .
+      - name: Entwicklungs-Image bauen
+        run: time docker build --progress=plain -f server-ce/Dockerfile-dev --build-arg SPUR_IMAGE="$IMAGE" -t "$DEV" .
+      - name: Frontend-Build im Entwicklungs-Image messen
+        run: |
+          docker run --rm --network none "$DEV" bash -lc '
+            set -e
+            cd /overleaf/services/web
+            time yarn run lezer-latex:generate
+            time yarn run webpack:production
+          '
       - name: Größe melden
         run: docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep spur
       - name: Veröffentlichen
         run: |
           docker push "$BASE"
           docker push "$IMAGE"
+          docker push "$DEV"
