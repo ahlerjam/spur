@@ -1,0 +1,31 @@
+{"features": [
+{"id": "f1", "title": "Mit Claude im Editor sprechen", "steps": [
+"Ohne Verbindung zeigt das Panel „Claude nicht verbunden“ samt Startbefehl und kein Eingabefeld",
+"Mit Fake-Client schreibt der Nutzer „Fasse Abschnitt 2 zusammen“: Die Nachricht landet per `events_since` beim Client",
+"Die `reply`-Antwort erscheint im Panel",
+"Schreibt der Fake-Client dabei, erscheint die Lauf-Karte im Chat",
+"100 Nachrichten bleiben flüssig bedienbar, nach dem Neuladen ist der Verlauf da"
+], "passes": false, "ui": true},
+{"id": "f2", "title": "Claude an einer Textstelle rufen", "steps": [
+"Nutzer A kommentiert „@claude prüfe diese Aussage“: Der Bot von A erhält `comment_mention` mit Dokument, Stelle und Kommentar-ID",
+"Der Bot von B erhält nichts",
+"`reply` erscheint im selben Thread als „Claude (A)“",
+"Der Text eines Kommentars von B erscheint nicht im Ereignis"
+], "passes": false, "ui": true},
+{"id": "f3", "title": "Zwei Schalter pro Nutzer und Projekt", "steps": [
+"Einstellungen zeigen „Compile-Fehler“ und „Belegloses Argument“, beide auf Aus",
+"Der Projekt-Standard gilt für neue Mitglieder, die eigene Einstellung überschreibt ihn",
+"Ein Fehler-Compile mit Schalter Aus erzeugt kein Ereignis, mit Vorschlag genau ein `suggest_trigger`"
+], "passes": false, "ui": true},
+{"id": "f4", "title": "Vorschläge im Seitenpanel mit Limit", "steps": [
+"`suggest` des Fake-Clients erscheint als Karte im Panel, der Text bleibt unverändert",
+"„Übernehmen“ startet einen Lauf, „Verwerfen“ entfernt die Karte",
+"Mit `SPUR_NOW` und Limit 2 erzeugt der dritte Auslöser kein Ereignis, das Panel zeigt „Tageslimit erreicht“",
+"60 Sekunden Tipp-Pause lösen genau ein Ereignis aus"
+], "passes": false, "ui": true},
+{"id": "f5", "title": "Fertige Workflows starten", "steps": [
+"Das Plugin enthält die Skills `/spur:literaturueberblick`, `/spur:methodenteil`, `/spur:folien` und besteht `claude plugin validate`",
+"Im Panel listet „Workflows“ dieselben drei Einträge, ein Klick legt den Auftrag in die Inbox",
+"Der Fake-Client erhält den Auftrag mit dem Skill-Namen"
+], "passes": false, "ui": true}
+]}
