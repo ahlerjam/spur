@@ -1,0 +1,63 @@
+{"features": [
+{"id": "f1", "title": "Paper zu einem Thema finden", "steps": [
+"Nutzer sucht im Panel „Recherche“ nach „sleep memory consolidation“: Treffer mit Titel, Autoren, Jahr, Quelle des Treffers",
+"`paper_search` liefert dieselben DOIs",
+"Fällt der Fake für Semantic Scholar aus, zeigt das Panel „Semantic Scholar nicht erreichbar“ und die übrigen Treffer",
+"Zwei schnelle arXiv-Suchen liegen im Fake-Protokoll mindestens 3 Sekunden auseinander",
+"Ohne Treffer steht „Keine Treffer“"
+], "passes": false, "ui": true},
+{"id": "f2", "title": "Zitationen folgen und Suche dokumentieren", "steps": [
+"Nutzer klickt bei einem Treffer „Zitiert von“ und „Zitiert“: Beide Listen erscheinen",
+"„Suchprotokoll“ listet Datum, Datenbank, Anfrage und Trefferzahl",
+"„Protokoll exportieren“ lädt eine CSV mit diesen Spalten",
+"`paper_citations` liefert dieselben DOIs"
+], "passes": false, "ui": true},
+{"id": "f3", "title": "Paper per DOI aufnehmen", "steps": [
+"Nutzer klickt „Aufnehmen“ bei einem Open-Access-Treffer: Quelle mit PDF erscheint, `.bib` enthält den Eintrag",
+"Ein zweites Aufnehmen meldet „Bereits vorhanden“",
+"Für einen arXiv-Treffer ohne Lizenz zur Weitergabe bleibt der Volltext auf das Projekt des Nutzers beschränkt",
+"`source_add` mit unbekannter DOI meldet „DOI nicht gefunden“"
+], "passes": false, "ui": true},
+{"id": "f4", "title": "Beschaffungsliste für nicht freie Paper", "steps": [
+"Nutzer klickt „Auf die Beschaffungsliste“ bei einem nicht freien Treffer: Der Eintrag zeigt „Offen“",
+"Der Link folgt der eingestellten Vorlage, zum Beispiel `https://bibliothek.example/?doi={doi}`",
+"Export liefert `.bib`, `.ris` und CSV mit denselben DOIs",
+"Nutzer lädt das PDF hoch: Es wird per DOI zugeordnet und der Eintrag zeigt „Beschafft“",
+"Findet spur keine DOI im PDF, wählt der Nutzer den Eintrag per Hand"
+], "passes": false, "ui": true},
+{"id": "f5", "title": "Bestand aus Zotero und Ordnern importieren", "steps": [
+"Nutzer importiert eine Zotero-Sammlung: Einträge erscheinen mit den vorhandenen Keys",
+"Nutzer wählt mehrere PDFs auf einmal: Alle erscheinen mit Status, Fehlschläge einzeln benannt",
+"Ein erneuter Import erzeugt keine Dubletten"
+], "passes": false, "ui": true},
+{"id": "f6", "title": "Notizen und Literaturmatrix", "steps": [
+"Nutzer schreibt eine Notiz zu Quelle und Zitat: Sie bleibt nach dem Neuladen erhalten",
+"Die Matrix zeigt Quellen als Zeilen und frei wählbare Spalten",
+"Der Fake-Client füllt eine Zelle per Tool als Vorschlag, der Nutzer bestätigt sie",
+"Export liefert CSV; 300 Zeilen bleiben bedienbar"
+], "passes": false, "ui": true},
+{"id": "f7", "title": "Claude sieht das echte Compile-Ergebnis", "steps": [
+"`compile` liefert ein Job-Handle, `job_status` meldet „fertig“",
+"`compile_log` liefert die Fehlerzeile eines kaputten Dokuments",
+"`page_image` liefert Seite 2 als PNG",
+"Ein Beamer-Projekt aus dem Fake-Client kompiliert zu Folien mit LaTeX-Quelltext"
+], "passes": false, "ui": false},
+{"id": "f8", "title": "Zahlen kommen aus ergebnisse.tex", "steps": [
+"Der Fake-Client legt `ergebnisse.tex` mit `\\newcommand{\\nGesamt}{412}` an: Der Inhalt erscheint als Track Change",
+"Im PDF steht nach `\\nGesamt` die Zahl 412",
+"Schreibt der Fake-Client „412 Personen“ im Fließtext, zeigt die Lauf-Karte „Zahl ohne Beleg“",
+"Jahreszahlen, Seitenzahlen und Mathe lösen keine Warnung aus"
+], "passes": false, "ui": true},
+{"id": "f9", "title": "KI-Nutzung offenlegen", "steps": [
+"Nutzer klickt „KI-Offenlegung“: Der Text nennt Läufe, Zweck, Dateien und angenommene Anteile",
+"Der Text lässt sich kopieren und als `.tex`-Abschnitt einfügen",
+"Ohne Läufe steht „Keine KI-Nutzung protokolliert“"
+], "passes": false, "ui": true},
+{"id": "f10", "title": "Semantische Suche einschalten", "steps": [
+"Ohne Schalter gibt es keinen Hinweis auf semantische Suche und kein Modell im Volume",
+"Mit `SPUR_SEMANTIC_SEARCH=true` und `SPUR_FAKE_EMBEDDINGS=1` zeigt das Panel den Fortschritt „Indexiert 3 von 8 Seiten“",
+"Eine sinngemäße Suche findet die Passage in `smith2024.pdf`",
+"Treffer ändern den Prüfstatus nicht",
+"Ausschalten lässt die Stichwortsuche unverändert"
+], "passes": false, "ui": true}
+]}
