@@ -54,7 +54,7 @@ jobs:
         run: time docker build --progress=plain -f server-ce/Dockerfile-dev --build-arg SPUR_IMAGE="$IMAGE" -t "$DEV" .
       - name: Frontend-Build im Entwicklungs-Image messen
         run: |
-          docker run --rm --network none "$DEV" bash -lc '
+          docker run --rm --network none --entrypoint bash "$DEV" -lc '
             set -e
             cd /overleaf/services/web
             time yarn run lezer-latex:generate
