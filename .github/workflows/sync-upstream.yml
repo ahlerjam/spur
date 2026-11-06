@@ -1,0 +1,55 @@
+# Holt neue Commits von overleaf-cep nach ext-ce und schlägt sie per Pull Request vor.
+# spur selbst wird nie automatisch verändert.
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Ziel-Branch des Pull Requests
+        default: spur
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      BASE: ${{ inputs.base || 'spur' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ext-ce
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: ext-ce auf den Stand von overleaf-cep bringen
+        run: |
+          git fetch origin "$BASE"
+          git fetch https://github.com/yu-i-i/overleaf-cep.git ext-ce
+          git merge --ff-only FETCH_HEAD
+          git push origin ext-ce
+
+      - name: Pull Request öffnen, falls etwas neu ist
+        run: |
+          new=$(git rev-list --count "origin/$BASE..ext-ce")
+          echo "Neue Commits gegenüber $BASE: $new"
+          if [ "$new" -eq 0 ]; then
+            exit 0
+          fi
+          open=$(gh pr list -R "$GITHUB_REPOSITORY" --base "$BASE" --head ext-ce --state open --json number --jq length)
+          if [ "$open" -gt 0 ]; then
+            echo "Pull Request ist bereits offen."
+            exit 0
+          fi
+          gh pr create -R "$GITHUB_REPOSITORY" --base "$BASE" --head ext-ce \
+            --title "Update von overleaf-cep ($new Commits)" \
+            --body "Neue Commits aus yu-i-i/overleaf-cep. Vor dem Übernehmen Tests und Installation prüfen."
