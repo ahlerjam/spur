@@ -1,0 +1,57 @@
+# Baut das spur-Image für beide Architekturen und prüft die TeX-Umgebung.
+name: Dev image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    env:
+      BASE: ghcr.io/${{ github.repository_owner }}/spur-base:dev-${{ matrix.arch }}
+      IMAGE: ghcr.io/${{ github.repository_owner }}/spur:dev-${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Basis bauen
+        run: |
+          cp server-ce/.dockerignore .dockerignore
+          time docker build --progress=plain -f server-ce/Dockerfile-base -t "$BASE" .
+      - name: TeX-Umgebung prüfen
+        run: |
+          docker run --rm "$BASE" bash -lc '
+            set -e
+            for f in biblatex.sty apa.bbx csquotes.sty natbib.sty beamer.cls; do
+              kpsewhich "$f"
+            done
+            biber --version
+            latexdiff --version
+            pdftotext -v 2>&1 | head -1
+          '
+      - name: Image bauen
+        run: time docker build --progress=plain -f server-ce/Dockerfile --build-arg OVERLEAF_BASE_TAG="$BASE" -t "$IMAGE" .
+      - name: Größe melden
+        run: docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep spur
+      - name: Veröffentlichen
+        run: |
+          docker push "$BASE"
+          docker push "$IMAGE"
