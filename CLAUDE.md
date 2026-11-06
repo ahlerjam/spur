@@ -4,8 +4,15 @@ Agentische Schreibumgebung für wissenschaftliche Arbeiten auf Basis von Overlea
 
 ## Befehle
 
-- Start: `make start`
-- Tests: `make test`
-- Lint: `make lint`
+- Stack starten: `spur-dev up`, stoppen: `spur-dev down`, zurücksetzen: `spur-dev reset`
+- Nach Änderungen am Frontend: `spur-dev reload` (Webpack ohne Netz, dann Neustart)
+- Nach Änderungen am Backend: `spur-dev restart`
+- Unit-Tests: `spur-dev test`
+- Testkonto: `spur-dev user mail@example.org` liefert den Aktivierungslink
+- Logs: `spur-dev logs 100`
 
-Die Targets sind Platzhalter, bis das erste Feature sie füllt.
+`spur-dev` liegt außerhalb des Repos und hängt den aktuellen Worktree in das Image `ghcr.io/ahlerjam/spur-dev` ein.
+
+Neue npm-Pakete brauchen einen neuen Lauf des Workflows `Dev image`. In einem Builder-Lauf sind sie ein Stoppgrund.
+
+Testartefakte, Screenshots und Hilfsskripte gehören nicht ins Repo.
