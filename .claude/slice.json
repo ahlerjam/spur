@@ -1,0 +1,21 @@
+{
+  "agentBranch": "agent",
+  "testCommand": "make test",
+  "startCommand": "make start",
+  "maxTurns": 400,
+  "allowedDomains": [
+    "github.com",
+    "codeload.github.com",
+    "export.arxiv.org",
+    "api.crossref.org",
+    "api.openalex.org",
+    "api.semanticscholar.org",
+    "registry-1.docker.io",
+    "auth.docker.io",
+    "production.cloudflare.docker.com",
+    "api.unpaywall.org",
+    "ghcr.io",
+    "pkg-containers.githubusercontent.com"
+  ],
+  "changelogDoc": "https://claude.ai/artifact/XYXcQgkJbtPQzsGgJbqBhe"
+}
