@@ -10,6 +10,26 @@ export function grundAusFehler(fehler) {
   return ersteZeile(fehler).slice(0, 200) || 'Ohne Fehlermeldung gescheitert.'
 }
 
+const normal = datei => datei.replace(/^\.\//, '').replace(/\/$/, '')
+
+// Dateiargumente vor dem Lauf: ein Tippfehler darf nicht als „0 bestanden, neu: 0“ grün durchgehen.
+export function dateienPruefen(suite, dateien, existiert, ausgeschlossen) {
+  const fehler = []
+  for (const d of dateien.map(normal)) {
+    if (!existiert(d)) fehler.push(`${d}: nicht gefunden (Pfad relativ zum Dienst)`)
+    else if (ausgeschlossen.some(a => a.suite === suite && a.datei === d)) fehler.push(`${d}: ist ausgeschlossen (tools/tests/upstream-ausschluss.json)`)
+    else if (suite === 'du' && !/^test\/(unit|acceptance)\//.test(d)) {
+      fehler.push(`${d}: liegt nicht unter test/unit/ oder test/acceptance/`)
+    }
+  }
+  return fehler
+}
+
+// Dateiargumente (auch Ordner), zu denen nach dem Lauf kein einziger Test gehört.
+export function dateienOhneTests(dateien, tests) {
+  return dateien.map(normal).filter(d => !tests.some(t => t.datei === d || t.datei.startsWith(`${d}/`)))
+}
+
 export function auswerten(tests, bekannt) {
   const bekanntIndex = new Set(bekannt.map(schluessel))
   const fehlgeschlagen = tests.filter(t => t.status === 'failed')

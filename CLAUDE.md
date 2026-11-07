@@ -8,7 +8,7 @@ Agentische Schreibumgebung für wissenschaftliche Arbeiten auf Basis von Overlea
 - Nach Änderungen am Frontend: `spur-dev reload` (Webpack ohne Netz, dann Neustart)
 - Nach Änderungen am Backend: `spur-dev restart`
 - Unit-Tests: `spur-dev test` (mit Abdeckungsbericht, Schwelle 80 % der Zeilen)
-- Overleafs Suiten: `spur-dev upstream web|frontend|du|alle`, einzelne Dateien als weitere Argumente (Pfad relativ zum Dienst). Ausgabe endet mit „bestanden, fehlgeschlagen, bekannt, neu“; Exit 1 nur bei neuen Fehlern
+- Overleafs Suiten: `spur-dev upstream web|frontend|du|alle`, einzelne Dateien als weitere Argumente (Pfad relativ zum Dienst). Ausgabe endet mit „bestanden, fehlgeschlagen, bekannt, neu“; Exit 1 nur bei neuen Fehlern, Exit 2, wenn eine angegebene Datei fehlt, ausgeschlossen ist oder keine Tests enthält, oder wenn gar kein Test läuft
 - Dreier-Vergleich `main`, `ext-ce`, aktueller Stand: `spur-dev upstream vergleich` schreibt `tools/tests/upstream-bekannt.json` neu (etwa 40 Minuten). Ausschlüsse mit Grund in `tools/tests/upstream-ausschluss.json`
 - Tests der Auswertung: `node --test tools/tests/upstream-auswertung.test.mjs`
 - Testkonto: `spur-dev user mail@example.org` liefert den Aktivierungslink. Das Konto ist Admin; Rechteprüfungen brauchen Konten ohne Admin.

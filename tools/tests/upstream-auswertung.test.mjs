@@ -1,7 +1,7 @@
 // node --test tools/tests
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { auswerten, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
+import { auswerten, dateienOhneTests, dateienPruefen, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
 
 const t = (datei, name, status, fehler = '') => ({ suite: 'web', datei, test: name, status, fehler })
 const b = (datei, name, herkunft = 'overleaf', grund = 'Grund.') => ({ suite: 'web', datei, test: name, herkunft, grund })
@@ -62,4 +62,22 @@ test('Grund aus bekanntem Fehlerbild, sonst erste Fehlerzeile', () => {
   const { liste } = herkunftBestimmen(agent, agent, agent, [])
   assert.match(liste[0].grund, /^[^\n]+$/)
   assert.equal(liste[1].grund, 'AssertionError: expected 1 to equal 2')
+})
+
+test('Dateiargumente: fehlende, ausgeschlossene und bei du falsch abgelegte Dateien sind Fehler', () => {
+  const da = new Set(['test/unit/src/a.test.mjs', 'test/unit/src/b.test.mjs', 'test/unit/js/x.js', 'app/js/y.js'])
+  const existiert = d => da.has(d)
+  const aus = [{ suite: 'web', datei: 'test/unit/src/b.test.mjs', grund: 'Pro.' }]
+  assert.deepEqual(dateienPruefen('web', ['test/unit/src/a.test.mjs'], existiert, aus), [])
+  assert.deepEqual(dateienPruefen('web', ['./test/unit/src/a.test.mjs'], existiert, aus), [])
+  assert.match(dateienPruefen('web', ['test/unit/src/fehlt.test.mjs'], existiert, aus)[0], /fehlt\.test\.mjs.*nicht gefunden/)
+  assert.match(dateienPruefen('web', ['test/unit/src/b.test.mjs'], existiert, aus)[0], /ausgeschlossen/)
+  assert.deepEqual(dateienPruefen('du', ['test/unit/js/x.js'], existiert, []), [])
+  assert.match(dateienPruefen('du', ['app/js/y.js'], existiert, [])[0], /test\/unit\/ oder test\/acceptance\//)
+})
+
+test('Dateiargumente ohne gelaufene Tests werden gemeldet, auch Ordner', () => {
+  const tests = [t('test/unit/src/a.test.mjs', 'x', 'passed'), t('test/unit/src/sub/c.test.mjs', 'y', 'passed')]
+  assert.deepEqual(dateienOhneTests(['test/unit/src/a.test.mjs', 'test/unit/src/sub/', 'app/src/z.mjs'], tests), ['app/src/z.mjs'])
+  assert.deepEqual(dateienOhneTests([], []), [])
 })

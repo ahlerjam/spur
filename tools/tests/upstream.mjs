@@ -5,7 +5,14 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { auswerten, ersteZeile, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
+import {
+  auswerten,
+  dateienOhneTests,
+  dateienPruefen,
+  ersteZeile,
+  herkunftBestimmen,
+  zusammenfassung,
+} from './upstream-auswertung.mjs'
 
 const HIER = path.dirname(new URL(import.meta.url).pathname)
 const BEKANNT = path.join(HIER, 'upstream-bekannt.json')
@@ -155,11 +162,23 @@ function minuten(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
+// Exit 2 heißt: nichts Verwertbares gelaufen. Das darf nie wie ein grüner Lauf aussehen.
+function abbrechen(suite, meldungen) {
+  for (const m of meldungen) console.error(`${suite}: FEHLER: ${m}`)
+  return 2
+}
+
 function suiteLaufen(suite) {
   const start = Date.now()
   const ausgeschlossen = lesenOder(AUSSCHLUSS, []).filter(a => a.suite === suite)
+  const basis = suite === 'du' ? DU : WEB
+  const falsch = dateienPruefen(suite, dateien, d => fs.existsSync(path.join(basis, d)), ausgeschlossen)
+  if (falsch.length) return abbrechen(suite, falsch)
   const tests = SUITEN[suite](ausgeschlossen)
   fs.writeFileSync(path.join(ergebnisOrdner, `${suite}.json`), JSON.stringify(tests, null, 1))
+  if (tests.length === 0) return abbrechen(suite, ['kein einziger Test gelaufen'])
+  const ohneTests = dateienOhneTests(dateien, tests)
+  if (ohneTests.length) return abbrechen(suite, ohneTests.map(d => `${d}: enthält keine Tests dieser Suite`))
   if (nurErgebnis) {
     console.log(`${suite}: ${tests.length} Tests in ${minuten(Date.now() - start)} min`)
     return 0
