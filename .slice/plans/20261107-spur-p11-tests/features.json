@@ -12,7 +12,7 @@
  {"id": "f3", "title": "document-updater vollständig geprüft", "steps": [
   "Entwickler führt `spur-dev upstream du` aus: Unit- und Acceptance-Tests des document-updater laufen gegen Redis und Mongo des Stacks",
   "Die Tests des spur-Ops-Endpunkts sind darin enthalten und grün",
-  "Die Ausgabe endet mit der Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“"]},
+  "Die Ausgabe endet mit der Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“"], "passes": true},
  {"id": "f4", "title": "Dreier-Vergleich und Liste bekannter Fehler", "steps": [
   "Entwickler führt den Vergleich aus: dieselben Suiten laufen auf Worktrees von `main`, `ext-ce` und `agent`",
   "Im Repo liegt danach die Liste bekannter Fehler; jeder Eintrag nennt Suite, Datei, Testname, Herkunft (`overleaf` oder `overleaf-cep`) und einen Grund",

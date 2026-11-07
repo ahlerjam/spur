@@ -9,5 +9,7 @@
 - Ausschluss ganzer Dateien nur, wenn sie Module oder Dateien aus Overleaf Server Pro/SaaS brauchen (`tools/tests/upstream-ausschluss.json`). Dateien, die nur in overleaf-cep scheitern (zum Beispiel ein Syntaxfehler in `LinkedFilesController.test.mjs`), stehen als bekannte Fehler auf der Liste.
 - `externalAuth` undefined ist kein Umgebungsfehler: overleaf-cep liest in `UserPagesController` `req.user.externalAuth`, die Tests setzen kein `req.user`. Steht mit Herkunft `overleaf-cep` auf der Liste und erscheint deshalb nicht mehr in der Ausgabe.
 
+- f3: „gegen Redis und Mongo des Stacks“ heißt hier: Mongo des Stacks (Datenbank `test-overleaf`) und die Redis `redis-test` aus derselben Compose-Datei. Die spur-Ops-Tests (`HttpController spurUpdate …`, 3 Tests) laufen in der Unit-Suite mit und sind grün; Ergebnis 784 bestanden, 0 fehlgeschlagen.
+
 ## Prüfbefehle (E2E der CLI-Features)
 Jeder als alleinstehender Aufruf: `spur-dev upstream web`, `spur-dev upstream frontend`, `spur-dev upstream du`, `spur-dev upstream vergleich`, `spur-dev test`, `node --test tools/tests/upstream-auswertung.test.mjs`. Die Browser-Suite bleibt `services/web/modules/spur/test/e2e/spur-e2e.js`.
