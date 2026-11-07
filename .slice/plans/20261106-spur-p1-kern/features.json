@@ -52,7 +52,7 @@
     "Nutzer trägt bei einer Quelle die Fassung „Preprint v1“ ein: Der Wert bleibt nach dem Neuladen erhalten",
     "Mit 300 gesäten Quellen bleibt die Liste bedienbar, und die Suche antwortet in unter 2 Sekunden"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
