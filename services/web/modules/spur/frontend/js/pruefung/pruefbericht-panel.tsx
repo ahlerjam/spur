@@ -108,6 +108,14 @@ export default function PruefberichtPanel() {
         {bericht && bericht.zeilen.length > 0 && zeilen.length === 0 && (
           <p className="spur-leer">{t('spur_keine_probleme')}</p>
         )}
+        {bericht && (
+          <p className="spur-zeile-meta">
+            {t('spur_abschnitte_geprueft', {
+              geprueft: bericht.statistik.geprueft,
+              wiederverwendet: bericht.statistik.wiederverwendet,
+            })}
+          </p>
+        )}
         <ul className="spur-liste">
           {zeilen.map(zeile => (
             <BerichtZeile key={zeile.id} zeile={zeile} />

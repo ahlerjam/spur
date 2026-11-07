@@ -105,6 +105,16 @@ async page => {
     )
   }
 
+  async function texErsetzen(datei) {
+    const name = datei.split('/').pop()
+    const eintrag = page.locator('.file-tree').getByRole('treeitem', { name })
+    if (!(await eintrag.isVisible())) await railTab(DATEIBAUM).click()
+    await page.locator('.file-tree').getByRole('button', { name: /Hochladen|Upload/ }).first().click()
+    await page.locator('.modal input[type=file]').first().setInputFiles(`${FIXTURES}/${datei}`)
+    await page.locator('.modal').getByRole('button', { name: /Overwrite|Überschreiben/ }).click()
+    await page.locator('.modal').waitFor({ state: 'detached' })
+  }
+
   async function editorErsetzen(alt, neu) {
     await page.evaluate(
       ([von, zu]) => {
@@ -379,6 +389,69 @@ async page => {
       await knopf.waitFor()
       ok(await knopf.isDisabled(), 'Einfügen ist für read-Nutzer aktiv')
       await sichtbar('Keine Schreibrechte')
+    },
+
+    async f7() {
+      await anmelden('e2e-a@example.org')
+      await projektOeffnen('E2E Bericht')
+      await panelOeffnen('Prüfbericht')
+      const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+      const zeigt = async (text, status) => {
+        await zeile(text).getByText(status, { exact: true }).waitFor({ timeout: 30000 })
+      }
+      await zeigt('kapitel.tex', 'Wortlaut: exakt')
+      await zeigt('Sleep supports […] declarative memory.', 'Wortlaut: exakt')
+      await zeigt('Sleep strongly supports', 'Wortlaut: abweichend')
+      await zeigt('hippocampus replays', 'Wortlaut: mit Trennungstoleranz')
+      await zeigt('Sleep supports […] declarative memory.', 'Seite: stimmt')
+      await zeigt('Memory traces', 'gefunden auf S. 347')
+      await zeigt('Naps improve', 'Seite nicht prüfbar')
+      await zeigt('Naps improve', 'Zurückgezogen')
+      ok(
+        await zeile('Naps improve')
+          .getByText('Zurückgezogen', { exact: true })
+          .evaluate(el => {
+            const [r, g, b] = getComputedStyle(el.closest('.badge'))
+              .backgroundColor.match(/\d+/g)
+              .map(Number)
+            return r > 150 && g < 100 && b < 100
+          }),
+        'Zurückgezogen ist nicht rot'
+      )
+      await zeigt('korrigiert', 'Korrektur vorhanden')
+      await zeigt('Sleep supports […] declarative memory.', 'Keine Meldung in Crossref')
+      await zeigt('unbekannt', 'Referenz nicht gefunden')
+      await zeigt('footfullcite', 'Nicht prüfbar')
+
+      await panelOeffnen('Quellen')
+      await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+      await page.getByRole('button', { name: 'Weiter' }).click()
+      await page.getByRole('button', { name: 'Weiter' }).click()
+      await page.getByLabel('Gedruckte Seitenzahl dieser Seite').fill('347')
+      await page.getByRole('button', { name: 'Seitenzahl bestätigen' }).click()
+      await sichtbar('Seitenzahlen bestätigt')
+      await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+      await panelOeffnen('Prüfbericht')
+      await zeigt('Sleep supports […] declarative memory.', 'Seite: bestätigt')
+
+      const alle = await page.locator('.spur-zeile').count()
+      await page.getByLabel('Nur Probleme').check()
+      const probleme = await page.locator('.spur-zeile').count()
+      ok(probleme < alle, `Filter: ${probleme} von ${alle}`)
+      ok(
+        (await page.locator('.spur-zeile', { hasText: 'kapitel.tex' }).count()) === 0,
+        'Grüne Zeile trotz Filter'
+      )
+      await page.getByLabel('Nur Probleme').uncheck()
+
+      await editorErsetzen('\\section{Zwei}', '\\section{Zwei!}')
+      await sichtbar('Abschnitte geprüft: 1, unverändert übernommen: 3')
+      await editorErsetzen('\\section{Zwei!}', '\\section{Zwei}')
+
+      await texErsetzen('ersetzen/kapitel.tex')
+      await panelOeffnen('Prüfbericht')
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await zeigt('kapitel.tex', 'Wortlaut: abweichend')
     },
   }
 

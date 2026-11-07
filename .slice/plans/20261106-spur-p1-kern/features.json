@@ -96,7 +96,7 @@
     "Eine nicht erkannte Form zeigt „Nicht prüfbar“; eine per Upload ersetzte `.tex`-Datei wird ebenfalls geprüft",
     "Der Filter „Nur Probleme“ blendet grüne Zeilen aus; die Prüfung läuft auf berührte Abschnitte begrenzt"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

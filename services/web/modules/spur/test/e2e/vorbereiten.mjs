@@ -6,7 +6,7 @@ import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
 import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.mjs'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
-import { ablageFreigeben, demoAnlegen } from '../../scripts/seed.mjs'
+import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
 import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
 import { quellen, quellenSeiten } from '../../app/src/sammlungen.mjs'
 
@@ -104,6 +104,45 @@ async function vieleQuellen(projectId, ownerId) {
   )
 }
 
+const BERICHT_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\usepackage{csquotes}
+\addbibresource{references.bib}
+\begin{document}
+\section{Eins}
+\enquote{Sleep supports […] declarative memory.} \autocite[347]{smith2024}
+\enquote{Sleep strongly supports the consolidation} \autocite[347]{smith2024}
+\enquote{During rest the hippocampus replays recent experience.} \autocite[349]{smith2024}
+\enquote{Memory traces are strengthened during slow-wave sleep} \autocite[999]{smith2024}
+\section{Zwei}
+\enquote{Naps improve every kind of memory equally.} \autocite[2]{retracted}
+\parencite{korrigiert}
+\parencite{unbekannt}
+\footfullcite{smith2024}
+\input{kapitel}
+\printbibliography
+\end{document}`
+
+const BERICHT_KAPITEL = String.raw`\section{Drei}
+\textcquote[347]{smith2024}{Sleep supports the consolidation of declarative memory.}`
+
+const BERICHT_BIB = `@article{smith2024,
+  title = {Sleep and Memory},
+  doi = {10.5555/spur.2024.001}
+}
+@article{retracted,
+  title = {Retracted Findings on Sleep},
+  doi = {10.5555/spur.retracted}
+}
+@article{korrigiert,
+  title = {Corrected Findings on Sleep},
+  doi = {10.5555/spur.korrigiert}
+}
+@article{unbekannt,
+  title = {Unknown},
+  doi = {10.5555/spur.unbekannt}
+}`
+
 const a = await konto('e2e-a@example.org')
 const leser = await konto('e2e-leser@example.org')
 const link = await konto('e2e-link@example.org')
@@ -132,6 +171,14 @@ for (const alt of await db.projects.find({ owner_ref: a._id, name: 'Demo' }).toA
   await ProjectDeleter.promises.deleteProject(alt._id)
   await ProjectDeleter.promises.expireDeletedProject(alt._id)
 }
+const bericht = await neuAnlegen(a, 'E2E Bericht', {
+  'main.tex': BERICHT_MAIN,
+  'kapitel.tex': BERICHT_KAPITEL,
+  'references.bib': BERICHT_BIB,
+})
+await quelleAusFixture(bericht._id, a._id, 'smith2024.pdf')
+await quelleAusFixture(bericht._id, a._id, 'retracted.pdf')
+
 const neuesDemo = await demoAnlegen(a)
 await db.projects.updateOne({ _id: neuesDemo._id }, { $set: { readOnly_refs: [leser._id] } })
 

@@ -78,7 +78,9 @@ function stempel(kontext) {
   return JSON.stringify({
     tag: jetzt().toISOString().slice(0, 10),
     bib: [...kontext.bibEintraege.values()],
-    werke: [...kontext.werke.entries()].map(([d, w]) => [d, w?.gefunden, w?.retraction]),
+    werke: [...kontext.werke.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([d, w]) => [d, w?.gefunden, w?.retraction]),
     quellen: kontext.quellen.map(q => [q._id, q.key, q.doi, q.versatz, q.versatzQuelle]),
   })
 }
@@ -114,7 +116,18 @@ async function zeilenFuer(projectId, abschnittsListe, kontext, statistik) {
     }
     zeilen.push({ abschnitt, liste })
   }
-  if (neu.length) await cache.insertMany(neu)
+  // Parallele Prüfungen desselben Projekts schreiben dieselben Abschnitte.
+  if (neu.length) {
+    await cache.bulkWrite(
+      neu.map(eintrag => ({
+        updateOne: {
+          filter: { projectId, hash: eintrag.hash },
+          update: { $setOnInsert: eintrag },
+          upsert: true,
+        },
+      }))
+    )
+  }
   return zeilen
 }
 

@@ -9,6 +9,7 @@ import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import QuelleLoeschenModal from './quelle-loeschen-modal'
+import SeitenzahlBestaetigen from './seitenzahl-bestaetigen'
 import Zitate from './zitate'
 import type { Quelle } from './typen'
 
@@ -112,6 +113,14 @@ export default function QuelleVorschau({
         )}
         {seite?.text.trim() && (
           <Zitate quelle={quelle} seite={nummer} textElement={textElement} />
+        )}
+        {darfSchreiben && seite && quelle.art === 'pdf' && seite.text.trim() && (
+          <SeitenzahlBestaetigen
+            key={nummer}
+            quelle={quelle}
+            pdfSeite={nummer}
+            label={seite.label}
+          />
         )}
         {darfSchreiben && (
           <form

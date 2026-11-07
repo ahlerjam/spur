@@ -5,7 +5,7 @@ const ausfuehren = promisify(execFile)
 const GRENZEN = { timeout: 120000, maxBuffer: 256 * 1024 * 1024 }
 
 export async function seitenTexte(pfad) {
-  const { stdout } = await ausfuehren('pdftotext', ['-enc', 'UTF-8', pfad, '-'], GRENZEN)
+  const { stdout } = await ausfuehren('pdftotext', ['-raw', '-enc', 'UTF-8', pfad, '-'], GRENZEN)
   const seiten = stdout.split('\f')
   // pdftotext schließt jede Seite mit einem Seitenvorschub ab.
   seiten.pop()

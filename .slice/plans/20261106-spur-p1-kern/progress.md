@@ -23,3 +23,4 @@
 - `spur-dev migrate up` schlägt fehl („Unrecognized command up“). Richtig ist `spur-dev migrate migrate -t server-ce`, `rollback` entsprechend. `CLAUDE.md` und Spec nennen die falsche Form.
 - f5 `projectExpired`: `spur-dev run modules/spur/test/e2e/ablauf.mjs` → „projectExpired: Ordner und Einträge entfernt“.
 - f5 Dump und Migration: vor `spur-dev dump` 305 Quellen, 629 Seiten, 3 Indizes. `spur-dev migrate rollback -t server-ce 20261107090000_spur_sources` → keine `spurS*`-Sammlungen mehr. `spur-dev migrate migrate -t server-ce`, `spur-dev restore` → wieder 305, 629, 3; `smith2024.pdf` lädt mit 200 und 4554 Byte `%PDF-1.5`.
+- Extraktion mit `pdftotext -raw`: Die Standardausgabe setzt Trennungen am Zeilenende stillschweigend zusammen (auch echte Bindestriche wie „well-known“), dann gäbe es nie „mit Trennungstoleranz“. `-raw` folgt der Inhaltsreihenfolge, bei mehrspaltigen PDFs aus LaTeX ist das spaltenweise.
