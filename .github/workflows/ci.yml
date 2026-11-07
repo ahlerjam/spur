@@ -15,12 +15,14 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    # MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13 (SERVER-121912); daher dieser Runner.
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - name: spur-dev einrichten
         run: |
+          uname -r
           tools/spur-dev/spur-dev install
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
