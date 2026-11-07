@@ -1,0 +1,48 @@
+# Entwicklungsstack für spur-dev. `spur-dev install` setzt @ARCH@ und legt die Datei nach ~/.config/spur-dev.
+name: spur-dev
+services:
+  web:
+    image: ghcr.io/ahlerjam/spur-dev:@ARCH@
+    container_name: spur-dev-web
+    depends_on:
+      mongo: {condition: service_healthy}
+      redis: {condition: service_started}
+    ports: ["127.0.0.1:8080:80"]
+    env_file: [secrets.env]
+    environment:
+      OVERLEAF_APP_NAME: spur
+      OVERLEAF_SITE_URL: http://localhost:8080
+      OVERLEAF_MONGO_URL: mongodb://mongo/sharelatex
+      OVERLEAF_REDIS_HOST: redis
+      REDIS_HOST: redis
+      ENABLED_LINKED_FILE_TYPES: project_file,project_output_file
+      EMAIL_CONFIRMATION_DISABLED: "true"
+      OVERLEAF_HISTORY_RESTORE: "true"
+      SPUR_DEV: "1"
+    volumes:
+      - data:/var/lib/overleaf
+      - ${SPUR_SRC}/services/web/app:/overleaf/services/web/app:ro
+      - ${SPUR_SRC}/services/web/frontend:/overleaf/services/web/frontend
+      - ${SPUR_SRC}/services/web/modules:/overleaf/services/web/modules:ro
+      - ${SPUR_SRC}/services/web/config:/overleaf/services/web/config:ro
+      - ${SPUR_SRC}/services/web/locales:/overleaf/services/web/locales:ro
+      - ${SPUR_SRC}/services/document-updater:/overleaf/services/document-updater:ro
+      - ${SPUR_SRC}/server-ce/nginx/vhost-extras/overleaf:/etc/nginx/vhost-extras/overleaf:ro
+      - ${SPUR_SRC}/libraries:/overleaf/libraries:ro
+      - ${SPUR_SRC}/tools/migrations:/overleaf/tools/migrations:ro
+  mongo:
+    image: mongo:8.0
+    container_name: spur-dev-mongo
+    command: --replSet overleaf
+    volumes: [mongo:/data/db]
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "try { rs.status().ok } catch(e) { rs.initiate({_id:'overleaf',members:[{_id:0,host:'mongo:27017'}]}).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+  redis:
+    image: redis:6.2
+    container_name: spur-dev-redis
+volumes: {data: {}, mongo: {}}

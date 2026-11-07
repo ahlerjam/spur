@@ -47,9 +47,17 @@ jobs:
             biber --version
             latexdiff --version
             pdftotext -v 2>&1 | head -1
+            tesseract --list-langs 2>&1 | grep -x deu
           '
       - name: Image bauen
         run: time docker build --progress=plain -f server-ce/Dockerfile --build-arg OVERLEAF_BASE_TAG="$BASE" -t "$IMAGE" .
+      - name: Pakete im Image prüfen
+        run: |
+          docker run --rm --network none --entrypoint bash "$IMAGE" -lc '
+            set -e
+            cd /overleaf/services/web
+            yarn node --input-type=module -e "await import(\"@huggingface/transformers\"); await import(\"@modelcontextprotocol/server\"); console.log(\"Pakete ok\")"
+          '
       - name: Entwicklungs-Image bauen
         run: time docker build --progress=plain -f server-ce/Dockerfile-dev --build-arg SPUR_IMAGE="$IMAGE" -t "$DEV" .
       - name: Frontend-Build im Entwicklungs-Image messen

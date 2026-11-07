@@ -1,0 +1,122 @@
+#!/bin/bash
+# Fester Zugang zum spur-Entwicklungsstack. `spur-dev install` legt eine Kopie außerhalb
+# des Repos ab (lokal ~/.local/bin, in der Cloud /usr/local/bin). Builder rufen nur diese
+# Kopie auf und bekommen so kein freies docker; Änderungen hier wirken erst nach einem
+# erneuten `install` durch einen Menschen.
+set -euo pipefail
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/spur-dev"
+MOUNTS="services/web/app services/web/frontend services/web/modules services/web/config services/web/locales services/document-updater libraries tools/migrations server-ce/nginx/vhost-extras/overleaf"
+
+install_self() {
+  local here bin arch root
+  here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+  if [ "${2:-}" != --cloud ]; then
+    # Hauptordner des Repos, auch wenn install aus einem Worktree läuft.
+    root=$(cd "$here" && cd "$(git rev-parse --git-common-dir)/.." && pwd -P)
+  fi
+  case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; *) arch=amd64 ;; esac
+  if [ "$(id -u)" = 0 ]; then bin=/usr/local/bin; else bin="$HOME/.local/bin"; fi
+  mkdir -p "$bin" "$CONF"
+  install -m 755 "$here/spur-dev" "$bin/spur-dev"
+  sed "s#@ARCH@#$arch#" "$here/compose.yml" > "$CONF/compose.yml"
+  if [ ! -s "$CONF/secrets.env" ]; then
+    (umask 077; printf 'OVERLEAF_INVITE_TOKEN_SECRET=%s\n' "$(openssl rand -hex 32)" > "$CONF/secrets.env")
+  fi
+  if [ "${2:-}" = --cloud ]; then
+    # Cloud-VM ohne Sandbox: jeder Klon und Worktree auf der VM ist erlaubt.
+    echo / > "$CONF/roots"
+  else
+    # Erlaubte Quellordner: dieses Repo und die slice-Worktrees daneben.
+    printf '%s\n%s/\n' "$root" "${XDG_CACHE_HOME:-$HOME/.cache}/slice/$(basename "$root")" > "$CONF/roots"
+  fi
+  echo "spur-dev installiert: $bin/spur-dev, Image spur-dev:$arch"
+}
+[ "${1:-}" = install ] && { install_self "$@"; exit 0; }
+
+[ -s "$CONF/compose.yml" ] || { echo "spur-dev: erst tools/spur-dev/spur-dev install ausführen" >&2; exit 2; }
+SRC=$(git rev-parse --show-toplevel 2>/dev/null || true)
+ok=""
+while IFS= read -r r; do
+  case "$r" in */) [[ "$SRC/" == "$r"* ]] && ok=1 ;; *) [ "$SRC" = "$r" ] && ok=1 ;; esac
+done < "$CONF/roots"
+[ -n "$SRC" ] && [ -n "$ok" ] || { echo "spur-dev: nur im spur-Repo oder einem slice-Worktree erlaubt" >&2; exit 2; }
+SRC=$(cd "$SRC" && pwd -P)
+export SPUR_SRC="$SRC"
+
+check_mounts() {
+  # Kein eingehängter Pfad darf per Symlink aus dem Worktree hinausführen.
+  local m real
+  for m in $MOUNTS; do
+    real=$(cd "$SRC/$m" 2>/dev/null && pwd -P) || { echo "spur-dev: $m fehlt im Worktree" >&2; exit 2; }
+    [ "$real" = "$SRC/$m" ] || { echo "spur-dev: $m ist ein Symlink, abgelehnt" >&2; exit 2; }
+  done
+}
+docker_bereit() {
+  docker info >/dev/null 2>&1 && return 0
+  # Cloud-VM: der Docker-Dienst läuft nach einem Neustart der VM nicht von selbst.
+  if [ "${CLAUDE_CODE_REMOTE:-}" = true ]; then
+    (service docker start >/dev/null 2>&1 || nohup dockerd >/var/log/dockerd.log 2>&1 &) || true
+    for _ in $(seq 1 30); do docker info >/dev/null 2>&1 && return 0; sleep 1; done
+  fi
+  echo "spur-dev: Docker läuft nicht" >&2; exit 2
+}
+dc() { docker compose -f "$CONF/compose.yml" "$@"; }
+web() { docker exec -i spur-dev-web bash -lc "set -o pipefail; cd /overleaf/services/web && $1"; }
+wait_up() {
+  for _ in $(seq 1 60); do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:8080/status || true)" = 200 ] && { echo "spur läuft auf http://localhost:8080"; return 0; }
+    sleep 3
+  done
+  echo "spur-dev: Stack antwortet nicht, siehe: spur-dev logs" >&2; return 1
+}
+# Ohne -i: webpack braucht keine Eingabe, und ein offenes stdin brach den Build nach einem Neustart
+# des Containers gelegentlich mit Exit 129 ab.
+build() { docker exec spur-dev-web bash -lc 'cd /overleaf/services/web && yarn run lezer-latex:generate >/dev/null 2>&1 && { yarn run webpack:production > /tmp/webpack.log 2>&1; rc=$?; grep compiled /tmp/webpack.log || tail -20 /tmp/webpack.log; exit $rc; }'; }
+restart() {
+  docker exec spur-dev-web bash -c 'sv restart web-overleaf web-api-overleaf document-updater-overleaf' | sed 's/:.*//' | sort -u | tr '\n' ' '; echo
+  docker exec spur-dev-web sv reload nginx >/dev/null 2>&1 || docker exec spur-dev-web sv restart nginx >/dev/null
+  wait_up
+}
+# Kurz nach dem Start des Containers bricht webpack gelegentlich mit Exit 129 (SIGHUP) ab,
+# Ursache unklar; ein zweiter Versuch läuft durch.
+build_sicher() { build || { echo "Build abgebrochen, zweiter Versuch in 30 s"; sleep 30; build; }; }
+up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null 2>&1; wait_up; build_sicher; restart; }
+ensure() {
+  local cur
+  docker_bereit
+  cur=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/overleaf/services/web/modules"}}{{.Source}}{{end}}{{end}}' spur-dev-web 2>/dev/null || true)
+  [ "$cur" = "$SRC/services/web/modules" ] || { echo "Worktree gewechselt oder Stack aus, Stack wird neu erzeugt."; up; }
+}
+du_geaendert() {
+  # Ohne upstream-Branch (flacher Klon in der Cloud) laufen die Tests immer.
+  local basis
+  basis=$(git -C "$SRC" merge-base HEAD origin/ext-ce 2>/dev/null) || return 0
+  ! git -C "$SRC" diff --quiet "$basis" -- services/document-updater libraries/ranges-tracker
+}
+case "${1:-}" in
+  up)      up ;;
+  down)    dc down ;;
+  reset)   dc down -v ;;
+  status)  dc ps --format '{{.Service}} {{.State}}' ;;
+  reload)  ensure; build_sicher; restart ;;
+  restart) ensure; restart ;;
+  test)    ensure
+           rc=0
+           if [ -d "$SRC/services/web/modules/spur" ]; then
+             web 'yarn run vitest run modules/spur 2>&1 | tail -20' || rc=$?
+           else echo "Noch keine spur-Tests."; fi
+           if du_geaendert; then
+             docker exec -i spur-dev-web bash -lc 'set -o pipefail; cd /overleaf/services/document-updater && TEST_NAME_PATTERN= yarn run test:unit 2>&1 | tail -8' || rc=$?
+           fi
+           exit "$rc" ;;
+  run)     ensure; shift; web "node $(printf '%q ' "$@")" ;;
+  mongo)   docker exec -i spur-dev-mongo mongosh sharelatex --quiet --eval "${2:?Ausdruck fehlt}" ;;
+  dump)    docker exec spur-dev-mongo mongodump --quiet --db sharelatex --archive=/data/db/spur-dump.archive
+           docker exec spur-dev-web tar czf /var/lib/overleaf/spur-data.tgz --ignore-failed-read -C /var/lib/overleaf data/spur 2>/dev/null || true; echo gesichert ;;
+  restore) docker exec spur-dev-mongo mongorestore --quiet --drop --archive=/data/db/spur-dump.archive
+           docker exec spur-dev-web bash -c 'rm -rf /var/lib/overleaf/data/spur; [ -s /var/lib/overleaf/spur-data.tgz ] && tar xzf /var/lib/overleaf/spur-data.tgz -C /var/lib/overleaf || true'; echo wiederhergestellt ;;
+  migrate) ensure; shift; docker exec -i spur-dev-web bash -lc "cd /overleaf/tools/migrations && yarn run east $(printf '%q ' "$@")" ;;
+  user)    web "node modules/server-ce-scripts/scripts/create-user.mjs --email='${2:?E-Mail fehlt}' --admin 2>&1" | tr -d '\r' | grep -m1 -oE 'token=[0-9a-f]+&user_id=[0-9a-f]+' | sed 's#^#http://localhost:8080/user/activate?#' ;;
+  logs)    docker exec spur-dev-web tail -n "${3:-60}" "/var/log/overleaf/${2:-web}.log" ;;
+  *) echo "Befehle: install up down reset status reload restart test run mongo dump restore migrate user logs" >&2; exit 2 ;;
+esac
