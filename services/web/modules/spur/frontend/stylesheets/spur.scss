@@ -194,8 +194,11 @@
 .spur-lauf-kopf {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--spacing-03);
+  // Kein Umbruch mitten in „Lauf“: Ein langes Badge rutscht in die nächste Zeile.
+  overflow-wrap: normal;
 
   h5 {
     margin: 0;

@@ -20,7 +20,7 @@ async page => {
   }
   const ok = (bedingung, msg) => bedingung || fail(msg)
 
-  async function anmelden(email) {
+  async function anmelden(email, versuch = 1) {
     // Erst die alte Seite verlassen: Ihre Polls würden sonst nach dem Löschen eine neue Session
     // setzen, und das CSRF-Token des Login-Formulars passte nicht mehr.
     await page.goto('about:blank')
@@ -28,7 +28,13 @@ async page => {
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/e-?mail/i).fill(email)
     await page.getByLabel(/passwort|password/i).fill(PASSWORT)
-    await page.getByRole('button', { name: /^(anmelden|log ?in)$/i }).click()
+    const [antwort] = await Promise.all([
+      page.waitForResponse(r => r.url() === `${BASE}/login` && r.request().method() === 'POST'),
+      page.getByRole('button', { name: /^(anmelden|log ?in)$/i }).click(),
+    ])
+    // Eine noch laufende Antwort der verlassenen Seite kann trotzdem eine Session setzen (403 CSRF).
+    // Dann genau einmal neu; ein echter Login-Fehler scheitert auch beim zweiten Mal.
+    if (antwort.status() === 403 && versuch === 1) return await anmelden(email, 2)
     await page.waitForURL(/\/project/, { waitUntil: 'commit' })
   }
 
@@ -786,6 +792,17 @@ async page => {
     await sichtbar('claude --allowedTools')
     await page.getByRole('button', { name: 'Senden' }).click()
     await sichtbar('Bitte zuerst einen Auftrag schreiben.')
+    ok(
+      await page.locator('#spur-auftrag-leer').evaluate(el => {
+        const r = el.getBoundingClientRect()
+        return r.top >= 0 && r.bottom <= window.innerHeight
+      }),
+      'Meldung zum leeren Auftrag liegt außer Sicht'
+    )
+    ok(
+      (await page.getByLabel('Auftrag an Claude').getAttribute('aria-invalid')) === 'true',
+      'Leeres Auftragsfeld nicht als ungültig markiert'
+    )
     const zahl = await seitenPost(`/spur/project/${demo}/claude/auftrag`, { text: 123 })
     ok(zahl.status === 422, `Auftrag mit Zahl: ${zahl.status}`)
 

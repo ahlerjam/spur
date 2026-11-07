@@ -1,3 +1,4 @@
+import logger from '@overleaf/logger'
 import { createHash } from 'node:crypto'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
@@ -79,10 +80,16 @@ async function pruefSperre(projectId, neuerText, von, bis) {
         `Zu ${z.key} gibt es keine Quelle mit Text. Bitte nur aus vorhandenen Quellen zitieren.`
       )
     }
-    if (z.form === 'unbekannt') rot.push({ grund: 'nicht_pruefbar', auszug: z.auszug })
+    // Nicht prüfbar (unbekannte Form oder Quelle ohne lesbaren Wortlaut): annehmen, aber rot,
+    // damit die Automatik es nie still übernimmt.
+    if (z.form === 'unbekannt' || z.wortlaut === 'nicht_pruefbar') {
+      rot.push({ grund: 'nicht_pruefbar', auszug: z.auszug })
+    }
   }
   return rot
 }
+
+const VERWAIST_MS = 2 * 60 * 1000
 
 // Fingerabdruck der Argumente: Derselbe Schlüssel mit anderem Inhalt ist ein Fehler des Aufrufers.
 const fingerabdruck = inhalt => createHash('sha256').update(JSON.stringify(inhalt)).digest('hex')
@@ -119,7 +126,14 @@ async function mitSchluessel({ projectId, botId, schluessel, argumente }, schrei
     reservierung = await sammlung.insertOne({ botId, schluessel, projectId, inhalt, am: jetzt() })
   } catch (error) {
     if (error.code !== 11000) throw error
-    return frueheresErgebnis(await sammlung.findOne({ botId, schluessel }), projectId, inhalt)
+    const frueher = await sammlung.findOne({ botId, schluessel })
+    // Eine Reservierung ohne Ergebnis, die älter als zwei Minuten ist, stammt von einem abgebrochenen
+    // Aufruf: freigeben und neu versuchen, statt den Schlüssel 30 Tage zu blockieren.
+    if (frueher && !frueher.ergebnis && jetzt() - frueher.am > VERWAIST_MS) {
+      await sammlung.deleteOne({ _id: frueher._id, ergebnis: { $exists: false } })
+      return await mitSchluessel({ projectId, botId, schluessel, argumente }, schreiben)
+    }
+    return frueheresErgebnis(frueher, projectId, inhalt)
   }
   let ergebnis
   try {
@@ -178,8 +192,14 @@ async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
   let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot }
   if (op.length) {
     await spurUpdate(projectId, doc.docId, op, version, { userId: botId, tracked: true })
-    await LaufManager.aenderungMerken(lauf, { docId: doc.docId, rot })
     ergebnis = { ...ergebnis, aenderung: true }
+    try {
+      await LaufManager.aenderungMerken(lauf, { docId: doc.docId, rot })
+    } catch (error) {
+      // Geschrieben ist geschrieben: Ein Fehler beim Mitzählen darf die Reservierung nicht freigeben,
+      // sonst schriebe eine Wiederholung doppelt.
+      logger.error({ err: error, projectId, docId: doc.docId }, 'spur: Änderung nicht am Lauf vermerkt')
+    }
   }
   return ergebnis
 }

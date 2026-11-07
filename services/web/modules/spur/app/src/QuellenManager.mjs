@@ -270,10 +270,17 @@ export async function aendern(quelle, { fassung, versatz }) {
     await (await quellenSeiten()).updateMany({ quelleId: quelle._id }, [
       {
         $set: {
+          // Wie beim Einlesen: Vorspannseiten ergäben Labels unter 1, dort keine Seitenzahl.
           label:
             versatz === null
               ? null
-              : { $toString: { $add: ['$seite', versatz] } },
+              : {
+                  $cond: [
+                    { $gte: [{ $add: ['$seite', versatz] }, 1] },
+                    { $toString: { $add: ['$seite', versatz] } },
+                    null,
+                  ],
+                },
         },
       },
     ])

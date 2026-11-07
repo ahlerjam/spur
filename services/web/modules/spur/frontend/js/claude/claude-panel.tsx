@@ -5,6 +5,7 @@ import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
+import OLFormText from '@/shared/components/ol/ol-form-text'
 import Notification from '@/shared/components/notification'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { startBefehl } from './claude-verbinden'
@@ -27,6 +28,7 @@ export default function ClaudePanel() {
   const [fehler, setFehler] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [sendet, setSendet] = useState(false)
+  const [leer, setLeer] = useState(false)
   const [kopiert, setKopiert] = useState(false)
   const feld = useRef<HTMLTextAreaElement>(null)
 
@@ -48,7 +50,7 @@ export default function ClaudePanel() {
 
   const senden = async () => {
     if (!text.trim()) {
-      setFehler(t('spur_auftrag_leer'))
+      setLeer(true)
       feld.current?.focus()
       return
     }
@@ -116,8 +118,20 @@ export default function ClaudePanel() {
             ref={feld}
             rows={3}
             value={text}
-            onChange={e => setText(e.target.value)}
+            isInvalid={leer}
+            aria-invalid={leer || undefined}
+            aria-describedby={leer ? 'spur-auftrag-leer' : undefined}
+            onChange={e => {
+              setText(e.target.value)
+              setLeer(false)
+            }}
           />
+          {/* Unter dem Feld: Eine Meldung oben im Panel läge nach dem Fokus außer Sicht. */}
+          {leer && (
+            <OLFormText type="error" id="spur-auftrag-leer" role="alert">
+              {t('spur_auftrag_leer')}
+            </OLFormText>
+          )}
           <OLButton type="submit" variant="primary" size="sm" isLoading={sendet}>
             {t('spur_senden')}
           </OLButton>
