@@ -83,7 +83,9 @@ restart() {
 # Kurz nach dem Start des Containers bricht webpack gelegentlich mit Exit 129 (SIGHUP) ab,
 # Ursache unklar; ein zweiter Versuch läuft durch.
 build_sicher() { build || { echo "Build abgebrochen, zweiter Versuch in 30 s"; sleep 30; build; }; }
-up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null; wait_up; build_sicher; restart; }
+# Ein frischer Checkout hat die generierte Lezer-Grammatik noch nicht; ohne sie startet web nicht.
+grammatik() { docker exec spur-dev-web bash -lc 'cd /overleaf/services/web && yarn run lezer-latex:generate >/dev/null 2>&1'; }
+up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null; grammatik; wait_up; build_sicher; restart; }
 ensure() {
   local cur
   docker_bereit
