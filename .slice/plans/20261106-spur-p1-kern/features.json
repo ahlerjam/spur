@@ -195,7 +195,7 @@
     "Eine veraltete Change-ID ist wirkungslos; ein gespaltener Einschub wird ganz abgelehnt, Nutzertext bleibt",
     "`review`-Nutzer lehnt Changes des eigenen Bots ab, fremde nicht"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
