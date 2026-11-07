@@ -10,8 +10,10 @@ MOUNTS="services/web/app services/web/frontend services/web/modules services/web
 install_self() {
   local here bin arch root
   here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-  # Hauptordner des Repos, auch wenn install aus einem Worktree läuft.
-  root=$(cd "$here" && cd "$(git rev-parse --git-common-dir)/.." && pwd -P)
+  if [ "${2:-}" != --cloud ]; then
+    # Hauptordner des Repos, auch wenn install aus einem Worktree läuft.
+    root=$(cd "$here" && cd "$(git rev-parse --git-common-dir)/.." && pwd -P)
+  fi
   case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; *) arch=amd64 ;; esac
   if [ "$(id -u)" = 0 ]; then bin=/usr/local/bin; else bin="$HOME/.local/bin"; fi
   mkdir -p "$bin" "$CONF"
@@ -20,11 +22,16 @@ install_self() {
   if [ ! -s "$CONF/secrets.env" ]; then
     (umask 077; printf 'OVERLEAF_INVITE_TOKEN_SECRET=%s\n' "$(openssl rand -hex 32)" > "$CONF/secrets.env")
   fi
-  # Erlaubte Quellordner: dieses Repo und die slice-Worktrees daneben.
-  printf '%s\n%s/\n' "$root" "${XDG_CACHE_HOME:-$HOME/.cache}/slice/$(basename "$root")" > "$CONF/roots"
+  if [ "${2:-}" = --cloud ]; then
+    # Cloud-VM ohne Sandbox: jeder Klon und Worktree auf der VM ist erlaubt.
+    echo / > "$CONF/roots"
+  else
+    # Erlaubte Quellordner: dieses Repo und die slice-Worktrees daneben.
+    printf '%s\n%s/\n' "$root" "${XDG_CACHE_HOME:-$HOME/.cache}/slice/$(basename "$root")" > "$CONF/roots"
+  fi
   echo "spur-dev installiert: $bin/spur-dev, Image spur-dev:$arch"
 }
-[ "${1:-}" = install ] && { install_self; exit 0; }
+[ "${1:-}" = install ] && { install_self "$@"; exit 0; }
 
 [ -s "$CONF/compose.yml" ] || { echo "spur-dev: erst tools/spur-dev/spur-dev install ausführen" >&2; exit 2; }
 SRC=$(git rev-parse --show-toplevel 2>/dev/null || true)
