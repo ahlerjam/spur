@@ -64,6 +64,9 @@ dc() { docker compose -f "$CONF/compose.yml" "$@"; }
 web() { docker exec -i spur-dev-web bash -lc "set -o pipefail; cd /overleaf/services/web && $1"; }
 wait_up() {
   for _ in $(seq 1 60); do
+    if [ "$(docker inspect -f '{{.State.Running}}' spur-dev-web 2>/dev/null)" != true ]; then
+      echo "spur-dev: Container läuft nicht, letzte Ausgabe:" >&2; docker logs --tail 60 spur-dev-web >&2 || true; return 1
+    fi
     [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:8080/status || true)" = 200 ] && { echo "spur läuft auf http://localhost:8080"; return 0; }
     sleep 3
   done
@@ -80,7 +83,7 @@ restart() {
 # Kurz nach dem Start des Containers bricht webpack gelegentlich mit Exit 129 (SIGHUP) ab,
 # Ursache unklar; ein zweiter Versuch läuft durch.
 build_sicher() { build || { echo "Build abgebrochen, zweiter Versuch in 30 s"; sleep 30; build; }; }
-up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null 2>&1; wait_up; build_sicher; restart; }
+up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null; wait_up; build_sicher; restart; }
 ensure() {
   local cur
   docker_bereit
@@ -117,6 +120,6 @@ case "${1:-}" in
            docker exec spur-dev-web bash -c 'rm -rf /var/lib/overleaf/data/spur; [ -s /var/lib/overleaf/spur-data.tgz ] && tar xzf /var/lib/overleaf/spur-data.tgz -C /var/lib/overleaf || true'; echo wiederhergestellt ;;
   migrate) ensure; shift; docker exec -i spur-dev-web bash -lc "cd /overleaf/tools/migrations && yarn run east $(printf '%q ' "$@")" ;;
   user)    web "node modules/server-ce-scripts/scripts/create-user.mjs --email='${2:?E-Mail fehlt}' --admin 2>&1" | tr -d '\r' | grep -m1 -oE 'token=[0-9a-f]+&user_id=[0-9a-f]+' | sed 's#^#http://localhost:8080/user/activate?#' ;;
-  logs)    docker exec spur-dev-web tail -n "${3:-60}" "/var/log/overleaf/${2:-web}.log" ;;
+  logs)    docker exec spur-dev-web tail -n "${3:-60}" "/var/log/overleaf/${2:-web}.log" 2>/dev/null || docker logs --tail "${3:-60}" spur-dev-web ;;
   *) echo "Befehle: install up down reset status reload restart test run mongo dump restore migrate user logs" >&2; exit 2 ;;
 esac
