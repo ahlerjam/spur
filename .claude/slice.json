@@ -1,7 +1,7 @@
 {
   "agentBranch": "agent",
-  "testCommand": "make test",
-  "startCommand": "make start",
+  "testCommand": "spur-dev test",
+  "startCommand": "spur-dev up",
   "maxTurns": 400,
   "allowedDomains": [
     "github.com",
@@ -17,5 +17,8 @@
     "ghcr.io",
     "pkg-containers.githubusercontent.com"
   ],
-  "changelogDoc": "https://claude.ai/artifact/XYXcQgkJbtPQzsGgJbqBhe"
+  "changelogDoc": "https://claude.ai/artifact/XYXcQgkJbtPQzsGgJbqBhe",
+  "excludedCommands": [
+    "Bash(spur-dev *)"
+  ]
 }
