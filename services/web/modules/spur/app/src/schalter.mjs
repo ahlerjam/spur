@@ -1,22 +1,22 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const DATEI = fileURLToPath(new URL('../../dev-schalter.json', import.meta.url))
 
 export const IST_DEV = process.env.SPUR_DEV === '1'
 
+let zwischenspeicher = { stand: null, werte: {} }
+
 function schalter() {
   if (!IST_DEV) return {}
-  try {
-    return JSON.parse(readFileSync(DATEI, 'utf8'))
-  } catch (error) {
-    if (error.code === 'ENOENT') return {}
-    throw error
+  const stand = statSync(DATEI, { throwIfNoEntry: false })?.mtimeMs ?? null
+  if (stand !== zwischenspeicher.stand) {
+    zwischenspeicher = {
+      stand,
+      werte: stand === null ? {} : JSON.parse(readFileSync(DATEI, 'utf8')),
+    }
   }
-}
-
-export function fakeAgent() {
-  return schalter().SPUR_FAKE_AGENT === '1'
+  return zwischenspeicher.werte
 }
 
 export function paperApiBasis() {

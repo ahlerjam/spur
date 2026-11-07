@@ -8,9 +8,12 @@ async page => {
     globalThis.SPUR_FIXTURES || 'services/web/modules/spur/test/fixtures'
   const nur = new URL(page.url()).hash.slice(1).split(',').filter(Boolean)
   const konsolenFehler = []
-  page.removeAllListeners('response')
-  page.removeAllListeners('pageerror')
-  page.on('pageerror', e => konsolenFehler.push(e.message))
+  const beiFehler = e => konsolenFehler.push(e.message)
+  page.on('pageerror', beiFehler)
+  // Overleaf fragt beim Verlassen mit noch nicht gesendeten Änderungen nach; der Test wechselt Seiten bewusst.
+  await page.addInitScript(() => {
+    window.addEventListener('beforeunload', e => e.stopImmediatePropagation(), true)
+  })
 
   const fail = msg => {
     throw new Error(msg)
@@ -422,8 +425,10 @@ async page => {
           erwartet
         )
         await editorAnsEnde()
-        await zeile.getByRole('button', { name: 'Einfügen' }).click()
-        await page.waitForTimeout(1500)
+        await Promise.all([
+          page.waitForResponse(r => r.url().endsWith('/einfuegen') && r.ok()),
+          zeile.getByRole('button', { name: 'Einfügen' }).click(),
+        ])
         const bib = await bibText('references.bib')
         ok((bib.match(/@article\{smith2024,/g) ?? []).length === 1, `bib: ${bib}`)
         ok(bib.includes('title = {Sleep and Memory}'), 'Titel aus Crossref fehlt')
@@ -527,8 +532,7 @@ async page => {
 
       await projektOeffnen('Demo')
       await page.getByRole('button', { name: /^(Teilen|Share)$/ }).first().click()
-      await page.locator('.modal').waitFor()
-      await page.waitForTimeout(1000)
+      await page.locator('.modal').getByText('e2e-a@example.org').first().waitFor()
       ok(!(await page.locator('.modal').innerText()).includes('Claude ('), 'Bot im Teilen-Dialog')
       await page.keyboard.press('Escape')
 
@@ -617,5 +621,6 @@ async page => {
       ergebnis.push(`${id} FEHLER: ${error.message}`)
     }
   }
+  page.off('pageerror', beiFehler)
   return ergebnis.join('\n')
 }

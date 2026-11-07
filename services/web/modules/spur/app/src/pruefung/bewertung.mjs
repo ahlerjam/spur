@@ -12,7 +12,7 @@ function seitenStatus(beleg, quelle, gefunden, texte) {
   return { seite: 'gefunden', gefundenAuf: labels[0] }
 }
 
-function quelleZu(key, bibEintraege, quellen) {
+export function quelleZu(key, bibEintraege, quellen) {
   const doi = bibEintraege.get(key)?.doi?.toLowerCase()
   const nachDoi = doi && quellen.find(q => q.doi?.toLowerCase() === doi)
   return nachDoi || quellen.find(q => q.key === key) || null

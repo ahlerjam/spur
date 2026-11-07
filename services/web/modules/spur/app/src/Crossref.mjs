@@ -13,7 +13,7 @@ const KORREKTUR = new Set([
   'clarification',
 ])
 
-export function werkAuswerten(message) {
+function werkAuswerten(message) {
   const updates = (message['updated-by'] ?? []).map(u =>
     (u.type ?? '').toLowerCase()
   )

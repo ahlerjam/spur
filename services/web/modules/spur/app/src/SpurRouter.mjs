@@ -20,6 +20,8 @@ const schreiben = [
   AuthorizationMiddleware.ensureUserCanWriteProjectContent,
 ]
 
+const angemeldet = AuthenticationController.requireLogin()
+
 const upload = multerUploadHandler({
   dest: Settings.path.uploadFolder,
   limits: { fileSize: MAX_BYTES },
@@ -41,7 +43,7 @@ function hochladenMitGrenze(req, res, next) {
 const QUELLEN = '/spur/project/:project_id/quellen'
 
 export default {
-  apply(webRouter, privateApiRouter, publicApiRouter) {
+  apply(webRouter, _privateApiRouter, publicApiRouter) {
     webRouter.get(QUELLEN, ...lesen, SpurController.quellenListe)
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
     webRouter.get(`${QUELLEN}/suche`, ...lesen, SpurController.quellenSuche)
@@ -61,7 +63,6 @@ export default {
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)
     webRouter.patch(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleAendern)
     webRouter.get('/spur/project/:project_id/pruefbericht', ...lesen, SpurController.pruefbericht)
-    const angemeldet = AuthenticationController.requireLogin()
     webRouter.get('/spur/claude/tokens', angemeldet, SpurController.claudeTokens)
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
     webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)

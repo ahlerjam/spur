@@ -7,7 +7,7 @@ import * as QuellenManager from '../QuellenManager.mjs'
 import { pruefCache } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { bibLesen } from './bib.mjs'
-import { istProblem, zeileBewerten } from './bewertung.mjs'
+import { istProblem, quelleZu, zeileBewerten } from './bewertung.mjs'
 import { zitateFinden } from './latex.mjs'
 
 const ABSCHNITT = /^[ \t]*\\(part|chapter|section)\*?\s*[[{]/gm
@@ -23,12 +23,21 @@ export function abschnitte(text) {
   }))
 }
 
-function zeileAn(text, pos) {
-  let zeile = 1
-  for (let i = text.indexOf('\n'); i >= 0 && i < pos; i = text.indexOf('\n', i + 1)) {
-    zeile++
+function zeilenStarts(text) {
+  const starts = [0]
+  for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) starts.push(i + 1)
+  return starts
+}
+
+function zeileAn(starts, pos) {
+  let unten = 0
+  let oben = starts.length - 1
+  while (unten < oben) {
+    const mitte = (unten + oben + 1) >> 1
+    if (starts[mitte] <= pos) unten = mitte
+    else oben = mitte - 1
   }
-  return zeile
+  return unten + 1
 }
 
 function hash(...teile) {
@@ -38,11 +47,11 @@ function hash(...teile) {
 }
 
 export async function dokumente(projectId) {
-  await DocumentUpdaterHandler.promises.flushProjectToMongo(projectId)
+  const [, projekt] = await Promise.all([
+    DocumentUpdaterHandler.promises.flushProjectToMongo(projectId),
+    ProjectGetter.promises.getProject(projectId, { rootDoc_id: true }),
+  ])
   const docs = await ProjectEntityHandler.promises.getAllDocs(projectId)
-  const projekt = await ProjectGetter.promises.getProject(projectId, {
-    rootDoc_id: true,
-  })
   const wurzel = String(projekt.rootDoc_id)
   return Object.entries(docs)
     .map(([pfad, doc]) => ({
@@ -71,7 +80,7 @@ async function kontextLaden(projectId, docs) {
       werke.set(doi.toLowerCase(), await Crossref.werk(doi))
     })
   )
-  return { bibEintraege, quellen, werke, seitenJeQuelle: null }
+  return { bibEintraege, quellen, werke, seitenJeQuelle: new Map() }
 }
 
 function stempel(kontext) {
@@ -86,15 +95,24 @@ function stempel(kontext) {
 }
 
 async function abschnittBewerten(abschnitt, kontext) {
-  kontext.seitenJeQuelle ??= await QuellenManager.seitenVon(
-    kontext.quellen.map(q => q._id)
-  )
-  return zitateFinden(abschnitt.text).map(fund => zeileBewerten(fund, kontext))
+  const funde = zitateFinden(abschnitt.text)
+  const fehlend = new Set()
+  for (const fund of funde) {
+    const key = fund.belege[0]?.key
+    const quelle = key && quelleZu(key, kontext.bibEintraege, kontext.quellen)
+    if (quelle && !kontext.seitenJeQuelle.has(String(quelle._id))) fehlend.add(quelle._id)
+  }
+  if (fehlend.size) {
+    const geladen = await QuellenManager.seitenVon([...fehlend])
+    for (const id of fehlend) {
+      kontext.seitenJeQuelle.set(String(id), geladen.get(String(id)) ?? [])
+    }
+  }
+  return funde.map(fund => zeileBewerten(fund, kontext))
 }
 
-async function zeilenFuer(projectId, abschnittsListe, kontext, statistik) {
+async function zeilenFuer(projectId, abschnittsListe, kontext, basis, statistik) {
   const cache = await pruefCache()
-  const basis = stempel(kontext)
   const schluessel = abschnittsListe.map(a => hash(basis, a.text))
   const vorhanden = new Map(
     (
@@ -135,11 +153,13 @@ export async function bericht(projectId) {
   const docs = await dokumente(projectId)
   const kontext = await kontextLaden(projectId, docs)
   const statistik = { geprueft: 0, wiederverwendet: 0 }
+  const basis = stempel(kontext)
   const zeilen = []
   for (const doc of docs) {
     if (!doc.pfad.endsWith('.tex')) continue
     const teile = abschnitte(doc.text)
-    for (const { abschnitt, liste } of await zeilenFuer(projectId, teile, kontext, statistik)) {
+    const starts = zeilenStarts(doc.text)
+    for (const { abschnitt, liste } of await zeilenFuer(projectId, teile, kontext, basis, statistik)) {
       for (const z of liste) {
         const von = z.von + abschnitt.von
         zeilen.push({
@@ -151,7 +171,7 @@ export async function bericht(projectId) {
           bis: z.bis + abschnitt.von,
           zitatVon: z.zitatVon + abschnitt.von,
           zitatBis: z.zitatBis + abschnitt.von,
-          zeile: zeileAn(doc.text, von),
+          zeile: zeileAn(starts, von),
           problem: istProblem(z),
         })
       }

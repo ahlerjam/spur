@@ -3,46 +3,15 @@ import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { ereignisse, herzschlaege, nachrichten } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 
-const VERBUNDEN_MS = 60 * 1000
 const TAKT_MS = 1000
 const HERZSCHLAG_MS = 5000
 
-export const FORTSCHRITT_MS = 30 * 1000
-
-export async function auftragAnlegen({ projectId, botId, menschId, text }) {
-  const nachricht = {
-    projectId,
-    botId,
-    von: 'mensch',
-    menschId,
-    text,
-    am: jetzt(),
-  }
-  await (await nachrichten()).insertOne(nachricht)
-  const ereignis = {
-    botId,
-    projectId,
-    typ: 'task_created',
-    daten: { text, nachricht_id: nachricht._id },
-    am: jetzt(),
-    zugestellt: false,
-  }
-  await (await ereignisse()).insertOne(ereignis)
-  return nachricht
-}
+const FORTSCHRITT_MS = 30 * 1000
 
 export async function antwortSpeichern({ projectId, botId, text }) {
   const nachricht = { projectId, botId, von: 'claude', text, am: jetzt() }
   await (await nachrichten()).insertOne(nachricht)
   return nachricht
-}
-
-export async function verlauf(projectId, botId) {
-  return await (await nachrichten())
-    .find({ projectId, botId })
-    .sort({ am: 1 })
-    .limit(200)
-    .toArray()
 }
 
 const fuerClient = e => ({
@@ -69,11 +38,6 @@ async function herzschlag(botId) {
     { $set: { zuletzt: jetzt() } },
     { upsert: true }
   )
-}
-
-export async function verbunden(botId) {
-  const eintrag = await (await herzschlaege()).findOne({ _id: botId })
-  return Boolean(eintrag && jetzt() - eintrag.zuletzt < VERBUNDEN_MS)
 }
 
 // Long-Poll: liefert das nächste nicht zugestellte Ereignis des Bots. Laufende Aufrufe sind der Herzschlag.

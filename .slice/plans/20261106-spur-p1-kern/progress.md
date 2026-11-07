@@ -39,3 +39,14 @@
 - f10: Inbox-Werkzeuge `wait_for_event` (Long-Poll mit Herzschlag und Fortschritt alle 30 s), `events_since` und `reply` sind gebaut und in `tools/list`. Es fehlen das Claude-Panel im Editor (Status „Claude verbunden/nicht verbunden“ samt Startbefehl, Auftrag schreiben, Antworten sehen), die Route zum Anlegen eines Auftrags, der Fake-Client unter `services/web/modules/spur/test` und der Test über 11 Minuten durch nginx. Grund: Turn-Budget des Laufs, Abschlussschritte haben Vorrang.
 - f11 bis f15: Nicht begonnen. Sie hängen am neuen Schreibweg über einen document-updater-Endpunkt mit Ops und Version (ADR 0002), an Läufen und an der Lauf-Karte. `doc_edit`, `doc_create`, `run_status` und `run_finish` stehen im Vertrag und in `tools/list`, antworten aber mit `nicht_verfuegbar`.
 - E2E: Die offenen Features melden im Lauf „übersprungen“ mit Grund.
+
+## /simplify
+- Umgesetzt: Prüfung lädt Seitentexte nur für getroffene Quellen; Flush und Projektabfrage parallel; Cache-Stempel einmal je Bericht; Zeilennummern per Binärsuche; Suche lädt nur Namen der Trefferquellen; `project_list` blättert vor der Rollenabfrage; `dev-schalter.json` nur bei geänderter mtime neu lesen; toter Code (`fakeAgent`, ungenutzte Inbox-Funktionen und Exporte) entfernt; abgeleitete Auswahl im Holen-Dialog; E2E ohne feste Wartezeiten und ohne `removeAllListeners`.
+- Nicht umgesetzt:
+  - Gemeinsamer Hook für Fehlerzustand in den Panels (rund 20 Stellen): Umbau über 7 Komponenten ohne Verhaltensgewinn, Vorschlag für später.
+  - `shared/bibtex/parser` statt eigenem `.bib`-Parser: Import einer `.mts`-Datei aus Server-Code ist im Lauf nicht erprobt; Vorschlag, weil der Regex-Parser bei `@` am Zeilenanfang in Feldern versagen kann.
+  - `fetch-json.ts` statt `api.ts`: `api.ts` liest das `detail` aus Problem-JSON und kann PATCH; Umstieg später prüfen.
+  - Stub-Werkzeuge entfernen: f9 verlangt alle P1-Tools in `tools/list`.
+  - Sprach-Default in `server-ce/config/settings.js`: Die Datei wird im Dev-Stack nicht eingehängt.
+  - `setuid` statt `chown` in Skripten: im Container nicht erprobt.
+  - Long-Poll über EventEmitter statt Mongo-Abfrage je Sekunde: gehört zu f10.

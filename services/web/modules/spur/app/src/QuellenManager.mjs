@@ -79,7 +79,7 @@ async function vttAuslesen(pfad) {
 
 const AUSLESER = { '.pdf': pdfAuslesen, '.vtt': vttAuslesen }
 
-export function pruefeDateityp(dateiname) {
+function pruefeDateityp(dateiname) {
   if (!AUSLESER[Path.extname(dateiname).toLowerCase()]) {
     throw new Problem(
       415,
@@ -217,8 +217,15 @@ export async function suchen(projectId, begriff) {
     .sort({ quelleId: 1, seite: 1 })
     .limit(SUCH_TREFFER)
     .toArray()
+  const ids = [...new Set(treffer.map(t => String(t.quelleId)))].map(
+    id => new ObjectId(id)
+  )
   const namen = new Map(
-    (await alle(projectId)).map(q => [String(q._id), q])
+    (
+      await (await quellen())
+        .find({ _id: { $in: ids }, projectId }, { projection: { dateiname: 1, art: 1 } })
+        .toArray()
+    ).map(q => [String(q._id), q])
   )
   return treffer.map(t => ({
     quelleId: t.quelleId,

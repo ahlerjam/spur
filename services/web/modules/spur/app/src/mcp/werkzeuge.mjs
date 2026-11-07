@@ -83,14 +83,15 @@ export const WERKZEUGE = {
         )
         .sort({ name: 1 })
         .toArray()
-      const mitRolle = await Promise.all(
-        projekte.map(async p => ({
+      const teil = blatt(projekte, cursor)
+      teil.eintraege = await Promise.all(
+        teil.eintraege.map(async p => ({
           id: p._id,
           name: p.name,
           rolle: await rolle(menschId, p._id),
         }))
       )
-      return blatt(mitRolle, cursor)
+      return teil
     },
   },
 

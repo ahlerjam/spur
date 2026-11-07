@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
@@ -28,13 +28,10 @@ export default function QuellenHolenModal({
   geholt: () => void
 }) {
   const { t } = useTranslation()
-  const [auswahl, setAuswahl] = useState(vorauswahl ?? projekte[0]?.id ?? '')
+  const [gewaehlt, setAuswahl] = useState(vorauswahl)
+  const auswahl = gewaehlt ?? projekte[0]?.id ?? ''
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
-
-  useEffect(() => {
-    if (!auswahl && projekte[0]) setAuswahl(projekte[0].id)
-  }, [auswahl, projekte])
 
   const holen = async () => {
     setLaeuft(true)
