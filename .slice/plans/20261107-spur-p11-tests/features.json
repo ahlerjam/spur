@@ -34,7 +34,7 @@
   "Die Lauf-Karte zeigt im Test für einen Owner „Alle annehmen“ und „Lauf ablehnen“, für eine Review-Rolle kein „Annehmen“",
   "Das Quellen-Panel zeigt im Test „Noch keine Quellen“ ohne Daten und nach einem Fehler der API eine Fehlermeldung in Text",
   "Der Prüfbericht filtert im Test mit „Nur Probleme“ grüne Zeilen heraus",
-  "„Claude verbinden“ zeigt im Test das Token genau einmal und danach nur noch „gültig bis“"], "ui": true},
+  "„Claude verbinden“ zeigt im Test das Token genau einmal und danach nur noch „gültig bis“"], "ui": true, "passes": true},
  {"id": "f8", "title": "Doku für Tests und MongoDB-Kernel", "steps": [
   "`CLAUDE.md` nennt die Befehle für alle Suiten und den Vergleich",
   "Die README hat einen Abschnitt „Entwicklung und Tests“ mit denselben Befehlen und dem Hinweis auf die Liste bekannter Fehler",
