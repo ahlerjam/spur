@@ -27,3 +27,24 @@ export function umkehrOps(changes) {
       c.op.i !== undefined ? { p: c.op.p, d: c.op.i, u: true } : { p: c.op.p, i: c.op.d, u: true }
     )
 }
+
+// Text um eine angenommene Änderung. Eine angenommene Löschung steht nicht mehr im Text,
+// ein Einschub schon; der Kontext liegt jeweils außen herum.
+const KONTEXT = 40
+
+export function kontextUm(text, op) {
+  const ende = op.p + (op.i?.length ?? 0)
+  return { vor: text.slice(Math.max(0, op.p - KONTEXT), op.p), nach: text.slice(ende, ende + KONTEXT) }
+}
+
+// Sucht die Stelle einer angenommenen Änderung im heutigen Text: Kontext davor, Einschub, Kontext
+// danach. Bei mehreren Treffern gilt der nächste zur alten Position; ohne Treffer ein Konflikt.
+export function heutigePosition(text, eintrag) {
+  const muster = eintrag.vor + (eintrag.op.i ?? '') + eintrag.nach
+  let beste = null
+  for (let i = text.indexOf(muster); i !== -1; i = text.indexOf(muster, i + 1)) {
+    const p = i + eintrag.vor.length
+    if (beste === null || Math.abs(p - eintrag.op.p) < Math.abs(beste - eintrag.op.p)) beste = p
+  }
+  return beste
+}

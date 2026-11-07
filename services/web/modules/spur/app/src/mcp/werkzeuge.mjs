@@ -6,6 +6,7 @@ import * as Inbox from '../Inbox.mjs'
 import * as LaufAktionen from '../schreiben/LaufAktionen.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as SchreibManager from '../schreiben/SchreibManager.mjs'
+import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import { WerkzeugFehler } from './fehler.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
@@ -32,11 +33,17 @@ async function rolle(menschId, projectId) {
 }
 
 async function pruefeRecht(menschId, projectId, erlaubt) {
-  const [stufe, eingeschraenkt] = await Promise.all([
-    rolle(menschId, projectId),
-    // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
-    AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null),
-  ])
+  let stufe, eingeschraenkt
+  try {
+    ;[stufe, eingeschraenkt] = await Promise.all([
+      rolle(menschId, projectId),
+      // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
+      AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null),
+    ])
+  } catch (error) {
+    // Ein unbekanntes Projekt sieht für den Aufrufer aus wie ein fremdes.
+    if (!(error instanceof Errors.NotFoundError)) throw error
+  }
   if (eingeschraenkt || !erlaubt.includes(stufe)) {
     throw new WerkzeugFehler(
       'keine_rechte',
@@ -296,7 +303,7 @@ Object.assign(WERKZEUGE, {
       project_id: id,
       doc_id: id.optional(),
       pfad: z.string().optional(),
-      alt: z.string().max(100000),
+      alt: z.string().max(100000).default(''),
       neu: z.string().max(100000),
       idempotenz_schluessel: schluessel,
     }),
@@ -318,7 +325,14 @@ Object.assign(WERKZEUGE, {
     description: 'Legt ein Dokument an; der Inhalt erscheint als Track Change.',
     inputSchema: z.object({
       project_id: id,
-      pfad: z.string().min(1).max(500).regex(/^[^\0]+\.(tex|bib|txt|md)$/),
+      pfad: z
+        .string()
+        .min(1)
+        .max(500)
+        .regex(/^[^\0]+\.(tex|bib|txt|md)$/)
+        .refine(p => !p.split('/').some(teil => teil === '..' || teil === '.'), {
+          message: 'Der Pfad darf keine Teile „..“ oder „.“ enthalten.',
+        }),
       inhalt: z.string().max(100000),
       idempotenz_schluessel: schluessel,
     }),

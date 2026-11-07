@@ -15,6 +15,19 @@
 
 .spur-panel-hinweis {
   padding: 0 var(--spacing-05) var(--spacing-03);
+
+  // Im schmalen Panel steht der Knopf unter dem Text, statt aus der Karte zu ragen.
+  .notification-content-and-cta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-02);
+    min-width: 0;
+  }
+
+  .notification-cta {
+    padding-left: 0;
+    margin-left: 0;
+  }
 }
 
 .spur-loeschen {

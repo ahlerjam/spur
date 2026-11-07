@@ -42,6 +42,14 @@ describe('zitateFinden', () => {
     expect(zeilen.map(z => z.form)).toEqual(['unbekannt', 'unbekannt'])
   })
 
+  it('meldet \\textquote ohne Schlüssel als nicht prüfbar', () => {
+    const zeilen = zitateFinden(String.raw`\textquote{Ohne Beleg.} und \blockquote{Auch ohne.}`)
+    expect(zeilen.map(z => [z.form, z.befehl])).toEqual([
+      ['unbekannt', 'textquote'],
+      ['unbekannt', 'blockquote'],
+    ])
+  })
+
   it('überspringt Literaturbefehle und liest Positionen', () => {
     const quelle = String.raw`ab \bibliography{x} \cite{k}`
     const [z] = zitateFinden(quelle)

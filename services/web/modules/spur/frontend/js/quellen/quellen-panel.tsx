@@ -52,7 +52,17 @@ export default function QuellenPanel() {
   const [andere, setAndere] = useState<Projekt[]>([])
   const [klonVon, setKlonVon] = useState<Projekt | null>(null)
   const [holenDialog, setHolenDialog] = useState<{ vorauswahl?: string } | null>(null)
+  const [meldung, setMeldung] = useState<{ typ: 'success' | 'info'; text: string } | null>(null)
+  const [fokusZurueck, setFokusZurueck] = useState(false)
   const dateiFeld = useRef<HTMLInputElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+
+  // Nach der Vorschau (etwa nach dem Löschen der Quelle) den Fokus im Panel halten statt auf BODY.
+  useEffect(() => {
+    if (!fokusZurueck || offen) return
+    panel.current?.querySelector<HTMLInputElement>('input[type="search"]')?.focus()
+    setFokusZurueck(false)
+  }, [fokusZurueck, offen])
 
   const laden = useCallback(async () => {
     setFehler(null)
@@ -126,6 +136,7 @@ export default function QuellenPanel() {
         startSeite={offen.seite}
         schliessen={() => {
           setOffen(null)
+          setFokusZurueck(true)
           laden()
         }}
       />
@@ -133,7 +144,7 @@ export default function QuellenPanel() {
   }
 
   return (
-    <div className="spur-panel">
+    <div className="spur-panel" ref={panel}>
       <RailPanelHeader title={t('spur_quellen')} />
       <div className="spur-panel-werkzeuge">
         {darfSchreiben && (
@@ -158,7 +169,10 @@ export default function QuellenPanel() {
             <OLButton
               variant="secondary"
               size="sm"
-              onClick={() => setHolenDialog({})}
+              onClick={() => {
+                setMeldung(null)
+                setHolenDialog({})
+              }}
             >
               {t('spur_aus_projekt_holen')}
             </OLButton>
@@ -182,7 +196,10 @@ export default function QuellenPanel() {
               <OLButton
                 variant="secondary"
                 size="sm"
-                onClick={() => setHolenDialog({ vorauswahl: klonVon.id })}
+                onClick={() => {
+                  setMeldung(null)
+                  setHolenDialog({ vorauswahl: klonVon.id })
+                }}
               >
                 {t('spur_holen')}
               </OLButton>
@@ -213,6 +230,9 @@ export default function QuellenPanel() {
       </form>
       <div className="spur-panel-inhalt">
         {fehler && <Notification type="error" content={fehler} />}
+        <div role="status">
+          {meldung && <Notification type={meldung.typ} content={meldung.text} />}
+        </div>
         {quellen === null && !fehler && (
           <p className="spur-leer">
             <OLSpinner size="sm" /> {t('spur_quellen_laden')}
@@ -249,8 +269,13 @@ export default function QuellenPanel() {
           projekte={klonVon && !andere.length ? [klonVon] : andere}
           vorauswahl={holenDialog.vorauswahl}
           schliessen={() => setHolenDialog(null)}
-          geholt={() => {
+          geholt={anzahl => {
             setHolenDialog(null)
+            setMeldung(
+              anzahl
+                ? { typ: 'success', text: t('spur_quellen_geholt', { count: anzahl }) }
+                : { typ: 'info', text: t('spur_quellen_schon_da') }
+            )
             laden()
             andereLaden()
             pruefenVerzoegert()

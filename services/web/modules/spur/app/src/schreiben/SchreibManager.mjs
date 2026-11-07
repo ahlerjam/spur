@@ -165,7 +165,13 @@ export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) 
         'Unter diesem Pfad gibt es schon eine Datei. Bitte doc_edit nehmen oder einen anderen Pfad wählen.'
       )
     }
-    const { doc } = await EditorController.promises.upsertDocWithPath(projectId, ziel, [''], 'spur', botId)
+    let doc
+    try {
+      ;({ doc } = await EditorController.promises.upsertDocWithPath(projectId, ziel, [''], 'spur', botId))
+    } catch (error) {
+      if (!(error instanceof Errors.InvalidNameError)) throw error
+      throw new WerkzeugFehler('pfad_ungueltig', 'Dieser Dateiname ist nicht erlaubt. Bitte einen anderen Pfad wählen.')
+    }
     return await bearbeiten({ projectId, botId, docId: String(doc._id), alt: '', neu: inhalt })
   })
 }

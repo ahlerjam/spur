@@ -24,7 +24,8 @@ export async function botFuer(mensch) {
     { _id: bot._id },
     { $set: { 'spur.botFuer': mensch._id }, $unset: { hashedPassword: '' } }
   )
-  return { ...bot, spur: { botFuer: mensch._id } }
+  // createNewUser liefert ein Mongoose-Dokument; ein Spread verlöre dessen _id.
+  return await db.users.findOne({ _id: bot._id })
 }
 
 export async function tokenErzeugen(menschId) {
@@ -80,8 +81,16 @@ export async function pruefen(token) {
   })
   if (!eintrag || eintrag.accessTokenExpiresAt <= jetzt()) return null
   // Wie GitBridgePATManager: gesperrte Konten verlieren auch den Token-Zugang.
-  const mensch = await db.users.findOne({ _id: eintrag.user_id }, { projection: { suspended: 1 } })
+  const mensch = await db.users.findOne(
+    { _id: eintrag.user_id },
+    { projection: { suspended: 1, first_name: 1, email: 1 } }
+  )
   if (!mensch || mensch.suspended) return null
+  if (!eintrag.spurBotId) {
+    // Tokens aus der Zeit vor der Korrektur in botFuer tragen keinen Bot: nachträglich verknüpfen.
+    eintrag.spurBotId = (await botFuer(mensch))._id
+    await db.oauthAccessTokens.updateOne({ _id: eintrag._id }, { $set: { spurBotId: eintrag.spurBotId } })
+  }
   return { menschId: eintrag.user_id, botId: eintrag.spurBotId, tokenId: eintrag._id }
 }
 

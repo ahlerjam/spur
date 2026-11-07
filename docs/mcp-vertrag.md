@@ -42,7 +42,8 @@ Stand: Entwurf vor Lauf 0. Änderungen an Namen und Fehlercodes gelten als Bruch
 | `konflikt` | Der erwartete Alttext stimmt nicht mehr, neu lesen |
 | `doc_fehlt` | Das Dokument ist gelöscht |
 | `grenze_changes` | Das Dokument nähert sich 2000 offenen Changes |
-| `keine_rechte` | Die Projektrolle erlaubt das nicht |
+| `keine_rechte` | Die Projektrolle erlaubt das nicht, oder das Projekt gibt es nicht |
+| `pfad_ungueltig` | Nur `doc_create`: Der Dateiname ist nicht erlaubt |
 
 Unerkannte Zitatformen und nicht auflösbare DOIs werden angenommen, aber rot markiert und nie automatisch übernommen.
 

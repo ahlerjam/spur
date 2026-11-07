@@ -25,7 +25,7 @@ export default function QuellenHolenModal({
   projekte: Projekt[]
   vorauswahl?: string
   schliessen: () => void
-  geholt: () => void
+  geholt: (anzahl: number) => void
 }) {
   const { t } = useTranslation()
   const [gewaehlt, setAuswahl] = useState(vorauswahl)
@@ -37,8 +37,12 @@ export default function QuellenHolenModal({
     setLaeuft(true)
     setFehler(null)
     try {
-      await jsonAnfrage('POST', projektPfad('/quellen/holen'), { projekt: auswahl })
-      geholt()
+      const { anzahl } = await jsonAnfrage<{ anzahl: number }>(
+        'POST',
+        projektPfad('/quellen/holen'),
+        { projekt: auswahl }
+      )
+      geholt(anzahl)
     } catch (error) {
       setFehler((error as Error).message)
       setLaeuft(false)

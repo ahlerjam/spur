@@ -1,5 +1,6 @@
 import { promiseMapWithLimit } from '@overleaf/promise-utils'
 import AuthorizationManager from '../../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
+import EditorRealTimeController from '../../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
@@ -8,7 +9,7 @@ import { Problem } from '../probleme.mjs'
 import { einstellungen, laeufe } from '../sammlungen.mjs'
 import * as LaufManager from './LaufManager.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
-import { umkehrOps } from './ops.mjs'
+import { heutigePosition, kontextUm, umkehrOps } from './ops.mjs'
 
 async function pfadVon(projectId, docId) {
   try {
@@ -81,6 +82,13 @@ function mussOffenSein(lauf) {
   }
 }
 
+// Tippt jemand in einen Einschub, zerfällt er in mehrere Changes mit gleichem Zeitstempel.
+// Abgelehnt wird immer der ganze Einschub.
+function gleicherEinschub(change, alle, nurIds) {
+  const gewaehlt = alle.filter(c => nurIds.includes(c.id))
+  return gewaehlt.some(c => c.id === change.id || c.metadata?.ts === change.metadata?.ts)
+}
+
 async function statusSetzen(lauf, status) {
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { status } })
 }
@@ -93,8 +101,10 @@ export async function annehmen(projectId, lauf, userId, nurIds) {
     const ids = d.changes.map(c => c.id).filter(id => !nurIds || nurIds.includes(id))
     if (!ids.length) continue
     await DocumentUpdaterHandler.promises.acceptChanges(projectId, d.docId, ids, userId)
+    // Wie TrackChangesController: offene Editoren entfernen die Marken sofort.
+    EditorRealTimeController.emitToRoom(projectId, 'accept-changes', d.docId, ids)
     for (const c of d.changes.filter(c => ids.includes(c.id))) {
-      angenommen.push({ docId: d.docId, op: c.op })
+      angenommen.push({ docId: d.docId, op: c.op, ...kontextUm(d.text, c.op) })
     }
   }
   const rest = liste.reduce((n, d) => n + d.changes.length, 0) - angenommen.length
@@ -113,7 +123,7 @@ export async function ablehnen(projectId, lauf, userId, nurIds) {
   const liste = await aenderungen(projectId, lauf)
   let abgelehnt = 0
   for (const d of liste) {
-    const changes = d.changes.filter(c => !nurIds || nurIds.includes(c.id))
+    const changes = d.changes.filter(c => !nurIds || gleicherEinschub(c, d.changes, nurIds))
     if (!changes.length) continue
     await spurUpdate(projectId, d.docId, umkehrOps(changes), d.version, { userId })
     abgelehnt += changes.length
@@ -121,6 +131,15 @@ export async function ablehnen(projectId, lauf, userId, nurIds) {
   const rest = liste.reduce((n, d) => n + d.changes.length, 0) - abgelehnt
   if (rest === 0) await statusSetzen(lauf, 'abgelehnt')
   return { abgelehnt, rest }
+}
+
+function konflikt(text, p) {
+  const zeile = text.slice(0, Math.min(p, text.length)).split('\n').length
+  return new Problem(
+    409,
+    'konflikt',
+    `Konflikt in Zeile ${zeile}: Der Text wurde nach der Annahme geändert. Es wurde nichts zurückgenommen.`
+  )
 }
 
 // Rücknahme eines angenommenen Laufs als neue Track Changes; bei Überschneidung nichts ändern.
@@ -132,18 +151,15 @@ export async function zuruecknehmen(projectId, lauf, userId) {
   for (const docId of [...new Set(lauf.angenommen.map(a => a.docId))]) {
     const { lines, version } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
     const text = lines.join('\n')
-    const ops = lauf.angenommen.filter(a => a.docId === docId).map(a => a.op)
-    for (const op of ops) {
-      const passt =
-        op.i === undefined || text.slice(op.p, op.p + op.i.length) === op.i
-      if (!passt) {
-        const zeile = text.slice(0, op.p).split('\n').length
-        throw new Problem(
-          409,
-          'konflikt',
-          `Konflikt in Zeile ${zeile}: Der Text wurde nach der Annahme geändert. Es wurde nichts zurückgenommen.`
-        )
-      }
+    const ops = []
+    for (const eintrag of lauf.angenommen.filter(a => a.docId === docId)) {
+      const p = eintrag.vor === undefined ? eintrag.op.p : heutigePosition(text, eintrag)
+      const altePasstNicht =
+        eintrag.vor === undefined &&
+        eintrag.op.i !== undefined &&
+        text.slice(p, p + eintrag.op.i.length) !== eintrag.op.i
+      if (p === null || altePasstNicht) throw konflikt(text, eintrag.op.p)
+      ops.push({ ...eintrag.op, p })
     }
     plan.push({ docId, version, ops: umkehrOps(ops.map(op => ({ op }))).map(({ u, ...op }) => op) })
   }

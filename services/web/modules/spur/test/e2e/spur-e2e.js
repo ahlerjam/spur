@@ -349,6 +349,22 @@ async page => {
       const smith = liste.quellen.find(q => q.dateiname === 'smith2024.pdf')
       const datei = `${BASE}/spur/project/${projektId}/quellen/${smith.id}/datei`
       ok((await page.request.get(datei)).status() === 200, 'Besitzer lädt nicht')
+      const ohneFeld = await page.evaluate(async url => {
+        const formular = new FormData()
+        formular.append('falsch', new Blob(['x']), 'x.pdf')
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-Csrf-Token': document.querySelector('meta[name="ol-csrfToken"]').content },
+          body: formular,
+        })
+        return { status: r.status, typ: r.headers.get('content-type'), body: await r.json().catch(() => null) }
+      }, `${BASE}/spur/project/${projektId}/quellen`)
+      ok(
+        ohneFeld.status === 400 &&
+          ohneFeld.typ.startsWith('application/problem+json') &&
+          ohneFeld.body?.type === 'urn:spur:problem:datei_fehlt',
+        `Upload ohne Feld: ${JSON.stringify(ohneFeld)}`
+      )
 
       await anmelden('e2e-leser@example.org')
       await page.goto(`${BASE}/project/${projektId}`)
@@ -394,6 +410,20 @@ async page => {
       await page.locator('.cm-content').first().waitFor()
       await panelOeffnen('Quellen')
       await sichtbar('Preprint v1')
+      const versatz = await page.evaluate(async basis => {
+        const t = document.querySelector('meta[name="ol-csrfToken"]').content
+        const id = location.pathname.split('/').pop()
+        const { quellen } = await (await fetch(`${basis}/spur/project/${id}/quellen`)).json()
+        const pdf = quellen.find(q => q.dateiname === 'smith2024.pdf')
+        const setzen = async wert =>
+          (await fetch(`${basis}/spur/project/${id}/quellen/${pdf.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': t },
+            body: JSON.stringify({ versatz: wert }),
+          })).status
+        return [await setzen(1e9), await setzen(-1e9), await setzen(null)]
+      }, BASE)
+      ok(JSON.stringify(versatz) === '[422,422,200]', `Versatz-Grenzen: ${versatz}`)
 
       await projektOeffnen('E2E Viele')
       await panelOeffnen('Quellen')
@@ -419,6 +449,9 @@ async page => {
       await page.getByRole('button', { name: 'Aus anderem Projekt holen' }).click()
       await page.getByLabel('Projekt').selectOption({ label: 'Demo' })
       await page.getByRole('button', { name: 'Holen', exact: true }).click()
+      await sichtbar('1 Quelle geholt')
+      await quelleHolen('Demo')
+      await sichtbar('Nichts zu holen: Alle Quellen aus diesem Projekt sind schon da.')
       await page.getByRole('button', { name: 'smith2024.pdf' }).click()
       await page.getByRole('button', { name: 'Nächste Seite' }).click()
       await page.getByRole('button', { name: 'Nächste Seite' }).click()
@@ -451,6 +484,14 @@ async page => {
       await page.locator('.cm-content').first().waitFor()
       await panelOeffnen('Quellen')
       await sichtbar('Quellen wurden nicht mitkopiert')
+      ok(
+        await page.locator('.spur-panel-hinweis').evaluate(hinweis => {
+          const karte = hinweis.querySelector('.notification').getBoundingClientRect()
+          const knopf = hinweis.querySelector('.notification-cta button').getBoundingClientRect()
+          return knopf.right <= karte.right + 0.5 && knopf.left >= karte.left - 0.5
+        }),
+        '„Holen“ ragt aus dem Klon-Hinweis'
+      )
       await page.getByRole('button', { name: 'Holen', exact: true }).click()
       await page.locator('.modal').getByRole('button', { name: 'Holen', exact: true }).click()
       await page.getByRole('button', { name: 'smith2024.pdf' }).waitFor()
@@ -460,6 +501,11 @@ async page => {
       await page.locator('.modal').getByText('1 Zitat nutzt diese Quelle').waitFor()
       await page.getByRole('button', { name: 'Endgültig löschen' }).click()
       await sichtbar('Noch keine Quellen')
+      await page.waitForFunction(() => document.activeElement?.closest('.spur-panel'))
+      ok(
+        await page.evaluate(() => document.activeElement?.matches('input[type="search"]')),
+        'Fokus nach dem Löschen nicht im Panel'
+      )
       await panelOeffnen('Prüfbericht')
       await sichtbar('Quelle fehlt')
     },
@@ -470,6 +516,8 @@ async page => {
       for (const [projekt, erwartet] of [
         ['E2E APA', String.raw`\enquote{${SATZ}} \autocite[347]{smith2024}`],
         ['E2E natbib', String.raw`\enquote{${SATZ}} \citep[S.~347]{smith2024}`],
+        // Ohne .bib: Die neue references.bib muss ohne Neuladen im Dateibaum erscheinen.
+        ['E2E Ohne Bib', String.raw`\enquote{${SATZ}} \autocite[347]{smith2024}`],
       ]) {
         await projektOeffnen(projekt)
         await panelOeffnen('Quellen')
@@ -619,6 +667,23 @@ async page => {
       const loeschen = await seitenPost('/user/delete', { password: PASSWORT })
       ok(loeschen.status === 200, `Konto löschen: ${loeschen.status}`)
       ok((await mcp('spur_e2e_weg', 'tools/list')).status === 401, 'Token überlebt Kontolöschung')
+
+      // Das allererste Token eines neuen Kontos legt den Bot an und muss sofort wirken.
+      await anmelden('e2e-neu@example.org')
+      await page.goto(`${BASE}/user/settings`)
+      await page.getByRole('button', { name: 'Token erzeugen' }).click()
+      await page.locator('.spur-befehl').waitFor()
+      const erstes = await page.locator('.spur-befehl').getAttribute('data-spur-token')
+      const neuPid = await projektId(erstes, 'E2E Neu')
+      const angefuegt = await werkzeug(erstes, 'doc_edit', {
+        project_id: neuPid, pfad: 'main.tex', neu: 'Von Claude angefügt.', idempotenz_schluessel: 'e2e-neu-1',
+      })
+      ok(!angefuegt.fehler && angefuegt.inhalt.aenderung, `doc_edit mit erstem Token: ${JSON.stringify(angefuegt.inhalt)}`)
+      const lesen = await werkzeug(erstes, 'doc_read', { project_id: neuPid, pfad: 'main.tex' })
+      ok(lesen.inhalt.text.endsWith('Von Claude angefügt.'), `Ohne Alttext nicht angefügt: ${lesen.inhalt.text}`)
+      await werkzeug(erstes, 'wait_for_event', { max_sekunden: 1 })
+      const verbindung = await (await page.request.get(`${BASE}/spur/project/${neuPid}/claude`)).json()
+      ok(verbindung.verbunden === true, `Erstes Token: Panel nicht verbunden: ${JSON.stringify(verbindung.verbunden)}`)
     },
 
     async f9() {
@@ -644,6 +709,33 @@ async page => {
 
       const fremdLesen = await werkzeug(token, 'doc_read', { project_id: fremd, pfad: 'main.tex' })
       ok(fremdLesen.fehler && fremdLesen.inhalt.fehler === 'keine_rechte', 'Fremdes Projekt lesbar')
+      const unbekannt = await werkzeug(token, 'doc_read', { project_id: 'ffffffffffffffffffffffff', pfad: 'main.tex' })
+      ok(unbekannt.inhalt.fehler === 'keine_rechte', `Unbekanntes Projekt: ${JSON.stringify(unbekannt.inhalt)}`)
+
+      const editSchema = liste.daten.result.tools.find(w => w.name === 'doc_edit').inputSchema
+      ok(!(editSchema.required ?? []).includes('alt'), `doc_edit verlangt alt: ${editSchema.required}`)
+
+      const ausbruch = await mcp(token, 'tools/call', {
+        name: 'doc_create',
+        arguments: { project_id: await projektId(token, 'E2E Schreiben'), pfad: '../../etc/x.tex', inhalt: 'x', idempotenz_schluessel: 'e2e-pfad' },
+      })
+      const ausbruchText = JSON.stringify(ausbruch.daten)
+      ok(
+        !ausbruchText.includes('interner_fehler') && (ausbruch.daten.error || ausbruch.daten.result?.isError),
+        `doc_create mit ../: ${ausbruchText}`
+      )
+
+      const kaputt = await page.request.post(`${BASE}/spur/mcp`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+        data: '{"jsonrpc": "2.0", kaputt',
+      })
+      const kaputtBody = await kaputt.json().catch(() => null)
+      ok(
+        kaputt.status() === 400 &&
+          kaputt.headers()['content-type']?.startsWith('application/problem+json') &&
+          kaputtBody?.type === 'urn:spur:problem:json_kaputt',
+        `Kaputtes JSON: ${kaputt.status()} ${JSON.stringify(kaputtBody)}`
+      )
 
       const demo = await projektId(token, 'Demo')
       const suche = await werkzeug(token, 'source_search', { project_id: demo, query: 'declarative memory' })
@@ -673,6 +765,8 @@ async page => {
     await panelOeffnen('Claude')
     await sichtbar('Claude nicht verbunden')
     await sichtbar('claude --allowedTools')
+    const zahl = await seitenPost(`/spur/project/${demo}/claude/auftrag`, { text: 123 })
+    ok(zahl.status === 422, `Auftrag mit Zahl: ${zahl.status}`)
 
     await warteStarten(token)
     await sichtbar('Claude verbunden', 20000)
@@ -879,6 +973,12 @@ async page => {
     await karte().getByText('Angenommen', { exact: true }).waitFor({ timeout: 20000 })
     await imEditor('Von Claude zwei.')
     ok((await changesVonClaude()).length === 0, 'Nach Annahme bleiben Changes')
+    // Ohne Neuladen: Der offene Editor nimmt die Marken der angenommenen Einschübe weg.
+    await page.waitForFunction(
+      () => ![...document.querySelectorAll('.cm-content .ol-cm-change-i')].some(e => e.textContent.includes('Von Claude')),
+      null,
+      { timeout: 10000 }
+    )
     const angenommenerLauf = await lauf()
     const zweimal = await laufAktion(pid, angenommenerLauf.id, 'ablehnen')
     ok(zweimal.status === 409, `Abgeschlossener Lauf lässt sich ablehnen: ${zweimal.status}`)
@@ -946,6 +1046,16 @@ async page => {
     await editorEinfuegen('Einschub von Claude', 'NUTZER ')
     await gespeichert(token, pid, 'NUTZER')
     const id = (await lauf()).id
+
+    // Ein Stück des gespaltenen Einschubs abgelehnt: der ganze Einschub geht, der Nutzertext bleibt.
+    const stueck = (await changesVonClaude()).find(c => c.op.i?.includes('Ein langer'))
+    const einzeln = await laufAktion(pid, id, 'ablehnen', { change_ids: [stueck.id] })
+    ok(einzeln.status === 200, `Einzeln ablehnen: ${einzeln.status}`)
+    ok(
+      !(await changesVonClaude()).some(c => /langer|Einschub von Claude/.test(c.op.i ?? '')),
+      'Gespaltener Einschub nur teilweise abgelehnt'
+    )
+    await gespeichert(token, pid, 'Gamma Satz.NUTZER ')
 
     await page.goto(`${BASE}/project`)
     const veraltet = await laufAktion(pid, id, 'ablehnen', { change_ids: ['ffffffffffffffffffffffff'] })
@@ -1025,6 +1135,34 @@ async page => {
     await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
     await karte().getByText(/Konflikt in Zeile \d+/).waitFor({ timeout: 20000 })
     ok((await docText()) === vorher, 'Konflikt änderte Text')
+
+    // Angenommene Löschung, danach eine Handänderung weiter oben: Die Rücknahme setzt die
+    // Zeile an ihre alte Stelle, nicht an die alte Zeichenposition.
+    const original = await docText()
+    const zeile = original.split('\n').find(z => z.startsWith('Delta'))
+    ok(!(await edit({ alt: `${zeile}\n`, neu: '' })).fehler, 'Löschung')
+    await fertig('Zeile gelöscht')
+    ok((await lauf()).status === 'angenommen', 'Löschung nicht angenommen')
+    await page.waitForFunction(
+      z => !window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(z),
+      zeile,
+      { timeout: 15000 }
+    )
+    await editorEinfuegen('Alpha', 'Ganz oben neu. ')
+    await gespeichert(token, pid, 'Ganz oben neu. ')
+    // Die Karte lädt alle 5 Sekunden: erst klicken, wenn sie den neuen Lauf zeigt.
+    await karte().getByText('Zeile gelöscht').waitFor({ timeout: 20000 })
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const erwartet = original.replace('Alpha', 'Ganz oben neu. Alpha')
+    await page
+      .waitForFunction(
+        t => window.overleaf.unstable.store.get('editor.view').state.doc.toString() === t,
+        erwartet,
+        { timeout: 15000 }
+      )
+      .catch(() => {})
+    ok((await docText()) === erwartet, `Rücknahme an falscher Stelle:\n${await docText()}\nerwartet:\n${erwartet}`)
 
     await anmelden('e2e-review@example.org')
     await laufProjekt('e2e-review@example.org')

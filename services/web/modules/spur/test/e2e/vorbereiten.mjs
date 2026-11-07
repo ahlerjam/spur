@@ -191,6 +191,7 @@ const link = await konto('e2e-link@example.org')
 
 await neuAnlegen(a, 'E2E APA', { 'main.tex': APA, 'references.bib': BIB })
 await neuAnlegen(a, 'E2E natbib', { 'main.tex': NATBIB, 'references.bib': BIB })
+await neuAnlegen(a, 'E2E Ohne Bib', { 'main.tex': APA })
 
 const leer = await projekt(a, 'E2E Quellen', { 'main.tex': LEER })
 await projektAufraeumen(leer._id)
@@ -286,6 +287,18 @@ if (altWeg) {
 await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': 'e2e-weg@example.org' })
 const weg = await konto('e2e-weg@example.org')
 await testToken(weg, 'spur_e2e_weg', new Date(Date.now() + 24 * 3600 * 1000))
+
+// Ein Konto ohne Bot und ohne Token: f8 prüft das allererste Token eines neuen Nutzers.
+for (const email of ['e2e-neu@example.org']) {
+  const alt = await db.users.findOne({ email })
+  if (alt) {
+    await kontoAufraeumen(alt._id)
+    await UserDeleter.promises.deleteUser(alt._id, { force: true, skipEmail: true, ipAddress: '127.0.0.1' })
+  }
+  await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': email })
+}
+const neu = await konto('e2e-neu@example.org')
+await neuAnlegen(neu, 'E2E Neu', { 'main.tex': 'Erster Absatz.\n' })
 
 for (const sammlung of [ereignisse, herzschlaege, nachrichten]) {
   await (await sammlung()).deleteMany({})

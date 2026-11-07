@@ -39,6 +39,12 @@ function hochladenMitGrenze(req, res, next) {
         res,
         new Problem(413, 'zu_gross', 'Datei ist größer als 50 MB. Bitte verkleinern.')
       )
+    } else if (error?.name === 'MulterError' || error?.message?.startsWith('Multipart')) {
+      // Falsches Feld, kaputtes Multipart: Fehler des Aufrufers, kein 500.
+      problemSenden(
+        res,
+        new Problem(400, 'datei_fehlt', 'Es kam keine Datei im Feld „datei“ an. Bitte erneut hochladen.')
+      )
     } else {
       next(error)
     }

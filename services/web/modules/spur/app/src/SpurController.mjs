@@ -123,8 +123,9 @@ export const quelleAendern = mitProblemen(async (req, res) => {
   if (versatz !== undefined && quelle.art !== 'pdf') {
     throw new Problem(422, 'versatz', 'Nur PDF-Quellen haben Seitenzahlen.')
   }
-  if (versatz !== undefined && versatz !== null && !Number.isInteger(versatz)) {
-    throw new Problem(422, 'versatz', 'Der Versatz muss eine ganze Zahl sein.')
+  // Gedruckte Seitenzahlen liegen in Zeitschriften weit über der PDF-Seite, aber nie über 100000.
+  if (versatz !== undefined && versatz !== null && !(Number.isInteger(versatz) && Math.abs(versatz) <= 100000)) {
+    throw new Problem(422, 'versatz', 'Der Versatz muss eine ganze Zahl zwischen -100000 und 100000 sein.')
   }
   res.json(quelleFuerClient(await QuellenManager.aendern(quelle, { fassung, versatz })))
 })
@@ -250,7 +251,7 @@ export const claudeStatus = mitProblemen(async (req, res) => {
 })
 
 export const claudeAuftrag = mitProblemen(async (req, res) => {
-  const text = String(req.body.text ?? '').trim()
+  const text = typeof req.body.text === 'string' ? req.body.text.trim() : ''
   if (!text || text.length > 20000) {
     throw new Problem(422, 'auftrag', 'Bitte einen Auftrag mit 1 bis 20000 Zeichen schreiben.')
   }

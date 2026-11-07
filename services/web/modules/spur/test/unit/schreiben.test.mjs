@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { opsFuer, umkehrOps } from '../../app/src/schreiben/ops.mjs'
+import { heutigePosition, kontextUm, opsFuer, umkehrOps } from '../../app/src/schreiben/ops.mjs'
 
 describe('opsFuer', () => {
   it('fügt nur den neuen Teil ein', () => {
@@ -29,5 +29,33 @@ describe('umkehrOps', () => {
       { p: 7, i: 'alt', u: true },
       { p: 4, d: 'neu', u: true },
     ])
+  })
+})
+
+describe('heutigePosition', () => {
+  const vorher = 'Erster Satz.\nZweiter Satz.\nDritter Satz.'
+  // Angenommene Löschung von „Zweiter Satz.\n“ an Position 13: Im Text steht sie nicht mehr.
+  const geloescht = { p: 13, d: 'Zweiter Satz.\n' }
+  const danach = 'Erster Satz.\nDritter Satz.'
+
+  it('findet die Stelle nach einer Handänderung weiter oben', () => {
+    const eintrag = { op: geloescht, ...kontextUm(danach, geloescht) }
+    const heute = 'Ganz neuer Anfang. Erster Satz.\nDritter Satz.'
+    expect(heutigePosition(heute, eintrag)).toBe(32)
+    expect(heute.slice(0, 32) + geloescht.d + heute.slice(32)).toBe(
+      'Ganz neuer Anfang. ' + vorher
+    )
+  })
+
+  it('meldet keinen Treffer, wenn der Kontext geändert wurde', () => {
+    const eintrag = { op: geloescht, ...kontextUm(danach, geloescht) }
+    expect(heutigePosition('Erster Satz, geändert.\nDritter Satz.', eintrag)).toBeNull()
+  })
+
+  it('findet einen Einschub samt Kontext', () => {
+    const op = { p: 6, i: 'großer ' }
+    const text = 'Der ein großer Hund.'
+    const eintrag = { op: { ...op, p: 8 }, ...kontextUm(text, { ...op, p: 8 }) }
+    expect(heutigePosition('Vorab. ' + text, eintrag)).toBe(15)
   })
 })

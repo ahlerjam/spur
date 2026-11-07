@@ -92,3 +92,14 @@
 - Nachtrag 360 px: Ein geöffnetes spur-Panel (Quellen, Vorschau, Prüfbericht, Claude) nimmt unter 576 px die Breite neben der Rail ein (320 statt 47 px); Schließen führt zurück zum Editor. Bei 1280 px unverändert (185 px). Overleafs eigene Panels bleiben unberührt.
 - E2E-Helfer `anmelden` verlässt die alte Seite vor dem Löschen der Cookies: Zwei Läufe scheiterten sonst am Login („invalid csrf token“), weil Polls der alten Seite eine neue Session setzten.
 - Letzter E2E-Lauf nach diesen Änderungen: f1–f15 ok.
+
+## Abnahme-Runde (unabhängige Abnahme, 2026-11-07)
+Behoben, je mit E2E-Probe:
+- f3: Upload ohne Feld `datei` (oder kaputtes Multipart) ergibt 400 `datei_fehlt` als RFC 9457 statt HTML-500.
+- f5: Nach „Endgültig löschen“ liegt der Fokus im Suchfeld des Panels; „Holen“ steht im Klon-Hinweis unter dem Text statt aus der Karte zu ragen; „Holen“ meldet „1 Quelle geholt“ bzw. „Nichts zu holen: Alle Quellen aus diesem Projekt sind schon da.“
+- f8 (und Folgen f10, f11): `botFuer` liest den neuen Bot nach dem Anlegen aus Mongo, das erste Token trägt `spurBotId`. `pruefen` verknüpft Tokens ohne Bot nachträglich. E2E mit frisch angelegtem Konto `e2e-neu`: erstes Token, `doc_edit` ohne Alttext, `wait_for_event`, Panel „verbunden“.
+- f9: Unbekanntes Projekt ergibt `keine_rechte`; `doc_create` lehnt Pfade mit `..`/`.` per Schema ab und meldet unzulässige Namen als `pfad_ungueltig` (im Vertrag ergänzt); kaputtes JSON ergibt 400 `json_kaputt` als RFC 9457 (eigener Parser vor dem Overleaf-Parser über `appMiddleware`); `alt` ist in `doc_edit` optional, ohne Alttext wird angefügt.
+- f15: Beim Annehmen wird je Änderung 40 Zeichen Kontext davor und danach gespeichert; die Rücknahme sucht Kontext plus Einschub im heutigen Text (bei mehreren Treffern der nächste zur alten Position) oder meldet „Konflikt in Zeile …“ ohne Änderung. E2E: angenommene Löschung, danach Handänderung weiter oben, Rücknahme setzt die Zeile an die richtige Stelle. Unit-Tests für `kontextUm` und `heutigePosition`. Läufe, die vor dieser Änderung angenommen wurden, haben keinen Kontext und nutzen die alte Prüfung.
+Kleinere Befunde, behoben: f13 offene Editoren erhalten `accept-changes` und nehmen die Marken sofort weg; f14 Zeilen-Ablehnen lehnt alle Stücke eines gespaltenen Einschubs ab (gleicher Zeitstempel); f6 `references.bib` entsteht über `EditorController` und erscheint ohne Neuladen im Dateibaum (E2E-Projekt „E2E Ohne Bib“); f1 `sign_up` hat eine deutsche Übersetzung; Versatz nur ganzzahlig in ±100000; Auftrag nur als Text; 429 mit `Retry-After`; `\textquote`/`\blockquote` ohne Beleg erscheinen als „Nicht prüfbar“.
+- Unit-Tests des document-updater laufen jetzt mit (`TEST_NAME_PATTERN` gesetzt); der HttpController-Test stubbt `UpdateManager` und prüft `spurUpdate` (204, 409, 404). 531 grün.
+- Nicht automatisiert geprüft: `Retry-After` (600 Aufrufe pro Minute im Test zu teuer).

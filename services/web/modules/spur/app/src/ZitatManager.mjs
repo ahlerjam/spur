@@ -1,4 +1,5 @@
-import ProjectEntityUpdateHandler from '../../../../app/src/Features/Project/ProjectEntityUpdateHandler.mjs'
+// EditorController meldet neue Dateien sofort an offene Editoren (Dateibaum).
+import EditorController from '../../../../app/src/Features/Editor/EditorController.mjs'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { bibLesen } from './pruefung/bib.mjs'
 import { zitierpaket } from './pruefung/latex.mjs'
@@ -100,7 +101,7 @@ async function bibSicherstellen(projectId, docs, quelle, userId) {
   }
   const eintrag = bibEintrag(quelle.key, quelle).split('\n')
   if (bibDocs.length) {
-    await ProjectEntityUpdateHandler.promises.appendToDocWithPath(
+    await EditorController.promises.appendToDoc(
       projectId,
       bibDocs[0].docId,
       ['', ...eintrag],
@@ -108,7 +109,7 @@ async function bibSicherstellen(projectId, docs, quelle, userId) {
       userId
     )
   } else {
-    await ProjectEntityUpdateHandler.promises.upsertDocWithPath(
+    await EditorController.promises.upsertDocWithPath(
       projectId,
       '/references.bib',
       eintrag,

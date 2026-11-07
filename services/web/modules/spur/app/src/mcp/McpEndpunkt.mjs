@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream'
+import express from 'express'
 import { pipeline } from 'node:stream/promises'
 import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
@@ -88,8 +89,12 @@ export async function mcpAnfrage(req, res) {
     }
     try {
       await begrenzer.consume(String(zugang.menschId), 1, { method: 'userId' })
-    } catch {
-      throw new Problem(429, 'zu_viele_anfragen', 'Zu viele Aufrufe. Bitte eine Minute warten.')
+    } catch (error) {
+      // Abgewiesen wird mit einem RateLimiterRes; ein echter Error ist ein Ausfall, kein Limit.
+      if (error instanceof Error) throw error
+      const sekunden = Math.max(1, Math.ceil((error?.msBeforeNext ?? 60000) / 1000))
+      res.setHeader('Retry-After', String(sekunden))
+      throw new Problem(429, 'zu_viele_anfragen', `Zu viele Aufrufe. Bitte ${sekunden} Sekunden warten.`)
     }
     const antwort = await handler.fetch(anfrageAus(req, res), {
       authInfo: {
@@ -118,4 +123,23 @@ export async function mcpAnfrage(req, res) {
       problemSenden(res, new Problem(500, 'intern', 'spur konnte die Anfrage nicht bearbeiten.'))
     }
   }
+}
+
+const jsonParser = express.json({ limit: Settings.max_json_request_size })
+
+// Läuft vor dem Body-Parser von Overleaf, der kaputtes JSON mit leerem 400 beantwortet.
+export function mcpJson(req, res, next) {
+  jsonParser(req, res, error => {
+    if (!error) return next()
+    problemSenden(
+      res,
+      new Problem(
+        error.status === 413 ? 413 : 400,
+        error.status === 413 ? 'zu_gross' : 'json_kaputt',
+        error.status === 413
+          ? 'Die Anfrage ist zu groß.'
+          : 'Der Body ist kein gültiges JSON. Bitte eine JSON-RPC-Nachricht senden.'
+      )
+    )
+  })
 }
