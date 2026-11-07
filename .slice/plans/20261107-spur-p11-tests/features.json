@@ -4,7 +4,7 @@
   "Die Ausgabe endet mit einer Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“",
   "Kein Fehler mehr mit „failed to resolve \"extends\":\"../../tsconfig.backend.json\"“, „Refusing to clear database“ oder „Cannot read properties of undefined (reading 'externalAuth')“ in der Ausgabe",
   "Testdateien, die Module aus Overleaf Server Pro brauchen, erscheinen als ausgeschlossen mit Grund, nicht als fehlgeschlagen",
-  "Die Zahl der fehlgeschlagenen Tests liegt deutlich unter den gemessenen 408"]},
+  "Die Zahl der fehlgeschlagenen Tests liegt deutlich unter den gemessenen 408"], "passes": true},
  {"id": "f2", "title": "Overleafs Frontend-Suite läuft", "steps": [
   "Entwickler führt `spur-dev upstream frontend` aus: die Suite lädt ohne „Your application tried to access @“ und läuft bis zum Ende",
   "Die Ausgabe endet mit der Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“",
