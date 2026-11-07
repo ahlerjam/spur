@@ -51,7 +51,10 @@ Forschende und Studierende, allein oder im kleinen Team. Betreiber installieren 
 - Builder nutzen ausschließlich `spur-dev` (siehe `CLAUDE.md`): `up`, `reload` (etwa 50 Sekunden, ohne Netz), `restart`, `test`, `user`, `logs`. Der Stack läuft auf `http://localhost:8080`.
 - Neue npm-Pakete sind in einem Lauf ein Stoppgrund. Sie brauchen vorher einen Lauf des Workflows `Dev image`. Vor P1 müssen die benötigten Pakete, vor allem `@modelcontextprotocol/sdk` und `@modelcontextprotocol/express`, im Lockfile stehen und `@lezer/common` und `@lezer/lr` unter `dependencies` liegen.
 - Für Betreiber gilt: `make start` startet mit dem veröffentlichten Image, `make test` die Unit-Tests, `make e2e` Playwright gegen den Stack, `make seed` legt Demo-Daten an.
-- `SPUR_FAKE_AGENT=1` ersetzt Claude durch einen gescripteten MCP-Client, `SPUR_PAPER_API_BASE` zeigt auf den Fake mit aufgezeichneten Crossref-Antworten, `SPUR_NOW` fixiert die Zeit.
+- Testschalter stehen bei `SPUR_DEV=1` in der gitignorierten Datei `services/web/modules/spur/.dev.env`: `SPUR_FAKE_AGENT=1`, `SPUR_NOW`, `SPUR_PAPER_API_BASE`. Der Crossref-Fake läuft hinter `SPUR_DEV` als Route im Modul, mit aufgezeichneten Antworten. Ohne `SPUR_DEV` existieren weder Schalter noch Route.
+- Der Fake-Client ist ein Skript im Repo unter `services/web/modules/spur/test`, das per HTTP gegen `http://localhost:8080/spur/mcp` arbeitet.
+- Weitere Befehle: `spur-dev run <skript>`, `spur-dev mongo <ausdruck>`, `spur-dev dump`, `spur-dev restore`, `spur-dev migrate <args>`, `spur-dev logs <dienst> <zeilen>`.
+- Das Dev-Image enthält Entwicklungspakete und verdeckt damit Fehlendes im Produktions-Image. Der Workflow `Smoke` prüft deshalb das echte Image.
 - Kein Schritt braucht ein echtes Claude. Das Plugin prüft `claude plugin validate`, der Smoke-Test läuft je Meilenstein von Hand.
 - Fixtures: `smith2024.pdf` (DOI `10.5555/spur.2024.001`, Seiten 345 bis 352, Seite 347 ist PDF-Seite 3, Satz „Sleep supports the consolidation of declarative memory.“), `retracted.pdf` (DOI `10.5555/spur.retracted`), `scan.pdf` ohne Text, `interview.vtt`.
 

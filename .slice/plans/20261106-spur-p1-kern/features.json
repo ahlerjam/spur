@@ -2,14 +2,14 @@
  "features": [
   {
    "id": "f1",
-   "title": "spur startet mit einem Befehl und trägt seinen eigenen Namen",
+   "title": "spur trägt seinen eigenen Namen und lässt sich nach README installieren",
    "steps": [
-    "In einem frischen Klon legt `make start` ein `.env` mit zufälligem `OVERLEAF_INVITE_TOKEN_SECRET` an, beim zweiten Start bleibt der Wert gleich",
-    "Betreiber führt `make start` aus und ruft http://localhost:8080/login auf: Der Seitentitel enthält „spur“, das Overleaf-Logo fehlt",
+    "Builder führt `spur-dev up` aus und ruft http://localhost:8080/login auf: Der Seitentitel enthält „spur“, das Overleaf-Logo fehlt",
     "Der Footer verlinkt https://github.com/ahlerjam/spur",
-    "`make e2e` läuft gegen den Stack und meldet Exit-Code 0 mit dem Fake-Server für Crossref",
-    "Ein Projekt mit biblatex, `style=apa`, csquotes und einer `.bib` kompiliert ohne Fehler zu einem PDF mit Literaturverzeichnis",
-    "Ein Projekt mit natbib kompiliert ebenfalls"
+    "Ein Projekt mit biblatex, `style=apa`, csquotes und einer `.bib` kompiliert im Browser ohne Fehler zu einem PDF mit Literaturverzeichnis",
+    "Ein Projekt mit natbib kompiliert ebenfalls",
+    "Das Repo enthält `docker-compose.yml` für Betreiber mit dem veröffentlichten Image, ein `make start`, das beim ersten Start ein `.env` mit zufälligem `OVERLEAF_INVITE_TOKEN_SECRET` anlegt, und eine README mit diesem Weg. Der Workflow `Smoke` startet genau diesen Weg in der CI, prüft `/status` und ein APA-Compile",
+    "`make start` selbst läuft im Builder nicht; der Lauf endet mit grünem Workflow-Stand oder dem Hinweis, dass ein Mensch ihn prüfen muss"
    ],
    "passes": false,
    "ui": true
@@ -104,6 +104,7 @@
    "title": "Token anlegen und Bot erhalten",
    "steps": [
     "Nutzer öffnet Einstellungen und „Claude verbinden“, klickt „Token erzeugen“: Das Token erscheint einmalig mit dem kopierbaren Befehl",
+    "Der angezeigte Befehl richtet das Plugin ein und enthält die Allow-Regel für die spur-Schreibtools, damit Browser-Aufträge nicht im Terminal hängen",
     "Mongo enthält nur den Hash; das Token gilt 90 Tage",
     "Der Bot „Claude (Name)“ existiert, ist kein Projektmitglied und erscheint nicht im Teilen-Dialog",
     "Widerruf: Ein Aufruf mit dem Token ergibt 401",
@@ -118,6 +119,7 @@
    "title": "MCP-Tools lesen Projekte und Quellen",
    "steps": [
     "`curl` mit Token listet per `tools/list` alle P1-Tools aus `docs/mcp-vertrag.md`",
+    "`curl` auf http://localhost:8080/spur/mcp geht über nginx; `tools/list` antwortet dort genauso",
     "Ohne Token kommt 401; mit ungültigem `Origin` kommt 403",
     "`doc_read` auf ein fremdes Projekt liefert `keine_rechte`",
     "`source_search` liefert Quelle, Seite und Position, keinen ganzen Absatz",
@@ -136,7 +138,8 @@
     "Nutzer schreibt im Panel einen Auftrag: `events_since` liefert genau ein `task_created`, ein zweiter Abruf mit Cursor nichts",
     "Wartet der Fake-Client in `wait_for_event`, liefert ein Auftrag im Panel das Ergebnis in unter 2 Sekunden, und währenddessen kommt alle 30 Sekunden eine Fortschrittsmeldung",
     "`reply` des Fake-Clients erscheint im Panel",
-    "Ein Bot sieht keine Ereignisse eines anderen Bots"
+    "Ein Bot sieht keine Ereignisse eines anderen Bots",
+    "Über `http://localhost:8080/spur/mcp` bleibt ein Aufruf von `wait_for_event` länger als 11 Minuten offen, und jede Fortschrittsmeldung kommt innerhalb von 35 Sekunden beim Fake-Client an"
    ],
    "passes": false,
    "ui": true

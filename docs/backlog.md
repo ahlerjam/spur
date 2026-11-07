@@ -32,6 +32,10 @@ Zurückgestellt, nicht verworfen. Vor neuen Plänen hier nachsehen.
 - Semantische Suche über Postgres mit pgvector, falls Brute Force nicht mehr reicht
 - Kurze Tokens mit OAuth
 
+## Vor dem jeweiligen Plan ins Image
+- P2: `@huggingface/transformers` für die semantische Suche
+- P4: `tesseract-ocr` mit Sprachdaten
+
 ## Ungeklärt
 - Link-Resolver für TIB und LUH
 - Marken- und Logo-Regeln von Overleaf für Forks; rechtlich prüfen lassen
