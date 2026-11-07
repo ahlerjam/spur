@@ -49,6 +49,7 @@ export default function LaufKarte({
   const { write } = usePermissionsContext()
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  const [automatikAn, setAutomatikAn] = useState(automatik)
   const pfad = (aktion: string) => projektPfad(`/laeufe/${lauf.id}/${aktion}`)
   const offen = lauf.status === 'offen' || lauf.status === 'fertig'
   const changes = aenderungen.filter(a => !a.geloescht)
@@ -146,10 +147,11 @@ export default function LaufKarte({
         <OLFormCheckbox
           id="spur-automatik"
           label={t('spur_automatisch_annehmen')}
-          checked={automatik}
-          onChange={e =>
+          checked={automatikAn}
+          onChange={e => {
+            setAutomatikAn(e.target.checked)
             aktion('PUT', projektPfad('/claude/automatik'), { an: e.target.checked })
-          }
+          }}
         />
       )}
       <p className="spur-zeile-meta">{t('spur_label_hinweis')}</p>

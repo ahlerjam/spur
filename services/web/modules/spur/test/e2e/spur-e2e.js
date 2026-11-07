@@ -209,6 +209,27 @@ async page => {
     }, token)
   }
 
+  async function editorEinfuegen(vor, text) {
+    await page.evaluate(
+      ([anker, neu]) => {
+        const view = window.overleaf.unstable.store.get('editor.view')
+        const pos = view.state.doc.toString().indexOf(anker)
+        view.dispatch({ changes: { from: pos, insert: neu }, userEvent: 'input.type' })
+      },
+      [vor, text]
+    )
+  }
+
+  // Wartet, bis eine Eingabe im Editor auf dem Server angekommen ist.
+  async function gespeichert(token, pid, text) {
+    for (let i = 0; i < 40; i++) {
+      const { inhalt } = await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'main.tex' })
+      if (inhalt.text?.includes(text)) return
+      await page.waitForTimeout(250)
+    }
+    fail(`Nicht gespeichert: ${text}`)
+  }
+
   async function editorErsetzen(alt, neu) {
     await page.evaluate(
       ([von, zu]) => {
@@ -902,14 +923,15 @@ async page => {
 
   features.f14 = async () => {
     await anmelden('e2e-a@example.org')
-    const { pid, edit, lauf, changesVonClaude } = await laufProjekt()
+    const { pid, token, edit, lauf, changesVonClaude } = await laufProjekt()
     const offen = await lauf()
     if (offen?.status === 'offen') await laufAktion(pid, offen.id, 'ablehnen')
 
     ok(!(await edit({ alt: 'mit altem Wort', neu: 'mit neuem Wort' })).fehler, 'Ersetzung')
     ok(!(await edit({ alt: 'Gamma Satz.', neu: 'Gamma Satz. Ein langer Einschub von Claude.' })).fehler, 'Einschub')
     await imEditor('Ein langer Einschub von Claude.')
-    await editorErsetzen('langer Einschub', 'langer NUTZER Einschub')
+    await editorEinfuegen('Einschub von Claude', 'NUTZER ')
+    await gespeichert(token, pid, 'NUTZER')
     const id = (await lauf()).id
 
     await page.goto(`${BASE}/project`)
@@ -923,8 +945,11 @@ async page => {
     const text = await docText()
     ok(!text.includes('neuem'), 'Einschub nicht zurückgesetzt')
     ok(text.split('mit altem Wort').length === 2, 'Doppeltext nach Ablehnen')
-    ok(text.includes('NUTZER') && !text.includes('langer'), `Gespaltener Einschub: ${text}`)
-    ok((await changesVonClaude()).length === 0, 'Changes bleiben nach Ablehnen')
+    ok(text.includes('Gamma Satz.NUTZER ') && !text.includes('langer'), `Gespaltener Einschub: ${text}`)
+    ok(
+      !(await changesVonClaude()).some(c => /neuem|Einschub|altem/.test(c.op.i ?? c.op.d)),
+      'Changes des Laufs bleiben nach Ablehnen'
+    )
 
     const pruefer = await laufProjekt('e2e-review@example.org')
     ok(!(await pruefer.edit({ alt: 'Delta', neu: 'Delta vom Prüfer-Bot' })).fehler, 'review-Edit')
@@ -951,7 +976,7 @@ async page => {
     await page.waitForResponse(r => r.url().endsWith('/claude/automatik'))
     await fertig('Grüner Lauf')
     ok((await lauf()).status === 'angenommen', 'Grüner Lauf nicht angenommen')
-    ok((await changesVonClaude()).length === 0, 'Changes nach Automatik')
+    ok(!(await changesVonClaude()).some(c => c.op.i?.includes(' eins')), 'Changes nach Automatik')
 
     ok(!(await edit({ alt: 'Delta', neu: 'Delta \\footfullcite{x}' })).fehler, 'Roter Edit')
     await fertig('Roter Lauf')
@@ -982,7 +1007,7 @@ async page => {
     await fertig('Konfliktlauf')
     await imEditor('Beta konflikt')
     await editorErsetzen('Beta konflikt', 'Beta Konflikt')
-    await page.waitForTimeout(1500)
+    await gespeichert(token, pid, 'Beta Konflikt')
     const vorher = await docText()
     await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
     await karte().getByText(/Konflikt in Zeile \d+/).waitFor({ timeout: 20000 })

@@ -120,7 +120,7 @@ export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schlues
   let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot }
   if (op.length) {
     const antwort = await anwenden(projectId, doc.docId, op, version, botId, seed)
-    await LaufManager.aenderungMerken(lauf, { seed, docId: doc.docId, rot })
+    await LaufManager.aenderungMerken(lauf, { docId: doc.docId, rot })
     ergebnis = { ...ergebnis, version: antwort.version, aenderung: true }
   }
   await sammlung.insertOne({ botId, schluessel, ergebnis, am: jetzt() })

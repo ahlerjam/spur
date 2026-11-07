@@ -21,7 +21,17 @@ async function pfadVon(projectId, docId) {
   }
 }
 
-// Changes eines Laufs erkennt man am Seed, den doc_edit als tc mitgeschickt hat.
+// Changes eines Laufs: vom Bot, in der Laufzeit. Autor und Zeit bleiben erhalten, wenn jemand
+// in einen Einschub tippt und ihn dadurch teilt; die Change-ID nicht.
+function gehoertZumLauf(change, lauf) {
+  const zeit = new Date(change.metadata?.ts)
+  return (
+    change.metadata?.user_id === String(lauf.botId) &&
+    zeit >= lauf.gestartet &&
+    (!lauf.beendet || zeit <= lauf.beendet)
+  )
+}
+
 export async function aenderungen(projectId, lauf) {
   const ergebnis = []
   for (const docId of lauf.docs) {
@@ -35,9 +45,7 @@ export async function aenderungen(projectId, lauf) {
       docId,
       -1
     )
-    const changes = (ranges?.changes ?? []).filter(c =>
-      lauf.seeds.some(seed => c.id.startsWith(seed))
-    )
+    const changes = (ranges?.changes ?? []).filter(c => gehoertZumLauf(c, lauf))
     ergebnis.push({ docId, pfad, geloescht: false, changes, version, text: lines.join('\n') })
   }
   return ergebnis

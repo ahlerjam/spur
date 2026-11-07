@@ -183,7 +183,7 @@
     "In `tools/list` gibt es kein Tool zum Annehmen",
     "Ist eine Datei gelöscht, zeigt die Karte „Datei gelöscht“"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

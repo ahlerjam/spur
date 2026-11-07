@@ -34,7 +34,6 @@ export async function laufFuerSchreiben(projectId, botId) {
     status: 'offen',
     gestartet: jetzt(),
     labelId: await labelSetzen(projectId, botId),
-    seeds: [],
     docs: [],
     aenderungen: 0,
     rot: [],
@@ -48,11 +47,11 @@ export function neuerSeed() {
   return randomBytes(9).toString('hex')
 }
 
-export async function aenderungMerken(lauf, { seed, docId, rot }) {
+export async function aenderungMerken(lauf, { docId, rot }) {
   await (await laeufe()).updateOne(
     { _id: lauf._id },
     {
-      $push: { seeds: seed, ...(rot.length ? { rot: { $each: rot } } : {}) },
+      ...(rot.length ? { $push: { rot: { $each: rot } } } : {}),
       $addToSet: { docs: docId },
       $inc: { aenderungen: 1 },
     }
