@@ -52,4 +52,6 @@ jobs:
           node "$RUNNER_TEMP/e2e.mjs" services/web/modules/spur/test/e2e/spur-e2e.js
       - name: Logs bei Fehler
         if: failure()
-        run: spur-dev logs web 200 || true
+        run: |
+          for c in spur-dev-mongo spur-dev-redis spur-dev-web; do echo "== $c"; docker logs --tail 80 "$c" 2>&1 || true; done
+          spur-dev logs web 200 || true
