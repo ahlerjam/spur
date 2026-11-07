@@ -69,13 +69,18 @@ wait_up() {
   done
   echo "spur-dev: Stack antwortet nicht, siehe: spur-dev logs" >&2; return 1
 }
-build() { web 'yarn run lezer-latex:generate >/dev/null 2>&1 && yarn run webpack:production 2>&1 | tail -1'; }
+# Ohne -i: webpack braucht keine Eingabe, und ein offenes stdin brach den Build nach einem Neustart
+# des Containers gelegentlich mit Exit 129 ab.
+build() { docker exec spur-dev-web bash -lc 'cd /overleaf/services/web && yarn run lezer-latex:generate >/dev/null 2>&1 && { yarn run webpack:production > /tmp/webpack.log 2>&1; rc=$?; grep compiled /tmp/webpack.log || tail -20 /tmp/webpack.log; exit $rc; }'; }
 restart() {
   docker exec spur-dev-web bash -c 'sv restart web-overleaf web-api-overleaf document-updater-overleaf' | sed 's/:.*//' | sort -u | tr '\n' ' '; echo
   docker exec spur-dev-web sv reload nginx >/dev/null 2>&1 || docker exec spur-dev-web sv restart nginx >/dev/null
   wait_up
 }
-up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null 2>&1; wait_up; build; restart; }
+# Kurz nach dem Start des Containers bricht webpack gelegentlich mit Exit 129 (SIGHUP) ab,
+# Ursache unklar; ein zweiter Versuch läuft durch.
+build_sicher() { build || { echo "Build abgebrochen, zweiter Versuch in 30 s"; sleep 30; build; }; }
+up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null 2>&1; wait_up; build_sicher; restart; }
 ensure() {
   local cur
   docker_bereit
@@ -93,7 +98,7 @@ case "${1:-}" in
   down)    dc down ;;
   reset)   dc down -v ;;
   status)  dc ps --format '{{.Service}} {{.State}}' ;;
-  reload)  ensure; build; restart ;;
+  reload)  ensure; build_sicher; restart ;;
   restart) ensure; restart ;;
   test)    ensure
            rc=0
