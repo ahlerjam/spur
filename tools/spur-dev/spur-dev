@@ -95,6 +95,7 @@ grammatik() { docker exec spur-dev-web bash -lc 'cd /overleaf/services/web && ya
 # Testschalter (gitignoriert): ohne Datei ginge die Prüfung an die echte Crossref-API.
 schalter_anlegen() {
   local f="$SRC/services/web/modules/spur/dev-schalter.json"
+  [ -d "${f%/*}" ] || return 0
   [ -e "$f" ] || printf '{"SPUR_PAPER_API_BASE": "http://127.0.0.1/spur/dev/crossref"}\n' > "$f"
 }
 up() { docker_bereit; check_mounts; schalter_anlegen; dc up -d --force-recreate web >/dev/null; grammatik; wait_up; build_sicher; restart; }
