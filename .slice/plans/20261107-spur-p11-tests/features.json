@@ -39,5 +39,5 @@
   "`CLAUDE.md` nennt die Befehle für alle Suiten und den Vergleich",
   "Die README hat einen Abschnitt „Entwicklung und Tests“ mit denselben Befehlen und dem Hinweis auf die Liste bekannter Fehler",
   "Die README nennt im Abschnitt Installation: MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13; Server brauchen Kernel bis 6.18 oder ab 7.0.14",
-  "`docs/backlog.md` enthält Cypress-Tests und web-Acceptance-Tests als offene Punkte"]}
+  "`docs/backlog.md` enthält Cypress-Tests und web-Acceptance-Tests als offene Punkte"], "passes": true}
 ]}

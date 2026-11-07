@@ -27,6 +27,10 @@ Zurückgestellt, nicht verworfen. Vor neuen Plänen hier nachsehen.
 - Literatur-Alerts, systematischer Review
 - Skriptausführung auf dem Server
 
+## Tests
+- Cypress-Tests von Overleaf (`server-ce/test`) im Dev-Stack und in der CI
+- Acceptance-Tests des web-Dienstes (`services/web/test/acceptance`)
+
 ## Betrieb
 - Semantische Suche über Postgres mit pgvector, falls Brute Force nicht mehr reicht
 - Kurze Tokens mit OAuth
