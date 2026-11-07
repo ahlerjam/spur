@@ -84,9 +84,10 @@ function mussOffenSein(lauf) {
 
 // Tippt jemand in einen Einschub, zerfällt er in mehrere Changes mit gleichem Zeitstempel.
 // Abgelehnt wird immer der ganze Einschub.
-function gleicherEinschub(change, alle, nurIds) {
-  const gewaehlt = alle.filter(c => nurIds.includes(c.id))
-  return gewaehlt.some(c => c.id === change.id || c.metadata?.ts === change.metadata?.ts)
+function mitGanzenEinschueben(changes, nurIds) {
+  if (!nurIds) return changes
+  const zeiten = new Set(changes.filter(c => nurIds.includes(c.id)).map(c => c.metadata?.ts))
+  return changes.filter(c => zeiten.has(c.metadata?.ts))
 }
 
 async function statusSetzen(lauf, status) {
@@ -123,7 +124,7 @@ export async function ablehnen(projectId, lauf, userId, nurIds) {
   const liste = await aenderungen(projectId, lauf)
   let abgelehnt = 0
   for (const d of liste) {
-    const changes = d.changes.filter(c => !nurIds || gleicherEinschub(c, d.changes, nurIds))
+    const changes = mitGanzenEinschueben(d.changes, nurIds)
     if (!changes.length) continue
     await spurUpdate(projectId, d.docId, umkehrOps(changes), d.version, { userId })
     abgelehnt += changes.length
@@ -153,12 +154,9 @@ export async function zuruecknehmen(projectId, lauf, userId) {
     const text = lines.join('\n')
     const ops = []
     for (const eintrag of lauf.angenommen.filter(a => a.docId === docId)) {
-      const p = eintrag.vor === undefined ? eintrag.op.p : heutigePosition(text, eintrag)
-      const altePasstNicht =
-        eintrag.vor === undefined &&
-        eintrag.op.i !== undefined &&
-        text.slice(p, p + eintrag.op.i.length) !== eintrag.op.i
-      if (p === null || altePasstNicht) throw konflikt(text, eintrag.op.p)
+      // Ohne gespeicherten Kontext lässt sich die Stelle nicht sicher finden: lieber Konflikt.
+      const p = eintrag.vor === undefined ? null : heutigePosition(text, eintrag)
+      if (p === null) throw konflikt(text, eintrag.op.p)
       ops.push({ ...eintrag.op, p })
     }
     plan.push({ docId, version, ops: umkehrOps(ops.map(op => ({ op }))).map(({ u, ...op }) => op) })

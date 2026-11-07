@@ -137,9 +137,9 @@ function zitatBefehl(text, name, start, pos) {
   const beleg = innen
     ? { belege: innen.belege, bis: inhalt.pos }
     : folgenderBeleg(text, inhalt.pos)
-  if (beleg) return zeileMitZitat(name, inhalt, start, inhalt.pos, beleg)
+  const zeile = zeileMitZitat(name, inhalt, start, inhalt.pos, beleg)
   // \textquote und \blockquote sind für Zitate gedacht: ohne Beleg nicht prüfbar statt unsichtbar.
-  return { ...zeileMitZitat(name, inhalt, start, inhalt.pos, null), form: 'unbekannt', befehl: name }
+  return beleg ? zeile : { ...zeile, form: 'unbekannt', befehl: name }
 }
 
 function quoteUmgebung(text, start, pos) {

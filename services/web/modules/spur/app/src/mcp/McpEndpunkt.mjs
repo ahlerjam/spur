@@ -131,15 +131,10 @@ const jsonParser = express.json({ limit: Settings.max_json_request_size })
 export function mcpJson(req, res, next) {
   jsonParser(req, res, error => {
     if (!error) return next()
-    problemSenden(
-      res,
-      new Problem(
-        error.status === 413 ? 413 : 400,
-        error.status === 413 ? 'zu_gross' : 'json_kaputt',
-        error.status === 413
-          ? 'Die Anfrage ist zu groß.'
-          : 'Der Body ist kein gültiges JSON. Bitte eine JSON-RPC-Nachricht senden.'
-      )
-    )
+    const problem =
+      error.status === 413
+        ? new Problem(413, 'zu_gross', 'Die Anfrage ist zu groß.')
+        : new Problem(400, 'json_kaputt', 'Der Body ist kein gültiges JSON. Bitte eine JSON-RPC-Nachricht senden.')
+    problemSenden(res, problem)
   })
 }

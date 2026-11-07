@@ -7,6 +7,7 @@ import * as LaufAktionen from '../schreiben/LaufAktionen.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as SchreibManager from '../schreiben/SchreibManager.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
+import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
 import { WerkzeugFehler } from './fehler.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
@@ -24,27 +25,22 @@ const LESEN = ['readOnly', 'review', 'readAndWrite', 'owner']
 const SCHREIBEN = ['review', 'readAndWrite', 'owner']
 const ANLEGEN = ['readAndWrite', 'owner']
 
+// Ein unbekanntes Projekt sieht für den Aufrufer aus wie ein fremdes: keine Rolle.
 async function rolle(menschId, projectId) {
-  return await AuthorizationManager.promises.getPrivilegeLevelForProject(
-    menschId,
-    projectId,
-    null
-  )
+  try {
+    return await AuthorizationManager.promises.getPrivilegeLevelForProject(menschId, projectId, null)
+  } catch (error) {
+    if (error instanceof Errors.NotFoundError) return null
+    throw error
+  }
 }
 
 async function pruefeRecht(menschId, projectId, erlaubt) {
-  let stufe, eingeschraenkt
-  try {
-    ;[stufe, eingeschraenkt] = await Promise.all([
-      rolle(menschId, projectId),
-      // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
-      AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null),
-    ])
-  } catch (error) {
-    // Ein unbekanntes Projekt sieht für den Aufrufer aus wie ein fremdes.
-    if (!(error instanceof Errors.NotFoundError)) throw error
-  }
-  if (eingeschraenkt || !erlaubt.includes(stufe)) {
+  const darf =
+    erlaubt.includes(await rolle(menschId, projectId)) &&
+    // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
+    !(await AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null))
+  if (!darf) {
     throw new WerkzeugFehler(
       'keine_rechte',
       'Die Projektrolle erlaubt das nicht. Bitte die Person um Zugriff bitten.'
@@ -330,8 +326,8 @@ Object.assign(WERKZEUGE, {
         .min(1)
         .max(500)
         .regex(/^[^\0]+\.(tex|bib|txt|md)$/)
-        .refine(p => !p.split('/').some(teil => teil === '..' || teil === '.'), {
-          message: 'Der Pfad darf keine Teile „..“ oder „.“ enthalten.',
+        .refine(SafePath.isCleanPath, {
+          message: 'Der Pfad enthält unzulässige Teile wie „..“ oder verbotene Zeichen.',
         }),
       inhalt: z.string().max(100000),
       idempotenz_schluessel: schluessel,
