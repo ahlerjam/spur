@@ -65,6 +65,7 @@ export default function QuellenPanel() {
 
   const holenOeffnen = (vorauswahl?: string) => {
     setMeldung(null)
+    setFehler(null)
     setHolenDialog({ vorauswahl })
   }
 
@@ -269,6 +270,7 @@ export default function QuellenPanel() {
           schliessen={() => setHolenDialog(null)}
           geholt={anzahl => {
             setHolenDialog(null)
+            setFehler(null)
             setMeldung(
               anzahl
                 ? { typ: 'success', text: t('spur_quellen_geholt', { count: anzahl }) }

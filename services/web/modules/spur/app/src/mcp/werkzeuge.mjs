@@ -25,21 +25,33 @@ const LESEN = ['readOnly', 'review', 'readAndWrite', 'owner']
 const SCHREIBEN = ['review', 'readAndWrite', 'owner']
 const ANLEGEN = ['readAndWrite', 'owner']
 
-// Ein unbekanntes Projekt sieht für den Aufrufer aus wie ein fremdes: keine Rolle.
+// Claude bekommt nur Rollen aus Mitgliedschaften, kein Admin-Sonderrecht: Was Claude liest, geht an
+// Anthropic, ein Admin-Token gäbe sonst fremde Projekte per ID preis (ADR 0003: nie mehr Rechte als
+// das Konto, weniger ist erlaubt). Ein unbekanntes Projekt sieht aus wie ein fremdes: keine Rolle.
 async function rolle(menschId, projectId) {
   try {
-    return await AuthorizationManager.promises.getPrivilegeLevelForProject(menschId, projectId, null)
+    return await AuthorizationManager.promises.getPrivilegeLevelForProject(menschId, projectId, null, {
+      ignoreSiteAdmin: true,
+    })
   } catch (error) {
     if (error instanceof Errors.NotFoundError) return null
     throw error
   }
 }
 
+async function eingeschraenkt(menschId, projectId) {
+  try {
+    // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
+    return await AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null)
+  } catch (error) {
+    if (error instanceof Errors.NotFoundError) return true
+    throw error
+  }
+}
+
 async function pruefeRecht(menschId, projectId, erlaubt) {
   const darf =
-    erlaubt.includes(await rolle(menschId, projectId)) &&
-    // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
-    !(await AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null))
+    erlaubt.includes(await rolle(menschId, projectId)) && !(await eingeschraenkt(menschId, projectId))
   if (!darf) {
     throw new WerkzeugFehler(
       'keine_rechte',

@@ -9,7 +9,7 @@ import { Problem } from '../probleme.mjs'
 import { einstellungen, laeufe } from '../sammlungen.mjs'
 import * as LaufManager from './LaufManager.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
-import { heutigePosition, kontextUm, umkehrOps } from './ops.mjs'
+import { auszug, heutigePosition, kontextUm, umkehrOps } from './ops.mjs'
 
 async function pfadVon(projectId, docId) {
   try {
@@ -59,7 +59,7 @@ export function fuerKarte(liste) {
           docId: d.docId,
           pfad: d.pfad,
           art: c.op.i !== undefined ? 'einfuegung' : 'loeschung',
-          text: (c.op.i ?? c.op.d).slice(0, 200),
+          text: auszug(d.text, c.op),
           zeile: d.text.slice(0, c.op.p).split('\n').length,
         }))
   )
@@ -185,7 +185,8 @@ export async function nachLaufende(projectId, lauf, menschId) {
   if (lauf.rot.length || !(await automatik(projectId, menschId))) return
   // Die Einstellung überdauert eine Herabstufung; annehmen darf nur, wer jetzt schreiben darf.
   const [stufe, eingeschraenkt] = await Promise.all([
-    AuthorizationManager.promises.getPrivilegeLevelForProject(menschId, projectId, null),
+    // Wie bei den MCP-Werkzeugen ohne Admin-Sonderrecht.
+    AuthorizationManager.promises.getPrivilegeLevelForProject(menschId, projectId, null, { ignoreSiteAdmin: true }),
     AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null),
   ])
   if (eingeschraenkt || !['readAndWrite', 'owner'].includes(stufe)) return

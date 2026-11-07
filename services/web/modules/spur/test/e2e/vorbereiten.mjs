@@ -298,6 +298,10 @@ for (const email of ['e2e-neu@example.org']) {
   await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': email })
 }
 const neu = await konto('e2e-neu@example.org')
+// Site-Admin: Claude bekommt über ein Admin-Token trotzdem nur Rollen aus Mitgliedschaften.
+const admin = await konto('e2e-admin@example.org')
+await db.users.updateOne({ _id: admin._id }, { $set: { isAdmin: true } })
+await testToken(admin, 'spur_e2e_admin', new Date(Date.now() + 24 * 3600 * 1000))
 await neuAnlegen(neu, 'E2E Neu', { 'main.tex': 'Erster Absatz.\n' })
 
 for (const sammlung of [ereignisse, herzschlaege, nachrichten]) {

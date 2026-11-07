@@ -54,3 +54,23 @@ export function heutigePosition(text, eintrag) {
   }
   return beste
 }
+
+const WORTZEICHEN = /[\p{L}\p{N}_]/u
+const MAX_ERGAENZUNG = 40
+
+// Auszug für die Lauf-Karte: Beginnt oder endet eine Änderung mitten im Wort (die Ops sind
+// minimal), wird sie um den Rest des Wortes aus dem Text ergänzt. Eine Löschung steht nicht mehr im
+// Text, ein Einschub schon.
+export function auszug(text, op, max = 200) {
+  const inhalt = op.i ?? op.d
+  const ende = op.p + (op.i?.length ?? 0)
+  let links = op.p
+  if (WORTZEICHEN.test(inhalt[0] ?? '')) {
+    while (links > 0 && op.p - links < MAX_ERGAENZUNG && WORTZEICHEN.test(text[links - 1])) links--
+  }
+  let rechts = ende
+  if (WORTZEICHEN.test(inhalt.at(-1) ?? '')) {
+    while (rechts < text.length && rechts - ende < MAX_ERGAENZUNG && WORTZEICHEN.test(text[rechts])) rechts++
+  }
+  return (text.slice(links, op.p) + inhalt + text.slice(ende, rechts)).slice(0, max)
+}

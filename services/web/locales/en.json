@@ -94,7 +94,7 @@
   "spur_seiten_plural": "__count__ pages",
   "spur_seitenzahl_bestaetigen": "Confirm page number",
   "spur_seitenzahl_bestaetigt": "Page numbers confirmed",
-  "spur_seitenzahl_ungueltig": "Please enter a whole number.",
+  "spur_seitenzahl_ungueltig": "Please enter a whole number of 1 or more.",
   "spur_senden": "Send",
   "spur_status": "Status",
   "spur_text_erkannt": "Text recognised",

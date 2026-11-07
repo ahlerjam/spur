@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
@@ -65,7 +66,10 @@ async function pruefSperre(projectId, neuerText, von, bis) {
   return rot
 }
 
-function frueheresErgebnis(frueher, projectId) {
+// Fingerabdruck der Argumente: Derselbe Schlüssel mit anderem Inhalt ist ein Fehler des Aufrufers.
+const fingerabdruck = inhalt => createHash('sha256').update(JSON.stringify(inhalt)).digest('hex')
+
+function frueheresErgebnis(frueher, projectId, inhalt) {
   if (!frueher) {
     // Der erste Aufruf ist zwischen Reservierung und Nachsehen gescheitert: einfach wiederholen.
     throw new WerkzeugFehler('konflikt', 'Ein Aufruf mit diesem Idempotenz-Schlüssel ist gerade gescheitert. Bitte erneut versuchen.')
@@ -76,6 +80,12 @@ function frueheresErgebnis(frueher, projectId) {
       'Dieser Idempotenz-Schlüssel gehört zu einem anderen Projekt. Bitte einen neuen Schlüssel nehmen.'
     )
   }
+  if (frueher.inhalt && frueher.inhalt !== inhalt) {
+    throw new WerkzeugFehler(
+      'konflikt',
+      'Dieser Idempotenz-Schlüssel wurde schon für eine andere Änderung benutzt. Bitte einen neuen Schlüssel nehmen.'
+    )
+  }
   if (!frueher.ergebnis) {
     throw new WerkzeugFehler('konflikt', 'Ein Aufruf mit diesem Idempotenz-Schlüssel läuft noch.')
   }
@@ -83,14 +93,15 @@ function frueheresErgebnis(frueher, projectId) {
 }
 
 // Reserviert den Schlüssel vor dem Schreiben; der Unique-Index fängt gleichzeitige Wiederholungen.
-async function mitSchluessel({ projectId, botId, schluessel }, schreiben) {
+async function mitSchluessel({ projectId, botId, schluessel, argumente }, schreiben) {
   const sammlung = await bearbeitungen()
+  const inhalt = fingerabdruck(argumente)
   let reservierung
   try {
-    reservierung = await sammlung.insertOne({ botId, schluessel, projectId, am: jetzt() })
+    reservierung = await sammlung.insertOne({ botId, schluessel, projectId, inhalt, am: jetzt() })
   } catch (error) {
     if (error.code !== 11000) throw error
-    return frueheresErgebnis(await sammlung.findOne({ botId, schluessel }), projectId)
+    return frueheresErgebnis(await sammlung.findOne({ botId, schluessel }), projectId, inhalt)
   }
   try {
     const ergebnis = await schreiben()
@@ -103,7 +114,8 @@ async function mitSchluessel({ projectId, botId, schluessel }, schreiben) {
 }
 
 export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schluessel }) {
-  return await mitSchluessel({ projectId, botId, schluessel }, () =>
+  const argumente = { werkzeug: 'doc_edit', docId, pfad, alt, neu }
+  return await mitSchluessel({ projectId, botId, schluessel, argumente }, () =>
     bearbeiten({ projectId, botId, docId, pfad, alt, neu })
   )
 }
@@ -161,7 +173,8 @@ async function pfadBelegt(projectId, pfad) {
 
 export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) {
   const ziel = `/${pfad.replace(/^\//, '')}`
-  return await mitSchluessel({ projectId, botId, schluessel }, async () => {
+  const argumente = { werkzeug: 'doc_create', pfad, inhalt }
+  return await mitSchluessel({ projectId, botId, schluessel, argumente }, async () => {
     // upsertDocWithPath würde ein vorhandenes Dokument ungetrackt leeren.
     if (await pfadBelegt(projectId, ziel)) {
       throw new WerkzeugFehler(

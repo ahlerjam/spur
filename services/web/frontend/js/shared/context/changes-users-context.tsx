@@ -1,9 +1,11 @@
 import {
   createContext,
   FC,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { getJSON } from '@/infrastructure/fetch-json'
@@ -26,6 +28,12 @@ export const ChangesUsersContext = createContext<ChangesUsers | undefined>(
   undefined
 )
 
+// spur: Autoren, die erst nach dem Laden Änderungen schreiben (etwa der Claude-Bot, der kein
+// Mitglied ist), werden nachgeladen statt bis zum Neuladen als „Deleted user“ zu erscheinen.
+export const ChangesUsersNachladenContext = createContext<
+  (userId: UserId) => void
+>(() => {})
+
 export const ChangesUsersProvider: FC<React.PropsWithChildren> = ({
   children,
 }) => {
@@ -34,6 +42,8 @@ export const ChangesUsersProvider: FC<React.PropsWithChildren> = ({
   const { isRestrictedTokenMember } = useEditorContext()
 
   const [changesUsers, setChangesUsers] = useState<ChangesUsers>()
+  const [stand, setStand] = useState(0)
+  const nachgefragt = useRef(new Set<UserId>())
 
   useEffect(() => {
     if (isRestrictedTokenMember) {
@@ -46,7 +56,14 @@ export const ChangesUsersProvider: FC<React.PropsWithChildren> = ({
         debugConsole.error(error)
         captureException(error)
       })
-  }, [projectId, isRestrictedTokenMember])
+  }, [projectId, isRestrictedTokenMember, stand])
+
+  // Je unbekannter ID höchstens einmal nachladen: wirklich gelöschte Nutzer bleiben unbekannt.
+  const nachladen = useCallback((userId: UserId) => {
+    if (nachgefragt.current.has(userId)) return
+    nachgefragt.current.add(userId)
+    setStand(n => n + 1)
+  }, [])
 
   // add the project owner and members to the changes users data
   const value = useMemo(() => {
@@ -63,7 +80,9 @@ export const ChangesUsersProvider: FC<React.PropsWithChildren> = ({
 
   return (
     <ChangesUsersContext.Provider value={value}>
-      {children}
+      <ChangesUsersNachladenContext.Provider value={nachladen}>
+        {children}
+      </ChangesUsersNachladenContext.Provider>
     </ChangesUsersContext.Provider>
   )
 }

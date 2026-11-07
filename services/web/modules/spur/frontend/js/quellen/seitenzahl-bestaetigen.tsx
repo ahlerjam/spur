@@ -24,8 +24,9 @@ export default function SeitenzahlBestaetigen({
 
   const speichern = async () => {
     setFehler(null)
-    const zahl = Number.parseInt(gedruckt, 10)
-    if (!Number.isInteger(zahl)) {
+    // Gedruckte Seitenzahlen sind ganze Zahlen ab 1; „1.5“ oder „-5“ nicht still umdeuten.
+    const zahl = /^\s*\d+\s*$/.test(gedruckt) ? Number(gedruckt) : Number.NaN
+    if (!Number.isInteger(zahl) || zahl < 1) {
       setFehler(t('spur_seitenzahl_ungueltig'))
       return
     }

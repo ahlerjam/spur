@@ -22,9 +22,7 @@ async page => {
 
   async function anmelden(email) {
     // Erst die alte Seite verlassen: Ihre Polls würden sonst nach dem Löschen eine neue Session
-    // setzen, und das CSRF-Token des Login-Formulars passte nicht mehr. Vorher laufende Downloads
-    // abwarten: Ein abgebrochener Asset-Download bringt den Web-Prozess im Dev-Stack zum Absturz.
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
+    // setzen, und das CSRF-Token des Login-Formulars passte nicht mehr.
     await page.goto('about:blank')
     await page.context().clearCookies()
     await page.goto(`${BASE}/login`)
@@ -666,9 +664,6 @@ async page => {
 
       ok((await mcp('spur_e2e_weg', 'tools/list')).status === 200, 'Test-Token fehlt')
       await anmelden('e2e-weg@example.org')
-      // Das Löschen beendet die Sitzung, die Seite navigiert sofort weg. Laufen dann noch
-      // Asset-Downloads, stürzt der Dev-Web-Prozess ab (send unter Node 24, siehe progress.md).
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
       const loeschen = await seitenPost('/user/delete', { password: PASSWORT })
       ok(loeschen.status === 200, `Konto löschen: ${loeschen.status}`)
       ok((await mcp('spur_e2e_weg', 'tools/list')).status === 401, 'Token überlebt Kontolöschung')
@@ -722,6 +717,11 @@ async page => {
       ok(fremdLesen.fehler && fremdLesen.inhalt.fehler === 'keine_rechte', 'Fremdes Projekt lesbar')
       const unbekannt = await werkzeug(token, 'doc_read', { project_id: 'ffffffffffffffffffffffff', pfad: 'main.tex' })
       ok(unbekannt.inhalt.fehler === 'keine_rechte', `Unbekanntes Projekt: ${JSON.stringify(unbekannt.inhalt)}`)
+      // Ein Site-Admin darf im Web jedes Projekt öffnen; sein Claude bekommt dieses Sonderrecht nicht.
+      for (const [was, pid] of [['unbekannt', 'ffffffffffffffffffffffff'], ['fremd', fremd]]) {
+        const admin = await werkzeug('spur_e2e_admin', 'doc_read', { project_id: pid, pfad: 'main.tex' })
+        ok(admin.inhalt.fehler === 'keine_rechte', `Admin-Token, Projekt ${was}: ${JSON.stringify(admin.inhalt)}`)
+      }
 
       const editSchema = liste.daten.result.tools.find(w => w.name === 'doc_edit').inputSchema
       ok(!(editSchema.required ?? []).includes('alt'), `doc_edit verlangt alt: ${editSchema.required}`)
@@ -855,6 +855,16 @@ async page => {
     ok(!r1.fehler, `doc_edit: ${JSON.stringify(r1.inhalt)}`)
     await imEditor('Ergänzt von Claude.')
     ok((await page.locator('.modal').count()) === 0, 'Modal erschienen')
+    // Ohne Neuladen: Das Review-Panel nennt Claude, nicht „Deleted user“ (Bot ist kein Mitglied).
+    await railTab('Review panel').click()
+    await page
+      .locator('.review-panel-entry-user', { hasText: 'Claude (e2e-a)' })
+      .first()
+      .waitFor({ timeout: 15000 })
+      .catch(async () =>
+        fail(`Review-Panel: ${(await page.locator('.review-panel-entry-user').allInnerTexts()).join(' | ')}`)
+      )
+    await railTab('Review panel').click()
     const bots = await jsonVon(`/project/${pid}/changes/users`)
     ok(bots.some(u => u.first_name === 'Claude' && u.last_name === '(e2e-a)'), `Autoren: ${JSON.stringify(bots)}`)
     const ranges = await jsonVon(`/project/${pid}/ranges`)
@@ -872,6 +882,8 @@ async page => {
 
     const nochmal = await edit({ alt: 'Erster Absatz.', neu: 'Erster Absatz. Ergänzt von Claude.' }, erster)
     ok(nochmal.inhalt.wiederholt === true, 'Idempotenz greift nicht')
+    const andererInhalt = await edit({ alt: 'Erster Absatz.', neu: 'Erster Absatz. Etwas anderes.' }, erster)
+    ok(andererInhalt.inhalt.fehler === 'konflikt', `Gleicher Schlüssel, anderer Inhalt: ${JSON.stringify(andererInhalt.inhalt)}`)
     ok((await docText()).split('Ergänzt von Claude.').length === 2, 'Doppelte Änderung')
 
     const labels = await jsonVon(`/project/${pid}/labels`)

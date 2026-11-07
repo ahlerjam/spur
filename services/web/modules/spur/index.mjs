@@ -1,4 +1,6 @@
 import logger from '@overleaf/logger'
+// Schützt den Web-Prozess vor abgebrochenen Downloads statischer Dateien (siehe Datei).
+import './app/src/sendSchutz.mjs'
 import SpurRouter from './app/src/SpurRouter.mjs'
 import * as QuellenManager from './app/src/QuellenManager.mjs'
 import * as ClaudeZugang from './app/src/ClaudeZugang.mjs'

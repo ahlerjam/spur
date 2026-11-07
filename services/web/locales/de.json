@@ -93,7 +93,7 @@
   "spur_seiten_plural": "__count__ Seiten",
   "spur_seitenzahl_bestaetigen": "Seitenzahl bestätigen",
   "spur_seitenzahl_bestaetigt": "Seitenzahlen bestätigt",
-  "spur_seitenzahl_ungueltig": "Bitte eine ganze Zahl eingeben.",
+  "spur_seitenzahl_ungueltig": "Bitte eine ganze Zahl ab 1 eingeben.",
   "spur_senden": "Senden",
   "spur_status": "Status",
   "spur_text_erkannt": "Text erkannt",
