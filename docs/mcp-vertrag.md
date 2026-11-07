@@ -33,6 +33,12 @@ Stand: Entwurf vor Lauf 0. Änderungen an Namen und Fehlercodes gelten als Bruch
 | `job_status`, `compile`, `compile_log`, `page_image` | P2 | Kompilieren und Ergebnis sehen |
 | `suggest` | P3 | Vorschlag ins Panel legen |
 
+## MCP-Prompts
+
+| Prompt | Plan | Zweck |
+|---|---|---|
+| `literaturueberblick`, `methodenteil`, `folien` | P3 | Fertige Workflows; derselbe Text liegt beim Klick auf „Workflows“ im Panel im Auftrag |
+
 ## Fehlercodes von `doc_edit`
 
 | Code | Bedeutung |

@@ -7,7 +7,6 @@ Zurückgestellt, nicht verworfen. Vor neuen Plänen hier nachsehen.
 - Knopf startet Cloud-Session über Scheduled Task mit API-Trigger
 - Serverseitiger Agent mit eigenem API-Key
 - Andere LLMs über MCP
-- Fertige Workflows zusätzlich als MCP-Prompts
 
 ## Proaktivität
 - Weitere fünf Schalter: Paper-Vorschläge, Zitate vormarkieren, Stil, PDF-Optik, Paraphrasen

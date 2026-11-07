@@ -12,7 +12,7 @@ Wie P1.
 - Im Chat-Panel mit der eigenen Claude-Session sprechen.
 - `@claude` an einer Textstelle im Kommentar schreiben.
 - Vorschläge zu Compile-Fehlern und beleglosen Argumenten ein- oder ausschalten.
-- Fertige Workflows als Plugin-Skills starten.
+- Fertige Workflows als MCP-Prompts starten, im Terminal oder per Knopf im Panel.
 
 ## Zustände der Oberfläche
 Chat: nicht verbunden, wartet, antwortet, lange Unterhaltung. Vorschläge: aus, keine, mehrere, Tageslimit erreicht.
@@ -24,7 +24,7 @@ Chat: nicht verbunden, wartet, antwortet, lange Unterhaltung. Vorschläge: aus, 
 - Auslöser: 60 Sekunden Tipp-Pause oder Kompilieren. Standardlimit 50 pro Tag, einstellbar.
 - Vorschläge liegen nur im Panel. Übernehmen startet einen normalen Lauf.
 - `@claude` erreicht nur die Session der schreibenden Person. Der Kommentartext anderer Personen geht nur als ID an Claude.
-- Workflows sind Plugin-Skills: Literaturüberblick, Methodenteil, Folien aus Paper.
+- Workflows sind MCP-Prompts des spur-Servers: Literaturüberblick, Methodenteil, Folien aus Paper. Eine Quelle für den Text: `prompts/get` und der Panel-Knopf liefern denselben Text, der Panel-Knopf legt ihn vollständig in den Auftrag, weil Claude MCP-Prompts nicht selbst aufrufen kann (nicht verifiziert). Argumente sind einzelne Wörter. Keine Workflow-Skills im Plugin. Standardtexte liegen im Modul, Site-Admins ändern sie im Admin-Bereich, gespeichert in Mongo.
 
 ## Testbarkeit
 Wie P1 mit `SPUR_FAKE_AGENT=1`. Der echte Weckweg wird je Meilenstein von Hand geprüft.
