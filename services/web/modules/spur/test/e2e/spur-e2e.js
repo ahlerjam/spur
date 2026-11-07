@@ -593,7 +593,19 @@ async page => {
     },
   }
 
+  const OFFEN = {
+    f10: 'Claude-Panel mit Status und Aufträgen fehlt; Inbox-Werkzeuge stehen, der Test über 11 Minuten ist nicht gebaut',
+    f11: 'Schreibweg über document-updater (ADR 0002) fehlt, doc_edit antwortet nicht_verfuegbar',
+    f12: 'hängt an doc_edit aus f11',
+    f13: 'Lauf-Karte hängt an Läufen aus f11',
+    f14: 'Ablehnen hängt an Läufen aus f11',
+    f15: 'Automatisch annehmen und Rücknahme hängen an Läufen aus f11',
+  }
+
   const ergebnis = []
+  for (const [id, grund] of Object.entries(OFFEN)) {
+    if (!nur.length || nur.includes(id)) ergebnis.push(`${id} übersprungen: ${grund}`)
+  }
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue
     konsolenFehler.length = 0

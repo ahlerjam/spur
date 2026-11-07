@@ -34,3 +34,8 @@
 - f8 Mongo: `oauthAccessTokens` mit `scope: spur_mcp` enthält nur `accessToken` als SHA-256 (64 Zeichen, kein Klartext); Bots „Claude (e2e-a)“ und „Claude (e2e-leser)“ ohne Passwort, 0 Projektmitgliedschaften; nach Kontolöschung von `e2e-weg` kein Bot ohne Mensch mehr.
 - f9 nginx: `curl -X POST http://localhost:8080/spur/mcp` → 401 (RFC 9457 `urn:spur:problem:token`), mit `Origin: https://evil.example` → 403. `claude plugin validate plugins/spur` und `claude plugin validate .` → „Validation passed with warnings“ (einzige Anmerkung: Installationszeile in der README, ergänzt).
 - f9 Hinweis: `doc_edit`, `doc_create`, `run_status`, `run_finish` stehen in `tools/list`, antworten aber mit `nicht_verfuegbar`, bis f11 bis f15 gebaut sind.
+
+## Offen
+- f10: Inbox-Werkzeuge `wait_for_event` (Long-Poll mit Herzschlag und Fortschritt alle 30 s), `events_since` und `reply` sind gebaut und in `tools/list`. Es fehlen das Claude-Panel im Editor (Status „Claude verbunden/nicht verbunden“ samt Startbefehl, Auftrag schreiben, Antworten sehen), die Route zum Anlegen eines Auftrags, der Fake-Client unter `services/web/modules/spur/test` und der Test über 11 Minuten durch nginx. Grund: Turn-Budget des Laufs, Abschlussschritte haben Vorrang.
+- f11 bis f15: Nicht begonnen. Sie hängen am neuen Schreibweg über einen document-updater-Endpunkt mit Ops und Version (ADR 0002), an Läufen und an der Lauf-Karte. `doc_edit`, `doc_create`, `run_status` und `run_finish` stehen im Vertrag und in `tools/list`, antworten aber mit `nicht_verfuegbar`.
+- E2E: Die offenen Features melden im Lauf „übersprungen“ mit Grund.
