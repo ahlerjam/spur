@@ -64,6 +64,8 @@ Forschende und Studierende, allein oder im kleinen Team. Betreiber installieren 
 - Der amd64-Build scheiterte zweimal an der Git-Abhängigkeit `codemirror-indentation-markers`, beim dritten Versuch lief er. Der Veröffentlichungs-Workflow braucht deshalb Wiederholungen.
 - `create-user.mjs` gibt den Link mit Steuerzeichen aus; Skripte filtern `token=…&user_id=…`.
 
+- `yarn.lock` weicht stark vom Upstream ab, weil Yarn Einträge privater Overleaf-Dienste entfernt. Bei Fork-Updates wird es nicht gemerged, sondern vom Upstream übernommen und mit dem Workflow `Update lockfile` neu erzeugt.
+
 ## Access
 - `CROSSREF_MAILTO`
 
