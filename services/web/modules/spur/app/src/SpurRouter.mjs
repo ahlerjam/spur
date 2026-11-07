@@ -48,6 +48,13 @@ export default {
     webRouter.get(`${QUELLEN}/andere`, ...lesen, SpurController.andereProjekte)
     webRouter.post(`${QUELLEN}/holen`, ...schreiben, SpurController.quellenHolen)
     webRouter.delete(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleLoeschen)
+    webRouter.get(`${QUELLEN}/:quelle_id/zitate`, ...lesen, SpurController.zitate)
+    webRouter.post(`${QUELLEN}/:quelle_id/zitate`, ...schreiben, SpurController.zitatMarkieren)
+    webRouter.post(
+      `${QUELLEN}/:quelle_id/zitate/:zitat_id/einfuegen`,
+      ...schreiben,
+      SpurController.zitatEinfuegen
+    )
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite`, ...lesen, SpurController.quelleSeite)
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/bild`, ...lesen, SpurController.quelleBild)
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)

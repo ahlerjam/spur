@@ -8,6 +8,8 @@ async page => {
     globalThis.SPUR_FIXTURES || 'services/web/modules/spur/test/fixtures'
   const nur = new URL(page.url()).hash.slice(1).split(',').filter(Boolean)
   const konsolenFehler = []
+  page.removeAllListeners('response')
+  page.removeAllListeners('pageerror')
   page.on('pageerror', e => konsolenFehler.push(e.message))
 
   const fail = msg => {
@@ -21,7 +23,7 @@ async page => {
     await page.getByLabel(/e-?mail/i).fill(email)
     await page.getByLabel(/passwort|password/i).fill(PASSWORT)
     await page.getByRole('button', { name: /^(anmelden|log ?in)$/i }).click()
-    await page.waitForURL(/\/project/)
+    await page.waitForURL(/\/project/, { waitUntil: 'commit' })
   }
 
   const KOMPILIEREN = /^(aktualisieren|recompile)$/i
@@ -39,6 +41,7 @@ async page => {
     await page.locator('.pdf-viewer .page canvas').first().waitFor({ timeout: 120000 })
   }
 
+  const DATEIBAUM = /^(Dateibaum|File tree)$/
   const railTab = name => page.getByRole('tab', { name, exact: true })
 
   async function panelOeffnen(name) {
@@ -62,6 +65,44 @@ async page => {
     const feld = page.getByRole('searchbox', { name: 'Quellen durchsuchen' })
     await feld.fill(begriff)
     if (begriff) await feld.press('Enter')
+  }
+
+  async function quelleHolen(projekt) {
+    await page.getByRole('button', { name: 'Aus anderem Projekt holen' }).click()
+    await page.getByLabel('Projekt').selectOption({ label: projekt })
+    await page.locator('.modal').getByRole('button', { name: 'Holen', exact: true }).click()
+    await page.locator('.modal').waitFor({ state: 'detached' })
+  }
+
+  async function textMarkieren(text) {
+    await page.locator('.spur-seitentext').evaluate((el, gesucht) => {
+      const knoten = el.firstChild
+      const start = knoten.textContent.indexOf(gesucht)
+      const bereich = document.createRange()
+      bereich.setStart(knoten, start)
+      bereich.setEnd(knoten, start + gesucht.length)
+      const auswahl = document.getSelection()
+      auswahl.removeAllRanges()
+      auswahl.addRange(bereich)
+    }, text)
+  }
+
+  async function editorAnsEnde() {
+    await page.evaluate(() => {
+      const view = window.overleaf.unstable.store.get('editor.view')
+      const ende = view.state.doc.length
+      view.dispatch({ selection: { anchor: ende } })
+    })
+  }
+
+  async function bibText(name) {
+    const eintrag = page.locator('.file-tree').getByRole('treeitem', { name })
+    if (!(await eintrag.isVisible())) await railTab(DATEIBAUM).click()
+    await eintrag.click()
+    await page.locator('.cm-content', { hasText: '@article{' }).waitFor()
+    return await page.evaluate(() =>
+      window.overleaf.unstable.store.get('editor.view').state.doc.toString()
+    )
   }
 
   async function editorErsetzen(alt, neu) {
@@ -185,11 +226,16 @@ async page => {
       await page.goto(`${BASE}/project/${projektId}`)
       await page.locator('.cm-content').first().waitFor()
       await panelOeffnen('Quellen')
-      await page.getByRole('button', { name: 'smith2024.pdf' }).click()
-      await page.locator('img.spur-seitenbild').waitFor()
+      await page.getByRole('button', { name: 'smith2024.pdf' }).waitFor()
       ok(
         (await page.getByRole('button', { name: 'Hochladen' }).count()) === 0,
         'read-Mitglied sieht Hochladen'
+      )
+      await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+      await page.locator('img.spur-seitenbild').waitFor()
+      ok(
+        (await page.getByRole('button', { name: 'Quelle löschen' }).count()) === 0,
+        'read-Mitglied sieht Löschen'
       )
 
       await anmelden('e2e-link@example.org')
@@ -245,7 +291,13 @@ async page => {
       await page.getByRole('button', { name: 'Aus anderem Projekt holen' }).click()
       await page.getByLabel('Projekt').selectOption({ label: 'Demo' })
       await page.getByRole('button', { name: 'Holen', exact: true }).click()
-      await page.getByRole('button', { name: 'smith2024.pdf' }).waitFor()
+      await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+      await page.getByRole('button', { name: 'Weiter' }).click()
+      await page.getByRole('button', { name: 'Weiter' }).click()
+      await page
+        .locator('.spur-zitate li', { hasText: 'Sleep supports the consolidation' })
+        .waitFor()
+      await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
 
       const [download] = await Promise.all([
         page.waitForEvent('download'),
@@ -282,6 +334,51 @@ async page => {
       await sichtbar('Noch keine Quellen')
       await panelOeffnen('Prüfbericht')
       await sichtbar('Quelle fehlt')
+    },
+
+    async f6() {
+      const SATZ = 'Sleep supports the consolidation of declarative memory.'
+      await anmelden('e2e-a@example.org')
+      for (const [projekt, erwartet] of [
+        ['E2E APA', String.raw`\enquote{${SATZ}} \autocite[347]{smith2024}`],
+        ['E2E natbib', String.raw`\enquote{${SATZ}} \citep[S.~347]{smith2024}`],
+      ]) {
+        await projektOeffnen(projekt)
+        await panelOeffnen('Quellen')
+        await quelleHolen('Demo')
+        await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+        await page.getByRole('button', { name: 'Weiter' }).click()
+        await page.getByRole('button', { name: 'Weiter' }).click()
+        await sichtbar('Seite 347 von 8')
+        await textMarkieren(SATZ)
+        await page.getByRole('button', { name: 'Zitat speichern' }).click()
+        const zeile = page.locator('.spur-zitate li', { hasText: SATZ }).first()
+        await zeile.waitFor()
+        await editorAnsEnde()
+        await zeile.getByRole('button', { name: 'Einfügen' }).click()
+        await page.waitForFunction(
+          text => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(text),
+          erwartet
+        )
+        await editorAnsEnde()
+        await zeile.getByRole('button', { name: 'Einfügen' }).click()
+        await page.waitForTimeout(1500)
+        const bib = await bibText('references.bib')
+        ok((bib.match(/@article\{smith2024,/g) ?? []).length === 1, `bib: ${bib}`)
+        ok(bib.includes('title = {Sleep and Memory}'), 'Titel aus Crossref fehlt')
+        ok(bib.includes('doi = {10.5555/spur.2024.001}'), 'DOI fehlt')
+      }
+
+      await anmelden('e2e-leser@example.org')
+      await projektOeffnen('Demo')
+      await panelOeffnen('Quellen')
+      await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+      await page.getByRole('button', { name: 'Weiter' }).click()
+      await page.getByRole('button', { name: 'Weiter' }).click()
+      const knopf = page.locator('.spur-zitate li').first().getByRole('button', { name: 'Einfügen' })
+      await knopf.waitFor()
+      ok(await knopf.isDisabled(), 'Einfügen ist für read-Nutzer aktiv')
+      await sichtbar('Keine Schreibrechte')
     },
   }
 

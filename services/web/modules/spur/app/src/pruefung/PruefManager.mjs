@@ -37,7 +37,7 @@ function hash(...teile) {
   return h.digest('hex')
 }
 
-async function dokumente(projectId) {
+export async function dokumente(projectId) {
   await DocumentUpdaterHandler.promises.flushProjectToMongo(projectId)
   const docs = await ProjectEntityHandler.promises.getAllDocs(projectId)
   const projekt = await ProjectGetter.promises.getProject(projectId, {

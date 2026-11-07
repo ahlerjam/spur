@@ -1,14 +1,17 @@
 // Legt Testkonten und Testprojekte an und setzt deren Quellen zurück.
 // Aufruf: spur-dev run modules/spur/test/e2e/vorbereiten.mjs
 import { randomUUID } from 'node:crypto'
+import logger from '@overleaf/logger'
 import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
+import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.mjs'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen } from '../../scripts/seed.mjs'
 import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
 import { quellen, quellenSeiten } from '../../app/src/sammlungen.mjs'
 
 const PASSWORT = 'spur-e2e-Passwort-1'
+logger.logger.level('error')
 
 const APA = String.raw`\documentclass{article}
 \usepackage[style=apa,backend=biber]{biblatex}
@@ -47,6 +50,14 @@ async function konto(email) {
     password: PASSWORT,
     analyticsId: randomUUID(),
   })
+}
+
+async function neuAnlegen(owner, name, dateien) {
+  for (const alt of await db.projects.find({ owner_ref: owner._id, name }).toArray()) {
+    await ProjectDeleter.promises.deleteProject(alt._id)
+    await ProjectDeleter.promises.expireDeletedProject(alt._id)
+  }
+  return await projektAnlegen(owner._id, name, dateien)
 }
 
 async function projekt(owner, name, dateien) {
@@ -97,8 +108,8 @@ const a = await konto('e2e-a@example.org')
 const leser = await konto('e2e-leser@example.org')
 const link = await konto('e2e-link@example.org')
 
-await projekt(a, 'E2E APA', { 'main.tex': APA, 'references.bib': BIB })
-await projekt(a, 'E2E natbib', { 'main.tex': NATBIB, 'references.bib': BIB })
+await neuAnlegen(a, 'E2E APA', { 'main.tex': APA, 'references.bib': BIB })
+await neuAnlegen(a, 'E2E natbib', { 'main.tex': NATBIB, 'references.bib': BIB })
 
 const leer = await projekt(a, 'E2E Quellen', { 'main.tex': LEER })
 await projektAufraeumen(leer._id)
@@ -117,16 +128,16 @@ const viele = await projekt(a, 'E2E Viele', { 'main.tex': LEER })
 await projektAufraeumen(viele._id)
 await vieleQuellen(viele._id, a._id)
 
-const demo = await db.projects.findOne({ owner_ref: a._id, name: 'Demo' })
-if (demo) {
-  await projektAufraeumen(demo._id)
-  await db.projects.deleteOne({ _id: demo._id })
+for (const alt of await db.projects.find({ owner_ref: a._id, name: 'Demo' }).toArray()) {
+  await ProjectDeleter.promises.deleteProject(alt._id)
+  await ProjectDeleter.promises.expireDeletedProject(alt._id)
 }
-await demoAnlegen(a)
+const neuesDemo = await demoAnlegen(a)
+await db.projects.updateOne({ _id: neuesDemo._id }, { $set: { readOnly_refs: [leser._id] } })
 
 for (const klon of await db.projects.find({ owner_ref: a._id, name: 'E2E Klon' }).toArray()) {
-  await projektAufraeumen(klon._id)
-  await db.projects.deleteOne({ _id: klon._id })
+  await ProjectDeleter.promises.deleteProject(klon._id)
+  await ProjectDeleter.promises.expireDeletedProject(klon._id)
 }
 
 await ablageFreigeben()

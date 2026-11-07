@@ -6,9 +6,10 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
-import { useEditorContext } from '@/shared/context/editor-context'
+import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import QuelleLoeschenModal from './quelle-loeschen-modal'
+import Zitate from './zitate'
 import type { Quelle } from './typen'
 
 type Seite = {
@@ -28,13 +29,14 @@ export default function QuelleVorschau({
   schliessen: () => void
 }) {
   const { t } = useTranslation()
-  const { permissionsLevel } = useEditorContext()
+  const { write: darfSchreiben } = usePermissionsContext()
   const [nummer, setNummer] = useState(startSeite)
   const [seite, setSeite] = useState<Seite | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
   const [fassung, setFassung] = useState(quelle.fassung)
   const [gespeichert, setGespeichert] = useState(false)
   const [loeschDialog, setLoeschDialog] = useState(false)
+  const [textElement, setTextElement] = useState<HTMLElement | null>(null)
   const basis = `/quellen/${quelle.id}`
 
   useEffect(() => {
@@ -102,11 +104,16 @@ export default function QuelleVorschau({
           <p className="spur-zeile-meta">{seite.label}</p>
         )}
         {seite?.text.trim() ? (
-          <pre className="spur-seitentext">{seite.text}</pre>
+          <pre className="spur-seitentext" ref={setTextElement}>
+            {seite.text}
+          </pre>
         ) : (
           seite && <p className="spur-leer">{t('spur_kein_text')}</p>
         )}
-        {permissionsLevel !== 'readOnly' && (
+        {seite?.text.trim() && (
+          <Zitate quelle={quelle} seite={nummer} textElement={textElement} />
+        )}
+        {darfSchreiben && (
           <form
             className="spur-fassung"
             onSubmit={e => {
@@ -135,7 +142,7 @@ export default function QuelleVorschau({
             )}
           </form>
         )}
-        {permissionsLevel !== 'readOnly' && (
+        {darfSchreiben && (
           <OLButton
             className="spur-loeschen"
             variant="danger-ghost"

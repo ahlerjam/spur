@@ -10,6 +10,7 @@ import { db } from '../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../app/src/Features/User/UserRegistrationHandler.mjs'
 import { projektAnlegen } from './lib/projekt-anlegen.mjs'
 import * as QuellenManager from '../app/src/QuellenManager.mjs'
+import * as ZitatManager from '../app/src/ZitatManager.mjs'
 
 const execDatei = promisify(execFile)
 const FIXTURES = fileURLToPath(new URL('../test/fixtures/', import.meta.url))
@@ -70,7 +71,12 @@ export async function demoAnlegen(owner) {
     'main.tex': MAIN,
     'references.bib': BIB,
   })
-  await quelleAusFixture(project._id, owner._id, 'smith2024.pdf')
+  const quelle = await quelleAusFixture(project._id, owner._id, 'smith2024.pdf')
+  await ZitatManager.markieren(
+    quelle,
+    { seite: 3, text: 'Sleep supports the consolidation of declarative memory.' },
+    owner._id
+  )
   return project
 }
 

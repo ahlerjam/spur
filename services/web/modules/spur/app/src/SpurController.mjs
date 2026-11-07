@@ -1,11 +1,24 @@
 import { createReadStream } from 'node:fs'
 import { rm } from 'node:fs/promises'
+import { pipeline } from 'node:stream/promises'
+import logger from '@overleaf/logger'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import CollaboratorsGetter from '../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import * as PruefManager from './pruefung/PruefManager.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
+import * as ZitatManager from './ZitatManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
+
+// Bricht der Browser ab, darf das den Prozess nicht beenden.
+async function dateiSenden(pfad, res) {
+  if (res.destroyed) return
+  await pipeline(createReadStream(pfad), res).catch(error => {
+    if (error.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+      logger.warn({ err: error, pfad }, 'Quelldatei nicht lesbar')
+    }
+  })
+}
 
 const projektId = req => new ObjectId(req.params.project_id)
 const nutzerId = req => SessionManager.getLoggedInUserId(req.session)
@@ -81,14 +94,16 @@ export const quelleBild = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   const nummer = Number.parseInt(req.params.seite, 10)
   await QuellenManager.seite(quelle, nummer)
-  res.type('png').sendFile(await QuellenManager.bild(quelle, nummer))
+  const pfad = await QuellenManager.bild(quelle, nummer)
+  res.type('png')
+  await dateiSenden(pfad, res)
 })
 
 export const quelleDatei = mitProblemen(async (req, res) => {
   await nurMitglieder(req)
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   res.attachment(quelle.dateiname)
-  createReadStream(QuellenManager.dateiPfad(quelle)).pipe(res)
+  await dateiSenden(QuellenManager.dateiPfad(quelle), res)
 })
 
 export const quelleAendern = mitProblemen(async (req, res) => {
@@ -147,6 +162,42 @@ export const quellenHolen = mitProblemen(async (req, res) => {
     new ObjectId(nutzerId(req))
   )
   res.json({ anzahl })
+})
+
+const zitatFuerClient = z => ({
+  id: z._id,
+  seite: z.seite,
+  label: z.label,
+  text: z.text,
+})
+
+export const zitate = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  res.json({ zitate: (await ZitatManager.liste(quelle)).map(zitatFuerClient) })
+})
+
+export const zitatMarkieren = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const seite = Number.parseInt(req.body.seite, 10)
+  const zitat = await ZitatManager.markieren(
+    quelle,
+    { seite, text: req.body.text },
+    new ObjectId(nutzerId(req))
+  )
+  res.status(201).json(zitatFuerClient(zitat))
+})
+
+export const zitatEinfuegen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitat = await ZitatManager.holen(quelle, req.params.zitat_id)
+  res.json(
+    await ZitatManager.einfuegen(
+      projektId(req),
+      quelle,
+      zitat,
+      new ObjectId(nutzerId(req))
+    )
+  )
 })
 
 export const pruefbericht = mitProblemen(async (req, res) => {

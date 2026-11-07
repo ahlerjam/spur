@@ -5,7 +5,7 @@ import OLButton from '@/shared/components/ol/ol-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
-import { useEditorContext } from '@/shared/context/editor-context'
+import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
@@ -41,7 +41,7 @@ function QuellenZeile({ quelle, oeffnen }: { quelle: Quelle; oeffnen: () => void
 
 export default function QuellenPanel() {
   const { t } = useTranslation()
-  const { permissionsLevel } = useEditorContext()
+  const { write: darfSchreiben } = usePermissionsContext()
   const [quellen, setQuellen] = useState<Quelle[] | null>(null)
   const [gesamt, setGesamt] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
@@ -53,7 +53,6 @@ export default function QuellenPanel() {
   const [klonVon, setKlonVon] = useState<Projekt | null>(null)
   const [holenDialog, setHolenDialog] = useState<{ vorauswahl?: string } | null>(null)
   const dateiFeld = useRef<HTMLInputElement>(null)
-  const darfSchreiben = permissionsLevel !== 'readOnly'
 
   const laden = useCallback(async () => {
     setFehler(null)

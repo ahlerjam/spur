@@ -80,7 +80,7 @@
     "Ist das Dokument nicht beschreibbar, bleibt „Einfügen“ deaktiviert mit dem Hinweis „Keine Schreibrechte“",
     "Ein zweites Einfügen erzeugt keinen doppelten `.bib`-Eintrag"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
