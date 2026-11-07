@@ -1,1 +1,8 @@
-{"state": "parked", "builderModel": "opus", "builderAdvisor": "opus", "dependsOn": ["20261106-spur-p3-app"]}
+{
+  "state": "parked",
+  "builderModel": "opus",
+  "builderAdvisor": "opus",
+  "dependsOn": [
+    "20261106-spur-p1-kern"
+  ]
+}
