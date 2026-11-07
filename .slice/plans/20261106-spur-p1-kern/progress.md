@@ -1,6 +1,14 @@
 # Fortschritt 20261106-spur-p1-kern
 
 ## Needs decision
+(keine offenen Punkte)
+
+## Entschieden (Owner, 2026-11-07)
+- Plan-Markierung: Die Planänderungen `d487908589` und `57ac447007` sind gewollt, der HEAD-Stand von `features.json` gilt. Umgesetzt als leerer Commit `dae404c775` „slice: plan 20261106-spur-p1-kern“ (Option A); seitdem vergleicht der Guard mit diesem Stand und meldet nichts mehr. Gegenüber `57ac447007` haben sich nur 15 `passes` geändert.
+- `plugins/spur/.mcp.json`: vom Owner angelegt (`22e90ac388`).
+- Hook `projectDuplicated`: bleibt, ADR 0001 ergänzt (`430ba7a050`); der Hook fängt Fehler jetzt selbst ab.
+
+## Frühere Fragen (erledigt, zur Nachvollziehbarkeit)
 - f1, f8, f9, f10: Der Guard `guard-features.mjs post` meldet nach jedem Bash-Aufruf „features.json changed beyond the passes fields“. Grund: `d487908589` und `57ac447007` haben den Plan nach `d37369ca3f` geändert, ohne neuen Commit `slice: plan 20261106-spur-p1-kern` (`run/SKILL.md:33-34`). Soll die Plan-Markierung nachgezogen werden?
   Interim: Der Build folgt dem HEAD-Stand von `features.json` und ändert dort nur `passes`. Weder wird die alte Fassung wiederhergestellt noch legt der Builder selbst einen `slice: plan`-Commit an, denn damit würde er die Referenz des Guards verschieben, der ihn überwacht. Die Hook-Meldungen bleiben stehen; sie halten nichts auf, weil der Hook nach der Ausführung läuft.
   Options: A (empfohlen): Owner oder Orchestrator legt für künftige Läufe nach jeder Planänderung den Commit `slice: plan <id>` an | B: Guard vergleicht künftig mit dem Stand beim Laufstart
