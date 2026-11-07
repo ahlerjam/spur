@@ -37,12 +37,18 @@ export function kontextUm(text, op) {
   return { vor: text.slice(Math.max(0, op.p - KONTEXT), op.p), nach: text.slice(ende, ende + KONTEXT) }
 }
 
+// Höchstens so viele Treffer werden verglichen; mehr Wiederholungen ergeben einen Konflikt.
+const MAX_TREFFER = 100
+
 // Sucht die Stelle einer angenommenen Änderung im heutigen Text: Kontext davor, Einschub, Kontext
 // danach. Bei mehreren Treffern gilt der nächste zur alten Position; ohne Treffer ein Konflikt.
+// Treffer überlappen nicht, sonst wüchse die Suche bei sich wiederholendem Text quadratisch.
 export function heutigePosition(text, eintrag) {
   const muster = eintrag.vor + (eintrag.op.i ?? '') + eintrag.nach
   let beste = null
-  for (let i = text.indexOf(muster); i !== -1; i = text.indexOf(muster, i + 1)) {
+  let treffer = 0
+  for (let i = text.indexOf(muster); i !== -1; i = text.indexOf(muster, i + Math.max(1, muster.length))) {
+    if (++treffer > MAX_TREFFER) return null
     const p = i + eintrag.vor.length
     if (beste === null || Math.abs(p - eintrag.op.p) < Math.abs(beste - eintrag.op.p)) beste = p
   }

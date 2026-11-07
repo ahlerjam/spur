@@ -50,13 +50,19 @@ async function abrufen(doi) {
   return werkAuswerten(message)
 }
 
+// DOIs, deren Abruf gerade gescheitert ist: nicht bei jedem Bericht erneut 10 s warten.
+const FEHLER_PAUSE_MS = 5 * 60 * 1000
+const zuletztGescheitert = new Map()
+
 export async function werk(doi) {
   const _id = doi.toLowerCase()
   const cache = await crossrefCache()
   const eintrag = await cache.findOne({ _id })
   if (eintrag && jetzt() - eintrag.abgerufenAm < TAG_MS) return eintrag.werk
+  if (Date.now() - (zuletztGescheitert.get(_id) ?? 0) < FEHLER_PAUSE_MS) return eintrag?.werk ?? null
   try {
     const neu = await abrufen(doi)
+    zuletztGescheitert.delete(_id)
     await cache.updateOne(
       { _id },
       { $set: { werk: neu, abgerufenAm: jetzt() } },
@@ -65,6 +71,7 @@ export async function werk(doi) {
     return neu
   } catch (error) {
     logger.warn({ err: error, doi }, 'Crossref nicht erreichbar')
+    zuletztGescheitert.set(_id, Date.now())
     return eintrag?.werk ?? null
   }
 }

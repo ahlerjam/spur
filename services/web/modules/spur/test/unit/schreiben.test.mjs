@@ -52,6 +52,12 @@ describe('heutigePosition', () => {
     expect(heutigePosition('Erster Satz, geändert.\nDritter Satz.', eintrag)).toBeNull()
   })
 
+  it('gibt bei sehr vielen gleichen Stellen auf, statt quadratisch zu suchen', () => {
+    const op = { p: 4, i: 'a' }
+    const eintrag = { op, ...kontextUm('aaaaaaaaa', op) }
+    expect(heutigePosition('a'.repeat(200000), eintrag)).toBeNull()
+  })
+
   it('findet einen Einschub samt Kontext', () => {
     const op = { p: 6, i: 'großer ' }
     const text = 'Der ein großer Hund.'

@@ -13,13 +13,21 @@ export async function botFuer(mensch) {
   const vorhanden = await db.users.findOne({ 'spur.botFuer': mensch._id })
   if (vorhanden) return vorhanden
   const name = mensch.first_name || mensch.email.split('@')[0]
-  const bot = await UserCreator.promises.createNewUser({
-    email: `claude-${mensch._id}@bot.spur.invalid`,
-    first_name: 'Claude',
-    last_name: `(${name})`,
-    holdingAccount: false,
-    analyticsId: randomUUID(),
-  })
+  const email = `claude-${mensch._id}@bot.spur.invalid`
+  let bot
+  try {
+    bot = await UserCreator.promises.createNewUser({
+      email,
+      first_name: 'Claude',
+      last_name: `(${name})`,
+      holdingAccount: false,
+      analyticsId: randomUUID(),
+    })
+  } catch (error) {
+    // Ein gleichzeitiger Aufruf (oder ein abgebrochener früherer) hat den Bot schon angelegt.
+    if (error.code !== 11000) throw error
+    bot = await db.users.findOne({ email })
+  }
   await db.users.updateOne(
     { _id: bot._id },
     { $set: { 'spur.botFuer': mensch._id }, $unset: { hashedPassword: '' } }

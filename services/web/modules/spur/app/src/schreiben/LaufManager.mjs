@@ -37,8 +37,14 @@ export async function laufFuerSchreiben(projectId, botId) {
     rot: [],
     zusammenfassung: null,
   }
-  const { insertedId } = await (await laeufe()).insertOne(lauf)
-  return { ...lauf, _id: insertedId }
+  try {
+    const { insertedId } = await (await laeufe()).insertOne(lauf)
+    return { ...lauf, _id: insertedId }
+  } catch (error) {
+    // Ein gleichzeitiger doc_edit hat den Lauf schon angelegt (eindeutiger Index auf offene Läufe).
+    if (error.code !== 11000) throw error
+    return await offenerLauf(projectId, botId)
+  }
 }
 
 export async function aenderungMerken(lauf, { docId, rot }) {

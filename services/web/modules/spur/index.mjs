@@ -1,3 +1,4 @@
+import logger from '@overleaf/logger'
 import SpurRouter from './app/src/SpurRouter.mjs'
 import * as QuellenManager from './app/src/QuellenManager.mjs'
 import * as ClaudeZugang from './app/src/ClaudeZugang.mjs'
@@ -13,8 +14,11 @@ const SpurModule = {
       projectExpired: QuellenManager.projektAufraeumen,
       deleteUser: ClaudeZugang.kontoAufraeumen,
       expireDeletedUser: ClaudeZugang.kontoAufraeumen,
+      // Der Hinweis im Klon ist ein Nebeneffekt: Er darf das Duplizieren nicht scheitern lassen.
       projectDuplicated: ({ originalProjectId, newProjectId }) =>
-        QuellenManager.klonMerken(originalProjectId, newProjectId),
+        QuellenManager.klonMerken(originalProjectId, newProjectId).catch(error =>
+          logger.warn({ err: error, originalProjectId, newProjectId }, 'spur: Klon nicht vermerkt')
+        ),
     },
   },
 }

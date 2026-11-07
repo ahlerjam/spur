@@ -108,3 +108,19 @@ Kleinere Befunde, behoben: f13 offene Editoren erhalten `accept-changes` und neh
 - Umgesetzt: `doc_create` prüft den Pfad mit `SafePath.isCleanPath` aus dem Kern statt mit eigener Regel; `rolle()` liefert für unbekannte Projekte `null`, `pruefeRecht` ohne `try`/`let`; Ablehnen bildet die Zeitstempel der Auswahl einmal als Set (vorher quadratisch); Rücknahme nur noch über den gespeicherten Kontext, Läufe ohne Kontext ergeben Konflikt; `mcpJson` ohne dreifache 413-Prüfung; `latex.mjs` mit einem Aufruf von `zeileMitZitat`; Panel fokussiert per Ref nach dem Schließen der Vorschau, `holenOeffnen` statt doppelter Handler.
 - Nicht umgesetzt: eigener JSON-Parser für `/spur/mcp` bleibt (der Overleaf-Parser beantwortet Fehler selbst; ein Ersatz bräuchte einen Kern-Patch); Reparatur alter Tokens in `pruefen` bleibt, weil die Abnahme-Datenbank solche Tokens enthält (eine Feldprüfung, Schreiben nur einmal je Token); Textprüfung „Multipart“ im Upload-Router bleibt, busboy meldet kaputte Bodies nicht als `MulterError`; paralleles Lesen bei Rücknahme, Vorab-Limit vor `pruefen` und eine nähere Suche in `heutigePosition` als Optimierung zurückgestellt.
 - E2E danach: f1–f15 ok; Unit-Tests 30 + 531 grün.
+
+## /code-review medium 46c92846db..HEAD (nach der Abnahme-Runde)
+- Behoben: `doc_create` entfernt das angelegte Dokument, wenn der Inhalt danach scheitert (E2E f12: erfundenes Zitat lässt keine Datei zurück); Idempotenz meldet bei verschwundener Reservierung `konflikt` statt TypeError; höchstens ein offener Lauf je Projekt und Bot über eindeutigen Teilindex (Migration `20261107150000_spur_offener_lauf`, `down` getestet) und Abfangen von E11000; `botFuer` übersteht gleichzeitige Aufrufe und abgebrochene frühere Anlagen; fehlgeschlagene Crossref-Abrufe werden 5 Minuten nicht wiederholt; der Hook `projectDuplicated` fängt Fehler ab und lässt das Duplizieren nie scheitern; „Ablehnen“ sehen nur Schreibende und Reviewer; mehrere dezimale PageLabel-Abschnitte ergeben keinen automatischen Versatz.
+- Nicht übernommen: Prüfbericht nach jeder Tipp-Pause lädt das ganze Projekt (Bewertung ist gecacht, f7 verlangt die Begrenzung auf berührte Abschnitte, das Laden bleibt eine Optimierung); Hinweis auf Hilfsskripte im Repo ist ein Fehlalarm, sie liegen in Test- und Skriptordnern des Moduls.
+
+## /security-review (nach der Abnahme-Runde, Subagent)
+- Konfidenz 8: `heutigePosition` suchte überlappend und damit quadratisch (DoS mit sich wiederholendem Text). Jetzt nicht überlappend und höchstens 100 Treffer, sonst Konflikt; Unit-Test mit 200 000 gleichen Zeichen.
+- Ohne Befund: eigener JSON-Parser, Zeitstempel-Gruppe beim Ablehnen (nur Changes des Laufs), Token-Reparatur, `rolle`/`pruefeRecht`, `SafePath`, Upload-Fehler, `Retry-After`, `accept-changes`, `EditorController` für `.bib`.
+
+## Menschlich zu prüfen (neu)
+- Dev-Stack: Bricht der Browser einen Asset-Download ab, stürzt der Web-Prozess mit `ERR_STREAM_UNABLE_TO_PIPE` in `send` ab (Node 24.22.2, Kern). Im E2E trat es direkt nach dem Kontolöschen auf; der Test wartet jetzt vor dem Löschen und vor jeder Anmeldung auf Ruhe im Netz. Ob das Produktions-Image statische Dateien über Express ausliefert und damit betroffen ist: nicht verifiziert.
+
+## Ansichten (Abnahme-Runde)
+- Login (Knopf „Registrieren“ statt `sign_up`), Quellen-Panel mit Meldung „1 Quelle geholt“ und Klon-Hinweis mit „Holen“ unter dem Text, je bei 1280 und 360 px geprüft; kein horizontaler Scroll.
+
+- Letzter voller E2E-Lauf nach der letzten Code-Änderung (Review-Fixes): f1–f15 ok.

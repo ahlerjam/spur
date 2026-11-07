@@ -66,6 +66,10 @@ async function pruefSperre(projectId, neuerText, von, bis) {
 }
 
 function frueheresErgebnis(frueher, projectId) {
+  if (!frueher) {
+    // Der erste Aufruf ist zwischen Reservierung und Nachsehen gescheitert: einfach wiederholen.
+    throw new WerkzeugFehler('konflikt', 'Ein Aufruf mit diesem Idempotenz-Schlüssel ist gerade gescheitert. Bitte erneut versuchen.')
+  }
   if (String(frueher.projectId) !== String(projectId)) {
     throw new WerkzeugFehler(
       'konflikt',
@@ -172,6 +176,12 @@ export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) 
       if (!(error instanceof Errors.InvalidNameError)) throw error
       throw new WerkzeugFehler('pfad_ungueltig', 'Dieser Dateiname ist nicht erlaubt. Bitte einen anderen Pfad wählen.')
     }
-    return await bearbeiten({ projectId, botId, docId: String(doc._id), alt: '', neu: inhalt })
+    try {
+      return await bearbeiten({ projectId, botId, docId: String(doc._id), alt: '', neu: inhalt })
+    } catch (error) {
+      // Kein leeres Dokument zurücklassen, das jede Wiederholung am belegten Pfad scheitern ließe.
+      await EditorController.promises.deleteEntity(projectId, doc._id, 'doc', 'spur', botId)
+      throw error
+    }
   })
 }

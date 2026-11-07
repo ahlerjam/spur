@@ -22,7 +22,9 @@ async page => {
 
   async function anmelden(email) {
     // Erst die alte Seite verlassen: Ihre Polls würden sonst nach dem Löschen eine neue Session
-    // setzen, und das CSRF-Token des Login-Formulars passte nicht mehr.
+    // setzen, und das CSRF-Token des Login-Formulars passte nicht mehr. Vorher laufende Downloads
+    // abwarten: Ein abgebrochener Asset-Download bringt den Web-Prozess im Dev-Stack zum Absturz.
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {})
     await page.goto('about:blank')
     await page.context().clearCookies()
     await page.goto(`${BASE}/login`)
@@ -404,7 +406,7 @@ async page => {
 
       await page.getByRole('button', { name: 'smith2024.pdf' }).click()
       await page.getByLabel('Fassung').fill('Preprint v1')
-      await page.getByRole('button', { name: 'Speichern' }).click()
+      await page.getByRole('button', { name: 'Speichern', exact: true }).click()
       await sichtbar('Gespeichert')
       await page.reload()
       await page.locator('.cm-content').first().waitFor()
@@ -664,6 +666,9 @@ async page => {
 
       ok((await mcp('spur_e2e_weg', 'tools/list')).status === 200, 'Test-Token fehlt')
       await anmelden('e2e-weg@example.org')
+      // Das Löschen beendet die Sitzung, die Seite navigiert sofort weg. Laufen dann noch
+      // Asset-Downloads, stürzt der Dev-Web-Prozess ab (send unter Node 24, siehe progress.md).
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {})
       const loeschen = await seitenPost('/user/delete', { password: PASSWORT })
       ok(loeschen.status === 200, `Konto löschen: ${loeschen.status}`)
       ok((await mcp('spur_e2e_weg', 'tools/list')).status === 401, 'Token überlebt Kontolöschung')
@@ -671,7 +676,13 @@ async page => {
       // Das allererste Token eines neuen Kontos legt den Bot an und muss sofort wirken.
       await anmelden('e2e-neu@example.org')
       await page.goto(`${BASE}/user/settings`)
-      await page.getByRole('button', { name: 'Token erzeugen' }).click()
+      await page
+        .getByRole('button', { name: 'Token erzeugen' })
+        .click({ timeout: 15000 })
+        .catch(async error => {
+          const text = (await page.locator('body').innerText()).slice(0, 400).replace(/\s+/g, ' ')
+          fail(`Token erzeugen fehlt auf ${page.url()}: ${text} (${error.message.split('\n')[0]})`)
+        })
       await page.locator('.spur-befehl').waitFor()
       const erstes = await page.locator('.spur-befehl').getAttribute('data-spur-token')
       const neuPid = await projektId(erstes, 'E2E Neu')
@@ -928,6 +939,13 @@ async page => {
     ok(erfunden.inhalt.fehler === 'zitat_abweichend', `Erfunden: ${JSON.stringify(erfunden.inhalt)}`)
     await page.waitForTimeout(1000)
     ok((await docText()) === vorher, 'Dokument wurde verändert')
+
+    const erfundenNeu = await werkzeug(token, 'doc_create', {
+      project_id: pid, pfad: 'erfunden.tex', inhalt: '\\enquote{Sleep erases all memory.} \\autocite[347]{smith2024}', idempotenz_schluessel: `erfunden-${Date.now()}`,
+    })
+    ok(erfundenNeu.inhalt.fehler === 'zitat_abweichend', `doc_create erfunden: ${JSON.stringify(erfundenNeu.inhalt)}`)
+    const nachDocs = (await werkzeug(token, 'doc_list', { project_id: pid })).inhalt.eintraege
+    ok(!nachDocs.some(d => d.pfad === 'erfunden.tex'), 'doc_create ließ eine leere Datei zurück')
 
     const ohneQuelle = await edit({ alt: 'Erster', neu: 'Erster \\enquote{Ein Satz.} \\autocite[1]{neuerkey2025}' })
     ok(ohneQuelle.inhalt.fehler === 'quelle_fehlt', `Ohne Quelle: ${JSON.stringify(ohneQuelle.inhalt)}`)

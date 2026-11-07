@@ -19,10 +19,10 @@ export async function versatzAusLabels(pfad) {
     [pfad, '--json', '--json-key=pagelabels'],
     GRENZEN
   )
-  const eintrag = JSON.parse(stdout).pagelabels?.find(
-    l => l.label?.['/S'] === '/D'
-  )
-  if (!eintrag) return null
+  const dezimal = (JSON.parse(stdout).pagelabels ?? []).filter(l => l.label?.['/S'] === '/D')
+  // Mehrere dezimale Abschnitte (z. B. Teil-Nummerierung) passen in keinen einzelnen Versatz.
+  if (dezimal.length !== 1) return null
+  const [eintrag] = dezimal
   return (eintrag.label['/St'] ?? 1) - (eintrag.index + 1)
 }
 

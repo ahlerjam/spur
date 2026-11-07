@@ -46,7 +46,9 @@ export default function LaufKarte({
   neuLaden: () => Promise<void>
 }) {
   const { t } = useTranslation()
-  const { write } = usePermissionsContext()
+  const { write, trackedWrite } = usePermissionsContext()
+  // Ablehnen dürfen wie im Server Schreibende und Reviewer.
+  const darfAblehnen = write || trackedWrite
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [automatikAn, setAutomatikAn] = useState(automatik)
@@ -114,14 +116,16 @@ export default function LaufKarte({
                     {t('spur_annehmen')}
                   </OLButton>
                 )}
-                <OLButton
-                  variant="ghost"
-                  size="sm"
-                  disabled={laeuft}
-                  onClick={() => aktion('POST', pfad('ablehnen'), { change_ids: [a.id] })}
-                >
-                  {t('spur_ablehnen')}
-                </OLButton>
+                {darfAblehnen && (
+                  <OLButton
+                    variant="ghost"
+                    size="sm"
+                    disabled={laeuft}
+                    onClick={() => aktion('POST', pfad('ablehnen'), { change_ids: [a.id] })}
+                  >
+                    {t('spur_ablehnen')}
+                  </OLButton>
+                )}
               </div>
             </li>
           ))}
@@ -133,7 +137,7 @@ export default function LaufKarte({
             {t('spur_alle_annehmen')}
           </OLButton>
         )}
-        {offen && changes.length > 0 && (
+        {offen && darfAblehnen && changes.length > 0 && (
           <OLButton variant="danger-ghost" size="sm" disabled={laeuft} onClick={() => aktion('POST', pfad('ablehnen'))}>
             {t('spur_lauf_ablehnen')}
           </OLButton>
