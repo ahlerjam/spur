@@ -1,26 +1,50 @@
-{"features": [
-{"id": "f1", "title": "Zitate gemeinsam nutzen", "steps": [
-"Nutzer A markiert ein Zitat: Nutzer B sieht es live in der Liste mit dem Namen von A",
-"B schreibt einen Kommentar und weist es A zu: A sieht den Hinweis",
-"`read`-Nutzer sehen Markierungen, dürfen aber keine anlegen",
-"Der Filter „Von mir“ zeigt nur eigene Zitate"
-], "passes": false, "ui": true},
-{"id": "f2", "title": "Scans per OCR aufnehmen", "steps": [
-"Nutzer klickt bei `scan.pdf` „Text erkennen“: Der Fortschritt läuft, danach zeigt die Quelle „OCR, Sichtprüfung nötig“",
-"Die Suche findet den bekannten Satz",
-"Ein Zitat daraus zeigt „Wortlaut: OCR, nicht bestätigt“",
-"Nach „Stelle bestätigt“ zeigt es „Wortlaut: von Mensch bestätigt“"
-], "passes": false, "ui": true},
-{"id": "f3", "title": "Webseiten als Schnappschuss", "steps": [
-"Nutzer gibt die URL der Testseite ein: Die Quelle zeigt Titel, URL und Abrufdatum aus `SPUR_NOW`",
-"Ein Zitat daraus wird gegen den Schnappschuss geprüft",
-"Eine nicht erreichbare Adresse zeigt „Seite nicht erreichbar“ und speichert nichts"
-], "passes": false, "ui": true},
-{"id": "f4", "title": "Interviews thematisch codieren", "steps": [
-"Nutzer markiert ein Segment in `interview.vtt` und vergibt den Code „Belastung“",
-"Der Fake-Client schlägt per Tool einen Code vor: Er erscheint als offen an genau diesem Segment",
-"Annehmen und Ablehnen wirken nur auf diesen Vorschlag",
-"Die Codeliste zeigt Anzahl und springt zu den Segmenten",
-"Export liefert CSV mit Code, Datei, Zeitmarke, Text"
-], "passes": false, "ui": true}
-]}
+{
+ "features": [
+  {
+   "id": "f1",
+   "title": "Zitate gemeinsam nutzen",
+   "steps": [
+    "Nutzer A markiert ein Zitat: Nutzer B sieht es live in der Liste mit dem Namen von A",
+    "B schreibt einen Kommentar und weist es A zu: A sieht den Hinweis",
+    "`read`-Nutzer sehen Markierungen, dürfen aber keine anlegen",
+    "Der Filter „Von mir“ zeigt nur eigene Zitate"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f2",
+   "title": "Scans per OCR aufnehmen",
+   "steps": [
+    "Nutzer klickt bei `scan.pdf` „Text erkennen“: Der Fortschritt läuft, danach zeigt die Quelle „OCR, Sichtprüfung nötig“",
+    "Die Suche findet den bekannten Satz",
+    "Ein Zitat daraus zeigt „Wortlaut: OCR, nicht bestätigt“",
+    "Nach „Stelle bestätigt“ zeigt es „Wortlaut: von Mensch bestätigt“"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f3",
+   "title": "Webseiten als Schnappschuss",
+   "steps": [
+    "Nutzer gibt die URL der Testseite ein: Die Quelle zeigt Titel, URL und Abrufdatum aus `SPUR_NOW`",
+    "Ein Zitat daraus wird gegen den Schnappschuss geprüft",
+    "Eine nicht erreichbare Adresse zeigt „Seite nicht erreichbar“ und speichert nichts"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f4",
+   "title": "Hinweis zu Interviews und Transkripten",
+   "steps": [
+    "Nutzer lädt `interview.vtt` hoch: Unter dem Upload steht „Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.“",
+    "Bei einem PDF steht dieser Hinweis nicht",
+    "Die README nennt denselben Hinweis im Abschnitt „Claude und Ihre Daten“"
+   ],
+   "passes": false,
+   "ui": true
+  }
+ ]
+}
