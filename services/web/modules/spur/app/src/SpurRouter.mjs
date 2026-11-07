@@ -1,3 +1,4 @@
+import Settings from '@overleaf/settings'
 import AuthorizationMiddleware from '../../../../app/src/Features/Authorization/AuthorizationMiddleware.mjs'
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
 import { multerUploadHandler } from '../../../../app/src/infrastructure/Multer.mjs'
@@ -18,7 +19,10 @@ const schreiben = [
   AuthorizationMiddleware.ensureUserCanWriteProjectContent,
 ]
 
-const upload = multerUploadHandler({ limits: { fileSize: MAX_BYTES } }).single('datei')
+const upload = multerUploadHandler({
+  dest: Settings.path.uploadFolder,
+  limits: { fileSize: MAX_BYTES },
+}).single('datei')
 
 function hochladenMitGrenze(req, res, next) {
   upload(req, res, error => {
@@ -40,6 +44,10 @@ export default {
     webRouter.get(QUELLEN, ...lesen, SpurController.quellenListe)
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
     webRouter.get(`${QUELLEN}/suche`, ...lesen, SpurController.quellenSuche)
+    webRouter.get(`${QUELLEN}/export`, ...lesen, SpurController.quellenExport)
+    webRouter.get(`${QUELLEN}/andere`, ...lesen, SpurController.andereProjekte)
+    webRouter.post(`${QUELLEN}/holen`, ...schreiben, SpurController.quellenHolen)
+    webRouter.delete(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleLoeschen)
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite`, ...lesen, SpurController.quelleSeite)
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/bild`, ...lesen, SpurController.quelleBild)
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)

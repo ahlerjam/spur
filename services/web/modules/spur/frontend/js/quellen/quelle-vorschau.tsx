@@ -8,6 +8,7 @@ import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { useEditorContext } from '@/shared/context/editor-context'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
+import QuelleLoeschenModal from './quelle-loeschen-modal'
 import type { Quelle } from './typen'
 
 type Seite = {
@@ -33,6 +34,7 @@ export default function QuelleVorschau({
   const [fehler, setFehler] = useState<string | null>(null)
   const [fassung, setFassung] = useState(quelle.fassung)
   const [gespeichert, setGespeichert] = useState(false)
+  const [loeschDialog, setLoeschDialog] = useState(false)
   const basis = `/quellen/${quelle.id}`
 
   useEffect(() => {
@@ -133,7 +135,24 @@ export default function QuelleVorschau({
             )}
           </form>
         )}
+        {permissionsLevel !== 'readOnly' && (
+          <OLButton
+            className="spur-loeschen"
+            variant="danger-ghost"
+            size="sm"
+            onClick={() => setLoeschDialog(true)}
+          >
+            {t('spur_quelle_loeschen')}
+          </OLButton>
+        )}
       </div>
+      {loeschDialog && (
+        <QuelleLoeschenModal
+          quelle={quelle}
+          schliessen={() => setLoeschDialog(false)}
+          geloescht={schliessen}
+        />
+      )}
     </div>
   )
 }

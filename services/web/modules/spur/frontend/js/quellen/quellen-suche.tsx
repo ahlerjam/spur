@@ -26,7 +26,9 @@ export default function QuellenSuche({
             {eintrag.dateiname}
           </OLButton>
           <p className="spur-zeile-meta">
-            {t('spur_seite_kurz', { seite: eintrag.label ?? eintrag.seite })}
+            {eintrag.art === 'vtt'
+              ? eintrag.label
+              : t('spur_seite_kurz', { seite: eintrag.label ?? eintrag.seite })}
           </p>
           <p className="spur-zeile-auszug">{eintrag.auszug}</p>
         </li>

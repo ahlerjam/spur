@@ -8,6 +8,7 @@ import Notification from '@/shared/components/notification'
 import { useEditorContext } from '@/shared/context/editor-context'
 import { anfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
+import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
 import type { Quelle, Treffer } from './typen'
@@ -48,6 +49,9 @@ export default function QuellenPanel() {
   const [offen, setOffen] = useState<{ quelle: Quelle; seite: number } | null>(null)
   const [treffer, setTreffer] = useState<Treffer[] | null>(null)
   const [begriff, setBegriff] = useState('')
+  const [andere, setAndere] = useState<Projekt[]>([])
+  const [klonVon, setKlonVon] = useState<Projekt | null>(null)
+  const [holenDialog, setHolenDialog] = useState<{ vorauswahl?: string } | null>(null)
   const dateiFeld = useRef<HTMLInputElement>(null)
   const darfSchreiben = permissionsLevel !== 'readOnly'
 
@@ -64,9 +68,18 @@ export default function QuellenPanel() {
     }
   }, [])
 
+  const andereLaden = useCallback(async () => {
+    const antwort = await anfrage<{ projekte: Projekt[]; klonVon: Projekt | null }>(
+      projektPfad('/quellen/andere')
+    )
+    setAndere(antwort.projekte)
+    setKlonVon(antwort.klonVon)
+  }, [])
+
   useEffect(() => {
     laden()
-  }, [laden])
+    andereLaden().catch(error => setFehler(error.message))
+  }, [laden, andereLaden])
 
   const hochladen = async (dateien: FileList | null) => {
     const datei = dateien?.[0]
@@ -143,9 +156,41 @@ export default function QuellenPanel() {
             >
               {t('spur_hochladen')}
             </OLButton>
+            <OLButton
+              variant="secondary"
+              size="sm"
+              onClick={() => setHolenDialog({})}
+            >
+              {t('spur_aus_projekt_holen')}
+            </OLButton>
           </>
         )}
+        <OLButton
+          variant="secondary"
+          size="sm"
+          href={projektPfad('/quellen/export')}
+          download
+        >
+          {t('spur_quellen_exportieren')}
+        </OLButton>
       </div>
+      {klonVon && darfSchreiben && (
+        <div className="spur-panel-hinweis">
+          <Notification
+            type="info"
+            content={t('spur_quellen_nicht_kopiert')}
+            action={
+              <OLButton
+                variant="secondary"
+                size="sm"
+                onClick={() => setHolenDialog({ vorauswahl: klonVon.id })}
+              >
+                {t('spur_holen')}
+              </OLButton>
+            }
+          />
+        </div>
+      )}
       <form
         className="spur-suche"
         role="search"
@@ -200,6 +245,19 @@ export default function QuellenPanel() {
           </>
         )}
       </div>
+      {holenDialog && (
+        <QuellenHolenModal
+          projekte={klonVon && !andere.length ? [klonVon] : andere}
+          vorauswahl={holenDialog.vorauswahl}
+          schliessen={() => setHolenDialog(null)}
+          geholt={() => {
+            setHolenDialog(null)
+            laden()
+            andereLaden()
+            pruefenVerzoegert()
+          }}
+        />
+      )}
     </div>
   )
 }

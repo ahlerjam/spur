@@ -1,9 +1,12 @@
-// Legt Testkonten und Testprojekte an. Wiederholbar: Vorhandenes bleibt stehen.
+// Legt Testkonten und Testprojekte an und setzt deren Quellen zurück.
 // Aufruf: spur-dev run modules/spur/test/e2e/vorbereiten.mjs
 import { randomUUID } from 'node:crypto'
 import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
+import { ablageFreigeben, demoAnlegen } from '../../scripts/seed.mjs'
+import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
+import { quellen, quellenSeiten } from '../../app/src/sammlungen.mjs'
 
 const PASSWORT = 'spur-e2e-Passwort-1'
 
@@ -31,6 +34,11 @@ const BIB = `@article{e2e,
   year = {2024}
 }`
 
+const LEER = String.raw`\documentclass{article}
+\begin{document}
+Hello
+\end{document}`
+
 async function konto(email) {
   const vorhanden = await db.users.findOne({ email })
   if (vorhanden) return vorhanden
@@ -43,12 +51,84 @@ async function konto(email) {
 
 async function projekt(owner, name, dateien) {
   const vorhanden = await db.projects.findOne({ owner_ref: owner._id, name })
-  if (!vorhanden) await projektAnlegen(owner._id, name, dateien)
+  return vorhanden ?? (await projektAnlegen(owner._id, name, dateien))
+}
+
+async function vieleQuellen(projectId, ownerId) {
+  const anzahl = 300
+  const eintraege = Array.from({ length: anzahl }, (_, i) => ({
+    projectId,
+    dateiname: `quelle-${String(i).padStart(3, '0')}.pdf`,
+    key: `quelle-${i}`,
+    art: 'pdf',
+    groesse: 1000,
+    seitenzahl: 2,
+    status: 'text',
+    doi: null,
+    meta: null,
+    versatz: null,
+    versatzQuelle: null,
+    fassung: '',
+    angelegtVon: ownerId,
+    angelegtAm: new Date(),
+  }))
+  const { insertedIds } = await (await quellen()).insertMany(eintraege)
+  await (await quellenSeiten()).insertMany(
+    Object.values(insertedIds).flatMap((quelleId, i) => [
+      {
+        quelleId,
+        projectId,
+        seite: 1,
+        label: null,
+        text: `Studie ${i} prüft Lernen und Schlaf bei Erwachsenen. `.repeat(40),
+      },
+      {
+        quelleId,
+        projectId,
+        seite: 2,
+        label: null,
+        text: i === 150 ? 'Die seltene Wortfolge steht nur hier.' : 'Nichts Besonderes.',
+      },
+    ])
+  )
 }
 
 const a = await konto('e2e-a@example.org')
+const leser = await konto('e2e-leser@example.org')
+const link = await konto('e2e-link@example.org')
+
 await projekt(a, 'E2E APA', { 'main.tex': APA, 'references.bib': BIB })
 await projekt(a, 'E2E natbib', { 'main.tex': NATBIB, 'references.bib': BIB })
 
+const leer = await projekt(a, 'E2E Quellen', { 'main.tex': LEER })
+await projektAufraeumen(leer._id)
+await db.projects.updateOne(
+  { _id: leer._id },
+  {
+    $set: {
+      publicAccesLevel: 'tokenBased',
+      readOnly_refs: [leser._id],
+      tokenAccessReadAndWrite_refs: [link._id],
+    },
+  }
+)
+
+const viele = await projekt(a, 'E2E Viele', { 'main.tex': LEER })
+await projektAufraeumen(viele._id)
+await vieleQuellen(viele._id, a._id)
+
+const demo = await db.projects.findOne({ owner_ref: a._id, name: 'Demo' })
+if (demo) {
+  await projektAufraeumen(demo._id)
+  await db.projects.deleteOne({ _id: demo._id })
+}
+await demoAnlegen(a)
+
+for (const klon of await db.projects.find({ owner_ref: a._id, name: 'E2E Klon' }).toArray()) {
+  await projektAufraeumen(klon._id)
+  await db.projects.deleteOne({ _id: klon._id })
+}
+
+await ablageFreigeben()
 console.log('E2E-Daten bereit')
 process.exit(0)

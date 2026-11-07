@@ -1,14 +1,17 @@
 // `make seed`: legt das Projekt „Demo“ an. Aufruf: node modules/spur/scripts/seed.mjs [email]
+import { execFile } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { copyFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import Path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import { db } from '../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../app/src/Features/User/UserRegistrationHandler.mjs'
 import { projektAnlegen } from './lib/projekt-anlegen.mjs'
 import * as QuellenManager from '../app/src/QuellenManager.mjs'
 
+const execDatei = promisify(execFile)
 const FIXTURES = fileURLToPath(new URL('../test/fixtures/', import.meta.url))
 
 export const MAIN = String.raw`\documentclass{article}
@@ -42,6 +45,12 @@ export async function quelleAusFixture(projectId, userId, dateiname) {
   })
 }
 
+// Das Skript läuft als root, der Web-Prozess muss die Ablage aber beschreiben können.
+export async function ablageFreigeben() {
+  const { uid, gid } = await stat(Path.dirname(QuellenManager.ablageWurzel()))
+  await execDatei('chown', ['-R', `${uid}:${gid}`, QuellenManager.ablageWurzel()])
+}
+
 async function besitzer(email) {
   const vorhanden = email
     ? await db.users.findOne({ email })
@@ -69,6 +78,7 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     const owner = await besitzer(process.argv[2])
     await demoAnlegen(owner)
+    await ablageFreigeben()
     console.log(`Projekt „Demo“ steht für ${owner.email} bereit`)
     process.exit(0)
   } catch (error) {

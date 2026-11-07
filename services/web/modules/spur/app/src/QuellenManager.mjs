@@ -1,9 +1,11 @@
 import fs from 'node:fs/promises'
 import Path from 'node:path'
+import archiver from 'archiver'
+import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
-import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
+import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
-import { quellen, quellenSeiten } from './sammlungen.mjs'
+import { klone, pruefCache, quellen, quellenSeiten, quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
@@ -13,11 +15,12 @@ const SEITE_LISTE = 100
 const SUCH_TREFFER = 50
 const DOI = /\b10\.\d{4,9}\/[^\s"<>]+/
 
-const wurzel = () => Path.join(Path.dirname(Settings.path.dumpFolder), 'spur')
+export const ablageWurzel = () =>
+  Path.join(Path.dirname(Settings.path.compilesDir), 'spur')
 
 export const dateiPfad = quelle =>
   Path.join(
-    wurzel(),
+    ablageWurzel(),
     String(quelle.projectId),
     `${quelle._id}${Path.extname(quelle.dateiname).toLowerCase()}`
   )
@@ -36,7 +39,8 @@ function versatzInSpanne(versatz, seitenzahl, spanne) {
 }
 
 async function pdfAuslesen(pfad) {
-  const texte = await seitenTexte(pfad).catch(() => {
+  const texte = await seitenTexte(pfad).catch(error => {
+    logger.warn({ err: error }, 'PDF nicht lesbar')
     throw new Problem(
       422,
       'datei_unlesbar',
@@ -219,6 +223,7 @@ export async function suchen(projectId, begriff) {
   return treffer.map(t => ({
     quelleId: t.quelleId,
     dateiname: namen.get(String(t.quelleId))?.dateiname,
+    art: namen.get(String(t.quelleId))?.art,
     seite: t.seite,
     label: t.label,
     position: t.text.toLowerCase().indexOf(begriff.toLowerCase()),
@@ -248,6 +253,7 @@ export async function aendern(quelle, { fassung, versatz }) {
 }
 
 export async function loeschen(quelle) {
+  await (await quotes()).deleteMany({ quelleId: quelle._id })
   await (await quellenSeiten()).deleteMany({ quelleId: quelle._id })
   await (await quellen()).deleteOne({ _id: quelle._id })
   const ordner = Path.dirname(dateiPfad(quelle))
@@ -256,4 +262,116 @@ export async function loeschen(quelle) {
       await fs.rm(Path.join(ordner, name), { force: true })
     }
   }
+}
+
+export async function projektAufraeumen(projectId) {
+  const id = new ObjectId(projectId)
+  await Promise.all([
+    (await quotes()).deleteMany({ projectId: id }),
+    (await quellenSeiten()).deleteMany({ projectId: id }),
+    (await quellen()).deleteMany({ projectId: id }),
+    (await pruefCache()).deleteMany({ projectId: id }),
+    (await klone()).deleteOne({ _id: id }),
+  ])
+  await fs.rm(Path.join(ablageWurzel(), String(id)), { recursive: true, force: true })
+}
+
+export async function klonMerken(originalProjectId, neuesProjekt) {
+  const hatQuellen = await (await quellen()).findOne({
+    projectId: new ObjectId(originalProjectId),
+  })
+  if (hatQuellen) {
+    await (await klone()).insertOne({
+      _id: neuesProjekt,
+      vonProjekt: new ObjectId(originalProjectId),
+    })
+  }
+}
+
+export async function klonHinweis(projectId) {
+  const klon = await (await klone()).findOne({ _id: projectId })
+  if (!klon) return null
+  const projekt = await db.projects.findOne(
+    { _id: klon.vonProjekt },
+    { projection: { name: 1 } }
+  )
+  return projekt && { id: projekt._id, name: projekt.name }
+}
+
+async function quelleKopieren(quelle, zielProjekt, userId) {
+  const neu = {
+    ...quelle,
+    _id: new ObjectId(),
+    projectId: zielProjekt,
+    angelegtVon: userId,
+    angelegtAm: jetzt(),
+  }
+  const ziel = dateiPfad(neu)
+  await fs.mkdir(Path.dirname(ziel), { recursive: true })
+  await fs.copyFile(dateiPfad(quelle), ziel)
+  const seiten = await (await quellenSeiten())
+    .find({ quelleId: quelle._id })
+    .toArray()
+  if (seiten.length) {
+    await (await quellenSeiten()).insertMany(
+      seiten.map(({ _id, ...s }) => ({
+        ...s,
+        quelleId: neu._id,
+        projectId: zielProjekt,
+      }))
+    )
+  }
+  const marken = await (await quotes()).find({ quelleId: quelle._id }).toArray()
+  if (marken.length) {
+    await (await quotes()).insertMany(
+      marken.map(({ _id, ...q }) => ({
+        ...q,
+        quelleId: neu._id,
+        projectId: zielProjekt,
+      }))
+    )
+  }
+  await (await quellen()).insertOne(neu)
+}
+
+export async function uebernehmen(zielProjekt, vonProjekt, userId) {
+  const vorhanden = new Set((await alle(zielProjekt)).map(q => q.key))
+  const neu = (await alle(vonProjekt)).filter(q => !vorhanden.has(q.key))
+  for (const quelle of neu) await quelleKopieren(quelle, zielProjekt, userId)
+  await (await klone()).deleteOne({ _id: zielProjekt })
+  return neu.length
+}
+
+export async function projekteMitQuellen(userId, ohneProjekt) {
+  const projekte = await db.projects
+    .find(
+      {
+        _id: { $ne: ohneProjekt },
+        $or: [
+          { owner_ref: userId },
+          { collaberator_refs: userId },
+          { reviewer_refs: userId },
+          { readOnly_refs: userId },
+        ],
+      },
+      { projection: { name: 1 } }
+    )
+    .toArray()
+  const mitQuellen = await (await quellen()).distinct('projectId', {
+    projectId: { $in: projekte.map(p => p._id) },
+  })
+  const ids = new Set(mitQuellen.map(String))
+  return projekte
+    .filter(p => ids.has(String(p._id)))
+    .map(p => ({ id: p._id, name: p.name }))
+}
+
+export async function zipSchreiben(projectId, ausgabe) {
+  const archiv = archiver('zip')
+  archiv.on('error', error => ausgabe.destroy(error))
+  archiv.pipe(ausgabe)
+  for (const quelle of await alle(projectId)) {
+    archiv.file(dateiPfad(quelle), { name: quelle.dateiname })
+  }
+  await archiv.finalize()
 }

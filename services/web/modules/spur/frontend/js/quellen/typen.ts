@@ -15,6 +15,7 @@ export type Quelle = {
 export type Treffer = {
   quelleId: string
   dateiname: string
+  art: Quelle['art']
   seite: number
   label: string | null
   auszug: string

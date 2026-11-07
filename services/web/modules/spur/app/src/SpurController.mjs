@@ -1,4 +1,5 @@
 import { createReadStream } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import CollaboratorsGetter from '../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
@@ -49,14 +50,18 @@ export const quelleHochladen = mitProblemen(async (req, res) => {
   if (!req.file) {
     throw new Problem(400, 'datei_fehlt', 'Es kam keine Datei an. Bitte erneut hochladen.')
   }
-  const quelle = await QuellenManager.aufnehmen({
-    projectId: projektId(req),
-    userId: new ObjectId(nutzerId(req)),
-    dateiname: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
-    tempPfad: req.file.path,
-    groesse: req.file.size,
-  })
-  res.status(201).json(quelleFuerClient(quelle))
+  try {
+    const quelle = await QuellenManager.aufnehmen({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      dateiname: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
+      tempPfad: req.file.path,
+      groesse: req.file.size,
+    })
+    res.status(201).json(quelleFuerClient(quelle))
+  } finally {
+    await rm(req.file.path, { force: true })
+  }
 })
 
 export const quellenSuche = mitProblemen(async (req, res) => {
@@ -96,6 +101,52 @@ export const quelleAendern = mitProblemen(async (req, res) => {
     throw new Problem(422, 'versatz', 'Der Versatz muss eine ganze Zahl sein.')
   }
   res.json(quelleFuerClient(await QuellenManager.aendern(quelle, { fassung, versatz })))
+})
+
+export const quelleLoeschen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  await QuellenManager.loeschen(quelle)
+  res.sendStatus(204)
+})
+
+export const quellenExport = mitProblemen(async (req, res) => {
+  await nurMitglieder(req)
+  res.attachment('quellen.zip')
+  await QuellenManager.zipSchreiben(projektId(req), res)
+})
+
+export const andereProjekte = mitProblemen(async (req, res) => {
+  res.json({
+    projekte: await QuellenManager.projekteMitQuellen(
+      new ObjectId(nutzerId(req)),
+      projektId(req)
+    ),
+    klonVon: await QuellenManager.klonHinweis(projektId(req)),
+  })
+})
+
+export const quellenHolen = mitProblemen(async (req, res) => {
+  const { projekt } = req.body
+  if (!ObjectId.isValid(projekt)) {
+    throw new Problem(422, 'projekt', 'Bitte ein Projekt auswählen.')
+  }
+  const darf = await CollaboratorsGetter.promises.isUserInvitedMemberOfProject(
+    nutzerId(req),
+    projekt
+  )
+  if (!darf) {
+    throw new Problem(
+      403,
+      'nur_mitglieder',
+      'Quellen lassen sich nur aus Projekten holen, in denen Sie Mitglied sind.'
+    )
+  }
+  const anzahl = await QuellenManager.uebernehmen(
+    projektId(req),
+    new ObjectId(projekt),
+    new ObjectId(nutzerId(req))
+  )
+  res.json({ anzahl })
 })
 
 export const pruefbericht = mitProblemen(async (req, res) => {

@@ -40,7 +40,7 @@
     "Eine Datei über 50 MB zeigt „Datei ist größer als 50 MB. Bitte verkleinern.“ und nichts wird gespeichert",
     "Ein Compile nach dem Upload zeigt keinen vollen Sync durch die Quelle; Mitglieder mit `read` sehen die Vorschau, Nutzer mit Edit-Link können das PDF nicht herunterladen"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
