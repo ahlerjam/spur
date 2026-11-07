@@ -28,6 +28,9 @@ jobs:
           docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
       - name: Stack starten
         run: spur-dev up
+      - name: Werkzeuge im Container prüfen
+        run: |
+          docker exec spur-dev-web bash -lc 'set -e; qpdf --version | head -1; pdftotext -v 2>&1 | head -1; cd /overleaf/services/web/modules/spur/test/fixtures && qpdf smith2024.pdf --json --json-key=pagelabels | tr -d " \n"; echo; pdftotext -raw smith2024.pdf - | head -3'
       - name: Unit-Tests
         run: spur-dev test
       - name: Playwright einrichten
