@@ -1,21 +1,42 @@
-<h1 align="center">
-  <br>
-  <a href="https://www.overleaf.com"><img src="doc/logo.png" alt="Overleaf" width="300"></a>
-</h1>
+# spur
 
-<h4 align="center">An open-source online real-time collaborative LaTeX editor.</h4>
+spur ist eine selbst gehostete Schreibumgebung für wissenschaftliche Arbeiten auf Basis von [overleaf-cep](https://github.com/yu-i-i/overleaf-cep). Sie verwalten Quellen im Editor, fügen Zitate per Knopf ein und sehen in einem Prüfbericht, ob Wortlaut, Seite und Referenz stimmen und ob eine Arbeit zurückgezogen wurde. Ihr eigenes Claude Code schreibt mit, ohne Zitate erfinden zu können.
 
-<p align="center">
-  <a href="https://github.com/yu-i-i/overleaf-cep/wiki">Wiki</a> •
-  <a href="https://www.overleaf.com/for/enterprises">Server Pro</a> •
-  <a href="#authors">Authors</a> •
-  <a href="#license">License</a>
-</p>
+## Installation
 
-<img src="doc/screenshot.png" alt="A screenshot of a project being edited in Overleaf Extended Community Edition">
-<p align="center">
-  Figure 1: A screenshot of a project being edited in Overleaf CE+
-</p>
+Sie brauchen Docker mit Compose und `make`.
+
+```sh
+git clone https://github.com/ahlerjam/spur.git
+cd spur
+make start
+```
+
+`make start` legt beim ersten Start ein `.env` mit einem zufälligen `OVERLEAF_INVITE_TOKEN_SECRET` an und startet das veröffentlichte Image. Ohne dieses Secret startet der Container nicht. spur läuft danach auf <http://localhost:8080>. Das erste Administratorkonto legen Sie unter `/launchpad` an.
+
+| Befehl | Wirkung |
+|---|---|
+| `make start` | Startet spur |
+| `make stop` | Stoppt spur |
+| `make seed` | Legt Demo-Daten an |
+| `make test` | Führt die Unit-Tests aus |
+| `make e2e` | Führt Playwright gegen den laufenden Stack aus |
+
+`SPUR_URL`, `SPUR_PORT` und `SPUR_IMAGE` ändern Adresse, Port und Image. Backups umfassen das Volume `spur_data` und die MongoDB.
+
+Betreiben Sie spur öffentlich, ist die Compile-Sandbox Pflicht:
+
+```sh
+SPUR_DATA_DIR=/srv/spur docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+```
+
+## Claude und Ihre Daten
+
+Inhalte, die Claude liest, gehen an Anthropic. Dazu gehören Dokumente und Quellen, auch Interviews. Die Verantwortung dafür liegt bei Ihnen.
+
+## Herkunft
+
+Der folgende Text stammt aus overleaf-cep.
 
 ## Community Edition
 

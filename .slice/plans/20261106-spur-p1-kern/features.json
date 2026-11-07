@@ -11,7 +11,7 @@
     "Das Repo enthält `docker-compose.yml` für Betreiber mit dem veröffentlichten Image, ein `make start`, das beim ersten Start ein `.env` mit zufälligem `OVERLEAF_INVITE_TOKEN_SECRET` anlegt, und eine README mit diesem Weg. Der Workflow `Smoke` startet genau diesen Weg in der CI, prüft `/status` und ein APA-Compile",
     "`make start` selbst läuft im Builder nicht; der Lauf endet mit grünem Workflow-Stand oder dem Hinweis, dass ein Mensch ihn prüfen muss"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

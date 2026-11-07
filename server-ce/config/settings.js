@@ -196,7 +196,7 @@ const settings = {
   enableRegiserPage: process.env.OVERLEAF_ENABLE_REGISTER_PAGE === 'true',
 
   // The name this is used to describe your Overleaf Community Edition Installation
-  appName: process.env.OVERLEAF_APP_NAME || 'Overleaf Community Edition',
+  appName: process.env.OVERLEAF_APP_NAME || 'spur',
 
   restrictInvitesToExistingAccounts:
     process.env.OVERLEAF_RESTRICT_INVITES_TO_EXISTING_ACCOUNTS === 'true',
@@ -205,7 +205,7 @@ const settings = {
     title:
       process.env.OVERLEAF_NAV_TITLE ||
       process.env.OVERLEAF_APP_NAME ||
-      'Overleaf Community Edition',
+      'spur',
   },
 
   // The email address which users will be directed to as the main point of
