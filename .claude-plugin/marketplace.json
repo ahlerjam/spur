@@ -1,0 +1,13 @@
+{
+  "name": "spur",
+  "owner": {
+    "name": "ahlerjam"
+  },
+  "plugins": [
+    {
+      "name": "spur",
+      "source": "./plugins/spur",
+      "description": "Verbindet Claude Code mit einer spur-Installation."
+    }
+  ]
+}

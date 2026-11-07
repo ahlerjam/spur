@@ -111,7 +111,7 @@
     "Ein abgelaufenes Token zeigt im Browser „Token abgelaufen, bitte erneuern“",
     "Beim Löschen des Kontos verschwinden Token und Bot"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

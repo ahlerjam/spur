@@ -1,0 +1,20 @@
+{
+  "name": "spur",
+  "version": "0.1.0",
+  "description": "Verbindet Claude Code mit einer spur-Installation: Quellen lesen, Zitate prüfen, Aufträge aus dem Browser annehmen.",
+  "userConfig": {
+    "server_url": {
+      "type": "string",
+      "title": "spur-Adresse",
+      "description": "Adresse des MCP-Endpunkts, zum Beispiel https://spur.example.org/spur/mcp",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "title": "spur-Token",
+      "description": "Token aus spur unter Einstellungen, Claude verbinden",
+      "required": true,
+      "sensitive": true
+    }
+  }
+}

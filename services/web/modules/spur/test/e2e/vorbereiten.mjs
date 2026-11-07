@@ -9,6 +9,9 @@ import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
 import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
 import { quellen, quellenSeiten } from '../../app/src/sammlungen.mjs'
+import { createHash } from 'node:crypto'
+import { botFuer, kontoAufraeumen, SCOPE } from '../../app/src/ClaudeZugang.mjs'
+import UserDeleter from '../../../../app/src/Features/User/UserDeleter.mjs'
 
 const PASSWORT = 'spur-e2e-Passwort-1'
 logger.logger.level('error')
@@ -186,6 +189,35 @@ for (const klon of await db.projects.find({ owner_ref: a._id, name: 'E2E Klon' }
   await ProjectDeleter.promises.deleteProject(klon._id)
   await ProjectDeleter.promises.expireDeletedProject(klon._id)
 }
+
+await neuAnlegen(link, 'E2E Fremd', { 'main.tex': LEER })
+
+async function testToken(mensch, token, ablauf) {
+  const bot = await botFuer(mensch)
+  await db.oauthAccessTokens.deleteMany({ user_id: mensch._id, scope: SCOPE })
+  await db.oauthAccessTokens.insertOne({
+    accessToken: createHash('sha256').update(token).digest('hex'),
+    accessTokenExpiresAt: ablauf,
+    scope: SCOPE,
+    user_id: mensch._id,
+    spurBotId: bot._id,
+    createdAt: new Date(ablauf.getTime() - 90 * 24 * 3600 * 1000),
+  })
+}
+
+await testToken(leser, 'spur_e2e_abgelaufen', new Date(Date.now() - 24 * 3600 * 1000))
+const altWeg = await db.users.findOne({ email: 'e2e-weg@example.org' })
+if (altWeg) {
+  await kontoAufraeumen(altWeg._id)
+  await UserDeleter.promises.deleteUser(altWeg._id, {
+    force: true,
+    skipEmail: true,
+    ipAddress: '127.0.0.1',
+  })
+}
+await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': 'e2e-weg@example.org' })
+const weg = await konto('e2e-weg@example.org')
+await testToken(weg, 'spur_e2e_weg', new Date(Date.now() + 24 * 3600 * 1000))
 
 await ablageFreigeben()
 console.log('E2E-Daten bereit')

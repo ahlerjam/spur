@@ -7,6 +7,7 @@ import { MAX_BYTES } from './QuellenManager.mjs'
 import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
 import { crossrefFake } from './dev/CrossrefFake.mjs'
+import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
 const lesen = [
   AuthenticationController.requireLogin(),
@@ -60,6 +61,11 @@ export default {
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)
     webRouter.patch(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleAendern)
     webRouter.get('/spur/project/:project_id/pruefbericht', ...lesen, SpurController.pruefbericht)
+    const angemeldet = AuthenticationController.requireLogin()
+    webRouter.get('/spur/claude/tokens', angemeldet, SpurController.claudeTokens)
+    webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
+    webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)
+    publicApiRouter.all('/spur/mcp', mcpAnfrage)
     if (IST_DEV) publicApiRouter.get('/spur/dev/crossref/works/:doi', crossrefFake)
   },
 }

@@ -8,6 +8,7 @@ import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import * as PruefManager from './pruefung/PruefManager.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
 import * as ZitatManager from './ZitatManager.mjs'
+import * as ClaudeZugang from './ClaudeZugang.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
@@ -202,4 +203,17 @@ export const zitatEinfuegen = mitProblemen(async (req, res) => {
 
 export const pruefbericht = mitProblemen(async (req, res) => {
   res.json(await PruefManager.bericht(projektId(req)))
+})
+
+export const claudeTokens = mitProblemen(async (req, res) => {
+  res.json({ tokens: await ClaudeZugang.tokens(nutzerId(req)) })
+})
+
+export const claudeTokenErzeugen = mitProblemen(async (req, res) => {
+  res.status(201).json(await ClaudeZugang.tokenErzeugen(nutzerId(req)))
+})
+
+export const claudeTokenWiderrufen = mitProblemen(async (req, res) => {
+  await ClaudeZugang.widerrufen(nutzerId(req), req.params.token_id)
+  res.sendStatus(204)
 })

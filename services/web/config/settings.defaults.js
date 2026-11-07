@@ -1086,7 +1086,9 @@ module.exports = {
         '../modules/python-runner/frontend/js/components/layout/python-editor-split'
       ),
     ],
-    langFeedbackLinkingWidgets: [],
+    langFeedbackLinkingWidgets: [
+      Path.resolve(__dirname, '../modules/spur/frontend/js/claude/claude-verbinden.tsx'),
+    ],
     labsExperiments: [],
     integrationLinkingWidgets: [
       Path.resolve(

@@ -115,6 +115,57 @@ async page => {
     await page.locator('.modal').waitFor({ state: 'detached' })
   }
 
+  async function mcp(token, method, params = {}, kopf = {}) {
+    const headers = {
+      Accept: 'application/json, text/event-stream',
+      'Content-Type': 'application/json',
+      ...kopf,
+    }
+    if (token) headers.Authorization = `Bearer ${token}`
+    const r = await page.request.post(`${BASE}/spur/mcp`, {
+      headers,
+      data: { jsonrpc: '2.0', id: 1, method, params },
+    })
+    const text = await r.text()
+    const zeilen = text.split('\n').filter(z => z.startsWith('data:'))
+    const daten = zeilen.length
+      ? JSON.parse(zeilen.at(-1).slice(5))
+      : text && JSON.parse(text)
+    return { status: r.status(), daten }
+  }
+
+  async function werkzeug(token, name, args = {}) {
+    const { daten } = await mcp(token, 'tools/call', { name, arguments: args })
+    return {
+      fehler: daten.result.isError === true,
+      inhalt: JSON.parse(daten.result.content[0].text),
+    }
+  }
+
+  async function seitenPost(pfad, body) {
+    return await page.evaluate(
+      async ([url, daten]) => {
+        const token = document.querySelector('meta[name="ol-csrfToken"]').content
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': token },
+          body: JSON.stringify(daten),
+        })
+        return { status: r.status, daten: await r.json().catch(() => null) }
+      },
+      [`${BASE}${pfad}`, body]
+    )
+  }
+
+  async function neuesToken() {
+    return (await seitenPost('/spur/claude/tokens', {})).daten.token
+  }
+
+  async function projektId(token, name) {
+    const { inhalt } = await werkzeug(token, 'project_list')
+    return inhalt.eintraege.find(p => p.name === name).id
+  }
+
   async function editorErsetzen(alt, neu) {
     await page.evaluate(
       ([von, zu]) => {
@@ -452,6 +503,93 @@ async page => {
       await panelOeffnen('Prüfbericht')
       await page.getByRole('button', { name: 'Erneut prüfen' }).click()
       await zeigt('kapitel.tex', 'Wortlaut: abweichend')
+    },
+
+    async f8() {
+      await anmelden('e2e-a@example.org')
+      await page.goto(`${BASE}/user/settings`)
+      await page.getByRole('heading', { name: 'Claude verbinden' }).waitFor()
+      await page.getByRole('button', { name: 'Token erzeugen' }).click()
+      const befehl = page.locator('.spur-befehl')
+      await befehl.waitFor()
+      const token = await befehl.getAttribute('data-spur-token')
+      const text = await befehl.innerText()
+      ok(text.includes(`token=${token}`), 'Token fehlt im Befehl')
+      ok(text.includes('claude plugin install spur@spur'), 'Plugin-Befehl fehlt')
+      ok(text.includes('mcp__plugin_spur_spur__doc_edit'), 'Allow-Regel fehlt')
+      await sichtbar('Dieses Token erscheint nur einmal')
+
+      const liste = (await (await page.request.get(`${BASE}/spur/claude/tokens`)).json()).tokens
+      ok(!JSON.stringify(liste).includes(token), 'Token im Klartext gespeichert')
+      const tage = (new Date(liste[0].ablauf) - new Date(liste[0].angelegt)) / 86400000
+      ok(Math.round(tage) === 90, `Gültigkeit ${tage} Tage`)
+      ok((await mcp(token, 'tools/list')).status === 200, 'Token wirkt nicht')
+
+      await projektOeffnen('Demo')
+      await page.getByRole('button', { name: /^(Teilen|Share)$/ }).first().click()
+      await page.locator('.modal').waitFor()
+      await page.waitForTimeout(1000)
+      ok(!(await page.locator('.modal').innerText()).includes('Claude ('), 'Bot im Teilen-Dialog')
+      await page.keyboard.press('Escape')
+
+      await page.goto(`${BASE}/user/settings`)
+      const vorher = await page.locator('.spur-token').count()
+      await page.locator('.spur-token').first().getByRole('button', { name: 'Widerrufen' }).click()
+      await page.waitForFunction(n => document.querySelectorAll('.spur-token').length === n - 1, vorher)
+      ok((await mcp(token, 'tools/list')).status === 401, 'Widerrufenes Token wirkt')
+
+      await anmelden('e2e-leser@example.org')
+      await page.goto(`${BASE}/user/settings`)
+      await sichtbar('Token abgelaufen, bitte erneuern')
+
+      ok((await mcp('spur_e2e_weg', 'tools/list')).status === 200, 'Test-Token fehlt')
+      await anmelden('e2e-weg@example.org')
+      const loeschen = await seitenPost('/user/delete', { password: PASSWORT })
+      ok(loeschen.status === 200, `Konto löschen: ${loeschen.status}`)
+      ok((await mcp('spur_e2e_weg', 'tools/list')).status === 401, 'Token überlebt Kontolöschung')
+    },
+
+    async f9() {
+      await anmelden('e2e-link@example.org')
+      await projektOeffnen('E2E Fremd')
+      const fremd = page.url().split('/').pop()
+
+      await anmelden('e2e-a@example.org')
+      await page.goto(`${BASE}/project`)
+      const token = await neuesToken()
+      const liste = await mcp(token, 'tools/list')
+      const namen = liste.daten.result.tools.map(w => w.name).sort()
+      const P1 = [
+        'project_list', 'doc_list', 'doc_read', 'sources_list', 'source_search', 'source_read',
+        'quote_mark', 'check_report', 'bib_list', 'doc_edit', 'doc_create', 'run_status',
+        'run_finish', 'wait_for_event', 'events_since', 'reply',
+      ].sort()
+      ok(JSON.stringify(namen) === JSON.stringify(P1), `Tools: ${namen}`)
+
+      ok((await mcp(null, 'tools/list')).status === 401, 'Ohne Token kein 401')
+      const origin = await mcp(token, 'tools/list', {}, { Origin: 'https://evil.example' })
+      ok(origin.status === 403, `Origin: ${origin.status}`)
+
+      const fremdLesen = await werkzeug(token, 'doc_read', { project_id: fremd, pfad: 'main.tex' })
+      ok(fremdLesen.fehler && fremdLesen.inhalt.fehler === 'keine_rechte', 'Fremdes Projekt lesbar')
+
+      const demo = await projektId(token, 'Demo')
+      const suche = await werkzeug(token, 'source_search', { project_id: demo, query: 'declarative memory' })
+      const [treffer] = suche.inhalt.treffer
+      ok(
+        JSON.stringify(Object.keys(treffer).sort()) ===
+          JSON.stringify(['dateiname', 'pdf_seite', 'position', 'quelle_id', 'seite']),
+        `Trefferfelder: ${Object.keys(treffer)}`
+      )
+      ok(treffer.seite === '347' && treffer.position >= 0, 'Seite oder Position falsch')
+
+      const bericht = await werkzeug(token, 'check_report', { project_id: demo })
+      const browser = await (await page.request.get(`${BASE}/spur/project/${demo}/pruefbericht`)).json()
+      const kurz = zeilen => zeilen.map(z => [z.id, z.wortlaut, z.seite, z.referenz, z.retraction].join('|'))
+      ok(
+        JSON.stringify(kurz(bericht.inhalt.eintraege)) === JSON.stringify(kurz(browser.zeilen)),
+        'check_report weicht vom Browser ab'
+      )
     },
   }
 

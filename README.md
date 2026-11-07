@@ -32,6 +32,14 @@ SPUR_DATA_DIR=/srv/spur docker compose -f docker-compose.yml -f docker-compose.s
 
 ## Claude und Ihre Daten
 
+Unter Einstellungen, „Claude verbinden“, erzeugt spur ein Token und zeigt die Befehle, die das Plugin `spur` aus diesem Repository in Claude Code einrichten:
+
+```sh
+claude plugin marketplace add ahlerjam/spur
+claude plugin install spur@spur --config server_url=https://ihre-spur-adresse/spur/mcp --config token=<Token>
+```
+
+
 Inhalte, die Claude liest, gehen an Anthropic. Dazu gehören Dokumente und Quellen, auch Interviews. Die Verantwortung dafür liegt bei Ihnen.
 
 ## Herkunft
