@@ -28,7 +28,7 @@
   "`spur-dev test` führt neue Unit-Tests für Token und Bot, Rechte, MCP-Fehlercodes, Crossref, PDF-Labels und VTT, `.bib`, Inbox, Lauf-Aktionen, Download-Schutz und Testschalter aus, alle grün",
   "Regressionstests decken die Fehler aus den P1-Abnahmen ab: erstes Token ist mit dem Bot verknüpft; unbekanntes Projekt mit Admin-Token ergibt `keine_rechte`; Rücknahme setzt eine gelöschte Zeile nach Handänderung an die richtige Stelle oder meldet Konflikt; zu langer Dateiname ergibt `pfad_ungueltig`; abgebrochener Download beendet den Prozess nicht; Upload ohne Feld ergibt RFC 9457",
   "Der Abdeckungsbericht für `modules/spur/app/src` ohne `dev/` zeigt mindestens 80 % der Zeilen",
-  "Ein absichtlich falsch gemachter Rechte-Check (lokal, nicht committet) lässt mindestens einen Test rot werden"]},
+  "Ein absichtlich falsch gemachter Rechte-Check (lokal, nicht committet) lässt mindestens einen Test rot werden"], "passes": true},
  {"id": "f7", "title": "Frontend-Tests für die spur-Oberfläche", "steps": [
   "`spur-dev upstream frontend` führt auch Tests unter `modules/spur/test/frontend` aus, alle grün",
   "Die Lauf-Karte zeigt im Test für einen Owner „Alle annehmen“ und „Lauf ablehnen“, für eine Review-Rolle kein „Annehmen“",
