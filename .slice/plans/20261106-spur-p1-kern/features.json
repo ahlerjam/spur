@@ -126,7 +126,7 @@
     "`check_report` entspricht dem Bericht im Browser",
     "Das Plugin in `plugins/spur` besteht `claude plugin validate`"
    ],
-   "passes": false,
+   "passes": true,
    "ui": false
   },
   {
