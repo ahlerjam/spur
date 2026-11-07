@@ -82,14 +82,28 @@ restart() {
 }
 # Kurz nach dem Start des Containers bricht webpack gelegentlich mit Exit 129 (SIGHUP) ab,
 # Ursache unklar; ein zweiter Versuch läuft durch.
-build_sicher() { build || { echo "Build abgebrochen, zweiter Versuch in 30 s"; sleep 30; build; }; }
+build_sicher() {
+  local n
+  for n in 1 2 3; do
+    build && return 0
+    echo "Build abgebrochen (Versuch $n), neuer Versuch in 30 s"; sleep 30
+  done
+  return 1
+}
 # Ein frischer Checkout hat die generierte Lezer-Grammatik noch nicht; ohne sie startet web nicht.
 grammatik() { docker exec spur-dev-web bash -lc 'cd /overleaf/services/web && yarn run lezer-latex:generate >/dev/null 2>&1'; }
-up() { docker_bereit; check_mounts; dc up -d --force-recreate web >/dev/null; grammatik; wait_up; build_sicher; restart; }
+# Testschalter (gitignoriert): ohne Datei ginge die Prüfung an die echte Crossref-API.
+schalter_anlegen() {
+  local f="$SRC/services/web/modules/spur/dev-schalter.json"
+  [ -e "$f" ] || printf '{"SPUR_PAPER_API_BASE": "http://127.0.0.1/spur/dev/crossref"}\n' > "$f"
+}
+up() { docker_bereit; check_mounts; schalter_anlegen; dc up -d --force-recreate web >/dev/null; grammatik; wait_up; build_sicher; restart; }
 ensure() {
   local cur
   docker_bereit
   cur=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/overleaf/services/web/modules"}}{{.Source}}{{end}}{{end}}' spur-dev-web 2>/dev/null || true)
+  # Docker Desktop meldet Pfade mit dem Präfix /host_mnt.
+  cur=${cur#/host_mnt}
   [ "$cur" = "$SRC/services/web/modules" ] || { echo "Worktree gewechselt oder Stack aus, Stack wird neu erzeugt."; up; }
 }
 du_geaendert() {
