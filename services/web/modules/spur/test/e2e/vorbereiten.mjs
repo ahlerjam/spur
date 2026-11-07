@@ -5,10 +5,21 @@ import logger from '@overleaf/logger'
 import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
 import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.mjs'
+import ProjectEntityHandler from '../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
+import DocumentUpdaterHandler from '../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
+import Settings from '@overleaf/settings'
+import { fetchJson } from '@overleaf/fetch-utils'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
 import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
-import { quellen, quellenSeiten } from '../../app/src/sammlungen.mjs'
+import {
+  ereignisse,
+  herzschlaege,
+  einstellungen,
+  nachrichten,
+  quellen,
+  quellenSeiten,
+} from '../../app/src/sammlungen.mjs'
 import { createHash } from 'node:crypto'
 import { botFuer, kontoAufraeumen, SCOPE } from '../../app/src/ClaudeZugang.mjs'
 import UserDeleter from '../../../../app/src/Features/User/UserDeleter.mjs'
@@ -61,6 +72,21 @@ async function neuAnlegen(owner, name, dateien) {
     await ProjectDeleter.promises.expireDeletedProject(alt._id)
   }
   return await projektAnlegen(owner._id, name, dateien)
+}
+
+// 1990 einzelne Einfügungen von hinten nach vorn, damit die Positionen gültig bleiben.
+async function volleAenderungen(projectId, bot) {
+  const docs = await ProjectEntityHandler.promises.getAllDocs(projectId)
+  const docId = String(docs['/voll.tex']._id)
+  const { version } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
+  const op = Array.from({ length: 1990 }, (_, i) => ({ p: (1989 - i) * 2 + 1, i: 'x' }))
+  await fetchJson(
+    `${Settings.apis.documentupdater.url}/project/${projectId}/doc/${docId}/spur-update`,
+    {
+      method: 'POST',
+      json: { op, v: version, meta: { user_id: String(bot._id), tc: 'e2e000000000000001', source: 'spur' } },
+    }
+  )
 }
 
 async function projekt(owner, name, dateien) {
@@ -146,6 +172,19 @@ const BERICHT_BIB = `@article{smith2024,
   doi = {10.5555/spur.unbekannt}
 }`
 
+const SCHREIBEN_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\usepackage{csquotes}
+\addbibresource{references.bib}
+\begin{document}
+\section{Eins}
+Erster Absatz.
+
+Zweiter Absatz.
+\section{Zwei}
+\enquote{Erfunden und falsch.} \autocite[1]{smith2024}
+\end{document}`
+
 const a = await konto('e2e-a@example.org')
 const leser = await konto('e2e-leser@example.org')
 const link = await konto('e2e-link@example.org')
@@ -181,6 +220,35 @@ const bericht = await neuAnlegen(a, 'E2E Bericht', {
 })
 await quelleAusFixture(bericht._id, a._id, 'smith2024.pdf')
 await quelleAusFixture(bericht._id, a._id, 'retracted.pdf')
+
+const schreiben = await neuAnlegen(a, 'E2E Schreiben', {
+  'main.tex': SCHREIBEN_MAIN,
+  'references.bib': BERICHT_BIB,
+  'weg.tex': 'Wird gelöscht.',
+  'voll.tex': Array.from({ length: 1991 }, () => 'a').join(' '),
+})
+await quelleAusFixture(schreiben._id, a._id, 'smith2024.pdf')
+await volleAenderungen(schreiben._id, await botFuer(a))
+
+const pruefer = await konto('e2e-review@example.org')
+const laufProjekt = await neuAnlegen(a, 'E2E Lauf', {
+  'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Alpha Satz.
+
+Beta Satz mit altem Wort.
+
+Gamma Satz.
+
+Delta Satz.
+\end{document}`,
+  'extra.tex': 'Extra Satz.',
+})
+await db.projects.updateOne(
+  { _id: laufProjekt._id },
+  { $set: { readOnly_refs: [leser._id], reviewer_refs: [pruefer._id] } }
+)
+await (await einstellungen()).deleteMany({})
 
 const neuesDemo = await demoAnlegen(a)
 await db.projects.updateOne({ _id: neuesDemo._id }, { $set: { readOnly_refs: [leser._id] } })
@@ -218,6 +286,11 @@ if (altWeg) {
 await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': 'e2e-weg@example.org' })
 const weg = await konto('e2e-weg@example.org')
 await testToken(weg, 'spur_e2e_weg', new Date(Date.now() + 24 * 3600 * 1000))
+
+for (const sammlung of [ereignisse, herzschlaege, nachrichten]) {
+  await (await sammlung()).deleteMany({})
+}
+await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))
 
 await ablageFreigeben()
 console.log('E2E-Daten bereit')

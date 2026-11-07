@@ -141,7 +141,7 @@
     "Ein Bot sieht keine Ereignisse eines anderen Bots",
     "Über `http://localhost:8080/spur/mcp` bleibt ein Aufruf von `wait_for_event` länger als 11 Minuten offen, und jede Fortschrittsmeldung kommt innerhalb von 35 Sekunden beim Fake-Client an"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

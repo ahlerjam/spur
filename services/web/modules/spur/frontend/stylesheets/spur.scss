@@ -147,3 +147,40 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.spur-claude-status {
+  margin: var(--spacing-03) 0;
+}
+
+.spur-nachricht-text {
+  margin: var(--spacing-01) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.spur-lauf-karte {
+  margin: var(--spacing-05) 0;
+  padding: var(--spacing-04);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-base, 4px);
+}
+
+.spur-lauf-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-03);
+
+  h5 {
+    margin: 0;
+  }
+}
+
+.spur-lauf-rot {
+  margin-top: var(--spacing-03);
+  color: var(--content-danger);
+}
+
+.spur-ohne-rand {
+  padding: var(--spacing-02) 0 0;
+}

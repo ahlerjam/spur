@@ -14,6 +14,11 @@ const lesen = [
   AuthorizationMiddleware.blockRestrictedUserFromProject,
   AuthorizationMiddleware.ensureUserCanReadProject,
 ]
+const pruefen = [
+  AuthenticationController.requireLogin(),
+  AuthorizationMiddleware.blockRestrictedUserFromProject,
+  AuthorizationMiddleware.ensureUserCanWriteOrReviewProjectContent,
+]
 const schreiben = [
   AuthenticationController.requireLogin(),
   AuthorizationMiddleware.blockRestrictedUserFromProject,
@@ -63,6 +68,13 @@ export default {
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)
     webRouter.patch(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleAendern)
     webRouter.get('/spur/project/:project_id/pruefbericht', ...lesen, SpurController.pruefbericht)
+    webRouter.get('/spur/project/:project_id/claude', ...lesen, SpurController.claudeStatus)
+    webRouter.post('/spur/project/:project_id/claude/auftrag', ...lesen, SpurController.claudeAuftrag)
+    const LAUF = '/spur/project/:project_id/laeufe/:lauf_id'
+    webRouter.post(`${LAUF}/annehmen`, ...schreiben, SpurController.laufAnnehmen)
+    webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)
+    webRouter.post(`${LAUF}/zuruecknehmen`, ...schreiben, SpurController.laufZuruecknehmen)
+    webRouter.put('/spur/project/:project_id/claude/automatik', ...schreiben, SpurController.automatikSetzen)
     webRouter.get('/spur/claude/tokens', angemeldet, SpurController.claudeTokens)
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
     webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)

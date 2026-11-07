@@ -94,8 +94,7 @@ function stempel(kontext) {
   })
 }
 
-async function abschnittBewerten(abschnitt, kontext) {
-  const funde = zitateFinden(abschnitt.text)
+async function fundeBewerten(funde, kontext) {
   const fehlend = new Set()
   for (const fund of funde) {
     const key = fund.belege[0]?.key
@@ -109,6 +108,18 @@ async function abschnittBewerten(abschnitt, kontext) {
     }
   }
   return funde.map(fund => zeileBewerten(fund, kontext))
+}
+
+async function abschnittBewerten(abschnitt, kontext) {
+  return await fundeBewerten(zitateFinden(abschnitt.text), kontext)
+}
+
+// Prüft nur Zitate, die den Bereich [von, bis) im Text berühren.
+export async function bereichPruefen(projectId, text, von, bis) {
+  const docs = await dokumente(projectId)
+  const kontext = await kontextLaden(projectId, docs)
+  const funde = zitateFinden(text).filter(f => f.von <= bis && f.bis >= von)
+  return await fundeBewerten(funde, kontext)
 }
 
 async function zeilenFuer(projectId, abschnittsListe, kontext, basis, statistik) {

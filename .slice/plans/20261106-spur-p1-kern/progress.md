@@ -26,6 +26,8 @@
 ## Testprotokoll
 - f2 Parser: 2 097 228 Zeichen in 511 ms, 24 967 Zitate (`spur-dev test`, Test „parst ein 2-MB-Dokument“).
 
+- f10 Langlauf: `SPUR_TOKEN=… node services/web/modules/spur/test/fake-client.mjs wait 700` gegen `http://localhost:8080/spur/mcp` (nginx): 23 Fortschrittsmeldungen von 30 s bis 690,1 s, größter Abstand 30,1 s, Ende nach 700,2 s mit Ergebnis, Exit 0.
+
 ## Recipe changes
 - `spur-dev migrate up` schlägt fehl („Unrecognized command up“). Richtig ist `spur-dev migrate migrate -t server-ce`, `rollback` entsprechend. `CLAUDE.md` und Spec nennen die falsche Form.
 - f5 `projectExpired`: `spur-dev run modules/spur/test/e2e/ablauf.mjs` → „projectExpired: Ordner und Einträge entfernt“.
@@ -35,10 +37,11 @@
 - f9 nginx: `curl -X POST http://localhost:8080/spur/mcp` → 401 (RFC 9457 `urn:spur:problem:token`), mit `Origin: https://evil.example` → 403. `claude plugin validate plugins/spur` und `claude plugin validate .` → „Validation passed with warnings“ (einzige Anmerkung: Installationszeile in der README, ergänzt).
 - f9 Hinweis: `doc_edit`, `doc_create`, `run_status`, `run_finish` stehen in `tools/list`, antworten aber mit `nicht_verfuegbar`, bis f11 bis f15 gebaut sind.
 
-## Offen
-- f10: Inbox-Werkzeuge `wait_for_event` (Long-Poll mit Herzschlag und Fortschritt alle 30 s), `events_since` und `reply` sind gebaut und in `tools/list`. Es fehlen das Claude-Panel im Editor (Status „Claude verbunden/nicht verbunden“ samt Startbefehl, Auftrag schreiben, Antworten sehen), die Route zum Anlegen eines Auftrags, der Fake-Client unter `services/web/modules/spur/test` und der Test über 11 Minuten durch nginx. Grund: Turn-Budget des Laufs, Abschlussschritte haben Vorrang.
-- f11 bis f15: Nicht begonnen. Sie hängen am neuen Schreibweg über einen document-updater-Endpunkt mit Ops und Version (ADR 0002), an Läufen und an der Lauf-Karte. `doc_edit`, `doc_create`, `run_status` und `run_finish` stehen im Vertrag und in `tools/list`, antworten aber mit `nicht_verfuegbar`.
-- E2E: Die offenen Features melden im Lauf „übersprungen“ mit Grund.
+## Fortsetzung (Resume mit neuem Turn-Budget)
+- f10: Claude-Panel in der Rail (Status, Startbefehl, Auftrag, Verlauf, Lauf-Karte). Aufträge wecken wartende `wait_for_event`-Aufrufe im selben Prozess sofort, sonst spätestens nach 5 s; Herzschlag alle 5 s, „verbunden“ gilt 45 s. Fake-Client: `services/web/modules/spur/test/fake-client.mjs`.
+- f11: Neuer document-updater-Endpunkt `POST /project/:id/doc/:doc_id/spur-update` (ADR 0002, erlaubter Kern-Patch) wendet Ops mit Version unter der Projektsperre über den normalen `applyUpdate`-Pfad an: OT gegen parallele Eingaben, Track Changes über `meta.tc`, Verteilung an Live-Clients ohne Modal. Läufe merken sich ihre tc-Seeds; daran erkennt spur die Changes eines Laufs. Vor dem ersten Schreiben legt spur das History-Label „Claude: Lauf“ an.
+- f12: Prüf-Sperre prüft nur Zitate, die den geänderten Bereich berühren.
+- f13 bis f15: Annehmen über den vorhandenen `acceptChanges`; Ablehnen wie im Editor (absteigend, Undo-Flag `u`), ohne geöffneten Editor; Rücknahme angenommener Läufe als neue Track Changes der Person, bei Überschneidung „Konflikt in Zeile …“ ohne Änderung. Automatik je Person und Projekt, nur per Browser-Session (PUT mit CSRF).
 
 ## /simplify
 - Umgesetzt: Prüfung lädt Seitentexte nur für getroffene Quellen; Flush und Projektabfrage parallel; Cache-Stempel einmal je Bericht; Zeilennummern per Binärsuche; Suche lädt nur Namen der Trefferquellen; `project_list` blättert vor der Rollenabfrage; `dev-schalter.json` nur bei geänderter mtime neu lesen; toter Code (`fakeAgent`, ungenutzte Inbox-Funktionen und Exporte) entfernt; abgeleitete Auswahl im Holen-Dialog; E2E ohne feste Wartezeiten und ohne `removeAllListeners`.
@@ -64,3 +67,4 @@
 - Screenshots bei 360 und 1280 px: Login, Editor mit Quellen-Panel, Quellenvorschau, Prüfbericht, Einstellungen mit „Claude verbinden“. Kein horizontaler Scroll in beiden Breiten.
 - Behoben nach Sichtprüfung: abgeschnittene Knöpfe und Badges im Panel, doppelte „Zurück“-Beschriftung und unklare Seitenangabe in der Vorschau („Seite 347 (PDF-Seite 3 von 8)“), zerbrochenes Layout von „Claude verbinden“ bei 1280 px.
 - Offen (Kern, nicht im Diff): Bei 360 px ist die Overleaf-IDE mit Rail, Editor und PDF so eng, dass Panels nur wenige Zeichen breit sind; das gilt auch für Overleafs eigenen Dateibaum. Auf der Login-Seite zeigt Overleafs Registrierungsmodul den Schlüssel „sign_up“ statt eines Textes. Vorschlag: mobiles Layout der IDE und fehlende Übersetzung in einem eigenen Plan.
+- `spur-dev test` bricht nach den Modul-Tests ab, sobald der Diff `services/document-updater` berührt: „Unbound variable TEST_NAME_PATTERN“ im `yarn run test:unit` des document-updater. `spur-dev` sollte `TEST_NAME_PATTERN=` setzen. Die Modul-Tests laufen davor vollständig.

@@ -1212,6 +1212,7 @@ module.exports = {
         __dirname,
         '../modules/spur/frontend/js/pruefung/pruefbericht-rail.tsx'
       ),
+      Path.resolve(__dirname, '../modules/spur/frontend/js/claude/claude-rail.tsx'),
     ],
     railPopovers: [],
     railActions: [],

@@ -1,17 +1,44 @@
-import { setTimeout as warten } from 'node:timers/promises'
+import { EventEmitter, once } from 'node:events'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { ereignisse, herzschlaege, nachrichten } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 
-const TAKT_MS = 1000
-const HERZSCHLAG_MS = 5000
+// Wecker im selben Prozess; der Takt fängt Ereignisse aus anderen Prozessen auf.
+const wecker = new EventEmitter()
+wecker.setMaxListeners(0)
 
+const TAKT_MS = 5000
+const HERZSCHLAG_MS = 5000
+const VERBUNDEN_MS = 45 * 1000
 const FORTSCHRITT_MS = 30 * 1000
+
+export async function auftragAnlegen({ projectId, botId, text }) {
+  const nachricht = { projectId, botId, von: 'mensch', text, am: jetzt() }
+  await (await nachrichten()).insertOne(nachricht)
+  await (await ereignisse()).insertOne({
+    botId,
+    projectId,
+    typ: 'task_created',
+    daten: { text, nachricht_id: nachricht._id },
+    am: jetzt(),
+    zugestellt: false,
+  })
+  wecker.emit(String(botId))
+  return nachricht
+}
 
 export async function antwortSpeichern({ projectId, botId, text }) {
   const nachricht = { projectId, botId, von: 'claude', text, am: jetzt() }
   await (await nachrichten()).insertOne(nachricht)
   return nachricht
+}
+
+export async function verlauf(projectId, botId) {
+  return await (await nachrichten())
+    .find({ projectId, botId })
+    .sort({ _id: -1 })
+    .limit(100)
+    .toArray()
 }
 
 const fuerClient = e => ({
@@ -40,6 +67,24 @@ async function herzschlag(botId) {
   )
 }
 
+export async function verbunden(botId) {
+  const eintrag = await (await herzschlaege()).findOne({ _id: botId })
+  return Boolean(eintrag && jetzt() - eintrag.zuletzt < VERBUNDEN_MS)
+}
+
+function bisWeckerOderTakt(botId, ms, signal) {
+  const abbruch = new AbortController()
+  const ende = () => abbruch.abort()
+  signal?.addEventListener('abort', ende, { once: true })
+  const zeit = setTimeout(ende, ms)
+  return once(wecker, String(botId), { signal: abbruch.signal })
+    .catch(() => {})
+    .finally(() => {
+      clearTimeout(zeit)
+      signal?.removeEventListener('abort', ende)
+    })
+}
+
 // Long-Poll: liefert das nächste nicht zugestellte Ereignis des Bots. Laufende Aufrufe sind der Herzschlag.
 export async function warteAufEreignis(botId, { signal, maxMs, fortschritt }) {
   const sammlung = await ereignisse()
@@ -61,7 +106,8 @@ export async function warteAufEreignis(botId, { signal, maxMs, fortschritt }) {
       letzterFortschritt = Date.now()
       await fortschritt(Math.round((Date.now() - start) / 1000))
     }
-    await warten(TAKT_MS, undefined, { signal }).catch(() => {})
+    const bisFortschritt = FORTSCHRITT_MS - (Date.now() - letzterFortschritt)
+    await bisWeckerOderTakt(botId, Math.max(10, Math.min(TAKT_MS, bisFortschritt)), signal)
   }
   return null
 }

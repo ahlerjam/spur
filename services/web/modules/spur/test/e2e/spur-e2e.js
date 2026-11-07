@@ -169,6 +169,46 @@ async page => {
     return inhalt.eintraege.find(p => p.name === name).id
   }
 
+  // Wartet im Browser wie der Fake-Client; Fortschritt und Ergebnis landen in window.__spur.
+  async function warteStarten(token) {
+    await page.evaluate(t => {
+      const start = Date.now()
+      const zustand = { log: [], abbruch: new AbortController() }
+      window.__spur = zustand
+      fetch('/spur/mcp', {
+        method: 'POST',
+        signal: zustand.abbruch.signal,
+        headers: {
+          Authorization: `Bearer ${t}`,
+          Accept: 'application/json, text/event-stream',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'wait_for_event', arguments: { max_sekunden: 300 }, _meta: { progressToken: 'e2e' } },
+        }),
+      })
+        .then(async r => {
+          const leser = r.body.getReader()
+          const dekodierer = new TextDecoder()
+          let puffer = ''
+          for (;;) {
+            const { done, value } = await leser.read()
+            if (done) break
+            puffer += dekodierer.decode(value, { stream: true })
+            for (let i = puffer.indexOf('\n\n'); i >= 0; i = puffer.indexOf('\n\n')) {
+              const daten = puffer.slice(0, i).split('\n').filter(z => z.startsWith('data:')).map(z => z.slice(5)).join('')
+              puffer = puffer.slice(i + 2)
+              if (daten) zustand.log.push({ t: Date.now() - start, msg: JSON.parse(daten) })
+            }
+          }
+        })
+        .catch(e => zustand.log.push({ t: Date.now() - start, fehler: e.name }))
+    }, token)
+  }
+
   async function editorErsetzen(alt, neu) {
     await page.evaluate(
       ([von, zu]) => {
@@ -601,13 +641,368 @@ async page => {
     },
   }
 
-  const OFFEN = {
-    f10: 'Claude-Panel mit Status und Aufträgen fehlt; Inbox-Werkzeuge stehen, der Test über 11 Minuten ist nicht gebaut',
-    f11: 'Schreibweg über document-updater (ADR 0002) fehlt, doc_edit antwortet nicht_verfuegbar',
-    f12: 'hängt an doc_edit aus f11',
-    f13: 'Lauf-Karte hängt an Läufen aus f11',
-    f14: 'Ablehnen hängt an Läufen aus f11',
-    f15: 'Automatisch annehmen und Rücknahme hängen an Läufen aus f11',
+  const OFFEN = {}
+
+  features.f10 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('Demo')
+    const demo = page.url().split('/').pop()
+    const token = await neuesToken()
+    await panelOeffnen('Claude')
+    await sichtbar('Claude nicht verbunden')
+    await sichtbar('claude --allowedTools')
+
+    await warteStarten(token)
+    await sichtbar('Claude verbunden', 20000)
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    const abgebrochen = Date.now()
+    await sichtbar('Claude nicht verbunden', 65000)
+    const sekunden = (Date.now() - abgebrochen) / 1000
+    ok(sekunden <= 60, `Rückfall nach ${sekunden} s`)
+
+    await warteStarten(token)
+    await page.waitForFunction(
+      () => window.__spur.log.some(e => e.msg?.method === 'notifications/progress'),
+      null,
+      { timeout: 40000 }
+    )
+    const fortschritt = await page.evaluate(() => window.__spur.log.find(e => e.msg?.method).t)
+    ok(fortschritt >= 25000 && fortschritt <= 35000, `Fortschritt nach ${fortschritt} ms`)
+    await page.getByLabel('Auftrag an Claude').fill('Bitte Kapitel 2 prüfen')
+    const gesendet = Date.now()
+    await page.getByRole('button', { name: 'Senden' }).click()
+    await page.waitForFunction(
+      () => window.__spur.log.some(e => e.msg?.result),
+      null,
+      { timeout: 5000 }
+    )
+    const dauer = Date.now() - gesendet
+    ok(dauer < 2000, `Auftrag kam nach ${dauer} ms`)
+    const ergebnis = await page.evaluate(() =>
+      JSON.parse(window.__spur.log.find(e => e.msg?.result).msg.result.content[0].text)
+    )
+    ok(ergebnis.ereignis?.typ === 'task_created', `Ergebnis: ${JSON.stringify(ergebnis)}`)
+
+    const erste = await werkzeug(token, 'events_since')
+    ok(
+      erste.inhalt.ereignisse.length === 1 && erste.inhalt.ereignisse[0].typ === 'task_created',
+      `events_since: ${JSON.stringify(erste.inhalt)}`
+    )
+    const zweite = await werkzeug(token, 'events_since', { cursor: erste.inhalt.cursor })
+    ok(zweite.inhalt.ereignisse.length === 0, 'Zweiter Abruf liefert Ereignisse')
+
+    await werkzeug(token, 'reply', { project_id: demo, text: 'Kapitel 2 ist geprüft.' })
+    await sichtbar('Kapitel 2 ist geprüft.', 10000)
+
+    await anmelden('e2e-leser@example.org')
+    await page.goto(`${BASE}/project`)
+    const fremd = await werkzeug(await neuesToken(), 'events_since')
+    ok(fremd.inhalt.ereignisse.length === 0, 'Bot sieht fremde Ereignisse')
+  }
+
+  const schluessel = () => `e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const docText = () =>
+    page.evaluate(() => window.overleaf.unstable.store.get('editor.view').state.doc.toString())
+  const imEditor = (text, timeout = 15000) =>
+    page.waitForFunction(
+      t => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(t),
+      text,
+      { timeout }
+    )
+  const jsonVon = async pfad => (await page.request.get(`${BASE}${pfad}`)).json()
+
+  async function schreibProjekt() {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Schreiben')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const edit = (args, key = schluessel()) =>
+      werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', idempotenz_schluessel: key, ...args })
+    return { pid, token, edit }
+  }
+
+  features.f11 = async () => {
+    const { pid, token, edit } = await schreibProjekt()
+    const erster = schluessel()
+    const r1 = await edit({ alt: 'Erster Absatz.', neu: 'Erster Absatz. Ergänzt von Claude.' }, erster)
+    ok(!r1.fehler, `doc_edit: ${JSON.stringify(r1.inhalt)}`)
+    await imEditor('Ergänzt von Claude.')
+    ok((await page.locator('.modal').count()) === 0, 'Modal erschienen')
+    const bots = await jsonVon(`/project/${pid}/changes/users`)
+    ok(bots.some(u => u.first_name === 'Claude' && u.last_name === '(e2e-a)'), `Autoren: ${JSON.stringify(bots)}`)
+    const ranges = await jsonVon(`/project/${pid}/ranges`)
+    const changes = ranges.flatMap(d => d.ranges?.changes ?? [])
+    ok(changes.some(c => c.op.i?.includes('Ergänzt von Claude')), 'Kein Track Change')
+
+    const parallel = edit({ alt: 'Zweiter Absatz.', neu: 'Zweiter Absatz. Von Claude.' })
+    await editorErsetzen('Erster Absatz.', 'Erster Absatz, getippt.')
+    ok(!(await parallel).fehler, 'Paralleles doc_edit scheiterte')
+    await imEditor('Zweiter Absatz. Von Claude.')
+    await imEditor('Erster Absatz, getippt.')
+
+    const konflikt = await edit({ alt: 'Gibt es nicht.', neu: 'x' })
+    ok(konflikt.inhalt.fehler === 'konflikt', `Konflikt: ${JSON.stringify(konflikt.inhalt)}`)
+
+    const nochmal = await edit({ alt: 'Erster Absatz.', neu: 'Erster Absatz. Ergänzt von Claude.' }, erster)
+    ok(nochmal.inhalt.wiederholt === true, 'Idempotenz greift nicht')
+    ok((await docText()).split('Ergänzt von Claude.').length === 2, 'Doppelte Änderung')
+
+    const labels = await jsonVon(`/project/${pid}/labels`)
+    ok(labels.some(l => l.comment === 'Claude: Lauf'), 'Label fehlt')
+    let herkunft = false
+    for (let i = 0; i < 20 && !herkunft; i++) {
+      const { updates } = await jsonVon(`/project/${pid}/updates?min_count=10`)
+      herkunft = updates.some(u => u.meta.users.some(n => n?.first_name === 'Claude'))
+      if (!herkunft) await page.waitForTimeout(1000)
+    }
+    ok(herkunft, 'History zeigt keine Herkunft Claude')
+
+    const docs = (await werkzeug(token, 'doc_list', { project_id: pid })).inhalt.eintraege
+    const weg = docs.find(d => d.pfad === 'weg.tex').id
+    const geloescht = await page.evaluate(
+      async ([p, d]) => {
+        const t = document.querySelector('meta[name="ol-csrfToken"]').content
+        return (await fetch(`/project/${p}/doc/${d}`, { method: 'DELETE', headers: { 'X-Csrf-Token': t } })).status
+      },
+      [pid, weg]
+    )
+    ok(geloescht < 300, `Löschen: ${geloescht}`)
+    const fehlt = await werkzeug(token, 'doc_edit', {
+      project_id: pid, doc_id: weg, alt: 'Wird gelöscht.', neu: 'x', idempotenz_schluessel: schluessel(),
+    })
+    ok(fehlt.inhalt.fehler === 'doc_fehlt', `doc_fehlt: ${JSON.stringify(fehlt.inhalt)}`)
+
+    const voll = await edit({ pfad: 'voll.tex', alt: '', neu: 'b' })
+    ok(voll.inhalt.fehler === 'grenze_changes', `Grenze: ${JSON.stringify(voll.inhalt)}`)
+    await editorErsetzen('Erster Absatz, getippt.', 'Erster Absatz, weiter getippt.')
+    await imEditor('weiter getippt')
+    ok(
+      !(await page.getByText(/Verbindung.*(verloren|getrennt)|disconnected/i).count()),
+      'Client getrennt'
+    )
+
+    const neu = await werkzeug(token, 'doc_create', {
+      project_id: pid, pfad: 'claude.tex', inhalt: 'Neuer Inhalt von Claude.', idempotenz_schluessel: schluessel(),
+    })
+    ok(!neu.fehler, `doc_create: ${JSON.stringify(neu.inhalt)}`)
+    const nachher = (await jsonVon(`/project/${pid}/ranges`)).find(d => d.id === neu.inhalt.doc_id)
+    ok(
+      nachher?.ranges?.changes?.some(c => c.op.i === 'Neuer Inhalt von Claude.'),
+      'Inhalt von doc_create ist kein Track Change'
+    )
+  }
+
+  features.f12 = async () => {
+    const { token, pid, edit } = await schreibProjekt()
+    const SATZ = 'Sleep supports the consolidation of declarative memory.'
+    const echt = await edit({
+      alt: '\\section{Zwei}',
+      neu: `\\enquote{${SATZ}} \\autocite[347]{smith2024}\n\\section{Zwei}`,
+    })
+    ok(!echt.fehler, `Echtes Zitat abgewiesen: ${JSON.stringify(echt.inhalt)}`)
+    await imEditor(`\\enquote{${SATZ}}`)
+
+    const vorher = await docText()
+    const erfunden = await edit({ alt: 'Erster', neu: 'Erster \\enquote{Sleep erases all memory.} \\autocite[347]{smith2024}' })
+    ok(erfunden.inhalt.fehler === 'zitat_abweichend', `Erfunden: ${JSON.stringify(erfunden.inhalt)}`)
+    await page.waitForTimeout(1000)
+    ok((await docText()) === vorher, 'Dokument wurde verändert')
+
+    const ohneQuelle = await edit({ alt: 'Erster', neu: 'Erster \\enquote{Ein Satz.} \\autocite[1]{neuerkey2025}' })
+    ok(ohneQuelle.inhalt.fehler === 'quelle_fehlt', `Ohne Quelle: ${JSON.stringify(ohneQuelle.inhalt)}`)
+
+    const unbekannt = await edit({ alt: 'Erster', neu: 'Erster \\footfullcite{smith2024}' })
+    ok(!unbekannt.fehler && unbekannt.inhalt.rot.length === 1, `Unbekannt: ${JSON.stringify(unbekannt.inhalt)}`)
+    const { lauf } = (await werkzeug(token, 'run_status', { project_id: pid })).inhalt
+    ok(lauf.rot.length >= 1, 'Lauf nicht rot')
+    await panelOeffnen('Claude')
+    await page.locator('.spur-lauf-rot').first().waitFor()
+  }
+
+  async function laufProjekt(email = 'e2e-a@example.org') {
+    await anmelden(email)
+    await projektOeffnen('E2E Lauf')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const edit = (args, pfad = 'main.tex') =>
+      werkzeug(token, 'doc_edit', { project_id: pid, pfad, idempotenz_schluessel: schluessel(), ...args })
+    const fertig = zusammenfassung =>
+      werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung })
+    const lauf = async () => (await werkzeug(token, 'run_status', { project_id: pid })).inhalt.lauf
+    const changesVonClaude = async () =>
+      (await jsonVon(`/project/${pid}/ranges`)).flatMap(d => d.ranges?.changes ?? [])
+    await panelOeffnen('Claude')
+    return { pid, token, edit, fertig, lauf, changesVonClaude }
+  }
+
+  const laufAktion = (pid, laufId, aktion, body = {}) =>
+    seitenPost(`/spur/project/${pid}/laeufe/${laufId}/${aktion}`, body)
+
+  const karte = () => page.locator('.spur-lauf-karte')
+
+  features.f13 = async () => {
+    const { pid, token, edit, fertig, lauf, changesVonClaude } = await laufProjekt()
+    ok(!(await edit({ alt: 'Alpha Satz.', neu: 'Alpha Satz. Von Claude eins.' })).fehler, 'Edit 1')
+    ok(!(await edit({ alt: 'Gamma Satz.', neu: 'Gamma Satz. Von Claude zwei.' })).fehler, 'Edit 2')
+    await fertig('Zwei Sätze ergänzt')
+    await karte().getByText('Dateien: 1 · Änderungen: 2').waitFor({ timeout: 20000 })
+    await karte().getByText('Zwei Sätze ergänzt').waitFor()
+
+    await karte().getByRole('button', { name: 'Alle annehmen' }).click()
+    await karte().getByText('Angenommen', { exact: true }).waitFor({ timeout: 20000 })
+    await imEditor('Von Claude zwei.')
+    ok((await changesVonClaude()).length === 0, 'Nach Annahme bleiben Changes')
+
+    ok(!(await edit({ alt: 'Delta Satz.', neu: 'Delta Satz. Claude schreibt hier etwas.' })).fehler, 'Edit 3')
+    ok(!(await edit({ alt: 'Alpha Satz.', neu: 'Alpha Satz. Und noch etwas.' })).fehler, 'Edit 4')
+    await imEditor('Claude schreibt hier etwas.')
+    await editorErsetzen('schreibt hier', 'schreibt nun hier')
+    const zeilen = karte().locator('.spur-lauf-aenderung')
+    await page.waitForFunction(() => document.querySelectorAll('.spur-lauf-aenderung').length >= 2, null, { timeout: 20000 })
+    const vorher = await zeilen.count()
+    await zeilen.filter({ hasText: 'Und noch etwas' }).getByRole('button', { name: 'Annehmen' }).click()
+    await page.waitForFunction(n => document.querySelectorAll('.spur-lauf-aenderung').length === n - 1, vorher, { timeout: 20000 })
+    ok((await zeilen.filter({ hasText: 'Und noch etwas' }).count()) === 0, 'Angenommene Zeile steht noch da')
+    await imEditor('schreibt nun hier')
+
+    const aktuell = await lauf()
+    await anmelden('e2e-leser@example.org')
+    await page.goto(`${BASE}/project/${pid}`)
+    await page.locator('.cm-content').first().waitFor()
+    const lesen = await laufAktion(pid, aktuell.id, 'annehmen')
+    ok(lesen.status === 403, `read darf annehmen: ${lesen.status}`)
+
+    await anmelden('e2e-review@example.org')
+    const pruefer = await laufProjekt('e2e-review@example.org')
+    ok(!(await pruefer.edit({ alt: 'Beta Satz', neu: 'Beta Satz, geprüft,' })).fehler, 'review kann nicht schreiben')
+    await karte().waitFor({ timeout: 20000 })
+    await karte().locator('.spur-lauf-aenderung').first().waitFor({ timeout: 20000 })
+    ok(
+      (await karte().getByRole('button', { name: /^(Annehmen|Alle annehmen)$/ }).count()) === 0,
+      'review sieht Annehmen'
+    )
+
+    const namen = (await mcp(token, 'tools/list')).daten.result.tools.map(w => w.name)
+    ok(!namen.some(n => /annehm|accept/i.test(n)), `Annahme-Tool: ${namen}`)
+
+    await anmelden('e2e-a@example.org')
+    const extra = await laufProjekt()
+    ok(!(await extra.edit({ alt: 'Extra Satz.', neu: 'Extra Satz von Claude.' }, 'extra.tex')).fehler, 'Edit extra')
+    const docs = (await werkzeug(extra.token, 'doc_list', { project_id: pid })).inhalt.eintraege
+    const extraId = docs.find(d => d.pfad === 'extra.tex').id
+    await page.evaluate(
+      async ([p, d]) => {
+        const t = document.querySelector('meta[name="ol-csrfToken"]').content
+        await fetch(`/project/${p}/doc/${d}`, { method: 'DELETE', headers: { 'X-Csrf-Token': t } })
+      },
+      [pid, extraId]
+    )
+    await karte().getByText('Datei gelöscht').waitFor({ timeout: 20000 })
+  }
+
+  features.f14 = async () => {
+    await anmelden('e2e-a@example.org')
+    const { pid, edit, lauf, changesVonClaude } = await laufProjekt()
+    const offen = await lauf()
+    if (offen?.status === 'offen') await laufAktion(pid, offen.id, 'ablehnen')
+
+    ok(!(await edit({ alt: 'mit altem Wort', neu: 'mit neuem Wort' })).fehler, 'Ersetzung')
+    ok(!(await edit({ alt: 'Gamma Satz.', neu: 'Gamma Satz. Ein langer Einschub von Claude.' })).fehler, 'Einschub')
+    await imEditor('Ein langer Einschub von Claude.')
+    await editorErsetzen('langer Einschub', 'langer NUTZER Einschub')
+    const id = (await lauf()).id
+
+    await page.goto(`${BASE}/project`)
+    const veraltet = await laufAktion(pid, id, 'ablehnen', { change_ids: ['ffffffffffffffffffffffff'] })
+    ok(veraltet.status === 200 && veraltet.daten.abgelehnt === 0, `Veraltete ID: ${JSON.stringify(veraltet)}`)
+    const abgelehnt = await laufAktion(pid, id, 'ablehnen')
+    ok(abgelehnt.status === 200, `Ablehnen: ${abgelehnt.status}`)
+
+    await projektOeffnen('E2E Lauf')
+    await imEditor('mit altem Wort')
+    const text = await docText()
+    ok(!text.includes('neuem'), 'Einschub nicht zurückgesetzt')
+    ok(text.split('mit altem Wort').length === 2, 'Doppeltext nach Ablehnen')
+    ok(text.includes('NUTZER') && !text.includes('langer'), `Gespaltener Einschub: ${text}`)
+    ok((await changesVonClaude()).length === 0, 'Changes bleiben nach Ablehnen')
+
+    const pruefer = await laufProjekt('e2e-review@example.org')
+    ok(!(await pruefer.edit({ alt: 'Delta', neu: 'Delta vom Prüfer-Bot' })).fehler, 'review-Edit')
+    const eigen = await laufAktion(pid, (await pruefer.lauf()).id, 'ablehnen')
+    ok(eigen.status === 200, `review lehnt eigenen ab: ${eigen.status}`)
+
+    const a = await laufProjekt()
+    ok(!(await a.edit({ alt: 'Alpha', neu: 'Alpha fremd' })).fehler, 'Fremder Edit')
+    const fremdId = (await a.lauf()).id
+    await anmelden('e2e-review@example.org')
+    await page.goto(`${BASE}/project/${pid}`)
+    await page.locator('.cm-content').first().waitFor()
+    const fremd = await laufAktion(pid, fremdId, 'ablehnen')
+    ok(fremd.status >= 400, `review lehnt fremden ab: ${fremd.status}`)
+  }
+
+  features.f15 = async () => {
+    const { pid, token, edit, fertig, lauf, changesVonClaude } = await laufProjekt()
+    const offen = await lauf()
+    if (offen?.status === 'offen') await laufAktion(pid, offen.id, 'ablehnen')
+    ok(!(await edit({ alt: 'Gamma', neu: 'Gamma eins' })).fehler, 'Start')
+    await karte().waitFor({ timeout: 20000 })
+    await page.getByLabel('Automatisch annehmen, wenn ein Lauf ohne Probleme endet').check()
+    await page.waitForResponse(r => r.url().endsWith('/claude/automatik'))
+    await fertig('Grüner Lauf')
+    ok((await lauf()).status === 'angenommen', 'Grüner Lauf nicht angenommen')
+    ok((await changesVonClaude()).length === 0, 'Changes nach Automatik')
+
+    ok(!(await edit({ alt: 'Delta', neu: 'Delta \\footfullcite{x}' })).fehler, 'Roter Edit')
+    await fertig('Roter Lauf')
+    ok((await lauf()).status === 'fertig', 'Roter Lauf wurde angenommen')
+    await karte().getByText('Bitte prüfen').waitFor({ timeout: 20000 })
+    await laufAktion(pid, (await lauf()).id, 'ablehnen')
+
+    const namen = (await mcp(token, 'tools/list')).daten.result.tools.map(w => w.name)
+    ok(!namen.some(n => /automat|auto_accept/i.test(n)), 'Automatik per Token')
+    const perToken = await page.request.put(`${BASE}/spur/project/${pid}/claude/automatik`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { an: false },
+    })
+    ok(perToken.status() === 403, `PUT ohne CSRF: ${perToken.status()}`)
+
+    ok(!(await edit({ alt: 'Alpha', neu: 'Alpha rueck' })).fehler, 'Edit für Rücknahme')
+    await fertig('Zum Zurücknehmen')
+    ok((await lauf()).status === 'angenommen', 'Nicht angenommen')
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    ok(
+      (await changesVonClaude()).some(c => c.op.d?.includes('rueck')),
+      'Rücknahme erzeugt keine Track Changes'
+    )
+    await karte().getByText('Letzter Ausweg: Die Wiederherstellung').waitFor()
+
+    ok(!(await edit({ alt: 'Beta', neu: 'Beta konflikt' })).fehler, 'Edit für Konflikt')
+    await fertig('Konfliktlauf')
+    await imEditor('Beta konflikt')
+    await editorErsetzen('Beta konflikt', 'Beta Konflikt')
+    await page.waitForTimeout(1500)
+    const vorher = await docText()
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText(/Konflikt in Zeile \d+/).waitFor({ timeout: 20000 })
+    ok((await docText()) === vorher, 'Konflikt änderte Text')
+
+    await anmelden('e2e-review@example.org')
+    await laufProjekt('e2e-review@example.org')
+    ok(
+      (await page.getByLabel('Automatisch annehmen, wenn ein Lauf ohne Probleme endet').count()) === 0,
+      'review sieht Automatik'
+    )
+    const reviewPut = await page.evaluate(async p => {
+      const t = document.querySelector('meta[name="ol-csrfToken"]').content
+      return (await fetch(`/spur/project/${p}/claude/automatik`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': t },
+        body: JSON.stringify({ an: true }),
+      })).status
+    }, pid)
+    ok(reviewPut === 403, `review setzt Automatik: ${reviewPut}`)
   }
 
   const ergebnis = []

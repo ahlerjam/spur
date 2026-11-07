@@ -4,11 +4,15 @@ import { pipeline } from 'node:stream/promises'
 import logger from '@overleaf/logger'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import CollaboratorsGetter from '../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs'
-import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
+import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import * as PruefManager from './pruefung/PruefManager.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
 import * as ZitatManager from './ZitatManager.mjs'
 import * as ClaudeZugang from './ClaudeZugang.mjs'
+import * as Inbox from './Inbox.mjs'
+import * as LaufAktionen from './schreiben/LaufAktionen.mjs'
+import * as LaufManager from './schreiben/LaufManager.mjs'
+import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
@@ -221,5 +225,75 @@ export const claudeTokenErzeugen = mitProblemen(async (req, res) => {
 
 export const claudeTokenWiderrufen = mitProblemen(async (req, res) => {
   await ClaudeZugang.widerrufen(nutzerId(req), req.params.token_id)
+  res.sendStatus(204)
+})
+
+async function botDesNutzers(req) {
+  const mensch = await db.users.findOne({ _id: new ObjectId(nutzerId(req)) })
+  return await ClaudeZugang.botFuer(mensch)
+}
+
+export const claudeStatus = mitProblemen(async (req, res) => {
+  const bot = await botDesNutzers(req)
+  const liste = await Inbox.verlauf(projektId(req), bot._id)
+  const lauf = await LaufManager.letzterLauf(projektId(req), bot._id)
+  res.json({
+    verbunden: await Inbox.verbunden(bot._id),
+    nachrichten: liste.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
+    automatik: await LaufAktionen.automatik(projektId(req), new ObjectId(nutzerId(req))),
+    ...(await LaufAktionen.laufDaten(projektId(req), lauf)),
+  })
+})
+
+export const claudeAuftrag = mitProblemen(async (req, res) => {
+  const text = String(req.body.text ?? '').trim()
+  if (!text || text.length > 20000) {
+    throw new Problem(422, 'auftrag', 'Bitte einen Auftrag mit 1 bis 20000 Zeichen schreiben.')
+  }
+  const bot = await botDesNutzers(req)
+  const nachricht = await Inbox.auftragAnlegen({ projectId: projektId(req), botId: bot._id, text })
+  res.status(201).json({ id: nachricht._id })
+})
+
+const changeIds = req => {
+  const ids = req.body?.change_ids
+  if (ids === undefined) return undefined
+  if (!Array.isArray(ids) || !ids.every(id => typeof id === 'string')) {
+    throw new Problem(422, 'change_ids', 'change_ids muss eine Liste von Texten sein.')
+  }
+  return ids
+}
+
+export const laufAnnehmen = mitProblemen(async (req, res) => {
+  const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id)
+  res.json(
+    await LaufAktionen.annehmen(projektId(req), lauf, new ObjectId(nutzerId(req)), changeIds(req))
+  )
+})
+
+// review darf nur Changes des eigenen Bots ablehnen.
+export const laufAblehnen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const stufe = await AuthorizationManager.promises.getPrivilegeLevelForProject(
+    userId,
+    req.params.project_id,
+    null
+  )
+  const nurBot = stufe === 'review' ? (await botDesNutzers(req))._id : undefined
+  const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id, nurBot)
+  res.json(await LaufAktionen.ablehnen(projektId(req), lauf, userId, changeIds(req)))
+})
+
+export const laufZuruecknehmen = mitProblemen(async (req, res) => {
+  const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id)
+  await LaufAktionen.zuruecknehmen(projektId(req), lauf, new ObjectId(nutzerId(req)))
+  res.sendStatus(204)
+})
+
+export const automatikSetzen = mitProblemen(async (req, res) => {
+  if (typeof req.body.an !== 'boolean') {
+    throw new Problem(422, 'automatik', 'an muss true oder false sein.')
+  }
+  await LaufAktionen.automatikSetzen(projektId(req), new ObjectId(nutzerId(req)), req.body.an)
   res.sendStatus(204)
 })

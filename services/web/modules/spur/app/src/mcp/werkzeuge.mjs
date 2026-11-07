@@ -3,6 +3,10 @@ import AuthorizationManager from '../../../../../app/src/Features/Authorization/
 import { db, ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import * as Crossref from '../Crossref.mjs'
 import * as Inbox from '../Inbox.mjs'
+import * as LaufAktionen from '../schreiben/LaufAktionen.mjs'
+import * as LaufManager from '../schreiben/LaufManager.mjs'
+import * as SchreibManager from '../schreiben/SchreibManager.mjs'
+import { WerkzeugFehler } from './fehler.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
@@ -12,12 +16,6 @@ const SEITE = 50
 const MAX_TEXT = 40000
 const MAX_QUELLTEXT = 4000
 
-export class WerkzeugFehler extends Error {
-  constructor(code, detail) {
-    super(detail)
-    this.code = code
-  }
-}
 
 const id = z.string().regex(/^[0-9a-f]{24}$/)
 const LESEN = ['readOnly', 'review', 'readAndWrite', 'owner']
@@ -286,22 +284,73 @@ export const WERKZEUGE = {
   },
 }
 
-const NICHT_VERFUEGBAR = {
-  doc_edit: 'Änderung als Track Change, mit erwartetem Alttext und Idempotenz-Schlüssel.',
-  doc_create: 'Leeres Dokument anlegen, Inhalt folgt über doc_edit.',
-  run_status: 'Lauf abfragen.',
-  run_finish: 'Lauf mit Zusammenfassung beenden.',
-}
+const schluessel = z.string().min(8).max(200)
 
-for (const [name, zweck] of Object.entries(NICHT_VERFUEGBAR)) {
-  WERKZEUGE[name] = {
-    description: `${zweck} Noch nicht verfügbar.`,
-    inputSchema: z.object({}).passthrough(),
-    async ausfuehren() {
-      throw new WerkzeugFehler(
-        'nicht_verfuegbar',
-        'Dieses Werkzeug ist in dieser spur-Version noch nicht freigeschaltet.'
-      )
+Object.assign(WERKZEUGE, {
+  doc_edit: {
+    description:
+      'Ersetzt den erwarteten Alttext (muss genau einmal vorkommen) durch neuen Text, als Track Change. Ohne Alttext wird am Ende angefügt. Zitate im berührten Bereich werden gegen die Quellen geprüft.',
+    inputSchema: z.object({
+      project_id: id,
+      doc_id: id.optional(),
+      pfad: z.string().optional(),
+      alt: z.string().max(100000),
+      neu: z.string().max(100000),
+      idempotenz_schluessel: schluessel,
+    }),
+    async ausfuehren(args, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, args.project_id, SCHREIBEN)
+      return await SchreibManager.docEdit({
+        projectId,
+        botId,
+        docId: args.doc_id,
+        pfad: args.pfad,
+        alt: args.alt,
+        neu: args.neu,
+        schluessel: args.idempotenz_schluessel,
+      })
     },
-  }
-}
+  },
+
+  doc_create: {
+    description: 'Legt ein Dokument an; der Inhalt erscheint als Track Change.',
+    inputSchema: z.object({
+      project_id: id,
+      pfad: z.string().min(1).max(500).regex(/^[^\0]+\.(tex|bib|txt|md)$/),
+      inhalt: z.string().max(100000),
+      idempotenz_schluessel: schluessel,
+    }),
+    async ausfuehren(args, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, args.project_id, SCHREIBEN)
+      return await SchreibManager.docCreate({
+        projectId,
+        botId,
+        pfad: args.pfad,
+        inhalt: args.inhalt,
+        schluessel: args.idempotenz_schluessel,
+      })
+    },
+  },
+
+  run_status: {
+    description: 'Zustand des aktuellen oder letzten Laufs im Projekt.',
+    inputSchema: z.object({ project_id: id }),
+    async ausfuehren({ project_id: pid }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
+    },
+  },
+
+  run_finish: {
+    description: 'Beendet den offenen Lauf mit einer Zusammenfassung für die Lauf-Karte.',
+    inputSchema: z.object({ project_id: id, zusammenfassung: z.string().min(1).max(2000) }),
+    async ausfuehren({ project_id: pid, zusammenfassung }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, SCHREIBEN)
+      const lauf = await LaufManager.offenerLauf(projectId, botId)
+      if (!lauf) throw new WerkzeugFehler('kein_lauf', 'Es gibt keinen offenen Lauf.')
+      await LaufManager.beenden(lauf, zusammenfassung)
+      await LaufAktionen.nachLaufende(projectId, lauf, menschId)
+      return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
+    },
+  },
+})
