@@ -9,7 +9,7 @@ spur ergänzt overleaf-cep um Quellen, Prüfung und eine MCP-Schnittstelle. Der 
 - Sidecar-Container
 
 ## Decision Outcome
-Modul im web-Dienst. Ein eigener Dienst bräuchte rund ein Dutzend neue interne Endpunkte für Baum, Dateien, Compile und Label sowie Workspace, runit und nginx-Regel. Kern-Patches bleiben auf `settings.defaults.js`, Sprachdateien, History-Anzeige und neue document-updater-Endpunkte begrenzt.
+Modul im web-Dienst. Ein eigener Dienst bräuchte rund ein Dutzend neue interne Endpunkte für Baum, Dateien, Compile und Label sowie Workspace, runit und nginx-Regel. Kern-Patches bleiben auf `settings.defaults.js`, Sprachdateien, History-Anzeige, neue document-updater-Endpunkte und den Hook `projectDuplicated` in `ProjectDuplicator.mjs` begrenzt. Der Hook ist eine Zeile und lässt ein kopiertes Projekt den Hinweis „Quellen wurden nicht mitkopiert“ zeigen.
 
 ### Consequences
 - Keine neue Datenbank und kein neuer Dienst.
