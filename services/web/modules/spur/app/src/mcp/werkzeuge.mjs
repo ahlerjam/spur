@@ -32,8 +32,12 @@ async function rolle(menschId, projectId) {
 }
 
 async function pruefeRecht(menschId, projectId, erlaubt) {
-  const stufe = await rolle(menschId, projectId)
-  if (!erlaubt.includes(stufe)) {
+  const [stufe, eingeschraenkt] = await Promise.all([
+    rolle(menschId, projectId),
+    // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
+    AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null),
+  ])
+  if (eingeschraenkt || !erlaubt.includes(stufe)) {
     throw new WerkzeugFehler(
       'keine_rechte',
       'Die Projektrolle erlaubt das nicht. Bitte die Person um Zugriff bitten.'
@@ -75,7 +79,6 @@ export const WERKZEUGE = {
               { reviewer_refs: menschId },
               { readOnly_refs: menschId },
               { tokenAccessReadAndWrite_refs: menschId },
-              { tokenAccessReadOnly_refs: menschId },
             ],
             trashed: { $ne: menschId },
           },

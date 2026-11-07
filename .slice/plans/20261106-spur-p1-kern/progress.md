@@ -54,3 +54,7 @@
 ## /code-review medium 46c92846db..HEAD
 - Behoben: leerer Beleg (`\cite{}`) brachte den Bericht zum Absturz; Seitenlabel beim Einfügen wird frisch gelesen; MCP-Abbruch hängt an `res.on('close')`; doppelter Upload liefert 409 und räumt auf; Versatz nur für PDF; Seitenbild für VTT gibt 404 statt 500; DOI ohne Satzzeichen am Ende; Crossref höchstens 5 parallel.
 - Nicht umgesetzt: fehlende MCP-Definition im Plugin (siehe Needs decision, Datei für den Builder gesperrt); „Hilfsskripte im Repo“ (`seed.mjs` und `smoke-compile.mjs` verlangt die Spec, alles andere liegt in Testordnern, die die Quality Bar erlaubt).
+
+## /security-review
+- Kein Befund mit Confidence ≥ 8. Kandidat mit 7 behoben: MCP-Werkzeuge sperren Leselink-Nutzer wie `blockRestrictedUserFromProject` im Web, `project_list` zeigt keine reinen Leselink-Projekte mehr.
+- Info, nicht geändert: Nutzer mit Bearbeiten-Link können Seitenbilder und Seitentext ansehen, nur den PDF-Download nicht (so verlangt es f3). Reviewer dürfen über `quote_mark` markieren (Spec: `review` schreibt).
