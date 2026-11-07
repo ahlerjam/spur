@@ -58,3 +58,4 @@
 ## /security-review
 - Kein Befund mit Confidence ≥ 8. Kandidat mit 7 behoben: MCP-Werkzeuge sperren Leselink-Nutzer wie `blockRestrictedUserFromProject` im Web, `project_list` zeigt keine reinen Leselink-Projekte mehr.
 - Info, nicht geändert: Nutzer mit Bearbeiten-Link können Seitenbilder und Seitentext ansehen, nur den PDF-Download nicht (so verlangt es f3). Reviewer dürfen über `quote_mark` markieren (Spec: `review` schreibt).
+- Hinweis f8: `oauthAccessTokens` hat aus Overleaf einen TTL-Index (`accessTokenExpiresAt`, 86400 s). spur zeigt „Token abgelaufen, bitte erneuern“ deshalb einen Tag lang; danach verschwindet der Eintrag aus der Liste. Vorschlag: eigenes Feld für den sichtbaren Ablauf, falls der Hinweis länger stehen soll.

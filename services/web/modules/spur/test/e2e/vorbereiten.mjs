@@ -205,7 +205,7 @@ async function testToken(mensch, token, ablauf) {
   })
 }
 
-await testToken(leser, 'spur_e2e_abgelaufen', new Date(Date.now() - 24 * 3600 * 1000))
+await testToken(leser, 'spur_e2e_abgelaufen', new Date(Date.now() - 3600 * 1000))
 const altWeg = await db.users.findOne({ email: 'e2e-weg@example.org' })
 if (altWeg) {
   await kontoAufraeumen(altWeg._id)
