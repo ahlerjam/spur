@@ -100,7 +100,8 @@ export async function annehmen(projectId, lauf, userId, nurIds) {
   const liste = await aenderungen(projectId, lauf)
   const angenommen = []
   for (const d of liste) {
-    const ids = d.changes.map(c => c.id).filter(id => !nurIds || nurIds.includes(id))
+    // Wie beim Ablehnen: ein gespaltener Einschub wird ganz angenommen, sonst blieben Restmarken.
+    const ids = mitGanzenEinschueben(d.changes, nurIds).map(c => c.id)
     if (!ids.length) continue
     await DocumentUpdaterHandler.promises.acceptChanges(projectId, d.docId, ids, userId)
     // Wie TrackChangesController: offene Editoren entfernen die Marken sofort.

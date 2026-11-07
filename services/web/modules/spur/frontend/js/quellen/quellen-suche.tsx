@@ -16,7 +16,7 @@ export default function QuellenSuche({
   return (
     <ul className="spur-liste">
       {treffer.map(eintrag => (
-        <li className="spur-zeile" key={`${eintrag.quelleId}-${eintrag.seite}`}>
+        <li className="spur-zeile" key={`${eintrag.quelleId}-${eintrag.imDateinamen ? 'name' : eintrag.seite}`}>
           <OLButton
             variant="link"
             size="sm"
@@ -26,11 +26,13 @@ export default function QuellenSuche({
             {eintrag.dateiname}
           </OLButton>
           <p className="spur-zeile-meta">
-            {eintrag.art === 'vtt'
-              ? eintrag.label
-              : t('spur_seite_kurz', { seite: eintrag.label ?? eintrag.seite })}
+            {eintrag.imDateinamen
+              ? t('spur_treffer_dateiname')
+              : eintrag.art === 'vtt'
+                ? eintrag.label
+                : t('spur_seite_kurz', { seite: eintrag.label ?? eintrag.seite })}
           </p>
-          <p className="spur-zeile-auszug">{eintrag.auszug}</p>
+          {eintrag.auszug && <p className="spur-zeile-auszug">{eintrag.auszug}</p>}
         </li>
       ))}
     </ul>

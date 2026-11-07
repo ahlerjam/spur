@@ -73,9 +73,12 @@ export default function Zitate({
         projektPfad(`${basis}/${zitat.id}/einfuegen`)
       )
       const pos = view.state.selection.main.head
+      // Direkt hinter einem Wort fehlte sonst das Leerzeichen vor \enquote.
+      const davor = pos > 0 ? view.state.sliceDoc(pos - 1, pos) : ''
+      const einfuegung = davor && !/\s/.test(davor) ? ` ${latex}` : latex
       view.dispatch({
-        changes: { from: pos, insert: latex },
-        selection: EditorSelection.cursor(pos + latex.length),
+        changes: { from: pos, insert: einfuegung },
+        selection: EditorSelection.cursor(pos + einfuegung.length),
         userEvent: 'input',
       })
       view.focus()

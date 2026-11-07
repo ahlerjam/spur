@@ -5,9 +5,8 @@ import * as Inbox from '../Inbox.mjs'
 import * as LaufAktionen from '../schreiben/LaufAktionen.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as SchreibManager from '../schreiben/SchreibManager.mjs'
-import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
 import { WerkzeugFehler } from './fehler.mjs'
-import { rolleFuerClaude } from '../rechte.mjs'
+import { rolleFuerClaude, rolleImVertrag } from '../rechte.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
@@ -80,7 +79,7 @@ export const WERKZEUGE = {
           id: p._id,
           name: p.name,
           // Dieselbe Rolle, mit der die übrigen Werkzeuge prüfen (null: Claude darf hier nichts).
-          rolle: await rolleFuerClaude(menschId, p._id),
+          rolle: rolleImVertrag(await rolleFuerClaude(menschId, p._id)),
         }))
       )
       return teil
@@ -307,14 +306,7 @@ Object.assign(WERKZEUGE, {
     description: 'Legt ein Dokument an; der Inhalt erscheint als Track Change.',
     inputSchema: z.object({
       project_id: id,
-      pfad: z
-        .string()
-        .min(1)
-        .max(500)
-        .regex(/^[^\0]+\.(tex|bib|txt|md)$/)
-        .refine(SafePath.isCleanPath, {
-          message: 'Der Pfad enthält unzulässige Teile wie „..“ oder verbotene Zeichen.',
-        }),
+      pfad: z.string().min(1).max(1024).regex(/\.(tex|bib|txt|md)$/),
       inhalt: z.string().max(100000),
       idempotenz_schluessel: schluessel,
     }),

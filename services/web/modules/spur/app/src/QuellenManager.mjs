@@ -1,3 +1,4 @@
+import _ from 'lodash'
 import fs from 'node:fs/promises'
 import Path from 'node:path'
 import archiver from 'archiver'
@@ -248,6 +249,16 @@ export async function suchen(projectId, begriff) {
     position: t.text.toLowerCase().indexOf(begriff.toLowerCase()),
     auszug: auszug(t.text, begriff),
   }))
+}
+
+// Quellen, deren Dateiname den Begriff enthält (ohne Groß-/Kleinschreibung).
+export async function dateinamenSuchen(projectId, begriff, grenze = 20) {
+  const muster = new RegExp(_.escapeRegExp(begriff), 'i')
+  return await (await quellen())
+    .find({ projectId, dateiname: muster })
+    .sort({ dateiname: 1 })
+    .limit(grenze)
+    .toArray()
 }
 
 export async function aendern(quelle, { fassung, versatz }) {

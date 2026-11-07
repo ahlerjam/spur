@@ -47,7 +47,11 @@ export default function ClaudePanel() {
   }, [laden])
 
   const senden = async () => {
-    if (!text.trim()) return
+    if (!text.trim()) {
+      setFehler(t('spur_auftrag_leer'))
+      feld.current?.focus()
+      return
+    }
     setSendet(true)
     setFehler(null)
     try {

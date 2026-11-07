@@ -11,6 +11,12 @@ describe('opsFuer', () => {
       { p: 4, i: 'neuem' },
     ])
   })
+  it('lässt den Backslash beim Befehl', () => {
+    expect(opsFuer(0, 'Text \\footfullcite{a}', 'Text \\enquote{a}')).toEqual([
+      { p: 5, d: '\\footfullcite' },
+      { p: 5, i: '\\enquote' },
+    ])
+  })
   it('trennt nie mitten im Wort', () => {
     expect(opsFuer(0, 'Beta Satz mit altem Wort.', 'Beta Satz, sprachlich geglättet.')).toEqual([
       { p: 9, d: ' mit altem Wort' },

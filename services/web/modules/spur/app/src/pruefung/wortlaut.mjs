@@ -1,3 +1,4 @@
+import _ from 'lodash'
 import { AUSLASSUNG, BUCHSTABE } from './latex.mjs'
 
 const LIGATUREN = { ﬀ: 'ff', ﬁ: 'fi', ﬂ: 'fl', ﬃ: 'ffi', ﬄ: 'ffl', ﬅ: 'st', ﬆ: 'st' }
@@ -25,8 +26,7 @@ function textFassungen(seiten) {
 }
 
 function segmentMuster(segment) {
-  const zeichen = segment
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const zeichen = _.escapeRegExp(segment)
     .replace(new RegExp(`${BUCHSTABE}(\\p{L})`, 'gu'), (_, b) => {
       return `[${b.toLowerCase()}${b.toUpperCase()}]`
     })

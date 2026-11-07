@@ -3,6 +3,8 @@ import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpda
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
+import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
+import EditorHttpController from '../../../../../app/src/Features/Editor/EditorHttpController.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
 import { zitateFinden } from '../pruefung/latex.mjs'
 import { bereichPruefen } from '../pruefung/PruefManager.mjs'
@@ -14,6 +16,19 @@ import { spurUpdate } from './spurUpdate.mjs'
 
 // document-updater trennt Clients ab 2000 offenen Changes; wir halten Abstand.
 const GRENZE_CHANGES = 1990
+
+// Namen und Pfade wie der Web-Weg prüfen: SafePath für erlaubte Zeichen und reservierte Namen,
+// _nameIsAcceptableLength für die Länge jedes Teils (unter 150 Zeichen). Längere Namen legt
+// SafePath zwar an, danach scheitert aber jeder Compile mit ENAMETOOLONG.
+function pruefePfad(pfad) {
+  const teile = pfad.replace(/^\//, '').split('/')
+  if (!SafePath.isCleanPath(pfad) || !teile.every(EditorHttpController._nameIsAcceptableLength)) {
+    throw new WerkzeugFehler(
+      'pfad_ungueltig',
+      'Dieser Pfad ist nicht erlaubt: keine Teile wie „..“, keine verbotenen Zeichen, jeder Ordner- und Dateiname unter 150 Zeichen.'
+    )
+  }
+}
 
 async function docAufloesen(projectId, docId, pfad) {
   if (!docId && !pfad) {
@@ -121,6 +136,7 @@ async function mitSchluessel({ projectId, botId, schluessel, argumente }, schrei
 }
 
 export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schluessel }) {
+  if (pfad !== undefined) pruefePfad(pfad)
   const argumente = { werkzeug: 'doc_edit', docId, pfad, alt, neu }
   return await mitSchluessel({ projectId, botId, schluessel, argumente }, () =>
     bearbeiten({ projectId, botId, docId, pfad, alt, neu })
@@ -179,6 +195,7 @@ async function pfadBelegt(projectId, pfad) {
 }
 
 export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) {
+  pruefePfad(pfad)
   const ziel = `/${pfad.replace(/^\//, '')}`
   const argumente = { werkzeug: 'doc_create', pfad, inhalt }
   return await mitSchluessel({ projectId, botId, schluessel, argumente }, async () => {

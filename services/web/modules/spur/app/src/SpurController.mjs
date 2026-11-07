@@ -85,7 +85,22 @@ export const quelleHochladen = mitProblemen(async (req, res) => {
 export const quellenSuche = mitProblemen(async (req, res) => {
   const begriff = String(req.query.q ?? '').trim()
   if (!begriff) return res.json({ treffer: [] })
-  res.json({ treffer: await QuellenManager.suchen(projektId(req), begriff) })
+  const [namen, imText] = await Promise.all([
+    QuellenManager.dateinamenSuchen(projektId(req), begriff),
+    QuellenManager.suchen(projektId(req), begriff),
+  ])
+  // Treffer im Dateinamen bringen die Quelle mit: Sie steht nicht unbedingt in der geladenen Liste.
+  const imNamen = namen.map(q => ({
+    quelleId: q._id,
+    dateiname: q.dateiname,
+    art: q.art,
+    seite: 1,
+    label: null,
+    auszug: '',
+    imDateinamen: true,
+    quelle: quelleFuerClient(q),
+  }))
+  res.json({ treffer: [...imNamen, ...imText] })
 })
 
 export const quelleSeite = mitProblemen(async (req, res) => {

@@ -19,4 +19,6 @@ export type Treffer = {
   seite: number
   label: string | null
   auszug: string
+  imDateinamen?: boolean
+  quelle?: Quelle
 }

@@ -1,4 +1,6 @@
 const istWort = zeichen => zeichen !== undefined && /[\p{L}\p{N}_]/u.test(zeichen)
+// Links einer Grenze gehört auch ein Backslash zum Wort: „\enquote“ bleibt ganz.
+const wortLinks = zeichen => istWort(zeichen) || zeichen === '\\'
 
 // Kleinste Änderung in ganzen Wörtern: gemeinsamer Anfang und gemeinsames Ende bleiben unangetastet,
 // aber die Grenze liegt nie mitten im Wort. Sonst zeigten Editor, Review-Panel und Lauf-Karte
@@ -6,7 +8,7 @@ const istWort = zeichen => zeichen !== undefined && /[\p{L}\p{N}_]/u.test(zeiche
 export function opsFuer(start, alt, neu) {
   let vorn = 0
   while (vorn < alt.length && vorn < neu.length && alt[vorn] === neu[vorn]) vorn++
-  while (vorn > 0 && istWort(alt[vorn - 1]) && (istWort(alt[vorn]) || istWort(neu[vorn]))) vorn--
+  while (vorn > 0 && wortLinks(alt[vorn - 1]) && (istWort(alt[vorn]) || istWort(neu[vorn]))) vorn--
   let hinten = 0
   while (
     hinten < alt.length - vorn &&
@@ -18,7 +20,7 @@ export function opsFuer(start, alt, neu) {
   while (
     hinten > 0 &&
     istWort(alt[alt.length - hinten]) &&
-    (istWort(alt[alt.length - hinten - 1]) || istWort(neu[neu.length - hinten - 1]))
+    (wortLinks(alt[alt.length - hinten - 1]) || wortLinks(neu[neu.length - hinten - 1]))
   ) {
     hinten--
   }

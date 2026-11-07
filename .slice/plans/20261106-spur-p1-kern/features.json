@@ -156,7 +156,7 @@
     "Ein gelöschtes Dokument liefert `doc_fehlt`; bei 1990 offenen Changes kommt `grenze_changes` und kein Client wird getrennt",
     "`doc_create` legt ein Dokument an, dessen Inhalt als Track Change erscheint"
    ],
-   "passes": true,
+   "passes": false,
    "ui": true
   },
   {

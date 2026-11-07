@@ -440,6 +440,12 @@ async page => {
         }),
         'Liste scrollt horizontal'
       )
+      // Die Liste zeigt nur 100 von 300 und verweist auf die Suche: Die findet auch Dateinamen.
+      await suchen('quelle-250')
+      const imNamen = page.locator('.spur-zeile', { hasText: 'Treffer im Dateinamen' })
+      await imNamen.getByRole('button', { name: 'quelle-250.pdf' }).waitFor()
+      await imNamen.getByRole('button', { name: 'quelle-250.pdf' }).click()
+      await page.locator('.rail-panel-title', { hasText: 'quelle-250.pdf' }).waitFor()
     },
 
     async f5() {
@@ -708,6 +714,8 @@ async page => {
         'run_finish', 'wait_for_event', 'events_since', 'reply',
       ].sort()
       ok(JSON.stringify(namen) === JSON.stringify(P1), `Tools: ${namen}`)
+      const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
+      ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
 
       ok((await mcp(null, 'tools/list')).status === 401, 'Ohne Token kein 401')
       const origin = await mcp(token, 'tools/list', {}, { Origin: 'https://evil.example' })
@@ -776,6 +784,8 @@ async page => {
     await panelOeffnen('Claude')
     await sichtbar('Claude nicht verbunden')
     await sichtbar('claude --allowedTools')
+    await page.getByRole('button', { name: 'Senden' }).click()
+    await sichtbar('Bitte zuerst einen Auftrag schreiben.')
     const zahl = await seitenPost(`/spur/project/${demo}/claude/auftrag`, { text: 123 })
     ok(zahl.status === 422, `Auftrag mit Zahl: ${zahl.status}`)
 
@@ -933,6 +943,18 @@ async page => {
       project_id: pid, pfad: 'claude.tex', inhalt: 'Überschreiben?', idempotenz_schluessel: schluessel(),
     })
     ok(belegt.inhalt.fehler === 'konflikt', `doc_create auf vorhandenen Pfad: ${JSON.stringify(belegt.inhalt)}`)
+    // Wie im Web: ein Dateiname mit 304 Zeichen wird abgelehnt, sonst scheiterte danach jeder Compile.
+    const langerName = `${'a'.repeat(300)}.tex`
+    const zuLang = await werkzeug(token, 'doc_create', {
+      project_id: pid, pfad: langerName, inhalt: 'x', idempotenz_schluessel: schluessel(),
+    })
+    ok(zuLang.inhalt.fehler === 'pfad_ungueltig', `doc_create mit ${langerName.length} Zeichen: ${JSON.stringify(zuLang.inhalt)}`)
+    const zuLangEdit = await edit({ pfad: langerName, alt: '', neu: 'x' })
+    ok(zuLangEdit.inhalt.fehler === 'pfad_ungueltig', `doc_edit mit langem Pfad: ${JSON.stringify(zuLangEdit.inhalt)}`)
+    ok(
+      !(await werkzeug(token, 'doc_list', { project_id: pid })).inhalt.eintraege.some(d => d.pfad === langerName),
+      'Datei mit zu langem Namen angelegt'
+    )
     ok((await jsonVon(`/project/${pid}/ranges`)).find(d => d.id === neu.inhalt.doc_id)?.ranges?.changes?.length, 'Vorhandene Datei geleert')
   }
 

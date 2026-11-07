@@ -130,7 +130,7 @@ export default function QuellenPanel() {
   }
 
   const trefferOeffnen = (t2: Treffer) => {
-    const quelle = quellen?.find(q => q.id === t2.quelleId)
+    const quelle = t2.quelle ?? quellen?.find(q => q.id === t2.quelleId)
     if (quelle) setOffen({ quelle, seite: t2.seite })
   }
 
