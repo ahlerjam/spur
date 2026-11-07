@@ -66,7 +66,7 @@
     "Nach dem Hook `projectExpired` liegen keine Dateien des Projekts mehr im Daten-Volume",
     "Ein Mongo-Dump plus Rücksicherung stellt die Quellen wieder her, die Migration hat ein funktionierendes `down`"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
