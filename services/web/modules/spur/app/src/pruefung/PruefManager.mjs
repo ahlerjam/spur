@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { promiseMapWithLimit } from '@overleaf/promise-utils'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import ProjectEntityHandler from '../../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
 import ProjectGetter from '../../../../../app/src/Features/Project/ProjectGetter.mjs'
@@ -10,6 +11,7 @@ import { bibLesen } from './bib.mjs'
 import { istProblem, quelleZu, zeileBewerten } from './bewertung.mjs'
 import { zitateFinden } from './latex.mjs'
 
+const CROSSREF_PARALLEL = 5
 const ABSCHNITT = /^[ \t]*\\(part|chapter|section)\*?\s*[[{]/gm
 
 export function abschnitte(text) {
@@ -75,11 +77,9 @@ async function kontextLaden(projectId, docs) {
   const quellen = await QuellenManager.alle(projectId)
   const dois = [...bibEintraege.values()].map(e => e.doi).filter(Boolean)
   const werke = new Map()
-  await Promise.all(
-    [...new Set(dois)].map(async doi => {
-      werke.set(doi.toLowerCase(), await Crossref.werk(doi))
-    })
-  )
+  await promiseMapWithLimit(CROSSREF_PARALLEL, [...new Set(dois)], async doi => {
+    werke.set(doi.toLowerCase(), await Crossref.werk(doi))
+  })
   return { bibEintraege, quellen, werke, seitenJeQuelle: new Map() }
 }
 

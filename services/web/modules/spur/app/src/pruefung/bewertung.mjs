@@ -39,6 +39,7 @@ export function zeileBewerten(fund, kontext) {
     return { ...basis, wortlaut: 'nicht_pruefbar', key: null, seite: null }
   }
   const [beleg] = fund.belege
+  if (!beleg) return { ...basis, wortlaut: 'nicht_pruefbar', key: null, seite: null }
   const quelle = quelleZu(beleg.key, bibEintraege, quellen)
   const eintrag = bibEintraege.get(beleg.key)
   const referenz = referenzStatus(

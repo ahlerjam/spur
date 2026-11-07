@@ -95,6 +95,9 @@ export const quelleBild = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   const nummer = Number.parseInt(req.params.seite, 10)
   await QuellenManager.seite(quelle, nummer)
+  if (quelle.art !== 'pdf') {
+    throw new Problem(404, 'kein_bild', 'Nur PDF-Quellen haben Seitenbilder.')
+  }
   const pfad = await QuellenManager.bild(quelle, nummer)
   res.type('png')
   await dateiSenden(pfad, res)
@@ -112,6 +115,9 @@ export const quelleAendern = mitProblemen(async (req, res) => {
   const { fassung, versatz } = req.body
   if (fassung !== undefined && (typeof fassung !== 'string' || fassung.length > 200)) {
     throw new Problem(422, 'fassung', 'Die Fassung darf höchstens 200 Zeichen lang sein.')
+  }
+  if (versatz !== undefined && quelle.art !== 'pdf') {
+    throw new Problem(422, 'versatz', 'Nur PDF-Quellen haben Seitenzahlen.')
   }
   if (versatz !== undefined && versatz !== null && !Number.isInteger(versatz)) {
     throw new Problem(422, 'versatz', 'Der Versatz muss eine ganze Zahl sein.')

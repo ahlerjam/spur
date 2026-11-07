@@ -50,3 +50,7 @@
   - Sprach-Default in `server-ce/config/settings.js`: Die Datei wird im Dev-Stack nicht eingehängt.
   - `setuid` statt `chown` in Skripten: im Container nicht erprobt.
   - Long-Poll über EventEmitter statt Mongo-Abfrage je Sekunde: gehört zu f10.
+
+## /code-review medium 46c92846db..HEAD
+- Behoben: leerer Beleg (`\cite{}`) brachte den Bericht zum Absturz; Seitenlabel beim Einfügen wird frisch gelesen; MCP-Abbruch hängt an `res.on('close')`; doppelter Upload liefert 409 und räumt auf; Versatz nur für PDF; Seitenbild für VTT gibt 404 statt 500; DOI ohne Satzzeichen am Ende; Crossref höchstens 5 parallel.
+- Nicht umgesetzt: fehlende MCP-Definition im Plugin (siehe Needs decision, Datei für den Builder gesperrt); „Hilfsskripte im Repo“ (`seed.mjs` und `smoke-compile.mjs` verlangt die Spec, alles andere liegt in Testordnern, die die Quality Bar erlaubt).

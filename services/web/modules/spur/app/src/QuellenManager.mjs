@@ -13,7 +13,7 @@ import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
 export const MAX_BYTES = 50 * 1024 * 1024
 const SEITE_LISTE = 100
 const SUCH_TREFFER = 50
-const DOI = /\b10\.\d{4,9}\/[^\s"<>]+/
+const DOI = /\b10\.\d{4,9}\/[^\s"<>]+?(?=[.,;:)\]]*(?:\s|$))/
 
 export const ablageWurzel = () =>
   Path.join(Path.dirname(Settings.path.compilesDir), 'spur')
@@ -93,13 +93,13 @@ export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groess
   pruefeDateityp(dateiname)
   const sammlung = await quellen()
   const key = schluesselAus(dateiname)
-  if (await sammlung.findOne({ projectId, key })) {
-    throw new Problem(
+  const vorhanden = () =>
+    new Problem(
       409,
       'quelle_vorhanden',
       `„${dateiname}“ ist schon vorhanden. Bitte die Datei umbenennen oder die alte Quelle löschen.`
     )
-  }
+  if (await sammlung.findOne({ projectId, key })) throw vorhanden()
   const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
   const quelle = {
     _id: new ObjectId(),
@@ -118,15 +118,26 @@ export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groess
     angelegtVon: userId,
     angelegtAm: jetzt(),
   }
-  const ziel = dateiPfad(quelle)
-  await fs.mkdir(Path.dirname(ziel), { recursive: true })
-  await fs.copyFile(tempPfad, ziel)
-  if (inhalt.seiten.length) {
-    await (await quellenSeiten()).insertMany(
-      inhalt.seiten.map(s => ({ quelleId: quelle._id, projectId, ...s }))
-    )
+  // Der eindeutige Index auf (projectId, key) entscheidet bei gleichzeitigen Uploads.
+  try {
+    await sammlung.insertOne(quelle)
+  } catch (error) {
+    if (error.code === 11000) throw vorhanden()
+    throw error
   }
-  await sammlung.insertOne(quelle)
+  try {
+    const ziel = dateiPfad(quelle)
+    await fs.mkdir(Path.dirname(ziel), { recursive: true })
+    await fs.copyFile(tempPfad, ziel)
+    if (inhalt.seiten.length) {
+      await (await quellenSeiten()).insertMany(
+        inhalt.seiten.map(s => ({ quelleId: quelle._id, projectId, ...s }))
+      )
+    }
+  } catch (error) {
+    await loeschen(quelle)
+    throw error
+  }
   return quelle
 }
 

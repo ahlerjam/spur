@@ -110,3 +110,14 @@ describe('wortlautPruefen', () => {
     expect(pruefen('x', []).wortlaut).toBe('nicht_pruefbar')
   })
 })
+
+describe('zeileBewerten', () => {
+  it('meldet leere Belege als nicht prüfbar statt abzustürzen', async () => {
+    const { zeileBewerten } = await import('../../app/src/pruefung/bewertung.mjs')
+    const kontext = { bibEintraege: new Map(), quellen: [], seitenJeQuelle: new Map(), werke: new Map() }
+    const zeilen = zitateFinden(String.raw`\enquote{x} \cite{} \autocite[12]{,}`)
+    expect(zeilen.map(z => zeileBewerten(z, kontext).wortlaut)).toEqual(
+      zeilen.map(() => 'nicht_pruefbar')
+    )
+  })
+})

@@ -53,13 +53,13 @@ function serverBauen({ authInfo }) {
 const handler = createMcpHandler(serverBauen)
 const erlaubterOrigin = new URL(Settings.siteUrl).origin
 
-function anfrageAus(req) {
+function anfrageAus(req, res) {
   const headers = new Headers()
   for (const [name, wert] of Object.entries(req.headers)) {
     if (wert != null) headers.set(name, Array.isArray(wert) ? wert.join(', ') : wert)
   }
   const abbruch = new AbortController()
-  req.on('close', () => abbruch.abort())
+  res.on('close', () => abbruch.abort())
   const mitInhalt = !['GET', 'HEAD', 'DELETE'].includes(req.method)
   return new Request(new URL(req.originalUrl, erlaubterOrigin), {
     method: req.method,
@@ -90,7 +90,7 @@ export async function mcpAnfrage(req, res) {
     } catch {
       throw new Problem(429, 'zu_viele_anfragen', 'Zu viele Aufrufe. Bitte eine Minute warten.')
     }
-    const antwort = await handler.fetch(anfrageAus(req), {
+    const antwort = await handler.fetch(anfrageAus(req, res), {
       authInfo: {
         token: 'spur',
         clientId: String(zugang.botId),

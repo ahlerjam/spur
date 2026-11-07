@@ -120,7 +120,9 @@ export async function einfuegen(projectId, quelle, zitat, userId) {
   const docs = await dokumente(projectId)
   const paket = zitierpaket(docs[0]?.text ?? '') ?? 'biblatex'
   const key = await bibSicherstellen(projectId, docs, quelle, userId)
-  const seite = zitat.label ?? String(zitat.seite)
+  // Das Label kann sich nach dem Markieren ändern, wenn jemand den Versatz bestätigt.
+  const { label } = await QuellenManager.seite(quelle, zitat.seite)
+  const seite = label ?? String(zitat.seite)
   const text = latexSicher(zitat.text)
   const latex =
     paket === 'natbib'
