@@ -8,7 +8,7 @@ import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.
 import ProjectEntityHandler from '../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
 import DocumentUpdaterHandler from '../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import Settings from '@overleaf/settings'
-import { fetchJson } from '@overleaf/fetch-utils'
+import { fetchNothing } from '@overleaf/fetch-utils'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
 import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
@@ -80,7 +80,7 @@ async function volleAenderungen(projectId, bot) {
   const docId = String(docs['/voll.tex']._id)
   const { version } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
   const op = Array.from({ length: 1990 }, (_, i) => ({ p: (1989 - i) * 2 + 1, i: 'x' }))
-  await fetchJson(
+  await fetchNothing(
     `${Settings.apis.documentupdater.url}/project/${projectId}/doc/${docId}/spur-update`,
     {
       method: 'POST',

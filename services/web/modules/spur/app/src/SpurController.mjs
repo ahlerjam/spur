@@ -236,11 +236,15 @@ async function botDesNutzers(req) {
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)
   const liste = await Inbox.verlauf(projektId(req), bot._id)
-  const lauf = await LaufManager.letzterLauf(projektId(req), bot._id)
+  const [lauf, verbunden, automatik] = await Promise.all([
+    LaufManager.letzterLauf(projektId(req), bot._id),
+    Inbox.verbunden(bot._id),
+    LaufAktionen.automatik(projektId(req), new ObjectId(nutzerId(req))),
+  ])
   res.json({
-    verbunden: await Inbox.verbunden(bot._id),
+    verbunden,
     nachrichten: liste.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
-    automatik: await LaufAktionen.automatik(projektId(req), new ObjectId(nutzerId(req))),
+    automatik,
     ...(await LaufAktionen.laufDaten(projektId(req), lauf)),
   })
 })

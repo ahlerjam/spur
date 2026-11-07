@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto'
 import Settings from '@overleaf/settings'
 import { fetchJson } from '@overleaf/fetch-utils'
 import HistoryManager from '../../../../../app/src/Features/History/HistoryManager.mjs'
@@ -11,11 +10,10 @@ const HISTORY = () => Settings.apis.project_history.url
 async function labelSetzen(projectId, botId) {
   await HistoryManager.promises.flushProject(projectId)
   const { version } = await fetchJson(`${HISTORY()}/project/${projectId}/version`)
-  const label = await fetchJson(`${HISTORY()}/project/${projectId}/labels`, {
+  await fetchJson(`${HISTORY()}/project/${projectId}/labels`, {
     method: 'POST',
     json: { comment: 'Claude: Lauf', version, user_id: String(botId) },
   })
-  return label.id ?? null
 }
 
 export async function offenerLauf(projectId, botId) {
@@ -28,12 +26,12 @@ export async function offenerLauf(projectId, botId) {
 export async function laufFuerSchreiben(projectId, botId) {
   const vorhanden = await offenerLauf(projectId, botId)
   if (vorhanden) return vorhanden
+  await labelSetzen(projectId, botId)
   const lauf = {
     projectId,
     botId,
     status: 'offen',
     gestartet: jetzt(),
-    labelId: await labelSetzen(projectId, botId),
     docs: [],
     aenderungen: 0,
     rot: [],
@@ -41,10 +39,6 @@ export async function laufFuerSchreiben(projectId, botId) {
   }
   const { insertedId } = await (await laeufe()).insertOne(lauf)
   return { ...lauf, _id: insertedId }
-}
-
-export function neuerSeed() {
-  return randomBytes(9).toString('hex')
 }
 
 export async function aenderungMerken(lauf, { docId, rot }) {

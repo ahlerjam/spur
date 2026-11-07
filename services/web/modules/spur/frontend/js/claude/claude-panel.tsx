@@ -39,7 +39,9 @@ export default function ClaudePanel() {
 
   useEffect(() => {
     laden()
-    const takt = setInterval(laden, ABFRAGE_MS)
+    const takt = setInterval(() => {
+      if (!document.hidden) laden()
+    }, ABFRAGE_MS)
     return () => clearInterval(takt)
   }, [laden])
 

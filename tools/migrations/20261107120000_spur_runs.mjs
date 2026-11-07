@@ -4,7 +4,7 @@ import { getCollectionInternal } from './lib/mongodb.mjs'
 const tags = ['server-ce', 'server-pro']
 
 const indexes = {
-  spurRuns: [{ key: { projectId: 1, botId: 1, status: 1 }, name: 'projectId_1_botId_1_status_1' }],
+  spurRuns: [{ key: { projectId: 1, botId: 1, _id: -1 }, name: 'projectId_1_botId_1__id_-1' }],
   spurEdits: [
     { key: { botId: 1, schluessel: 1 }, name: 'botId_1_schluessel_1', unique: true },
     { key: { am: 1 }, name: 'am_1', expireAfterSeconds: 30 * 24 * 60 * 60 },

@@ -662,8 +662,6 @@ async page => {
     },
   }
 
-  const OFFEN = {}
-
   features.f10 = async () => {
     await anmelden('e2e-a@example.org')
     await projektOeffnen('Demo')
@@ -1031,9 +1029,6 @@ async page => {
   }
 
   const ergebnis = []
-  for (const [id, grund] of Object.entries(OFFEN)) {
-    if (!nur.length || nur.includes(id)) ergebnis.push(`${id} übersprungen: ${grund}`)
-  }
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue
     konsolenFehler.length = 0

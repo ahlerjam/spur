@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
@@ -50,6 +50,7 @@ export default function LaufKarte({
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [automatikAn, setAutomatikAn] = useState(automatik)
+  useEffect(() => setAutomatikAn(automatik), [automatik])
   const pfad = (aktion: string) => projektPfad(`/laeufe/${lauf.id}/${aktion}`)
   const offen = lauf.status === 'offen' || lauf.status === 'fertig'
   const changes = aenderungen.filter(a => !a.geloescht)

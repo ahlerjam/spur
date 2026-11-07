@@ -359,7 +359,7 @@ const spurUpdateSchema = z.object({
 })
 
 // spur: Änderung eines Bots als Track Change über den normalen Apply-Pfad, mit OT gegen
-// parallele Eingaben. Antwortet mit der neuen Version und den Ranges.
+// parallele Eingaben.
 async function spurUpdate(req, res) {
   const { params, body } = parseReq(req, spurUpdateSchema)
   const { project_id: projectId, doc_id: docId } = params
@@ -373,16 +373,15 @@ async function spurUpdate(req, res) {
     )
   } catch (error) {
     if (error instanceof Errors.NotFoundError) return res.sendStatus(404)
-    if (/does not match|out of range|Invalid/i.test(error.message)) {
-      return res.status(409).json({ fehler: error.message })
+    // sharejs meldet Versionsfehler als nackte Strings.
+    const versionsFehler =
+      typeof error === 'string' && /^Op (too old|at future version)/.test(error)
+    if (error instanceof Errors.DeleteMismatchError || versionsFehler) {
+      return res.status(409).json({ fehler: String(error.message ?? error) })
     }
     throw error
   }
-  const { lines, version, ranges } = await DocumentManager.promises.getDoc(
-    projectId,
-    docId
-  )
-  res.json({ lines, version, ranges })
+  res.sendStatus(204)
 }
 
 const docOnlySchema = z.object({

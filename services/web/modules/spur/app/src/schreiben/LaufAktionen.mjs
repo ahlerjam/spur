@@ -1,11 +1,12 @@
-import Settings from '@overleaf/settings'
-import { fetchJson } from '@overleaf/fetch-utils'
+import { promiseMapWithLimit } from '@overleaf/promise-utils'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
+import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from '../probleme.mjs'
 import { einstellungen, laeufe } from '../sammlungen.mjs'
 import * as LaufManager from './LaufManager.mjs'
+import { spurUpdate } from './spurUpdate.mjs'
 import { umkehrOps } from './ops.mjs'
 
 async function pfadVon(projectId, docId) {
@@ -16,8 +17,9 @@ async function pfadVon(projectId, docId) {
       type: 'doc',
     })
     return path.fileSystem.replace(/^\//, '')
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof Errors.NotFoundError) return null
+    throw error
   }
 }
 
@@ -33,22 +35,17 @@ function gehoertZumLauf(change, lauf) {
 }
 
 export async function aenderungen(projectId, lauf) {
-  const ergebnis = []
-  for (const docId of lauf.docs) {
+  return await promiseMapWithLimit(5, lauf.docs, async docId => {
     const pfad = await pfadVon(projectId, docId)
-    if (!pfad) {
-      ergebnis.push({ docId, pfad: null, geloescht: true, changes: [], text: '' })
-      continue
-    }
+    if (!pfad) return { docId, pfad: null, geloescht: true, changes: [], text: '' }
     const { lines, version, ranges } = await DocumentUpdaterHandler.promises.getDocument(
       projectId,
       docId,
       -1
     )
     const changes = (ranges?.changes ?? []).filter(c => gehoertZumLauf(c, lauf))
-    ergebnis.push({ docId, pfad, geloescht: false, changes, version, text: lines.join('\n') })
-  }
-  return ergebnis
+    return { docId, pfad, geloescht: false, changes, version, text: lines.join('\n') }
+  })
 }
 
 export function fuerKarte(liste) {
@@ -66,25 +63,18 @@ export function fuerKarte(liste) {
   )
 }
 
-async function laufHolen(projectId, laufId, botId) {
+export async function laufHolen(projectId, laufId, botId) {
+  const fehlt = () => new Problem(404, 'lauf_fehlt', 'Diesen Lauf gibt es nicht.')
+  if (!ObjectId.isValid(laufId)) throw fehlt()
   const filter = { _id: new ObjectId(laufId), projectId }
   if (botId) filter.botId = botId
-  const lauf = ObjectId.isValid(laufId) && (await (await laeufe()).findOne(filter))
-  if (!lauf) throw new Problem(404, 'lauf_fehlt', 'Diesen Lauf gibt es nicht.')
+  const lauf = await (await laeufe()).findOne(filter)
+  if (!lauf) throw fehlt()
   return lauf
 }
 
-export { laufHolen }
-
-async function anwenden(projectId, docId, op, version, meta) {
-  await fetchJson(
-    `${Settings.apis.documentupdater.url}/project/${projectId}/doc/${docId}/spur-update`,
-    { method: 'POST', json: { op, v: version, meta: { source: 'spur', ...meta } } }
-  )
-}
-
-async function statusSetzen(lauf, status, felder = {}) {
-  await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { status, ...felder } })
+async function statusSetzen(lauf, status) {
+  await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { status } })
 }
 
 export async function annehmen(projectId, lauf, userId, nurIds) {
@@ -115,7 +105,7 @@ export async function ablehnen(projectId, lauf, userId, nurIds) {
   for (const d of liste) {
     const changes = d.changes.filter(c => !nurIds || nurIds.includes(c.id))
     if (!changes.length) continue
-    await anwenden(projectId, d.docId, umkehrOps(changes), d.version, { user_id: String(userId) })
+    await spurUpdate(projectId, d.docId, umkehrOps(changes), d.version, { userId })
     abgelehnt += changes.length
   }
   const rest = liste.reduce((n, d) => n + d.changes.length, 0) - abgelehnt
@@ -148,10 +138,7 @@ export async function zuruecknehmen(projectId, lauf, userId) {
     plan.push({ docId, version, ops: umkehrOps(ops.map(op => ({ op }))).map(({ u, ...op }) => op) })
   }
   for (const { docId, version, ops } of plan) {
-    await anwenden(projectId, docId, ops, version, {
-      user_id: String(userId),
-      tc: LaufManager.neuerSeed(),
-    })
+    await spurUpdate(projectId, docId, ops, version, { userId, tracked: true })
   }
   await statusSetzen(lauf, 'zurueckgenommen')
 }
