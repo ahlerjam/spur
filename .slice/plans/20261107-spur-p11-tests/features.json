@@ -23,7 +23,7 @@
   "Mit unveränderten Tests endet der Vergleich lokal mit Exit 0 und „neu: 0“",
   "Mit einem absichtlich kaputt gemachten Overleaf-Test (lokal, nicht committet) endet derselbe Vergleich mit Exit 1 und nennt genau diesen Test als neu",
   "Ein Test der Liste, der grün wird, erscheint als Hinweis „bekannt, jetzt grün“, ohne dass der Job scheitert",
-  "Die Laufzeit des Jobs ist in der Ausgabe ablesbar und unter 30 Minuten"]},
+  "Die Laufzeit des Jobs ist in der Ausgabe ablesbar und unter 30 Minuten"], "passes": true},
  {"id": "f6", "title": "Unit-Tests für die spur-Serverlogik", "steps": [
   "`spur-dev test` führt neue Unit-Tests für Token und Bot, Rechte, MCP-Fehlercodes, Crossref, PDF-Labels und VTT, `.bib`, Inbox, Lauf-Aktionen, Download-Schutz und Testschalter aus, alle grün",
   "Regressionstests decken die Fehler aus den P1-Abnahmen ab: erstes Token ist mit dem Bot verknüpft; unbekanntes Projekt mit Admin-Token ergibt `keine_rechte`; Rücknahme setzt eine gelöschte Zeile nach Handänderung an die richtige Stelle oder meldet Konflikt; zu langer Dateiname ergibt `pfad_ungueltig`; abgebrochener Download beendet den Prozess nicht; Upload ohne Feld ergibt RFC 9457",

@@ -60,3 +60,31 @@ jobs:
         run: |
           for c in spur-dev-mongo spur-dev-redis spur-dev-web; do echo "== $c"; docker logs --tail 80 "$c" 2>&1 || true; done
           spur-dev logs web 200 || true
+
+  # Overleafs eigene Suiten (web-Unit, Frontend, document-updater). Rot nur bei Fehlern, die nicht in
+  # tools/tests/upstream-bekannt.json stehen; bekannte Tests, die grün werden, erscheinen als Hinweis.
+  upstream:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+      - name: spur-dev einrichten
+        run: |
+          tools/spur-dev/spur-dev install
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
+      - name: web-Unit
+        run: spur-dev upstream web
+      - name: Frontend
+        if: success() || failure()
+        run: spur-dev upstream frontend
+      - name: document-updater
+        if: success() || failure()
+        run: spur-dev upstream du
+      - name: Laufzeit
+        if: always()
+        run: echo "Laufzeit des Jobs: $(( ($(date +%s) - START) / 60 )) min $(( ($(date +%s) - START) % 60 )) s (Grenze 30 min)"
+      - name: Protokolle bei Fehler
+        if: failure()
+        run: tail -n 60 ~/.cache/spur-dev/upstream/aktuell/*.log
