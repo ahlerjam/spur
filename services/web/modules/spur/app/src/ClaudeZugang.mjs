@@ -79,6 +79,9 @@ export async function pruefen(token) {
     scope: SCOPE,
   })
   if (!eintrag || eintrag.accessTokenExpiresAt <= jetzt()) return null
+  // Wie GitBridgePATManager: gesperrte Konten verlieren auch den Token-Zugang.
+  const mensch = await db.users.findOne({ _id: eintrag.user_id }, { projection: { suspended: 1 } })
+  if (!mensch || mensch.suspended) return null
   return { menschId: eintrag.user_id, botId: eintrag.spurBotId, tokenId: eintrag._id }
 }
 

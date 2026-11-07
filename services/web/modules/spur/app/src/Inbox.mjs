@@ -86,7 +86,23 @@ function bisWeckerOderTakt(botId, ms, signal) {
 }
 
 // Long-Poll: liefert das nächste nicht zugestellte Ereignis des Bots. Laufende Aufrufe sind der Herzschlag.
-export async function warteAufEreignis(botId, { signal, maxMs, fortschritt }) {
+// Pro Bot höchstens ein offener Long-Poll: Ein neuer Aufruf beendet den älteren.
+const wartende = new Map()
+
+export async function warteAufEreignis(botId, { signal: aussen, maxMs, fortschritt }) {
+  const schluessel = String(botId)
+  wartende.get(schluessel)?.abort()
+  const eigener = new AbortController()
+  wartende.set(schluessel, eigener)
+  const signal = aussen ? AbortSignal.any([aussen, eigener.signal]) : eigener.signal
+  try {
+    return await warten(botId, { signal, maxMs, fortschritt })
+  } finally {
+    if (wartende.get(schluessel) === eigener) wartende.delete(schluessel)
+  }
+}
+
+async function warten(botId, { signal, maxMs, fortschritt }) {
   const sammlung = await ereignisse()
   const start = Date.now()
   let letzterSchlag = 0

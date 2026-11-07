@@ -74,13 +74,16 @@ function latexSicher(text) {
 
 function bibEintrag(key, quelle) {
   const meta = quelle.meta?.gefunden ? quelle.meta : {}
+  // Crossref-Daten und Dateinamen sind fremder Text: maskieren, damit die Klammern der .bib halten.
+  const text = wert => wert && latexSicher(String(wert))
+  const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
   const felder = [
-    ['author', meta.autoren?.map(a => [a.family, a.given].filter(Boolean).join(', ')).join(' and ')],
-    ['title', meta.titel ?? quelle.dateiname],
-    ['journal', meta.journal],
-    ['year', meta.jahr],
-    ['pages', meta.seiten?.replace('-', '--')],
-    ['doi', quelle.doi],
+    ['author', text(meta.autoren?.map(a => [a.family, a.given].filter(Boolean).join(', ')).join(' and '))],
+    ['title', text(meta.titel ?? quelle.dateiname)],
+    ['journal', text(meta.journal)],
+    ['year', ohneKlammern(meta.jahr)],
+    ['pages', ohneKlammern(meta.seiten?.replace('-', '--'))],
+    ['doi', ohneKlammern(quelle.doi)],
   ].filter(([, wert]) => wert)
   const zeilen = felder.map(([name, wert]) => `  ${name} = {${wert}}`)
   return `@article{${key},\n${zeilen.join(',\n')}\n}`

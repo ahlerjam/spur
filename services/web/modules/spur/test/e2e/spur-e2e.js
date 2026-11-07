@@ -809,6 +809,11 @@ async page => {
       nachher?.ranges?.changes?.some(c => c.op.i === 'Neuer Inhalt von Claude.'),
       'Inhalt von doc_create ist kein Track Change'
     )
+    const belegt = await werkzeug(token, 'doc_create', {
+      project_id: pid, pfad: 'claude.tex', inhalt: 'Überschreiben?', idempotenz_schluessel: schluessel(),
+    })
+    ok(belegt.inhalt.fehler === 'konflikt', `doc_create auf vorhandenen Pfad: ${JSON.stringify(belegt.inhalt)}`)
+    ok((await jsonVon(`/project/${pid}/ranges`)).find(d => d.id === neu.inhalt.doc_id)?.ranges?.changes?.length, 'Vorhandene Datei geleert')
   }
 
   features.f12 = async () => {
@@ -871,6 +876,9 @@ async page => {
     await karte().getByText('Angenommen', { exact: true }).waitFor({ timeout: 20000 })
     await imEditor('Von Claude zwei.')
     ok((await changesVonClaude()).length === 0, 'Nach Annahme bleiben Changes')
+    const angenommenerLauf = await lauf()
+    const zweimal = await laufAktion(pid, angenommenerLauf.id, 'ablehnen')
+    ok(zweimal.status === 409, `Abgeschlossener Lauf lässt sich ablehnen: ${zweimal.status}`)
 
     ok(!(await edit({ alt: 'Delta Satz.', neu: 'Delta Satz. Claude schreibt hier etwas.' })).fehler, 'Edit 3')
     ok(!(await edit({ alt: 'Alpha Satz.', neu: 'Alpha Satz. Und noch etwas.' })).fehler, 'Edit 4')
@@ -900,6 +908,10 @@ async page => {
       (await karte().getByRole('button', { name: /^(Annehmen|Alle annehmen)$/ }).count()) === 0,
       'review sieht Annehmen'
     )
+    const anlegen = await werkzeug(pruefer.token, 'doc_create', {
+      project_id: pruefer.pid, pfad: 'review.tex', inhalt: 'x', idempotenz_schluessel: schluessel(),
+    })
+    ok(anlegen.inhalt.fehler === 'keine_rechte', `review legt Dateien an: ${JSON.stringify(anlegen.inhalt)}`)
 
     const namen = (await mcp(token, 'tools/list')).daten.result.tools.map(w => w.name)
     ok(!namen.some(n => /annehm|accept/i.test(n)), `Annahme-Tool: ${namen}`)

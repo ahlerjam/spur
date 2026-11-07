@@ -65,11 +65,46 @@ async function pruefSperre(projectId, neuerText, von, bis) {
   return rot
 }
 
-export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schluessel }) {
-  const sammlung = await bearbeitungen()
-  const frueher = await sammlung.findOne({ botId, schluessel })
-  if (frueher) return { ...frueher.ergebnis, wiederholt: true }
+function frueheresErgebnis(frueher, projectId) {
+  if (String(frueher.projectId) !== String(projectId)) {
+    throw new WerkzeugFehler(
+      'konflikt',
+      'Dieser Idempotenz-Schlüssel gehört zu einem anderen Projekt. Bitte einen neuen Schlüssel nehmen.'
+    )
+  }
+  if (!frueher.ergebnis) {
+    throw new WerkzeugFehler('konflikt', 'Ein Aufruf mit diesem Idempotenz-Schlüssel läuft noch.')
+  }
+  return { ...frueher.ergebnis, wiederholt: true }
+}
 
+// Reserviert den Schlüssel vor dem Schreiben; der Unique-Index fängt gleichzeitige Wiederholungen.
+async function mitSchluessel({ projectId, botId, schluessel }, schreiben) {
+  const sammlung = await bearbeitungen()
+  let reservierung
+  try {
+    reservierung = await sammlung.insertOne({ botId, schluessel, projectId, am: jetzt() })
+  } catch (error) {
+    if (error.code !== 11000) throw error
+    return frueheresErgebnis(await sammlung.findOne({ botId, schluessel }), projectId)
+  }
+  try {
+    const ergebnis = await schreiben()
+    await sammlung.updateOne({ _id: reservierung.insertedId }, { $set: { ergebnis } })
+    return ergebnis
+  } catch (error) {
+    await sammlung.deleteOne({ _id: reservierung.insertedId })
+    throw error
+  }
+}
+
+export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schluessel }) {
+  return await mitSchluessel({ projectId, botId, schluessel }, () =>
+    bearbeiten({ projectId, botId, docId, pfad, alt, neu })
+  )
+}
+
+async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
   const doc = await docAufloesen(projectId, docId, pfad)
   const { lines, version, ranges } = await DocumentUpdaterHandler.promises.getDocument(
     projectId,
@@ -107,24 +142,30 @@ export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schlues
     await LaufManager.aenderungMerken(lauf, { docId: doc.docId, rot })
     ergebnis = { ...ergebnis, aenderung: true }
   }
-  await sammlung.insertOne({ botId, schluessel, ergebnis, am: jetzt() })
   return ergebnis
 }
 
+async function pfadBelegt(projectId, pfad) {
+  try {
+    await ProjectLocator.promises.findElementByPath({ project_id: projectId, path: pfad })
+    return true
+  } catch (error) {
+    if (error instanceof Errors.NotFoundError) return false
+    throw error
+  }
+}
+
 export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) {
-  const { doc } = await EditorController.promises.upsertDocWithPath(
-    projectId,
-    `/${pfad.replace(/^\//, '')}`,
-    [''],
-    'spur',
-    botId
-  )
-  return await docEdit({
-    projectId,
-    botId,
-    docId: String(doc._id),
-    alt: '',
-    neu: inhalt,
-    schluessel,
+  const ziel = `/${pfad.replace(/^\//, '')}`
+  return await mitSchluessel({ projectId, botId, schluessel }, async () => {
+    // upsertDocWithPath würde ein vorhandenes Dokument ungetrackt leeren.
+    if (await pfadBelegt(projectId, ziel)) {
+      throw new WerkzeugFehler(
+        'konflikt',
+        'Unter diesem Pfad gibt es schon eine Datei. Bitte doc_edit nehmen oder einen anderen Pfad wählen.'
+      )
+    }
+    const { doc } = await EditorController.promises.upsertDocWithPath(projectId, ziel, [''], 'spur', botId)
+    return await bearbeiten({ projectId, botId, docId: String(doc._id), alt: '', neu: inhalt })
   })
 }

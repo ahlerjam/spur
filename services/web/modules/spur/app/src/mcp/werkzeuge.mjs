@@ -19,7 +19,9 @@ const MAX_QUELLTEXT = 4000
 
 const id = z.string().regex(/^[0-9a-f]{24}$/)
 const LESEN = ['readOnly', 'review', 'readAndWrite', 'owner']
+// Getrackte Änderungen dürfen auch Reviewer; Dateien anlegen und Zitate markieren nur Schreibende, wie im Web.
 const SCHREIBEN = ['review', 'readAndWrite', 'owner']
+const ANLEGEN = ['readAndWrite', 'owner']
 
 async function rolle(menschId, projectId) {
   return await AuthorizationManager.promises.getPrivilegeLevelForProject(
@@ -201,7 +203,7 @@ export const WERKZEUGE = {
       text: z.string().min(1).max(2000),
     }),
     async ausfuehren({ project_id: pid, source_id: qid, pdf_seite: nr, text }, { menschId }) {
-      const projectId = await pruefeRecht(menschId, pid, SCHREIBEN)
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
       const quelle = await QuellenManager.holen(projectId, qid)
       const zitat = await ZitatManager.markieren(quelle, { seite: nr, text }, menschId)
       return { zitat_id: zitat._id, seite: zitat.label ?? zitat.seite }
@@ -321,7 +323,7 @@ Object.assign(WERKZEUGE, {
       idempotenz_schluessel: schluessel,
     }),
     async ausfuehren(args, { menschId, botId }) {
-      const projectId = await pruefeRecht(menschId, args.project_id, SCHREIBEN)
+      const projectId = await pruefeRecht(menschId, args.project_id, ANLEGEN)
       return await SchreibManager.docCreate({
         projectId,
         botId,

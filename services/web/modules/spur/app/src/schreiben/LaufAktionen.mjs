@@ -1,4 +1,5 @@
 import { promiseMapWithLimit } from '@overleaf/promise-utils'
+import AuthorizationManager from '../../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
@@ -73,11 +74,19 @@ export async function laufHolen(projectId, laufId, botId) {
   return lauf
 }
 
+// Abgeschlossene Läufe (etwa aus einem veralteten Tab) dürfen ihren Status nicht mehr wechseln.
+function mussOffenSein(lauf) {
+  if (lauf.status !== 'offen' && lauf.status !== 'fertig') {
+    throw new Problem(409, 'lauf_abgeschlossen', 'Dieser Lauf ist schon abgeschlossen. Bitte neu laden.')
+  }
+}
+
 async function statusSetzen(lauf, status) {
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { status } })
 }
 
 export async function annehmen(projectId, lauf, userId, nurIds) {
+  mussOffenSein(lauf)
   const liste = await aenderungen(projectId, lauf)
   const angenommen = []
   for (const d of liste) {
@@ -100,6 +109,7 @@ export async function annehmen(projectId, lauf, userId, nurIds) {
 }
 
 export async function ablehnen(projectId, lauf, userId, nurIds) {
+  mussOffenSein(lauf)
   const liste = await aenderungen(projectId, lauf)
   let abgelehnt = 0
   for (const d of liste) {
@@ -159,6 +169,12 @@ export async function automatikSetzen(projectId, userId, an) {
 // Sammelannahme am Laufende, nur ohne rote Status und nur, wenn der Mensch sie im Browser eingeschaltet hat.
 export async function nachLaufende(projectId, lauf, menschId) {
   if (lauf.rot.length || !(await automatik(projectId, menschId))) return
+  // Die Einstellung überdauert eine Herabstufung; annehmen darf nur, wer jetzt schreiben darf.
+  const [stufe, eingeschraenkt] = await Promise.all([
+    AuthorizationManager.promises.getPrivilegeLevelForProject(menschId, projectId, null),
+    AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null),
+  ])
+  if (eingeschraenkt || !['readAndWrite', 'owner'].includes(stufe)) return
   await annehmen(projectId, lauf, menschId)
 }
 

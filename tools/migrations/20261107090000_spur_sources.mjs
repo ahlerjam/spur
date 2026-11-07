@@ -33,7 +33,7 @@ async function up() {
 }
 
 async function down() {
-  for (const name of [...Object.keys(indexes), 'spurCrossref']) {
+  for (const name of [...Object.keys(indexes), 'spurCrossref', 'spurQuotes', 'spurClones']) {
     await (await getCollectionInternal(name)).drop().catch(error => {
       if (error.codeName !== 'NamespaceNotFound') throw error
     })

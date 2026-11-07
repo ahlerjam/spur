@@ -20,7 +20,7 @@ async function up() {
 }
 
 async function down() {
-  for (const name of [...Object.keys(indexes), 'spurHeartbeats']) {
+  for (const name of [...Object.keys(indexes), 'spurHeartbeats', 'spurSettings']) {
     await (await getCollectionInternal(name)).drop().catch(error => {
       if (error.codeName !== 'NamespaceNotFound') throw error
     })

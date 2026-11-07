@@ -324,6 +324,20 @@ async function quelleKopieren(quelle, zielProjekt, userId) {
     angelegtVon: userId,
     angelegtAm: jetzt(),
   }
+  try {
+    await kopieAnlegen(quelle, neu, zielProjekt)
+  } catch (error) {
+    // Keine Seiten, Zitate oder Dateien ohne Quellen-Dokument zurücklassen.
+    await Promise.all([
+      (await quellenSeiten()).deleteMany({ quelleId: neu._id }),
+      (await quotes()).deleteMany({ quelleId: neu._id }),
+      fs.rm(dateiPfad(neu), { force: true }),
+    ])
+    throw error
+  }
+}
+
+async function kopieAnlegen(quelle, neu, zielProjekt) {
   const ziel = dateiPfad(neu)
   await fs.mkdir(Path.dirname(ziel), { recursive: true })
   await fs.copyFile(dateiPfad(quelle), ziel)
