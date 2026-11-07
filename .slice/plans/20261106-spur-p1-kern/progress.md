@@ -88,3 +88,6 @@
 ## Abschluss
 - Letzter E2E-Lauf nach der letzten Code-Änderung (Panel-CSS): f1–f15 ok.
 - Abschlussrunde der Ansichten (nach dem letzten E2E-Lauf, ohne Code-Änderung): Login, Quellen-Panel, Quellenvorschau, Prüfbericht, „Claude verbinden“ und Claude-Panel mit Lauf-Karte als Owner und als Reviewer, je bei 1280 und 360 px neu aufgenommen. Kein horizontaler Scroll der Seite. Login und Einstellungen sind bei 360 px sauber; die Panels in der IDE sind bei 360 px nur rund 47 px breit (Kern-Layout, siehe oben). Die vielen Zeilen „Token gültig bis …“ in den Einstellungen sind Testdaten aus den E2E-Läufen.
+- Nachtrag 360 px: Ein geöffnetes spur-Panel (Quellen, Vorschau, Prüfbericht, Claude) nimmt unter 576 px die Breite neben der Rail ein (320 statt 47 px); Schließen führt zurück zum Editor. Bei 1280 px unverändert (185 px). Overleafs eigene Panels bleiben unberührt.
+- E2E-Helfer `anmelden` verlässt die alte Seite vor dem Löschen der Cookies: Zwei Läufe scheiterten sonst am Login („invalid csrf token“), weil Polls der alten Seite eine neue Session setzten.
+- Letzter E2E-Lauf nach diesen Änderungen: f1–f15 ok.

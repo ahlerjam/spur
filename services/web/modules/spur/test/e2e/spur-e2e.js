@@ -21,6 +21,9 @@ async page => {
   const ok = (bedingung, msg) => bedingung || fail(msg)
 
   async function anmelden(email) {
+    // Erst die alte Seite verlassen: Ihre Polls würden sonst nach dem Löschen eine neue Session
+    // setzen, und das CSRF-Token des Login-Formulars passte nicht mehr.
+    await page.goto('about:blank')
     await page.context().clearCookies()
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/e-?mail/i).fill(email)

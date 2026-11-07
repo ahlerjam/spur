@@ -197,3 +197,11 @@
 .spur-ohne-rand {
   padding: var(--spacing-02) 0 0;
 }
+
+// Schmale Bildschirme: Die IDE gibt dem Seitenpanel 15 % der Breite, bei 360 px also kaum 50 px.
+// Ein geöffnetes spur-Panel nimmt dort die Breite neben der Rail; Schließen führt zurück zum Editor.
+@media (max-width: 575.98px) {
+  [id^='ide-redesign-sidebar-panel-spur-'] {
+    flex: 0 0 calc(100vw - 40px) !important;
+  }
+}
