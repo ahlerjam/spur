@@ -8,7 +8,7 @@
  {"id": "f2", "title": "Overleafs Frontend-Suite läuft", "steps": [
   "Entwickler führt `spur-dev upstream frontend` aus: die Suite lädt ohne „Your application tried to access @“ und läuft bis zum Ende",
   "Die Ausgabe endet mit der Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“",
-  "Die Tests des Review-Panels (gepatcht in P1) laufen mit"]},
+  "Die Tests des Review-Panels (gepatcht in P1) laufen mit"], "passes": true},
  {"id": "f3", "title": "document-updater vollständig geprüft", "steps": [
   "Entwickler führt `spur-dev upstream du` aus: Unit- und Acceptance-Tests des document-updater laufen gegen Redis und Mongo des Stacks",
   "Die Tests des spur-Ops-Endpunkts sind darin enthalten und grün",
