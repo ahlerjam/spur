@@ -19,4 +19,8 @@ Die Quelle von `spur-dev` liegt in `tools/spur-dev/`. Ein Mensch installiert sie
 
 Neue npm-Pakete brauchen einen neuen Lauf des Workflows `Dev image`. In einem Builder-Lauf sind sie ein Stoppgrund.
 
+## Tests (TDD)
+
+Test zuerst: Neue oder geänderte Server-Logik beginnt mit einem roten Unit-Test unter `services/web/modules/spur/test/unit`, jeder behobene Fehler mit einem Test, der ihn nachstellt. Neue Oberflächen bekommen Frontend-Tests und Schritte in der E2E-Suite. Overleafs eigene Suiten bleiben grün bis auf die Liste bekannter Upstream-Fehler.
+
 Testartefakte, Screenshots und Hilfsskripte gehören nicht ins Repo.
