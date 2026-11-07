@@ -27,6 +27,7 @@ export default function ClaudePanel() {
   const [fehler, setFehler] = useState<string | null>(null)
   const [text, setText] = useState('')
   const [sendet, setSendet] = useState(false)
+  const [kopiert, setKopiert] = useState(false)
   const feld = useRef<HTMLTextAreaElement>(null)
 
   const laden = useCallback(async () => {
@@ -74,7 +75,17 @@ export default function ClaudePanel() {
             {!status.verbunden && (
               <>
                 <p className="spur-zeile-meta">{t('spur_claude_starten')}</p>
-                <pre className="spur-befehl">{startBefehl()}</pre>
+                <pre className="spur-befehl spur-befehl-kompakt">{startBefehl()}</pre>
+                <OLButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(startBefehl())
+                    setKopiert(true)
+                  }}
+                >
+                  {kopiert ? t('spur_kopiert') : t('spur_befehl_kopieren')}
+                </OLButton>
               </>
             )}
           </div>

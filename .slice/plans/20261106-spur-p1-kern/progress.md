@@ -66,6 +66,7 @@
 ## Ansichten (taste, Quality bar)
 - Screenshots bei 360 und 1280 px: Login, Editor mit Quellen-Panel, Quellenvorschau, Prüfbericht, Einstellungen mit „Claude verbinden“. Kein horizontaler Scroll in beiden Breiten.
 - Behoben nach Sichtprüfung: abgeschnittene Knöpfe und Badges im Panel, doppelte „Zurück“-Beschriftung und unklare Seitenangabe in der Vorschau („Seite 347 (PDF-Seite 3 von 8)“), zerbrochenes Layout von „Claude verbinden“ bei 1280 px.
+- Claude-Panel mit Lauf-Karte (f10–f15) bei 1280 und 360 px: Der Startbefehl stand als Wortspalte über die ganze Panelhöhe und schob die Karte aus dem Bild; jetzt einzeilig mit Scrollbalken und Knopf „Befehle kopieren“. Rote Auszüge wie `\footfullcite{…}` ragten aus der Karte; jetzt mit Umbruch. Bei 360 px gilt dieselbe Enge der IDE wie unten.
 - Offen (Kern, nicht im Diff): Bei 360 px ist die Overleaf-IDE mit Rail, Editor und PDF so eng, dass Panels nur wenige Zeichen breit sind; das gilt auch für Overleafs eigenen Dateibaum. Auf der Login-Seite zeigt Overleafs Registrierungsmodul den Schlüssel „sign_up“ statt eines Textes. Vorschlag: mobiles Layout der IDE und fehlende Übersetzung in einem eigenen Plan.
 - `spur-dev test` bricht nach den Modul-Tests ab, sobald der Diff `services/document-updater` berührt: „Unbound variable TEST_NAME_PATTERN“ im `yarn run test:unit` des document-updater. `spur-dev` sollte `TEST_NAME_PATTERN=` setzen. Die Modul-Tests laufen davor vollständig.
 
@@ -83,3 +84,6 @@
 - MCP-Token blieben nach Kontosperre gültig: `ClaudeZugang.pruefen` weist gesperrte und fehlende Konten ab (wie `GitBridgePATManager`).
 - Unbegrenzt viele gleichzeitige `wait_for_event`: pro Bot nur noch ein offener Long-Poll, ein neuer beendet den älteren. `max_sekunden` bleibt bei 3600, weil f10 über 11 Minuten verlangt.
 - E2E nach den Fixes: f1–f15 ok; Unit-Tests 26 grün.
+
+## Abschluss
+- Letzter E2E-Lauf nach der letzten Code-Änderung (Panel-CSS): f1–f15 ok.

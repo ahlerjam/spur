@@ -152,6 +152,17 @@
   margin: var(--spacing-03) 0;
 }
 
+// Im schmalen Panel: eine Zeile mit Scrollbalken statt einer Spalte aus Wortfetzen.
+.spur-befehl-kompakt {
+  white-space: pre;
+  overflow-x: auto;
+  font-size: var(--font-size-01);
+  padding: var(--spacing-02);
+  margin: var(--spacing-02) 0;
+  background: var(--bg-light-secondary);
+  border-radius: var(--border-radius-base);
+}
+
 .spur-nachricht-text {
   margin: var(--spacing-01) 0 0;
   white-space: pre-wrap;
@@ -163,6 +174,8 @@
   padding: var(--spacing-04);
   border: 1px solid var(--border-divider);
   border-radius: var(--border-radius-base, 4px);
+  // LaTeX-Befehle haben keine Umbruchstellen und ragten sonst aus der Karte.
+  overflow-wrap: anywhere;
 }
 
 .spur-lauf-kopf {
