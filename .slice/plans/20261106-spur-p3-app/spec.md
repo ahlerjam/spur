@@ -31,3 +31,9 @@ Wie P1 mit `SPUR_FAKE_AGENT=1`. Der echte Weckweg wird je Meilenstein von Hand g
 
 ## Quality bar
 Wie P1. Der Chat ist per Tastatur bedienbar, neue Nachrichten werden Screenreadern angesagt.
+
+### Tests (TDD)
+- Test zuerst: Für jede neue oder geänderte Server-Logik entsteht zuerst ein roter Unit-Test (vitest unter `modules/spur/test/unit`), dann der Code, der ihn grün macht. Jeder behobene Fehler bekommt zuerst einen Test, der ihn nachstellt.
+- Jede neue Oberfläche bekommt Frontend-Tests im Stil von Overleafs Frontend-Tests (Komponente rendern, bedienen, Ergebnis prüfen), dazu ihre Schritte in der E2E-Suite `test/e2e/spur-e2e.js`.
+- Jedes Feature erweitert die E2E-Suite um seine Schritte; die Suite läuft nach `vorbereiten.mjs` vollständig grün.
+- Overleafs eigene Suiten (web Unit, Frontend, document-updater) bleiben grün bis auf die Liste bekannter Upstream-Fehler im Repo; ein neuer roter Test dort ist ein Fehler dieses Plans.
