@@ -11,5 +11,7 @@
 
 - f3: „gegen Redis und Mongo des Stacks“ heißt hier: Mongo des Stacks (Datenbank `test-overleaf`) und die Redis `redis-test` aus derselben Compose-Datei. Die spur-Ops-Tests (`HttpController spurUpdate …`, 3 Tests) laufen in der Unit-Suite mit und sind grün; Ergebnis 784 bestanden, 0 fehlgeschlagen.
 
+- f4: Der Vergleich (2026-11-07) fand keinen Fehler, der nur auf spur auftritt: web scheitert auf ext-ce und spur an denselben Tests, document-updater ist überall grün. Die 14 Frontend-Fehler, die zuerst als „nur auf spur“ erschienen, kamen daher, dass die Suite auf frischen Worktrees ohne generierte Lezer-Grammatik nicht lud; nach der Korrektur stammen alle aus Overleaf oder overleaf-cep. Liste: 187 Einträge (173 web, 14 frontend), Gründe je Fehlerbild von Hand formuliert; ein neuer Vergleich behält vorhandene Gründe. Alle Einträge mit Herkunft `overleaf` scheitern auf main mit derselben Meldung (kein PnP-Artefakt).
+
 ## Prüfbefehle (E2E der CLI-Features)
 Jeder als alleinstehender Aufruf: `spur-dev upstream web`, `spur-dev upstream frontend`, `spur-dev upstream du`, `spur-dev upstream vergleich`, `spur-dev test`, `node --test tools/tests/upstream-auswertung.test.mjs`. Die Browser-Suite bleibt `services/web/modules/spur/test/e2e/spur-e2e.js`.

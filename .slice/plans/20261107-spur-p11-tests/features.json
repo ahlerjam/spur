@@ -17,7 +17,7 @@
   "Entwickler führt den Vergleich aus: dieselben Suiten laufen auf Worktrees von `main`, `ext-ce` und `agent`",
   "Im Repo liegt danach die Liste bekannter Fehler; jeder Eintrag nennt Suite, Datei, Testname, Herkunft (`overleaf` oder `overleaf-cep`) und einen Grund",
   "Kein Eintrag hat die Herkunft `spur`; ein Fehler, der nur auf `agent` auftritt, ist behoben und hat einen Regressionstest",
-  "`spur-dev upstream web` meldet danach „neu: 0“"]},
+  "`spur-dev upstream web` meldet danach „neu: 0“"], "passes": true},
  {"id": "f5", "title": "CI-Job upstream im Pull Request", "steps": [
   "`.github/workflows/ci.yml` hat neben `test` einen Job `upstream`, der web, frontend und document-updater prüft",
   "Mit unveränderten Tests endet der Vergleich lokal mit Exit 0 und „neu: 0“",
