@@ -1125,8 +1125,11 @@ async page => {
     if (offen?.status === 'offen') await laufAktion(pid, offen.id, 'ablehnen')
     ok(!(await edit({ alt: 'Gamma', neu: 'Gamma eins' })).fehler, 'Start')
     await karte().waitFor({ timeout: 20000 })
-    await page.getByLabel('Automatisch annehmen, wenn ein Lauf ohne Probleme endet').check()
-    await page.waitForResponse(r => r.url().endsWith('/claude/automatik'))
+    // Erst auf die Antwort warten, dann klicken: sonst kann sie vor dem Warten schon da sein.
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith('/claude/automatik')),
+      page.getByLabel('Automatisch annehmen, wenn ein Lauf ohne Probleme endet').check(),
+    ])
     await fertig('Grüner Lauf')
     ok((await lauf()).status === 'angenommen', 'Grüner Lauf nicht angenommen')
     ok(!(await changesVonClaude()).some(c => c.op.i?.includes(' eins')), 'Changes nach Automatik')

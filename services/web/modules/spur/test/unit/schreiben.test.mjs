@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { auszug, heutigePosition, kontextUm, opsFuer, umkehrOps } from '../../app/src/schreiben/ops.mjs'
+import { heutigePosition, kontextUm, opsFuer, umkehrOps } from '../../app/src/schreiben/ops.mjs'
 
 describe('opsFuer', () => {
   it('fügt nur den neuen Teil ein', () => {
     expect(opsFuer(10, 'Satz.', 'Satz. Mehr.')).toEqual([{ p: 15, i: ' Mehr.' }])
   })
-  it('ersetzt nur das geänderte Wort', () => {
+  it('ersetzt nur das geänderte Wort, als ganzes Wort', () => {
     expect(opsFuer(0, 'mit altem Wort', 'mit neuem Wort')).toEqual([
-      { p: 4, d: 'alt' },
-      { p: 4, i: 'neu' },
+      { p: 4, d: 'altem' },
+      { p: 4, i: 'neuem' },
+    ])
+  })
+  it('trennt nie mitten im Wort', () => {
+    expect(opsFuer(0, 'Beta Satz mit altem Wort.', 'Beta Satz, sprachlich geglättet.')).toEqual([
+      { p: 9, d: ' mit altem Wort' },
+      { p: 9, i: ', sprachlich geglättet' },
     ])
   })
   it('hängt ohne Alttext am Startpunkt an', () => {
@@ -63,20 +69,5 @@ describe('heutigePosition', () => {
     const text = 'Der ein großer Hund.'
     const eintrag = { op: { ...op, p: 8 }, ...kontextUm(text, { ...op, p: 8 }) }
     expect(heutigePosition('Vorab. ' + text, eintrag)).toBe(15)
-  })
-})
-
-describe('auszug', () => {
-  it('ergänzt einen Einschub mitten im Wort zu ganzen Wörtern', () => {
-    const text = 'Beta Satz, sprachlich geglättet.'
-    // minimaler Einschub „, sprachlich geglätte“ hinter „Satz“, vor „t.“
-    expect(auszug(text, { p: 9, i: ', sprachlich geglätte' })).toBe(', sprachlich geglättet')
-  })
-  it('ergänzt eine Löschung mitten im Wort aus dem Text daneben', () => {
-    // „altem Wor“ gelöscht, im Text steht noch „Konflikt Satz mit t.“
-    expect(auszug('Konflikt Satz mit t.', { p: 18, d: 'altem Wor' })).toBe('altem Wort')
-  })
-  it('lässt ganze Wörter unverändert', () => {
-    expect(auszug('Alpha Satz. Neu.', { p: 11, i: ' Neu.' })).toBe(' Neu.')
   })
 })

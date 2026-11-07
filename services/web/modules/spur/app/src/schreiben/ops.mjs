@@ -1,7 +1,12 @@
-// Kleinste Änderung: gemeinsamer Anfang und gemeinsames Ende bleiben unangetastet.
+const istWort = zeichen => zeichen !== undefined && /[\p{L}\p{N}_]/u.test(zeichen)
+
+// Kleinste Änderung in ganzen Wörtern: gemeinsamer Anfang und gemeinsames Ende bleiben unangetastet,
+// aber die Grenze liegt nie mitten im Wort. Sonst zeigten Editor, Review-Panel und Lauf-Karte
+// Bruchstücke wie „mit altem Wor“ → „geglätte“.
 export function opsFuer(start, alt, neu) {
   let vorn = 0
   while (vorn < alt.length && vorn < neu.length && alt[vorn] === neu[vorn]) vorn++
+  while (vorn > 0 && istWort(alt[vorn - 1]) && (istWort(alt[vorn]) || istWort(neu[vorn]))) vorn--
   let hinten = 0
   while (
     hinten < alt.length - vorn &&
@@ -9,6 +14,13 @@ export function opsFuer(start, alt, neu) {
     alt[alt.length - 1 - hinten] === neu[neu.length - 1 - hinten]
   ) {
     hinten++
+  }
+  while (
+    hinten > 0 &&
+    istWort(alt[alt.length - hinten]) &&
+    (istWort(alt[alt.length - hinten - 1]) || istWort(neu[neu.length - hinten - 1]))
+  ) {
+    hinten--
   }
   const geloescht = alt.slice(vorn, alt.length - hinten)
   const eingefuegt = neu.slice(vorn, neu.length - hinten)
@@ -53,24 +65,4 @@ export function heutigePosition(text, eintrag) {
     if (beste === null || Math.abs(p - eintrag.op.p) < Math.abs(beste - eintrag.op.p)) beste = p
   }
   return beste
-}
-
-const WORTZEICHEN = /[\p{L}\p{N}_]/u
-const MAX_ERGAENZUNG = 40
-
-// Auszug für die Lauf-Karte: Beginnt oder endet eine Änderung mitten im Wort (die Ops sind
-// minimal), wird sie um den Rest des Wortes aus dem Text ergänzt. Eine Löschung steht nicht mehr im
-// Text, ein Einschub schon.
-export function auszug(text, op, max = 200) {
-  const inhalt = op.i ?? op.d
-  const ende = op.p + (op.i?.length ?? 0)
-  let links = op.p
-  if (WORTZEICHEN.test(inhalt[0] ?? '')) {
-    while (links > 0 && op.p - links < MAX_ERGAENZUNG && WORTZEICHEN.test(text[links - 1])) links--
-  }
-  let rechts = ende
-  if (WORTZEICHEN.test(inhalt.at(-1) ?? '')) {
-    while (rechts < text.length && rechts - ende < MAX_ERGAENZUNG && WORTZEICHEN.test(text[rechts])) rechts++
-  }
-  return (text.slice(links, op.p) + inhalt + text.slice(ende, rechts)).slice(0, max)
 }

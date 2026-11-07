@@ -117,6 +117,11 @@ async function warten(botId, { signal, maxMs, fortschritt }) {
       { $set: { zugestellt: true } },
       { sort: { _id: 1 }, returnDocument: 'after' }
     )
+    if (ereignis && signal?.aborted) {
+      // Ein verdrängter oder abgebrochener Aufruf darf den Auftrag nicht verschlucken.
+      await sammlung.updateOne({ _id: ereignis._id }, { $set: { zugestellt: false } })
+      return null
+    }
     if (ereignis) return fuerClient(ereignis)
     if (Date.now() - letzterFortschritt >= FORTSCHRITT_MS) {
       letzterFortschritt = Date.now()

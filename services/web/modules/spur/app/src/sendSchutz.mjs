@@ -7,6 +7,8 @@ import logger from '@overleaf/logger'
 // nicht, und der Web-Prozess stürzt ab. Betroffen sind alle /js-Bundles: nginx reicht sie an Express
 // durch (server-ce/nginx/overleaf.conf.template, `location /`). Ohne Kern-Patch und ohne neues
 // Image: Ist die Antwort schon zu, wird nichts mehr gestreamt; ein später Wurf wird abgefangen.
+// Übergang: Die eigentliche Korrektur gehört in den Yarn-Patch (res.destroyed prüfen) und braucht
+// einen neuen Lauf des Workflows „Dev image“; danach kann diese Datei weg.
 const ausExpress = createRequire(createRequire(import.meta.url).resolve('express'))
 
 function sendVon(pfad) {
@@ -23,7 +25,7 @@ const kandidaten = new Set([sendVon('send'), serveStatic('send')].filter(Boolean
 for (const send of kandidaten) {
   // send 0.19 exportiert SendStream nicht überall; der Prototyp eines Objekts ist derselbe.
   const proto = send.SendStream?.prototype ?? Object.getPrototypeOf(send({ headers: {} }, '/'))
-  if (!proto || proto.spurGeschuetzt) continue
+  if (!proto) continue
   const stream = proto.stream
   proto.stream = function (pfad, optionen) {
     if (this.res.destroyed || this.res.writableEnded) return
@@ -34,7 +36,6 @@ for (const send of kandidaten) {
       logger.debug({ err: error, pfad }, 'Download abgebrochen, Datei nicht mehr gesendet')
     }
   }
-  proto.spurGeschuetzt = true
 }
 
 if (!kandidaten.size) logger.warn({}, 'spur: send nicht gefunden, abgebrochene Downloads bleiben ungeschützt')

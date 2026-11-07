@@ -59,10 +59,17 @@ export const ChangesUsersProvider: FC<React.PropsWithChildren> = ({
   }, [projectId, isRestrictedTokenMember, stand])
 
   // Je unbekannter ID höchstens einmal nachladen: wirklich gelöschte Nutzer bleiben unbekannt.
+  // Mehrere unbekannte IDs im selben Rendern lösen nur einen Abruf aus.
+  const geplant = useRef(false)
   const nachladen = useCallback((userId: UserId) => {
     if (nachgefragt.current.has(userId)) return
     nachgefragt.current.add(userId)
-    setStand(n => n + 1)
+    if (geplant.current) return
+    geplant.current = true
+    queueMicrotask(() => {
+      geplant.current = false
+      setStand(n => n + 1)
+    })
   }, [])
 
   // add the project owner and members to the changes users data

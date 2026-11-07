@@ -16,6 +16,9 @@ import { spurUpdate } from './spurUpdate.mjs'
 const GRENZE_CHANGES = 1990
 
 async function docAufloesen(projectId, docId, pfad) {
+  if (!docId && !pfad) {
+    throw new WerkzeugFehler('doc_fehlt', 'Bitte doc_id oder pfad angeben. doc_list nennt beide.')
+  }
   try {
     if (docId) {
       const { element, path } = await ProjectLocator.promises.findElement({
@@ -103,14 +106,18 @@ async function mitSchluessel({ projectId, botId, schluessel, argumente }, schrei
     if (error.code !== 11000) throw error
     return frueheresErgebnis(await sammlung.findOne({ botId, schluessel }), projectId, inhalt)
   }
+  let ergebnis
   try {
-    const ergebnis = await schreiben()
-    await sammlung.updateOne({ _id: reservierung.insertedId }, { $set: { ergebnis } })
-    return ergebnis
+    ergebnis = await schreiben()
   } catch (error) {
+    // Nichts geschrieben: Der Schlüssel ist für eine Wiederholung wieder frei.
     await sammlung.deleteOne({ _id: reservierung.insertedId })
     throw error
   }
+  // Geschrieben ist geschrieben: Scheitert nur das Merken, bleibt die Reservierung stehen,
+  // damit eine Wiederholung nicht doppelt schreibt.
+  await sammlung.updateOne({ _id: reservierung.insertedId }, { $set: { ergebnis } })
+  return ergebnis
 }
 
 export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schluessel }) {

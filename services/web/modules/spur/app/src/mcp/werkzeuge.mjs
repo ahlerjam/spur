@@ -1,14 +1,13 @@
 import * as z from 'zod/v4'
-import AuthorizationManager from '../../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { db, ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import * as Crossref from '../Crossref.mjs'
 import * as Inbox from '../Inbox.mjs'
 import * as LaufAktionen from '../schreiben/LaufAktionen.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as SchreibManager from '../schreiben/SchreibManager.mjs'
-import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
 import { WerkzeugFehler } from './fehler.mjs'
+import { rolleFuerClaude } from '../rechte.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
@@ -25,34 +24,8 @@ const LESEN = ['readOnly', 'review', 'readAndWrite', 'owner']
 const SCHREIBEN = ['review', 'readAndWrite', 'owner']
 const ANLEGEN = ['readAndWrite', 'owner']
 
-// Claude bekommt nur Rollen aus Mitgliedschaften, kein Admin-Sonderrecht: Was Claude liest, geht an
-// Anthropic, ein Admin-Token gäbe sonst fremde Projekte per ID preis (ADR 0003: nie mehr Rechte als
-// das Konto, weniger ist erlaubt). Ein unbekanntes Projekt sieht aus wie ein fremdes: keine Rolle.
-async function rolle(menschId, projectId) {
-  try {
-    return await AuthorizationManager.promises.getPrivilegeLevelForProject(menschId, projectId, null, {
-      ignoreSiteAdmin: true,
-    })
-  } catch (error) {
-    if (error instanceof Errors.NotFoundError) return null
-    throw error
-  }
-}
-
-async function eingeschraenkt(menschId, projectId) {
-  try {
-    // Wie im Web: Wer nur über einen Leselink zugreift, sieht keine Quellen.
-    return await AuthorizationManager.promises.isRestrictedUserForProject(menschId, projectId, null)
-  } catch (error) {
-    if (error instanceof Errors.NotFoundError) return true
-    throw error
-  }
-}
-
 async function pruefeRecht(menschId, projectId, erlaubt) {
-  const darf =
-    erlaubt.includes(await rolle(menschId, projectId)) && !(await eingeschraenkt(menschId, projectId))
-  if (!darf) {
+  if (!erlaubt.includes(await rolleFuerClaude(menschId, projectId))) {
     throw new WerkzeugFehler(
       'keine_rechte',
       'Die Projektrolle erlaubt das nicht. Bitte die Person um Zugriff bitten.'
@@ -106,7 +79,8 @@ export const WERKZEUGE = {
         teil.eintraege.map(async p => ({
           id: p._id,
           name: p.name,
-          rolle: await rolle(menschId, p._id),
+          // Dieselbe Rolle, mit der die übrigen Werkzeuge prüfen (null: Claude darf hier nichts).
+          rolle: await rolleFuerClaude(menschId, p._id),
         }))
       )
       return teil

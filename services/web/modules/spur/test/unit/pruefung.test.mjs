@@ -6,6 +6,7 @@ import {
   zitierpaket,
 } from '../../app/src/pruefung/latex.mjs'
 import { normalisieren, wortlautPruefen } from '../../app/src/pruefung/wortlaut.mjs'
+import { doiNormal } from '../../app/src/pruefung/bib.mjs'
 
 const SEITE = 'Sleep supports the consolidation of declarative memory. Later text.'
 
@@ -127,5 +128,15 @@ describe('zeileBewerten', () => {
     expect(zeilen.map(z => zeileBewerten(z, kontext).wortlaut)).toEqual(
       zeilen.map(() => 'nicht_pruefbar')
     )
+  })
+})
+
+describe('doiNormal', () => {
+  it('macht aus URL und Präfix die nackte DOI', () => {
+    expect(doiNormal(' https://doi.org/10.1234/abc ')).toBe('10.1234/abc')
+    expect(doiNormal('http://dx.doi.org/10.1/x')).toBe('10.1/x')
+    expect(doiNormal('doi: 10.5/y')).toBe('10.5/y')
+    expect(doiNormal('10.5555/spur')).toBe('10.5555/spur')
+    expect(doiNormal('  ')).toBeNull()
   })
 })

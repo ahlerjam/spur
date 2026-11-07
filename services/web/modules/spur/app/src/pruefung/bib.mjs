@@ -15,6 +15,12 @@ function feldWert(rumpf, name) {
   return null
 }
 
+// Viele Exporte schreiben die DOI als URL oder mit Präfix: für Crossref zählt nur „10.…“.
+export function doiNormal(wert) {
+  const doi = wert?.trim().replace(/^(https?:\/\/(dx\.)?doi\.org\/|doi:\s*)/i, '')
+  return doi || null
+}
+
 export function bibLesen(text) {
   const eintraege = new Map()
   for (const m of text.matchAll(EINTRAG)) {
@@ -22,7 +28,7 @@ export function bibLesen(text) {
     const rumpf = text.slice(m.index + m[0].length)
     const naechster = rumpf.search(/\n\s*@[a-zA-Z]+\s*\{/)
     const felder = naechster < 0 ? rumpf : rumpf.slice(0, naechster)
-    eintraege.set(m[2], { key: m[2], doi: feldWert(felder, 'doi')?.trim() ?? null })
+    eintraege.set(m[2], { key: m[2], doi: doiNormal(feldWert(felder, 'doi')) })
   }
   return eintraege
 }

@@ -5,7 +5,7 @@ import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
-import { klone, pruefCache, quellen, quellenSeiten, quotes } from './sammlungen.mjs'
+import { bearbeitungen, einstellungen, ereignisse, klone, laeufe, nachrichten, pruefCache, quellen, quellenSeiten, quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
@@ -54,7 +54,8 @@ async function pdfAuslesen(pfad) {
   const versatz = await versatzAusLabels(pfad).catch(() => null)
   const belegt =
     meta?.gefunden && versatzInSpanne(versatz, seiten.length, meta.seiten)
-  for (const s of seiten) s.label = belegt ? String(s.seite + versatz) : null
+  // Vorspannseiten (römisch) ergäben Labels unter 1: dort lieber keine Seitenzahl.
+  for (const s of seiten) s.label = belegt && s.seite + versatz >= 1 ? String(s.seite + versatz) : null
   return {
     seiten,
     hatText,
@@ -290,6 +291,12 @@ export async function projektAufraeumen(projectId) {
     (await quellen()).deleteMany({ projectId: id }),
     (await pruefCache()).deleteMany({ projectId: id }),
     (await klone()).deleteOne({ _id: id }),
+    // Aufträge, Antworten, Läufe samt Kontextauszügen und Einstellungen gehören zum Projekt.
+    (await nachrichten()).deleteMany({ projectId: id }),
+    (await ereignisse()).deleteMany({ projectId: id }),
+    (await laeufe()).deleteMany({ projectId: id }),
+    (await bearbeitungen()).deleteMany({ projectId: id }),
+    (await einstellungen()).deleteMany({ projectId: id }),
   ])
   await fs.rm(Path.join(ablageWurzel(), String(id)), { recursive: true, force: true })
 }
