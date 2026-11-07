@@ -5,7 +5,7 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { auswerten, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
+import { auswerten, ersteZeile, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
 
 const HIER = path.dirname(new URL(import.meta.url).pathname)
 const BEKANNT = path.join(HIER, 'upstream-bekannt.json')
@@ -22,6 +22,7 @@ const nurErgebnis = args.includes('--nur-ergebnis')
 const dateien = args.slice(1).filter((a, i, l) => !a.startsWith('--') && l[i] !== ergebnisOrdner)
 
 const lesen = datei => JSON.parse(fs.readFileSync(datei, 'utf8'))
+const lesenOder = (datei, standard) => (fs.existsSync(datei) ? lesen(datei) : standard)
 
 function ausfuehren(suite, teil, cwd, befehl, env) {
   const log = path.join(ergebnisOrdner, `${suite}${teil ? `-${teil}` : ''}.log`)
@@ -153,20 +154,20 @@ function minuten(ms) {
 
 function suiteLaufen(suite) {
   const start = Date.now()
-  const ausgeschlossen = (fs.existsSync(AUSSCHLUSS) ? lesen(AUSSCHLUSS) : []).filter(a => a.suite === suite)
+  const ausgeschlossen = lesenOder(AUSSCHLUSS, []).filter(a => a.suite === suite)
   const tests = SUITEN[suite](ausgeschlossen)
   fs.writeFileSync(path.join(ergebnisOrdner, `${suite}.json`), JSON.stringify(tests, null, 1))
   if (nurErgebnis) {
     console.log(`${suite}: ${tests.length} Tests in ${minuten(Date.now() - start)} min`)
     return 0
   }
-  const bekannt = (fs.existsSync(BEKANNT) ? lesen(BEKANNT).tests : []).filter(b => b.suite === suite)
+  const bekannt = lesenOder(BEKANNT, { tests: [] }).tests.filter(b => b.suite === suite)
   const a = auswerten(tests, bekannt)
   for (const x of ausgeschlossen) console.log(`ausgeschlossen: ${x.datei} – ${x.grund}`)
   for (const t of a.jetztGruen) console.log(`Hinweis: bekannt, jetzt grün: ${t.datei} › ${t.test}`)
   for (const t of a.neu.slice(0, 30)) {
     console.log(`NEU: ${t.datei} › ${t.test}`)
-    console.log(`  ${t.fehler.split('\n').find(Boolean) || ''}`.slice(0, 300))
+    console.log(`  ${ersteZeile(t.fehler).slice(0, 300)}`)
   }
   if (a.neu.length > 30) console.log(`… und ${a.neu.length - 30} weitere neue Fehler, siehe ${suite}.json`)
   console.log(`${suite}: Laufzeit ${minuten(Date.now() - start)} min, Protokoll und ${suite}.json in ${process.env.SPUR_PROTOKOLL || ergebnisOrdner}`)
@@ -175,15 +176,12 @@ function suiteLaufen(suite) {
 }
 
 function listeSchreiben() {
-  const alt = fs.existsSync(BEKANNT) ? lesen(BEKANNT).tests : []
-  const ausgeschlossen = fs.existsSync(AUSSCHLUSS) ? lesen(AUSSCHLUSS) : []
+  const alt = lesenOder(BEKANNT, { tests: [] }).tests
+  const ausgeschlossen = lesenOder(AUSSCHLUSS, [])
   const neu = []
   const spur = []
   for (const suite of Object.keys(SUITEN)) {
-    const lauf = name => {
-      const datei = path.join(ergebnisOrdner, name, `${suite}.json`)
-      return fs.existsSync(datei) ? lesen(datei) : []
-    }
+    const lauf = name => lesenOder(path.join(ergebnisOrdner, name, `${suite}.json`), [])
     const { liste, nurSpur } = herkunftBestimmen(lauf('main'), lauf('ext-ce'), lauf('agent'), alt, ausgeschlossen)
     neu.push(...liste)
     spur.push(...nurSpur)
@@ -192,7 +190,7 @@ function listeSchreiben() {
   console.log(`Liste bekannter Fehler: ${neu.length} Einträge in tools/tests/upstream-bekannt.json`)
   for (const t of spur) {
     console.log(`NUR AUF SPUR: ${t.suite} ${t.datei} › ${t.test}`)
-    console.log(`  ${t.fehler.split('\n').find(Boolean) || ''}`.slice(0, 300))
+    console.log(`  ${ersteZeile(t.fehler).slice(0, 300)}`)
   }
   return spur.length > 0 ? 1 : 0
 }

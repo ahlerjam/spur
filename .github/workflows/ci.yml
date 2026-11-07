@@ -77,10 +77,10 @@ jobs:
       - name: web-Unit
         run: spur-dev upstream web
       - name: Frontend
-        if: success() || failure()
+        if: ${{ !cancelled() }}
         run: spur-dev upstream frontend
       - name: document-updater
-        if: success() || failure()
+        if: ${{ !cancelled() }}
         run: spur-dev upstream du
       - name: Laufzeit
         if: always()

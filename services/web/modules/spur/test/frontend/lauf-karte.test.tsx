@@ -2,7 +2,9 @@ import { expect } from 'chai'
 import { render, screen } from '@testing-library/react'
 import LaufKarte, { type Lauf } from '@modules/spur/frontend/js/claude/lauf-karte'
 import { deutschAktivieren } from './helpers/deutsch'
-import { mitRolle } from './helpers/berechtigungen'
+import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
+import type { PermissionsLevel } from '@/features/ide-react/types/permissions'
+import type { FC, PropsWithChildren } from 'react'
 
 const lauf: Lauf = {
   id: 'lauf-1',
@@ -24,7 +26,19 @@ const aenderungen = [
   },
 ]
 
-function zeigen(rolle: 'owner' | 'review' | 'lesen') {
+const mitRolle =
+  (permissionsLevel: PermissionsLevel): FC<PropsWithChildren> =>
+  ({ children }) => (
+    // Ohne Track Changes gäbe Overleaf der Review-Rolle kein trackedWrite; spur setzt es voraus.
+    <EditorProviders
+      permissionsLevel={permissionsLevel}
+      projectFeatures={{ trackChanges: true }}
+    >
+      {children}
+    </EditorProviders>
+  )
+
+function zeigen(rolle: PermissionsLevel) {
   render(
     <LaufKarte
       lauf={lauf}
@@ -54,7 +68,7 @@ describe('Lauf-Karte', function () {
   })
 
   it('zeigt Lesenden keine Schaltflächen zum Entscheiden', function () {
-    zeigen('lesen')
+    zeigen('readOnly')
     expect(screen.queryByRole('button')).to.not.exist
   })
 })

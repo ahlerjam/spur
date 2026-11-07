@@ -36,8 +36,7 @@ export class Antwort extends Writable {
   }
 
   sendStatus(code) {
-    this.statusCode = code
-    return this
+    return this.status(code)
   }
 }
 

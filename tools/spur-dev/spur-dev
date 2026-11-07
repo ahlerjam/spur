@@ -130,9 +130,9 @@ upstream_lauf() {
     -lc "node /spur-tests/upstream.mjs $suite --ergebnis /ergebnis ${4:+$(printf '%q ' "${@:4}")}"
 }
 upstream() {
-  local s rc=0 basis b wt
+  local s q rc=0 cache="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev" b
   local -a suiten
-  UPSTREAM_ERG="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev/upstream"
+  UPSTREAM_ERG="$cache/upstream"
   docker_bereit; check_mounts
   dc --profile upstream up -d --wait mongo redis redis-test >/dev/null
   case "${1:-}" in
@@ -141,19 +141,17 @@ upstream() {
     vergleich)
       # main ist Overleaf, ext-ce overleaf-cep; die spur-Seite ist dieser Worktree (agent mit den Änderungen
       # dieses Zweigs), damit die Liste zum Code passt, mit dem sie committet wird.
-      basis="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev/vergleich"
       git -C "$SRC" fetch -q origin main ext-ce
       for b in main ext-ce; do
-        wt="$basis/$b"
-        if [ -d "$wt" ]; then git -C "$wt" checkout -q --detach "origin/$b"
-        else git -C "$SRC" worktree add -q --detach "$wt" "origin/$b"; fi
+        if [ -d "$cache/vergleich/$b" ]; then git -C "$cache/vergleich/$b" checkout -q --detach "origin/$b"
+        else git -C "$SRC" worktree add -q --detach "$cache/vergleich/$b" "origin/$b"; fi
       done
       # Ohne Argument alle Suiten; sonst nur die genannten, die übrigen Ergebnisse bleiben stehen.
       suiten=("${@:2}"); [ ${#suiten[@]} -gt 0 ] || suiten=(web frontend du)
       for s in "${suiten[@]}"; do
-        upstream_lauf "$s" "$basis/main" main --nur-ergebnis || true
-        upstream_lauf "$s" "$basis/ext-ce" ext-ce --nur-ergebnis || true
-        upstream_lauf "$s" "$SRC" agent --nur-ergebnis || true
+        for q in main:"$cache/vergleich/main" ext-ce:"$cache/vergleich/ext-ce" agent:"$SRC"; do
+          upstream_lauf "$s" "${q#*:}" "${q%%:*}" --nur-ergebnis || true
+        done
       done
       SPUR_SRC="$SRC" dc run --rm --no-deps -T --entrypoint bash \
         -v "$SRC/tools/tests:/spur-tests" -v "$UPSTREAM_ERG:/ergebnis" web \

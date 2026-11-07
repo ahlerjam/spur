@@ -2,19 +2,16 @@
 
 const schluessel = t => `${t.suite}\0${t.datei}\0${t.test}`
 
-// Ein Satz je wiederkehrendem Fehlerbild; alles andere bekommt die erste Fehlerzeile als Grund.
-const FEHLERBILDER = [
-  [/Cannot find (module|package)/, 'Ein Modul fehlt im Dev-Image oder gehört zu Overleaf Server Pro.'],
-]
+export const ersteZeile = fehler => (fehler.split('\n').find(z => z.trim()) || '').trim()
 
+// Vorschlag für neue Einträge; die Gründe der Liste werden danach von Hand geschärft.
 export function grundAusFehler(fehler) {
-  const bild = FEHLERBILDER.find(([muster]) => muster.test(fehler))
-  if (bild) return bild[1]
-  return (fehler.split('\n').find(z => z.trim()) || 'Ohne Fehlermeldung gescheitert.').trim().slice(0, 200)
+  if (/Cannot find (module|package)/.test(fehler)) return 'Ein Modul fehlt im Dev-Image oder gehört zu Overleaf Server Pro.'
+  return ersteZeile(fehler).slice(0, 200) || 'Ohne Fehlermeldung gescheitert.'
 }
 
 export function auswerten(tests, bekannt) {
-  const bekanntIndex = new Map(bekannt.map(b => [schluessel(b), b]))
+  const bekanntIndex = new Set(bekannt.map(schluessel))
   const fehlgeschlagen = tests.filter(t => t.status === 'failed')
   return {
     bestanden: tests.filter(t => t.status === 'passed').length,
