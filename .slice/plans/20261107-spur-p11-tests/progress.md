@@ -18,5 +18,17 @@
 
 - f6: 21 neue Testdateien, 419 Tests grün, Zeilenabdeckung 98,67 % (vorher 16,56 %); `spur-dev test` erzwingt 80 %. Probe: `ignoreSiteAdmin: false` in `rechte.mjs` → 5 Tests rot (u. a. „meldet ein unbekanntes Projekt auch mit Admin-Token als keine_rechte“). Die Tests mocken `infrastructure/mongodb.mjs` und nutzen eine eigene Datenbank je Datei, weil `Settings.mongo.url` im Stack-Container auf die Dev-Datenbank zeigt. Kein Fehler im spur-Code gefunden.
 
+## Abschluss-Review
+- /simplify: umgesetzt (gemeinsame Testhilfen, Crossref-Fake über `werkAuswerten`, Lauf-Karte mit Overleafs echten Rechten je Stufe samt Track Changes, `lesenOder`/`ersteZeile`, eine Schleife im Vergleich, `!cancelled()` in CI). Bewusst gelassen: Ausschlüsse erst bei der Auswertung anwenden (Dateien wie der workbench-Test brechen sonst den ganzen mocha-Lauf ab); Grammatik im Image erzeugen (main/ext-ce-Worktrees laufen nie durch `spur-dev up`); Coverage mit v8 statt istanbul (Spec verlangt istanbul); Indizes der Test-Datenbank aus den Migrationen importieren (zieht die Migrations-Infrastruktur in die Unit-Tests).
+- /code-review medium: behoben: `vergleich <suite>` löschte die Einträge der übrigen Suiten; eine gescheiterte Lezer-Grammatik erscheint jetzt als eigener Suite-Fehler statt als Folgefehler; CI zeigt Protokolle auch nach Timeout. Gelassen: fehlendes `--ergebnis` (nur interner Aufruf aus spur-dev); Mounts aus `git ls-tree HEAD` (neue Dateien in bestehenden Ordnern wie `test/` sind eingehängt, nur neue Einträge direkt unter `services/web` nicht); generierte vitest-Konfiguration (liegt im Image-Verzeichnis `/overleaf/services/web`, nicht im Worktree); Hook-Fehler ohne Datei (spekulativ); Restdatenbanken `spur-unit-*` nach abgebrochenen Läufen; nachgebaute Rechteprüfung in Unit-Tests (Absicht, Overleafs Verhalten prüfen die Upstream-Suiten).
+- Kein /security-review: der Diff ändert weder Anmeldung noch Secrets noch Eingaben von Nutzern; Produktivcode nur um ein `export` in `Crossref.mjs`.
+
+## Vorschläge
+- `spur-dev upstream vergleich` könnte die Ergebnisse von main und ext-ce je Commit zwischenspeichern; heute laufen sie jedes Mal neu (rund 25 Minuten).
+- Die Unit-Tests für `rechte.mjs` laufen gegen eine nachgebaute Rechteprüfung; ein web-Acceptance-Test (Backlog) würde die echte prüfen.
+
+## Recipe changes
+- Die Browser-Suite braucht etwa 4 Minuten, das run-code-Werkzeug von Playwright bricht nach 60 s ab und lässt den Lauf weiterlaufen (ein zweiter Aufruf läuft dann parallel auf derselben Seite). Ablauf, der funktioniert: einen Wrapper in `.playwright-mcp/` (gitignoriert) erzeugen, der `spur-e2e.js` startet, ohne zu warten, und das Ergebnis an `page.__e2eErgebnis` hängt (`globalThis` wird zwischen Aufrufen nicht geteilt), dann in Aufrufen unter 60 s abfragen.
+
 ## Prüfbefehle (E2E der CLI-Features)
 Jeder als alleinstehender Aufruf: `spur-dev upstream web`, `spur-dev upstream frontend`, `spur-dev upstream du`, `spur-dev upstream vergleich`, `spur-dev test`, `node --test tools/tests/upstream-auswertung.test.mjs`. Die Browser-Suite bleibt `services/web/modules/spur/test/e2e/spur-e2e.js`.

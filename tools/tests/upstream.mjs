@@ -124,7 +124,10 @@ export default { ...basis, test: { ...basis.test, projects: basis.test.projects.
   frontend(ausgeschlossen) {
     // Die Lezer-Grammatik ist generiert und fehlt in einem frischen Worktree.
     if (!fs.existsSync(path.join(WEB, 'frontend/js/features/source-editor/lezer-latex/latex.terms.mjs'))) {
-      ausfuehren('frontend', 'grammatik', WEB, ['run', 'lezer-latex:generate'], {})
+      const r = ausfuehren('frontend', 'grammatik', WEB, ['run', 'lezer-latex:generate'], {})
+      if (r.status !== 0) {
+        return [{ suite: 'frontend', datei: '(Suite)', test: 'Lezer-Grammatik nicht erzeugt', status: 'failed', fehler: logEnde(r.log) }]
+      }
     }
     // Wie `yarn run test:frontend`, nur mit JSON-Ausgabe.
     return mochaLauf('frontend', 'mocha', WEB, [
@@ -181,8 +184,16 @@ function listeSchreiben() {
   const neu = []
   const spur = []
   for (const suite of Object.keys(SUITEN)) {
-    const lauf = name => lesenOder(path.join(ergebnisOrdner, name, `${suite}.json`), [])
-    const { liste, nurSpur } = herkunftBestimmen(lauf('main'), lauf('ext-ce'), lauf('agent'), alt, ausgeschlossen)
+    const [main, extCe, agent] = ['main', 'ext-ce', 'agent'].map(name =>
+      lesenOder(path.join(ergebnisOrdner, name, `${suite}.json`), null)
+    )
+    // Ohne Ergebnisse aller drei Stände (etwa `vergleich web` auf frischem Cache) bleiben die Einträge.
+    if (!main || !extCe || !agent) {
+      console.log(`${suite}: nicht auf allen drei Ständen gelaufen, Einträge bleiben unverändert`)
+      neu.push(...alt.filter(b => b.suite === suite))
+      continue
+    }
+    const { liste, nurSpur } = herkunftBestimmen(main, extCe, agent, alt, ausgeschlossen)
     neu.push(...liste)
     spur.push(...nurSpur)
   }

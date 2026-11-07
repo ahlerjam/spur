@@ -86,5 +86,5 @@ jobs:
         if: always()
         run: echo "Laufzeit des Jobs: $(( ($(date +%s) - START) / 60 )) min $(( ($(date +%s) - START) % 60 )) s (Grenze 30 min)"
       - name: Protokolle bei Fehler
-        if: failure()
+        if: failure() || cancelled()
         run: tail -n 60 ~/.cache/spur-dev/upstream/aktuell/*.log
