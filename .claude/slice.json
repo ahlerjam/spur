@@ -19,6 +19,6 @@
   ],
   "changelogDoc": "https://claude.ai/artifact/XYXcQgkJbtPQzsGgJbqBhe",
   "excludedCommands": [
-    "Bash(spur-dev *)"
+    "spur-dev *"
   ]
 }
