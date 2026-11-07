@@ -7,3 +7,6 @@ docker-compose.override.yml
 
 # slice
 .claude/slice-run.json
+
+# spur Testschalter
+services/web/modules/spur/dev-schalter.json
