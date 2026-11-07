@@ -137,8 +137,13 @@ upstream() {
   dc --profile upstream up -d --wait mongo redis redis-test >/dev/null
   case "${1:-}" in
     web|frontend|du) upstream_lauf "$1" "$SRC" aktuell "${@:2}" ;;
-    alle) for s in web frontend du; do upstream_lauf "$s" "$SRC" aktuell || rc=$?; done; return "$rc" ;;
+    alle) [ $# -eq 1 ] || { echo "spur-dev upstream alle nimmt keine Dateien; dafür web|frontend|du <datei …>" >&2; return 2; }
+          for s in web frontend du; do upstream_lauf "$s" "$SRC" aktuell || rc=$?; done; return "$rc" ;;
     vergleich)
+      # Ein unbekannter Name liefe sonst nirgends und endete trotzdem mit Exit 0.
+      for s in "${@:2}"; do
+        case "$s" in web|frontend|du) ;; *) echo "spur-dev upstream vergleich: unbekannte Suite „$s“ (web, frontend, du)" >&2; return 2 ;; esac
+      done
       # main ist Overleaf, ext-ce overleaf-cep; die spur-Seite ist dieser Worktree (agent mit den Änderungen
       # dieses Zweigs), damit die Liste zum Code passt, mit dem sie committet wird.
       git -C "$SRC" fetch -q origin main ext-ce

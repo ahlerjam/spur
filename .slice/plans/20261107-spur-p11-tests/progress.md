@@ -18,6 +18,18 @@
 
 - f6: 21 neue Testdateien, 419 Tests grün, Zeilenabdeckung 98,67 % (vorher 16,56 %); `spur-dev test` erzwingt 80 %. Probe: `ignoreSiteAdmin: false` in `rechte.mjs` → 5 Tests rot (u. a. „meldet ein unbekanntes Projekt auch mit Admin-Token als keine_rechte“). Die Tests mocken `infrastructure/mongodb.mjs` und nutzen eine eigene Datenbank je Datei, weil `Settings.mongo.url` im Stack-Container auf die Dev-Datenbank zeigt. Kein Fehler im spur-Code gefunden.
 
+## Nachabnahme f1 (stilles Grün bei falschem Dateiargument)
+Befund der unabhängigen Abnahme: `spur-dev upstream web <nicht vorhandene Datei>` endete mit Exit 0 und „bestanden: 0“. f1 dafür auf `passes: false` gesetzt, behoben (Tests zuerst: `dateienPruefen`, `dateienOhneTests` in `upstream-auswertung.test.mjs`), dann wieder `true`. Nachweis, jeder Aufruf alleinstehend:
+- `spur-dev upstream web test/unit/src/GibtEsNicht.test.mjs` → Exit 2, `web: FEHLER: test/unit/src/GibtEsNicht.test.mjs: nicht gefunden (Pfad relativ zum Dienst)`
+- `spur-dev upstream frontend test/frontend/gibt-es-nicht.test.tsx` → Exit 2, gleiche Meldung für frontend
+- `spur-dev upstream du test/unit/js/GibtEsNicht.js` → Exit 2, gleiche Meldung für du
+- `spur-dev upstream web app/src/Features/Uploads/ArchiveManager.mjs` (existiert, keine Tests) → Exit 2, `kein einziger Test gelaufen`
+- `spur-dev upstream web test/unit/src/Settings/Settings.test.mjs` → Exit 2, `ist ausgeschlossen (tools/tests/upstream-ausschluss.json)`
+- `spur-dev upstream du app/js/HttpController.js` → Exit 2, `liegt nicht unter test/unit/ oder test/acceptance/`
+- `spur-dev upstream frontend <gültiger Test> <Komponente ohne Tests>` → Exit 2, `enthält keine Tests dieser Suite`
+- `spur-dev upstream vergleich webb` → Exit 2, `unbekannte Suite „webb“`; `spur-dev upstream alle <datei>` → Exit 2
+- Gegenprobe: `spur-dev upstream web test/unit/src/Uploads/ArchiveManager.test.mjs` → Exit 0, `bestanden: 36, fehlgeschlagen: 1, bekannt: 1, neu: 0`; `spur-dev upstream alle` → Exit 0, web 5484/173/173/0, frontend 1659/14/14/0, du 784/0/0/0.
+
 ## Abschluss-Review
 - /simplify: umgesetzt (gemeinsame Testhilfen, Crossref-Fake über `werkAuswerten`, Lauf-Karte mit Overleafs echten Rechten je Stufe samt Track Changes, `lesenOder`/`ersteZeile`, eine Schleife im Vergleich, `!cancelled()` in CI). Bewusst gelassen: Ausschlüsse erst bei der Auswertung anwenden (Dateien wie der workbench-Test brechen sonst den ganzen mocha-Lauf ab); Grammatik im Image erzeugen (main/ext-ce-Worktrees laufen nie durch `spur-dev up`); Coverage mit v8 statt istanbul (Spec verlangt istanbul); Indizes der Test-Datenbank aus den Migrationen importieren (zieht die Migrations-Infrastruktur in die Unit-Tests).
 - /code-review medium: behoben: `vergleich <suite>` löschte die Einträge der übrigen Suiten; eine gescheiterte Lezer-Grammatik erscheint jetzt als eigener Suite-Fehler statt als Folgefehler; CI zeigt Protokolle auch nach Timeout. Gelassen: fehlendes `--ergebnis` (nur interner Aufruf aus spur-dev); Mounts aus `git ls-tree HEAD` (neue Dateien in bestehenden Ordnern wie `test/` sind eingehängt, nur neue Einträge direkt unter `services/web` nicht); generierte vitest-Konfiguration (liegt im Image-Verzeichnis `/overleaf/services/web`, nicht im Worktree); Hook-Fehler ohne Datei (spekulativ); Restdatenbanken `spur-unit-*` nach abgebrochenen Läufen; nachgebaute Rechteprüfung in Unit-Tests (Absicht, Overleafs Verhalten prüfen die Upstream-Suiten).
