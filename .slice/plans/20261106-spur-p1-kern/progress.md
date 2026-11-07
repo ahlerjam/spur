@@ -59,3 +59,8 @@
 - Kein Befund mit Confidence ≥ 8. Kandidat mit 7 behoben: MCP-Werkzeuge sperren Leselink-Nutzer wie `blockRestrictedUserFromProject` im Web, `project_list` zeigt keine reinen Leselink-Projekte mehr.
 - Info, nicht geändert: Nutzer mit Bearbeiten-Link können Seitenbilder und Seitentext ansehen, nur den PDF-Download nicht (so verlangt es f3). Reviewer dürfen über `quote_mark` markieren (Spec: `review` schreibt).
 - Hinweis f8: `oauthAccessTokens` hat aus Overleaf einen TTL-Index (`accessTokenExpiresAt`, 86400 s). spur zeigt „Token abgelaufen, bitte erneuern“ deshalb einen Tag lang; danach verschwindet der Eintrag aus der Liste. Vorschlag: eigenes Feld für den sichtbaren Ablauf, falls der Hinweis länger stehen soll.
+
+## Ansichten (taste, Quality bar)
+- Screenshots bei 360 und 1280 px: Login, Editor mit Quellen-Panel, Quellenvorschau, Prüfbericht, Einstellungen mit „Claude verbinden“. Kein horizontaler Scroll in beiden Breiten.
+- Behoben nach Sichtprüfung: abgeschnittene Knöpfe und Badges im Panel, doppelte „Zurück“-Beschriftung und unklare Seitenangabe in der Vorschau („Seite 347 (PDF-Seite 3 von 8)“), zerbrochenes Layout von „Claude verbinden“ bei 1280 px.
+- Offen (Kern, nicht im Diff): Bei 360 px ist die Overleaf-IDE mit Rail, Editor und PDF so eng, dass Panels nur wenige Zeichen breit sind; das gilt auch für Overleafs eigenen Dateibaum. Auf der Login-Seite zeigt Overleafs Registrierungsmodul den Schlüssel „sign_up“ statt eines Textes. Vorschlag: mobiles Layout der IDE und fehlende Übersetzung in einem eigenen Plan.

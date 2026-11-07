@@ -119,3 +119,31 @@
   margin: var(--spacing-05) 0 var(--spacing-02);
   font-size: var(--font-size-03);
 }
+
+.spur-panel-werkzeuge .btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+.spur-badges .badge,
+.spur-badges .badge-content {
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  text-align: left;
+}
+
+.settings-widget-container.spur-claude-verbinden {
+  display: block;
+
+  .description-container {
+    margin-bottom: var(--spacing-05);
+  }
+}
+
+.spur-befehl {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

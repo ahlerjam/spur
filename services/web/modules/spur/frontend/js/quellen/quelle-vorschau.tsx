@@ -69,10 +69,13 @@ export default function QuelleVorschau({
           {t('spur_zurueck')}
         </OLButton>
         <span className="spur-seitenzahl" aria-live="polite">
-          {t('spur_seite_von', {
-            seite: seite?.label ?? nummer,
-            gesamt: quelle.seitenzahl,
-          })}
+          {seite?.label && quelle.art === 'pdf'
+            ? t('spur_seite_label_von', {
+                seite: seite.label,
+                nr: nummer,
+                gesamt: quelle.seitenzahl,
+              })
+            : t('spur_seite_von', { seite: nummer, gesamt: quelle.seitenzahl })}
         </span>
         <OLButton
           variant="ghost"
