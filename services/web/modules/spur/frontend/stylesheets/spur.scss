@@ -1,0 +1,104 @@
+.spur-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.spur-panel-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-03);
+  padding: var(--spacing-03) var(--spacing-05);
+}
+
+.spur-suche {
+  padding: 0 var(--spacing-05) var(--spacing-03);
+}
+
+.spur-panel-inhalt {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--spacing-05) var(--spacing-05);
+}
+
+.spur-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.spur-zeile {
+  padding: var(--spacing-03) 0;
+  border-bottom: 1px solid var(--border-divider);
+  overflow-wrap: anywhere;
+}
+
+.spur-zeile-link.btn {
+  padding: 0;
+  text-align: left;
+  white-space: normal;
+}
+
+.spur-zeile-key {
+  margin-left: var(--spacing-03);
+  font-family: var(--font-family-mono, monospace);
+  font-size: var(--font-size-02);
+}
+
+.spur-zeile-meta,
+.spur-zeile-auszug,
+.spur-leer {
+  margin: var(--spacing-01) 0 0;
+  font-size: var(--font-size-02);
+  color: var(--content-secondary);
+}
+
+.spur-leer {
+  padding: var(--spacing-05) 0;
+}
+
+.spur-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-02);
+  margin-top: var(--spacing-02);
+}
+
+.spur-seitenzahl {
+  font-size: var(--font-size-02);
+}
+
+.spur-seitenbild {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border-divider);
+}
+
+.spur-seitentext {
+  margin-top: var(--spacing-03);
+  font-family: inherit;
+  font-size: var(--font-size-02);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.spur-fassung {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-02);
+  margin-top: var(--spacing-05);
+}
+
+.spur-marke-rot {
+  background-color: rgb(179 38 30 / 18%);
+  border-bottom: 2px solid var(--content-danger);
+}
+
+.spur-marke-gelb {
+  background-color: rgb(204 136 0 / 18%);
+  border-bottom: 2px dotted var(--content-warning);
+}

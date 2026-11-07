@@ -11,3 +11,13 @@
 
 ## Entscheidungen
 - Finish-Basis: Die Skill-Formel ergibt `d37369ca3f^`. Dieser Diff enthält auch die Owner-Commits (Lockfile, MCP-Pakete, nginx). `/simplify` und `/code-review` laufen deshalb auf `46c92846db..HEAD`, also nur auf der Arbeit dieses Laufs.
+- Sprache: Die Spec nennt deutsche Texte, die Sprache gilt pro Installation, und der Dev-Stack setzt keine. `settings.defaults.js` setzt deshalb `OVERLEAF_SITE_LANGUAGE` auf `de`, wenn nichts gesetzt ist; `OVERLEAF_SITE_LANGUAGE=en` stellt um.
+- PageLabels: `pdfjs-dist` ist im Produktions-Image nicht vorhanden, gelesen wird mit `qpdf --json` aus dem Basis-Image.
+- Vorschau: Seitenbild per `pdftocairo` plus markierbarer Text aus Mongo.
+- Fehlertexte des Servers (`detail`) sind deutsch und werden noch nicht übersetzt (Vorschlag: Typ auf Sprachschlüssel abbilden).
+
+## Testprotokoll
+- f2 Parser: 2 097 228 Zeichen in 511 ms, 24 967 Zitate (`spur-dev test`, Test „parst ein 2-MB-Dokument“).
+
+## Recipe changes
+- `spur-dev migrate up` schlägt fehl („Unrecognized command up“). Richtig ist `spur-dev migrate migrate -t server-ce`, `rollback` entsprechend. `CLAUDE.md` und Spec nennen die falsche Form.

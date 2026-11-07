@@ -1,0 +1,259 @@
+import fs from 'node:fs/promises'
+import Path from 'node:path'
+import Settings from '@overleaf/settings'
+import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
+import { Problem } from './probleme.mjs'
+import { quellen, quellenSeiten } from './sammlungen.mjs'
+import { jetzt } from './schalter.mjs'
+import * as Crossref from './Crossref.mjs'
+import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
+
+export const MAX_BYTES = 50 * 1024 * 1024
+const SEITE_LISTE = 100
+const SUCH_TREFFER = 50
+const DOI = /\b10\.\d{4,9}\/[^\s"<>]+/
+
+const wurzel = () => Path.join(Path.dirname(Settings.path.dumpFolder), 'spur')
+
+export const dateiPfad = quelle =>
+  Path.join(
+    wurzel(),
+    String(quelle.projectId),
+    `${quelle._id}${Path.extname(quelle.dateiname).toLowerCase()}`
+  )
+
+function schluesselAus(dateiname) {
+  return Path.basename(dateiname, Path.extname(dateiname)).replace(
+    /[^\p{L}\p{N}_:-]/gu,
+    '-'
+  )
+}
+
+function versatzInSpanne(versatz, seitenzahl, spanne) {
+  const m = /^(\d+)\D+(\d+)$/.exec(spanne ?? '')
+  if (versatz == null || !m) return false
+  return versatz + 1 >= Number(m[1]) && versatz + seitenzahl <= Number(m[2])
+}
+
+async function pdfAuslesen(pfad) {
+  const texte = await seitenTexte(pfad).catch(() => {
+    throw new Problem(
+      422,
+      'datei_unlesbar',
+      'Die PDF-Datei lässt sich nicht lesen. Bitte eine andere Fassung hochladen.'
+    )
+  })
+  const seiten = texte.map((text, i) => ({ seite: i + 1, label: null, text }))
+  const hatText = texte.some(t => t.trim())
+  const doi = hatText ? DOI.exec(texte.slice(0, 2).join('\n'))?.[0] : null
+  const meta = doi ? await Crossref.werk(doi) : null
+  const versatz = await versatzAusLabels(pfad).catch(() => null)
+  const belegt =
+    meta?.gefunden && versatzInSpanne(versatz, seiten.length, meta.seiten)
+  for (const s of seiten) s.label = belegt ? String(s.seite + versatz) : null
+  return {
+    seiten,
+    hatText,
+    doi: doi ?? null,
+    meta,
+    versatz: belegt ? versatz : null,
+    versatzQuelle: belegt ? 'pagelabels' : null,
+  }
+}
+
+async function vttAuslesen(pfad) {
+  const abschnitte = vttSeiten(await fs.readFile(pfad, 'utf8'))
+  return {
+    seiten: abschnitte.map((a, i) => ({ seite: i + 1, ...a })),
+    hatText: abschnitte.length > 0,
+    doi: null,
+    meta: null,
+    versatz: null,
+    versatzQuelle: null,
+  }
+}
+
+const AUSLESER = { '.pdf': pdfAuslesen, '.vtt': vttAuslesen }
+
+export function pruefeDateityp(dateiname) {
+  if (!AUSLESER[Path.extname(dateiname).toLowerCase()]) {
+    throw new Problem(
+      415,
+      'dateityp',
+      'Dieser Dateityp wird nicht unterstützt. Bitte eine PDF- oder VTT-Datei hochladen.'
+    )
+  }
+}
+
+export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groesse }) {
+  pruefeDateityp(dateiname)
+  const sammlung = await quellen()
+  const key = schluesselAus(dateiname)
+  if (await sammlung.findOne({ projectId, key })) {
+    throw new Problem(
+      409,
+      'quelle_vorhanden',
+      `„${dateiname}“ ist schon vorhanden. Bitte die Datei umbenennen oder die alte Quelle löschen.`
+    )
+  }
+  const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
+  const quelle = {
+    _id: new ObjectId(),
+    projectId,
+    dateiname,
+    key,
+    groesse,
+    art: Path.extname(dateiname).slice(1).toLowerCase(),
+    seitenzahl: inhalt.seiten.length,
+    status: inhalt.hatText ? 'text' : 'kein_text',
+    doi: inhalt.doi,
+    meta: inhalt.meta,
+    versatz: inhalt.versatz,
+    versatzQuelle: inhalt.versatzQuelle,
+    fassung: '',
+    angelegtVon: userId,
+    angelegtAm: jetzt(),
+  }
+  const ziel = dateiPfad(quelle)
+  await fs.mkdir(Path.dirname(ziel), { recursive: true })
+  await fs.copyFile(tempPfad, ziel)
+  if (inhalt.seiten.length) {
+    await (await quellenSeiten()).insertMany(
+      inhalt.seiten.map(s => ({ quelleId: quelle._id, projectId, ...s }))
+    )
+  }
+  await sammlung.insertOne(quelle)
+  return quelle
+}
+
+export async function liste(projectId, { seite = 0 } = {}) {
+  const sammlung = await quellen()
+  const [eintraege, gesamt] = await Promise.all([
+    sammlung
+      .find({ projectId })
+      .sort({ dateiname: 1 })
+      .skip(seite * SEITE_LISTE)
+      .limit(SEITE_LISTE)
+      .toArray(),
+    sammlung.countDocuments({ projectId }),
+  ])
+  return { quellen: eintraege, gesamt, seitengroesse: SEITE_LISTE }
+}
+
+export async function alle(projectId) {
+  return await (await quellen()).find({ projectId }).toArray()
+}
+
+export async function holen(projectId, quelleId) {
+  if (!ObjectId.isValid(quelleId)) throw quelleFehlt()
+  const quelle = await (await quellen()).findOne({
+    _id: new ObjectId(quelleId),
+    projectId,
+  })
+  if (!quelle) throw quelleFehlt()
+  return quelle
+}
+
+function quelleFehlt() {
+  return new Problem(
+    404,
+    'quelle_fehlt',
+    'Diese Quelle gibt es nicht mehr. Bitte die Liste neu laden.'
+  )
+}
+
+export async function seitenVon(quelleIds) {
+  const seiten = await (await quellenSeiten())
+    .find({ quelleId: { $in: quelleIds } })
+    .sort({ seite: 1 })
+    .toArray()
+  const nachQuelle = new Map()
+  for (const s of seiten) {
+    const key = String(s.quelleId)
+    if (!nachQuelle.has(key)) nachQuelle.set(key, [])
+    nachQuelle.get(key).push(s)
+  }
+  return nachQuelle
+}
+
+export async function seite(quelle, nummer) {
+  const eintrag = await (await quellenSeiten()).findOne({
+    quelleId: quelle._id,
+    seite: nummer,
+  })
+  if (!eintrag) {
+    throw new Problem(404, 'seite_fehlt', 'Diese Seite gibt es in der Quelle nicht.')
+  }
+  return eintrag
+}
+
+export async function bild(quelle, nummer) {
+  const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}`)
+  const pfad = `${ziel}.png`
+  try {
+    await fs.access(pfad)
+    return pfad
+  } catch {
+    return await seitenBild(dateiPfad(quelle), nummer, ziel)
+  }
+}
+
+function auszug(text, begriff) {
+  const flach = text.replace(/\s+/g, ' ')
+  const pos = flach.toLowerCase().indexOf(begriff.toLowerCase())
+  const von = Math.max(0, pos - 60)
+  return flach.slice(von, von + 160).trim()
+}
+
+export async function suchen(projectId, begriff) {
+  const seiten = await quellenSeiten()
+  const phrase = `"${begriff.replace(/"/g, ' ')}"`
+  const treffer = await seiten
+    .find({ projectId, $text: { $search: phrase } })
+    .sort({ quelleId: 1, seite: 1 })
+    .limit(SUCH_TREFFER)
+    .toArray()
+  const namen = new Map(
+    (await alle(projectId)).map(q => [String(q._id), q])
+  )
+  return treffer.map(t => ({
+    quelleId: t.quelleId,
+    dateiname: namen.get(String(t.quelleId))?.dateiname,
+    seite: t.seite,
+    label: t.label,
+    position: t.text.toLowerCase().indexOf(begriff.toLowerCase()),
+    auszug: auszug(t.text, begriff),
+  }))
+}
+
+export async function aendern(quelle, { fassung, versatz }) {
+  const felder = {}
+  if (fassung !== undefined) felder.fassung = fassung
+  if (versatz !== undefined) {
+    felder.versatz = versatz
+    felder.versatzQuelle = versatz === null ? null : 'bestaetigt'
+    await (await quellenSeiten()).updateMany({ quelleId: quelle._id }, [
+      {
+        $set: {
+          label:
+            versatz === null
+              ? null
+              : { $toString: { $add: ['$seite', versatz] } },
+        },
+      },
+    ])
+  }
+  await (await quellen()).updateOne({ _id: quelle._id }, { $set: felder })
+  return { ...quelle, ...felder }
+}
+
+export async function loeschen(quelle) {
+  await (await quellenSeiten()).deleteMany({ quelleId: quelle._id })
+  await (await quellen()).deleteOne({ _id: quelle._id })
+  const ordner = Path.dirname(dateiPfad(quelle))
+  for (const name of await fs.readdir(ordner).catch(() => [])) {
+    if (name.startsWith(String(quelle._id))) {
+      await fs.rm(Path.join(ordner, name), { force: true })
+    }
+  }
+}

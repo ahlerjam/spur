@@ -22,7 +22,7 @@ make start
 | `make test` | Führt die Unit-Tests aus |
 | `make e2e` | Führt Playwright gegen den laufenden Stack aus |
 
-`SPUR_URL`, `SPUR_PORT` und `SPUR_IMAGE` ändern Adresse, Port und Image. Backups umfassen das Volume `spur_data` und die MongoDB.
+`SPUR_URL`, `SPUR_PORT` und `SPUR_IMAGE` ändern Adresse, Port und Image. Die Sprache gilt für die ganze Installation: Standard ist Deutsch, `OVERLEAF_SITE_LANGUAGE=en` im `.env` stellt auf Englisch um. Backups umfassen das Volume `spur_data` und die MongoDB.
 
 Betreiben Sie spur öffentlich, ist die Compile-Sandbox Pflicht:
 

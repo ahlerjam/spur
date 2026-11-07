@@ -25,7 +25,7 @@
     "Eine Laufzeitmessung des Parsers für ein 2-MB-Dokument steht im Testprotokoll",
     "Das Kompilieren erzeugt weiter ein PDF"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

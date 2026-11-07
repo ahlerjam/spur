@@ -5,6 +5,9 @@ const {
   DEFAULT_EDITABLE_FILENAMES,
 } = require('overleaf-editor-core/lib/text_file_defaults')
 
+// Muss vor /etc/overleaf/settings.js gesetzt sein; das liest den Wert beim Laden.
+process.env.OVERLEAF_SITE_LANGUAGE ||= 'de'
+
 let defaultFeatures, siteUrl
 
 // Make time interval config easier.
@@ -1037,6 +1040,10 @@ module.exports = {
         __dirname,
         '../modules/bib-editor/frontend/js/extensions/bib-editor-extension.ts'
       ),
+      Path.resolve(
+        __dirname,
+        '../modules/spur/frontend/js/pruefung/pruef-markierung.ts'
+      ),
     ],
     sourceEditorVisualExtensions: [],
     sourceEditorComponents: [],
@@ -1197,7 +1204,13 @@ module.exports = {
         '../modules/reference-picker/frontend/js/reference-index/advanced-reference-index.ts'
       ),
     ],
-    railEntries: [],
+    railEntries: [
+      Path.resolve(__dirname, '../modules/spur/frontend/js/quellen/quellen-rail.tsx'),
+      Path.resolve(
+        __dirname,
+        '../modules/spur/frontend/js/pruefung/pruefbericht-rail.tsx'
+      ),
+    ],
     railPopovers: [],
     railActions: [],
     railModals: [],
