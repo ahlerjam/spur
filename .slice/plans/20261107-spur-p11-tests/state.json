@@ -1,5 +1,6 @@
 {
-  "state": "parked",
+  "state": "queued",
   "builderModel": "opus",
-  "builderAdvisor": "opus"
+  "builderAdvisor": "opus",
+  "where": "cloud"
 }
