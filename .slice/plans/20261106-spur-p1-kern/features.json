@@ -209,7 +209,7 @@
     "Bei Überschneidung mit späteren Edits zeigt die Karte „Konflikt in Zeile …“ und ändert nichts",
     "Die Karte erklärt beim Label als letzten Ausweg, dass die Wiederherstellung spätere Änderungen in der Datei verwirft"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   }
  ]
