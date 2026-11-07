@@ -169,7 +169,7 @@
     "Eine nicht erkannte Zitatform wird angenommen und auf der Lauf-Karte rot",
     "Liegt der Fehler in fremdem Text außerhalb des berührten Bereichs, wird Claude nicht blockiert"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
