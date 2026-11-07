@@ -9,7 +9,7 @@ Agentische Schreibumgebung für wissenschaftliche Arbeiten auf Basis von Overlea
 - Nach Änderungen am Backend: `spur-dev restart`
 - Unit-Tests: `spur-dev test`
 - Testkonto: `spur-dev user mail@example.org` liefert den Aktivierungslink. Das Konto ist Admin; Rechteprüfungen brauchen Konten ohne Admin.
-- E2E: erst `spur-dev run modules/spur/test/e2e/vorbereiten.mjs`, dann alle Features in einem Lauf
+- E2E: erst `spur-dev run modules/spur/test/e2e/vorbereiten.mjs`, dann alle Features in einem Lauf. `spur-dev up` legt `services/web/modules/spur/dev-schalter.json` mit dem Crossref-Fake an, falls sie fehlt
 - Skript im Container: `spur-dev run modules/spur/test/skript.mjs` (Pfad relativ zu `services/web`)
 - Mongo: `spur-dev mongo 'db.users.countDocuments()'`, Sicherung: `spur-dev dump`, `spur-dev restore`
 - Migrationen: `spur-dev migrate migrate -t server-ce`, zurück: `spur-dev migrate rollback -t server-ce <name>`
