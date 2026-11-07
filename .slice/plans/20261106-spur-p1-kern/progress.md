@@ -87,3 +87,4 @@
 
 ## Abschluss
 - Letzter E2E-Lauf nach der letzten Code-Änderung (Panel-CSS): f1–f15 ok.
+- Abschlussrunde der Ansichten (nach dem letzten E2E-Lauf, ohne Code-Änderung): Login, Quellen-Panel, Quellenvorschau, Prüfbericht, „Claude verbinden“ und Claude-Panel mit Lauf-Karte als Owner und als Reviewer, je bei 1280 und 360 px neu aufgenommen. Kein horizontaler Scroll der Seite. Login und Einstellungen sind bei 360 px sauber; die Panels in der IDE sind bei 360 px nur rund 47 px breit (Kern-Layout, siehe oben). Die vielen Zeilen „Token gültig bis …“ in den Einstellungen sind Testdaten aus den E2E-Läufen.
