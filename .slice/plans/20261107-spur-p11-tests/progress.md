@@ -27,6 +27,12 @@
 - `spur-dev upstream vergleich` könnte die Ergebnisse von main und ext-ce je Commit zwischenspeichern; heute laufen sie jedes Mal neu (rund 25 Minuten).
 - Die Unit-Tests für `rechte.mjs` laufen gegen eine nachgebaute Rechteprüfung; ein web-Acceptance-Test (Backlog) würde die echte prüfen.
 
+## Ansichten (Finish-Schritt, 360 und 1280 px)
+Geprüft: Claude-Panel mit Lauf-Karte, Quellen-Panel (E2E Viele), Prüfbericht (E2E Bericht), „Claude verbinden“ in den Kontoeinstellungen. Kein horizontaler Überlauf (scrollWidth = Fensterbreite), Hierarchie und Farben passen zu Overleaf, Prüfbericht-Badges lesbar auch bei 360 px. Dieser Plan ändert keine Oberfläche; Schwächen der P1-Oberfläche als Vorschläge:
+- „Widerrufen“ in „Claude verbinden“ ist ein Textknopf mit etwa 20 px Höhe (Ziel 44 px).
+- „Token gültig bis 2/5/2027“: `toLocaleDateString()` folgt der Browsersprache, nicht der Sprache der Installation; mit `i18n.language` stünde in der deutschen Oberfläche 5.2.2027.
+- Bei Overleafs Standardbreite des Seitenpanels (1280 px) ist der Platzhalter „Quellen durchsuchen“ abgeschnitten und der Startbefehl im Claude-Panel nur gekürzt sichtbar.
+
 ## Recipe changes
 - Die Browser-Suite braucht etwa 4 Minuten, das run-code-Werkzeug von Playwright bricht nach 60 s ab und lässt den Lauf weiterlaufen (ein zweiter Aufruf läuft dann parallel auf derselben Seite). Ablauf, der funktioniert: einen Wrapper in `.playwright-mcp/` (gitignoriert) erzeugen, der `spur-e2e.js` startet, ohne zu warten, und das Ergebnis an `page.__e2eErgebnis` hängt (`globalThis` wird zwischen Aufrufen nicht geteilt), dann in Aufrufen unter 60 s abfragen.
 
