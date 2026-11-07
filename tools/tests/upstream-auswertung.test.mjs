@@ -1,7 +1,7 @@
 // node --test tools/tests
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { auswerten, dateienOhneTests, dateienPruefen, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
+import { auswerten, dateiNormal, dateienOhneTests, dateienPruefen, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
 
 const t = (datei, name, status, fehler = '') => ({ suite: 'web', datei, test: name, status, fehler })
 const b = (datei, name, herkunft = 'overleaf', grund = 'Grund.') => ({ suite: 'web', datei, test: name, herkunft, grund })
@@ -69,7 +69,7 @@ test('Dateiargumente: fehlende, ausgeschlossene und bei du falsch abgelegte Date
   const existiert = d => da.has(d)
   const aus = [{ suite: 'web', datei: 'test/unit/src/b.test.mjs', grund: 'Pro.' }]
   assert.deepEqual(dateienPruefen('web', ['test/unit/src/a.test.mjs'], existiert, aus), [])
-  assert.deepEqual(dateienPruefen('web', ['./test/unit/src/a.test.mjs'], existiert, aus), [])
+  assert.equal(dateiNormal('./test/unit/src/'), 'test/unit/src')
   assert.match(dateienPruefen('web', ['test/unit/src/fehlt.test.mjs'], existiert, aus)[0], /fehlt\.test\.mjs.*nicht gefunden/)
   assert.match(dateienPruefen('web', ['test/unit/src/b.test.mjs'], existiert, aus)[0], /ausgeschlossen/)
   assert.deepEqual(dateienPruefen('du', ['test/unit/js/x.js'], existiert, []), [])
@@ -78,6 +78,6 @@ test('Dateiargumente: fehlende, ausgeschlossene und bei du falsch abgelegte Date
 
 test('Dateiargumente ohne gelaufene Tests werden gemeldet, auch Ordner', () => {
   const tests = [t('test/unit/src/a.test.mjs', 'x', 'passed'), t('test/unit/src/sub/c.test.mjs', 'y', 'passed')]
-  assert.deepEqual(dateienOhneTests(['test/unit/src/a.test.mjs', 'test/unit/src/sub/', 'app/src/z.mjs'], tests), ['app/src/z.mjs'])
+  assert.deepEqual(dateienOhneTests(['test/unit/src/a.test.mjs', 'test/unit/src/sub', 'app/src/z.mjs'], tests), ['app/src/z.mjs'])
   assert.deepEqual(dateienOhneTests([], []), [])
 })

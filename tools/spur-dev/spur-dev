@@ -129,21 +129,30 @@ upstream_lauf() {
   SPUR_SRC="$quelle" dc run --rm --no-deps -T --entrypoint bash -e SPUR_PROTOKOLL="$erg" "${vol[@]}" web \
     -lc "node /spur-tests/upstream.mjs $suite --ergebnis /ergebnis ${4:+$(printf '%q ' "${@:4}")}"
 }
+UPSTREAM_SUITEN="web frontend du"
+upstream_suite() { case " $UPSTREAM_SUITEN " in *" $1 "*) return 0 ;; esac; return 1; }
 upstream() {
-  local s q rc=0 cache="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev" b
-  local -a suiten
+  local s q r rc=0 cache="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev" b
+  local -a suiten fehlt=()
+  local hilfe="spur-dev upstream web|frontend|du [datei …] | alle | vergleich [web|frontend|du …]"
+  # Argumente vor dem Docker-Start prüfen; ein unbekannter Name liefe sonst nirgends und endete mit Exit 0.
+  case "${1:-}" in
+    alle) [ $# -eq 1 ] || { echo "spur-dev upstream alle nimmt keine Dateien. $hilfe" >&2; return 2; } ;;
+    vergleich) for s in "${@:2}"; do
+                 upstream_suite "$s" || { echo "spur-dev upstream vergleich: unbekannte Suite „$s“. $hilfe" >&2; return 2; }
+               done ;;
+    *) upstream_suite "${1:-}" || { echo "$hilfe" >&2; return 2; } ;;
+  esac
   UPSTREAM_ERG="$cache/upstream"
   docker_bereit; check_mounts
   dc --profile upstream up -d --wait mongo redis redis-test >/dev/null
-  case "${1:-}" in
-    web|frontend|du) upstream_lauf "$1" "$SRC" aktuell "${@:2}" ;;
-    alle) [ $# -eq 1 ] || { echo "spur-dev upstream alle nimmt keine Dateien; dafür web|frontend|du <datei …>" >&2; return 2; }
-          for s in web frontend du; do upstream_lauf "$s" "$SRC" aktuell || rc=$?; done; return "$rc" ;;
+  case "$1" in
+    # Der schwerste Exit-Code zählt: 2 (nichts gelaufen) darf nicht von einer späteren 1 überdeckt werden.
+    alle) for s in $UPSTREAM_SUITEN; do
+            upstream_lauf "$s" "$SRC" aktuell || { r=$?; [ "$r" -le "$rc" ] || rc=$r; }
+          done
+          return "$rc" ;;
     vergleich)
-      # Ein unbekannter Name liefe sonst nirgends und endete trotzdem mit Exit 0.
-      for s in "${@:2}"; do
-        case "$s" in web|frontend|du) ;; *) echo "spur-dev upstream vergleich: unbekannte Suite „$s“ (web, frontend, du)" >&2; return 2 ;; esac
-      done
       # main ist Overleaf, ext-ce overleaf-cep; die spur-Seite ist dieser Worktree (agent mit den Änderungen
       # dieses Zweigs), damit die Liste zum Code passt, mit dem sie committet wird.
       git -C "$SRC" fetch -q origin main ext-ce
@@ -152,16 +161,22 @@ upstream() {
         else git -C "$SRC" worktree add -q --detach "$cache/vergleich/$b" "origin/$b"; fi
       done
       # Ohne Argument alle Suiten; sonst nur die genannten, die übrigen Ergebnisse bleiben stehen.
-      suiten=("${@:2}"); [ ${#suiten[@]} -gt 0 ] || suiten=(web frontend du)
+      suiten=("${@:2}"); [ ${#suiten[@]} -gt 0 ] || read -ra suiten <<< "$UPSTREAM_SUITEN"
       for s in "${suiten[@]}"; do
         for q in main:"$cache/vergleich/main" ext-ce:"$cache/vergleich/ext-ce" agent:"$SRC"; do
-          upstream_lauf "$s" "${q#*:}" "${q%%:*}" --nur-ergebnis || true
+          upstream_lauf "$s" "${q#*:}" "${q%%:*}" --nur-ergebnis || fehlt+=("$s auf ${q%%:*}")
         done
       done
+      # Ohne Ergebnis eines Stands behält die Liste die alten Einträge dieser Suite; das muss rot enden.
       SPUR_SRC="$SRC" dc run --rm --no-deps -T --entrypoint bash \
         -v "$SRC/tools/tests:/spur-tests" -v "$UPSTREAM_ERG:/ergebnis" web \
-        -lc 'node /spur-tests/upstream.mjs liste --ergebnis /ergebnis' ;;
-    *) echo "spur-dev upstream web|frontend|du [datei …] | alle | vergleich [web|frontend|du …]" >&2; return 2 ;;
+        -lc 'node /spur-tests/upstream.mjs liste --ergebnis /ergebnis' || rc=$?
+      if [ ${#fehlt[@]} -gt 0 ]; then
+        echo "spur-dev upstream vergleich: ohne Ergebnis: ${fehlt[*]}; deren Einträge blieben unverändert" >&2
+        return 2
+      fi
+      return "$rc" ;;
+    *) upstream_lauf "$1" "$SRC" aktuell "${@:2}" ;;
   esac
 }
 case "${1:-}" in

@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {
   auswerten,
+  dateiNormal,
   dateienOhneTests,
   dateienPruefen,
   ersteZeile,
@@ -26,7 +27,10 @@ const befehl = args[0]
 const ergebnisOrdner = args[args.indexOf('--ergebnis') + 1]
 const nurErgebnis = args.includes('--nur-ergebnis')
 // Optional nur einzelne Testdateien, relativ zum Dienst (für schnelle Proben).
-const dateien = args.slice(1).filter((a, i, l) => !a.startsWith('--') && l[i] !== ergebnisOrdner)
+const dateien = args
+  .slice(1)
+  .filter(a => !a.startsWith('--') && a !== ergebnisOrdner)
+  .map(dateiNormal)
 
 const lesen = datei => JSON.parse(fs.readFileSync(datei, 'utf8'))
 const lesenOder = (datei, standard) => (fs.existsSync(datei) ? lesen(datei) : standard)
@@ -174,11 +178,14 @@ function suiteLaufen(suite) {
   const basis = suite === 'du' ? DU : WEB
   const falsch = dateienPruefen(suite, dateien, d => fs.existsSync(path.join(basis, d)), ausgeschlossen)
   if (falsch.length) return abbrechen(suite, falsch)
+  // Ein altes Ergebnis darf einen gescheiterten Lauf nicht vertreten (der Vergleich liest diese Datei).
+  const ergebnis = path.join(ergebnisOrdner, `${suite}.json`)
+  fs.rmSync(ergebnis, { force: true })
   const tests = SUITEN[suite](ausgeschlossen)
-  fs.writeFileSync(path.join(ergebnisOrdner, `${suite}.json`), JSON.stringify(tests, null, 1))
   if (tests.length === 0) return abbrechen(suite, ['kein einziger Test gelaufen'])
   const ohneTests = dateienOhneTests(dateien, tests)
   if (ohneTests.length) return abbrechen(suite, ohneTests.map(d => `${d}: enthält keine Tests dieser Suite`))
+  fs.writeFileSync(ergebnis, JSON.stringify(tests, null, 1))
   if (nurErgebnis) {
     console.log(`${suite}: ${tests.length} Tests in ${minuten(Date.now() - start)} min`)
     return 0
