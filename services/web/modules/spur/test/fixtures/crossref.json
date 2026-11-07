@@ -1,0 +1,35 @@
+{
+  "10.5555/spur.2024.001": {
+    "DOI": "10.5555/spur.2024.001",
+    "type": "journal-article",
+    "title": ["Sleep and Memory"],
+    "author": [{ "given": "Alice", "family": "Smith" }],
+    "container-title": ["Journal of Sleep Research"],
+    "issued": { "date-parts": [[2024]] },
+    "page": "345-352"
+  },
+  "10.5555/spur.retracted": {
+    "DOI": "10.5555/spur.retracted",
+    "type": "journal-article",
+    "title": ["Retracted Findings on Sleep"],
+    "author": [{ "given": "Bob", "family": "Jones" }],
+    "container-title": ["Journal of Sleep Research"],
+    "issued": { "date-parts": [[2022]] },
+    "page": "1-2",
+    "updated-by": [
+      { "DOI": "10.5555/spur.retraction-note", "type": "retraction", "label": "Retraction" }
+    ]
+  },
+  "10.5555/spur.korrigiert": {
+    "DOI": "10.5555/spur.korrigiert",
+    "type": "journal-article",
+    "title": ["Corrected Findings on Sleep"],
+    "author": [{ "given": "Carla", "family": "Klein" }],
+    "container-title": ["Journal of Sleep Research"],
+    "issued": { "date-parts": [[2023]] },
+    "page": "10-20",
+    "updated-by": [
+      { "DOI": "10.5555/spur.correction-note", "type": "correction", "label": "Correction" }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+# Entwicklungs-Image: das fertige spur-Image plus alle Entwicklungspakete.
+# Quellcode wird beim Start eingehängt, Bauen braucht danach kein Netz.
+ARG SPUR_IMAGE
+FROM ${SPUR_IMAGE}
+
+WORKDIR /overleaf
+
+ENV CYPRESS_INSTALL_BINARY=0
+RUN yarn install --immutable

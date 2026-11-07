@@ -1,88 +1,82 @@
-<h1 align="center">
-  <br>
-  <a href="https://www.overleaf.com"><img src="doc/logo.png" alt="Overleaf" width="300"></a>
-</h1>
+# spur
 
-<h4 align="center">An open-source online real-time collaborative LaTeX editor.</h4>
-
-<p align="center">
-  <a href="https://github.com/yu-i-i/overleaf-cep/wiki">Wiki</a> •
-  <a href="https://www.overleaf.com/for/enterprises">Server Pro</a> •
-  <a href="#authors">Authors</a> •
-  <a href="#license">License</a>
-</p>
-
-<img src="doc/screenshot.png" alt="A screenshot of a project being edited in Overleaf Extended Community Edition">
-<p align="center">
-  Figure 1: A screenshot of a project being edited in Overleaf CE+
-</p>
-
-## Community Edition
-
-[Overleaf](https://www.overleaf.com) is an open-source online real-time collaborative LaTeX editor. Overleaf runs a hosted version at [www.overleaf.com](https://www.overleaf.com), but you can also run your own local version, and contribute to the development of Overleaf.
-
-## Extended Community Edition (CE+)
-
-The present "extended" version of Overleaf CE includes:
-
-- Sandboxed compiles with TeX Live image selection
-- Sign Up page
-- LDAP authentication
-- SAML authentication
-- OpenID Connect authentication
-- Real-time track changes and comments
-- Symbol palette
-- Template gallery
-- Import file from external URL
-- Git integration
-- GitHub synchronization
-- Zotero integration
-- Reference Search and Pick Tool
-- Document Import (`.docx`, `.md`) and Export (`.docx`, `.md`, `.html`) 
-- Advanced administrator tools for managing user accounts and projects
-- Python script runner
-- Logo tools
-
-> [!CAUTION]
-> Overleaf Community Edition is intended for use in environments where **all** users are trusted. Community Edition is **not** appropriate for scenarios where isolation of users is required due to Sandbox Compiles not being available. When not using Sandboxed Compiles, users have full read and write access to the `sharelatex` container resources (filesystem, network, environment variables) when running LaTeX compiles. 
-Therefore, in any environment where not all users can be fully trusted, it is strongly recommended to enable the Sandboxed Compiles feature available in the Extended Community Edition.
-
-For more information on Sandbox Compiles check out Overleaf [documentation](https://docs.overleaf.com/on-premises/configuration/overleaf-toolkit/server-pro-only-configuration/sandboxed-compiles).
-
-## Enterprise
-
-If you want help installing and maintaining Overleaf in your lab or workplace, Overleaf offers an officially supported version called [Overleaf Server Pro](https://www.overleaf.com/for/enterprises).
+spur ist eine selbst gehostete Schreibumgebung für wissenschaftliche Arbeiten auf Basis von [overleaf-cep](https://github.com/yu-i-i/overleaf-cep). Sie verwalten Quellen im Editor, fügen Zitate per Knopf ein und sehen in einem Prüfbericht, ob Wortlaut, Seite und Referenz stimmen und ob eine Arbeit zurückgezogen wurde. Ihr eigenes Claude Code schreibt mit, ohne Zitate erfinden zu können.
 
 ## Installation
 
-Detailed installation instructions can be found in the [Overleaf Toolkit](https://github.com/overleaf/toolkit/).
-Configuration details and release history for the Extended Community Edition can be found on the [Extended CE Wiki Page](https://github.com/yu-i-i/overleaf-cep/wiki).
+Sie brauchen Docker mit Compose und `make`.
 
-## Overleaf Docker Image
+```sh
+git clone https://github.com/ahlerjam/spur.git
+cd spur
+make start
+```
 
-This repo contains two dockerfiles, [`Dockerfile-base`](server-ce/Dockerfile-base), which builds the
-`sharelatex/sharelatex-base:ext-ce` image, and [`Dockerfile`](server-ce/Dockerfile) which builds the
-`sharelatex/sharelatex:ext-ce` image.
+`make start` legt beim ersten Start ein `.env` mit einem zufälligen `OVERLEAF_INVITE_TOKEN_SECRET` an und startet das veröffentlichte Image. Ohne dieses Secret startet der Container nicht. spur läuft danach auf <http://localhost:8080>. Das erste Administratorkonto legen Sie unter `/launchpad` an.
 
-The Base image generally contains the basic dependencies like `wget`, plus `texlive`.
-This is split out because it's a pretty heavy set of
-dependencies, and it's nice to not have to rebuild all of that every time.
+| Befehl | Wirkung |
+|---|---|
+| `make start` | Startet spur |
+| `make stop` | Stoppt spur |
+| `make seed` | Legt Demo-Daten an |
+| `make test` | Führt die Unit-Tests aus |
+| `make e2e` | Führt Playwright gegen den laufenden Stack aus |
 
-The `sharelatex/sharelatex` image extends the base image and adds the actual Overleaf code
-and services.
+`SPUR_URL`, `SPUR_PORT` und `SPUR_IMAGE` ändern Adresse, Port und Image. Die Sprache gilt für die ganze Installation: Standard ist Deutsch, `OVERLEAF_SITE_LANGUAGE=en` im `.env` stellt auf Englisch um. Backups umfassen das Volume `spur_data` und die MongoDB.
 
-Use `make build-base` and `make build-community` from `server-ce/` to build these images.
+Betreiben Sie spur öffentlich, ist die Compile-Sandbox Pflicht:
 
-The [Phusion base-image](https://github.com/phusion/baseimage-docker)
-(which is extended by the `base` image) provides a VM-like container
-in which to run the Overleaf services. Baseimage uses the `runit` service
-manager to manage services, and init scripts from the `server-ce/runit`
-folder are added.
+```sh
+SPUR_DATA_DIR=/srv/spur docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+```
+
+### HTTPS
+
+Für einen Server im Netz gehört ein Reverse Proxy mit TLS vor spur. Im `.env` stehen dann:
+
+```sh
+SPUR_URL=https://spur.example.org
+OVERLEAF_SECURE_COOKIE=true
+```
+
+Beispiel für [Caddy](https://caddyserver.com), das Zertifikate selbst holt:
+
+```
+spur.example.org {
+	reverse_proxy localhost:8080 {
+		flush_interval -1
+	}
+}
+```
+
+`flush_interval -1` reicht Antworten sofort durch. Das braucht der MCP-Endpunkt `/spur/mcp`, der lange auf Aufträge wartet und alle 30 Sekunden Fortschritt sendet. Läuft der Proxy nicht auf demselben Rechner, ergänzen Sie seine Adresse in `OVERLEAF_TRUSTED_PROXY_IPS` (zum Beispiel `loopback,10.0.0.5`).
+
+## Claude und Ihre Daten
+
+Unter Einstellungen, „Claude verbinden“, erzeugt spur ein Token und zeigt die Befehle, die das Plugin `spur` aus diesem Repository in Claude Code einrichten:
+
+```sh
+claude plugin marketplace add ahlerjam/spur
+claude plugin install spur@spur --config server_url=https://ihre-spur-adresse/spur/mcp --config token=<Token>
+```
+
+
+Inhalte, die Claude liest, gehen an Anthropic. Dazu gehören Dokumente und Quellen, auch Interviews. Die Verantwortung dafür liegt bei Ihnen.
+
+## Herkunft
+
+spur baut auf [overleaf-cep](https://github.com/yu-i-i/overleaf-cep) auf, der Extended Community Edition von [Overleaf](https://www.overleaf.com). Von dort stammen unter anderem Track Changes und Kommentare, Sandbox-Compiles, LDAP-, SAML- und OpenID-Anmeldung, Git- und Zotero-Integration sowie die Admin-Werkzeuge. Ein wöchentlicher Job holt Änderungen von overleaf-cep als Pull Request.
+
+> [!CAUTION]
+> Ohne Sandbox-Compiles haben alle Nutzer beim Kompilieren vollen Zugriff auf den Container (Dateisystem, Netz, Umgebungsvariablen). Betreiben Sie spur ohne Sandbox nur, wenn Sie allen Nutzern vertrauen.
+
+Overleaf® ist eine eingetragene Marke. spur ist kein Produkt von Overleaf und wird von Overleaf weder betrieben noch unterstützt.
 
 ## Authors
 
 [The Overleaf Team](https://www.overleaf.com/about)\
-[yu-i-i](https://github.com/yu-i-i), [davrot](https://github.com/davrot) — CE extensions; references to adapted code are listed in [`CREDITS`](CREDITS.md). See also the authors of individual commits.
+[yu-i-i](https://github.com/yu-i-i), [davrot](https://github.com/davrot) — CE extensions; references to adapted code are listed in [`CREDITS`](CREDITS.md). See also the authors of individual commits.\
+spur: [ahlerjam](https://github.com/ahlerjam).
 
 ## License
 

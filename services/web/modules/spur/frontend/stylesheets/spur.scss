@@ -1,0 +1,223 @@
+.spur-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.spur-panel-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-03);
+  padding: var(--spacing-03) var(--spacing-05);
+}
+
+.spur-panel-hinweis {
+  padding: 0 var(--spacing-05) var(--spacing-03);
+
+  // Im schmalen Panel steht der Knopf unter dem Text, statt aus der Karte zu ragen.
+  .notification-content-and-cta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-02);
+    min-width: 0;
+  }
+
+  .notification-cta {
+    padding-left: 0;
+    margin-left: 0;
+  }
+}
+
+.spur-loeschen {
+  margin-top: var(--spacing-05);
+}
+
+.spur-suche {
+  padding: 0 var(--spacing-05) var(--spacing-03);
+}
+
+.spur-panel-inhalt {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--spacing-05) var(--spacing-05);
+}
+
+.spur-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.spur-zeile {
+  padding: var(--spacing-03) 0;
+  border-bottom: 1px solid var(--border-divider);
+  overflow-wrap: anywhere;
+}
+
+.spur-zeile-link.btn {
+  padding: 0;
+  text-align: left;
+  white-space: normal;
+}
+
+.spur-zeile-key {
+  margin-left: var(--spacing-03);
+  font-family: var(--font-family-mono, monospace);
+  font-size: var(--font-size-02);
+}
+
+.spur-zeile-meta,
+.spur-zeile-auszug,
+.spur-leer {
+  margin: var(--spacing-01) 0 0;
+  font-size: var(--font-size-02);
+  color: var(--content-secondary);
+}
+
+.spur-leer {
+  padding: var(--spacing-05) 0;
+}
+
+.spur-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-02);
+  margin-top: var(--spacing-02);
+}
+
+.spur-seitenzahl {
+  font-size: var(--font-size-02);
+}
+
+.spur-seitenbild {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border-divider);
+}
+
+.spur-seitentext {
+  margin-top: var(--spacing-03);
+  font-family: inherit;
+  font-size: var(--font-size-02);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.spur-fassung {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-02);
+  margin-top: var(--spacing-05);
+}
+
+.spur-marke-rot {
+  background-color: rgb(179 38 30 / 18%);
+  border-bottom: 2px solid var(--content-danger);
+}
+
+.spur-marke-gelb {
+  background-color: rgb(204 136 0 / 18%);
+  border-bottom: 2px dotted var(--content-warning);
+}
+
+.spur-zitate {
+  margin-top: var(--spacing-05);
+}
+
+.spur-zitate-titel {
+  margin: var(--spacing-05) 0 var(--spacing-02);
+  font-size: var(--font-size-03);
+}
+
+.spur-panel-werkzeuge .btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+.spur-badges .badge,
+.spur-badges .badge-content {
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  text-align: left;
+}
+
+.settings-widget-container.spur-claude-verbinden {
+  display: block;
+
+  .description-container {
+    margin-bottom: var(--spacing-05);
+  }
+}
+
+.spur-befehl {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.spur-claude-status {
+  margin: var(--spacing-03) 0;
+}
+
+// Im schmalen Panel: eine Zeile mit Scrollbalken statt einer Spalte aus Wortfetzen.
+.spur-befehl-kompakt {
+  white-space: pre;
+  overflow-x: auto;
+  font-size: var(--font-size-01);
+  padding: var(--spacing-02);
+  margin: var(--spacing-02) 0;
+  background: var(--bg-light-secondary);
+  border-radius: var(--border-radius-base);
+}
+
+.spur-nachricht-text {
+  margin: var(--spacing-01) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.spur-lauf-karte {
+  margin: var(--spacing-05) 0;
+  padding: var(--spacing-04);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-base, 4px);
+  // LaTeX-Befehle haben keine Umbruchstellen und ragten sonst aus der Karte.
+  overflow-wrap: anywhere;
+}
+
+.spur-lauf-kopf {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--spacing-03);
+  // Kein Umbruch mitten in „Lauf“: Ein langes Badge rutscht in die nächste Zeile.
+  overflow-wrap: normal;
+
+  h5 {
+    margin: 0;
+  }
+}
+
+.spur-lauf-rot {
+  margin-top: var(--spacing-03);
+  color: var(--content-danger);
+}
+
+.spur-ohne-rand {
+  padding: var(--spacing-02) 0 0;
+}
+
+// Schmale Bildschirme: Die IDE gibt dem Seitenpanel 15 % der Breite, bei 360 px also kaum 50 px.
+// Ein geöffnetes spur-Panel nimmt dort die Breite neben der Rail; Schließen führt zurück zum Editor.
+@media (max-width: 575.98px) {
+  [id^='ide-redesign-sidebar-panel-spur-'] {
+    flex: 0 0 calc(100vw - 40px) !important;
+  }
+}
