@@ -11,7 +11,7 @@ Agentische Schreibumgebung für wissenschaftliche Arbeiten auf Basis von Overlea
 - Testkonto: `spur-dev user mail@example.org` liefert den Aktivierungslink
 - Logs: `spur-dev logs 100`
 
-`spur-dev` liegt außerhalb des Repos und hängt den aktuellen Worktree in das Image `ghcr.io/ahlerjam/spur-dev` ein.
+`spur-dev` liegt außerhalb des Repos und hängt den aktuellen Worktree in das Image `ghcr.io/ahlerjam/spur-dev` ein. Es läuft als einziger Befehl außerhalb der Sandbox, und nur als alleinstehender Aufruf: Mit `;`, `&&`, Pipe oder Umleitung bleibt er in der Sandbox und erreicht Docker nicht. Freies `docker` ist gesperrt.
 
 Neue npm-Pakete brauchen einen neuen Lauf des Workflows `Dev image`. In einem Builder-Lauf sind sie ein Stoppgrund.
 

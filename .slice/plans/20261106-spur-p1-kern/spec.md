@@ -48,11 +48,18 @@ Forschende und Studierende, allein oder im kleinen Team. Betreiber installieren 
 - `make start` erzeugt beim ersten Start ein `.env` mit `OVERLEAF_INVITE_TOKEN_SECRET`; ohne dieses Secret startet der Container nicht.
 
 ## Testbarkeit
-- Fertiges Image aus Lauf 0: `ghcr.io/ahlerjam/spur:dev-arm64` und `dev-amd64`, Workflow `Dev image`.
-- `make start` startet den Stack auf `http://localhost:8080`, `make test` die Unit-Tests, `make e2e` Playwright gegen den Stack, `make seed` legt Demo-Daten an.
+- Builder nutzen ausschließlich `spur-dev` (siehe `CLAUDE.md`): `up`, `reload` (etwa 50 Sekunden, ohne Netz), `restart`, `test`, `user`, `logs`. Der Stack läuft auf `http://localhost:8080`.
+- Neue npm-Pakete sind in einem Lauf ein Stoppgrund. Sie brauchen vorher einen Lauf des Workflows `Dev image`. Vor P1 müssen die benötigten Pakete, vor allem `@modelcontextprotocol/sdk` und `@modelcontextprotocol/express`, im Lockfile stehen und `@lezer/common` und `@lezer/lr` unter `dependencies` liegen.
+- Für Betreiber gilt: `make start` startet mit dem veröffentlichten Image, `make test` die Unit-Tests, `make e2e` Playwright gegen den Stack, `make seed` legt Demo-Daten an.
 - `SPUR_FAKE_AGENT=1` ersetzt Claude durch einen gescripteten MCP-Client, `SPUR_PAPER_API_BASE` zeigt auf den Fake mit aufgezeichneten Crossref-Antworten, `SPUR_NOW` fixiert die Zeit.
 - Kein Schritt braucht ein echtes Claude. Das Plugin prüft `claude plugin validate`, der Smoke-Test läuft je Meilenstein von Hand.
 - Fixtures: `smith2024.pdf` (DOI `10.5555/spur.2024.001`, Seiten 345 bis 352, Seite 347 ist PDF-Seite 3, Satz „Sleep supports the consolidation of declarative memory.“), `retracted.pdf` (DOI `10.5555/spur.retracted`), `scan.pdf` ohne Text, `interview.vtt`.
+
+## Bekannt aus Lauf 0
+- Beide Architekturen bauen in GitHub Actions in etwa 7 Minuten, Image 3,56 GB, `biber 2.22` läuft auf arm64.
+- Lokaler Build hinter Zscaler geht nicht; gebaut wird in der CI.
+- Der amd64-Build scheiterte zweimal an der Git-Abhängigkeit `codemirror-indentation-markers`, beim dritten Versuch lief er. Der Veröffentlichungs-Workflow braucht deshalb Wiederholungen.
+- `create-user.mjs` gibt den Link mit Steuerzeichen aus; Skripte filtern `token=…&user_id=…`.
 
 ## Access
 - `CROSSREF_MAILTO`
