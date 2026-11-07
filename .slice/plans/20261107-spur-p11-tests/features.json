@@ -1,0 +1,43 @@
+{"features": [
+ {"id": "f1", "title": "Overleafs web-Unit-Suite läuft in korrekter Umgebung", "steps": [
+  "Entwickler führt `spur-dev upstream web` im spur-Repo aus: die web-Unit-Suite von Overleaf läuft mit NODE_ENV=test im Dev-Container",
+  "Die Ausgabe endet mit einer Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“",
+  "Kein Fehler mehr mit „failed to resolve \"extends\":\"../../tsconfig.backend.json\"“, „Refusing to clear database“ oder „Cannot read properties of undefined (reading 'externalAuth')“ in der Ausgabe",
+  "Testdateien, die Module aus Overleaf Server Pro brauchen, erscheinen als ausgeschlossen mit Grund, nicht als fehlgeschlagen",
+  "Die Zahl der fehlgeschlagenen Tests liegt deutlich unter den gemessenen 408"]},
+ {"id": "f2", "title": "Overleafs Frontend-Suite läuft", "steps": [
+  "Entwickler führt `spur-dev upstream frontend` aus: die Suite lädt ohne „Your application tried to access @“ und läuft bis zum Ende",
+  "Die Ausgabe endet mit der Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“",
+  "Die Tests des Review-Panels (gepatcht in P1) laufen mit"]},
+ {"id": "f3", "title": "document-updater vollständig geprüft", "steps": [
+  "Entwickler führt `spur-dev upstream du` aus: Unit- und Acceptance-Tests des document-updater laufen gegen Redis und Mongo des Stacks",
+  "Die Tests des spur-Ops-Endpunkts sind darin enthalten und grün",
+  "Die Ausgabe endet mit der Zusammenfassung „bestanden, fehlgeschlagen, bekannt, neu“"]},
+ {"id": "f4", "title": "Dreier-Vergleich und Liste bekannter Fehler", "steps": [
+  "Entwickler führt den Vergleich aus: dieselben Suiten laufen auf Worktrees von `main`, `ext-ce` und `agent`",
+  "Im Repo liegt danach die Liste bekannter Fehler; jeder Eintrag nennt Suite, Datei, Testname, Herkunft (`overleaf` oder `overleaf-cep`) und einen Grund",
+  "Kein Eintrag hat die Herkunft `spur`; ein Fehler, der nur auf `agent` auftritt, ist behoben und hat einen Regressionstest",
+  "`spur-dev upstream web` meldet danach „neu: 0“"]},
+ {"id": "f5", "title": "CI-Job upstream im Pull Request", "steps": [
+  "`.github/workflows/ci.yml` hat neben `test` einen Job `upstream`, der web, frontend und document-updater prüft",
+  "Mit unveränderten Tests endet der Vergleich lokal mit Exit 0 und „neu: 0“",
+  "Mit einem absichtlich kaputt gemachten Overleaf-Test (lokal, nicht committet) endet derselbe Vergleich mit Exit 1 und nennt genau diesen Test als neu",
+  "Ein Test der Liste, der grün wird, erscheint als Hinweis „bekannt, jetzt grün“, ohne dass der Job scheitert",
+  "Die Laufzeit des Jobs ist in der Ausgabe ablesbar und unter 30 Minuten"]},
+ {"id": "f6", "title": "Unit-Tests für die spur-Serverlogik", "steps": [
+  "`spur-dev test` führt neue Unit-Tests für Token und Bot, Rechte, MCP-Fehlercodes, Crossref, PDF-Labels und VTT, `.bib`, Inbox, Lauf-Aktionen, Download-Schutz und Testschalter aus, alle grün",
+  "Regressionstests decken die Fehler aus den P1-Abnahmen ab: erstes Token ist mit dem Bot verknüpft; unbekanntes Projekt mit Admin-Token ergibt `keine_rechte`; Rücknahme setzt eine gelöschte Zeile nach Handänderung an die richtige Stelle oder meldet Konflikt; zu langer Dateiname ergibt `pfad_ungueltig`; abgebrochener Download beendet den Prozess nicht; Upload ohne Feld ergibt RFC 9457",
+  "Der Abdeckungsbericht für `modules/spur/app/src` ohne `dev/` zeigt mindestens 80 % der Zeilen",
+  "Ein absichtlich falsch gemachter Rechte-Check (lokal, nicht committet) lässt mindestens einen Test rot werden"]},
+ {"id": "f7", "title": "Frontend-Tests für die spur-Oberfläche", "steps": [
+  "`spur-dev upstream frontend` führt auch Tests unter `modules/spur/test/frontend` aus, alle grün",
+  "Die Lauf-Karte zeigt im Test für einen Owner „Alle annehmen“ und „Lauf ablehnen“, für eine Review-Rolle kein „Annehmen“",
+  "Das Quellen-Panel zeigt im Test „Noch keine Quellen“ ohne Daten und nach einem Fehler der API eine Fehlermeldung in Text",
+  "Der Prüfbericht filtert im Test mit „Nur Probleme“ grüne Zeilen heraus",
+  "„Claude verbinden“ zeigt im Test das Token genau einmal und danach nur noch „gültig bis“"], "ui": true},
+ {"id": "f8", "title": "Doku für Tests und MongoDB-Kernel", "steps": [
+  "`CLAUDE.md` nennt die Befehle für alle Suiten und den Vergleich",
+  "Die README hat einen Abschnitt „Entwicklung und Tests“ mit denselben Befehlen und dem Hinweis auf die Liste bekannter Fehler",
+  "Die README nennt im Abschnitt Installation: MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13; Server brauchen Kernel bis 6.18 oder ab 7.0.14",
+  "`docs/backlog.md` enthält Cypress-Tests und web-Acceptance-Tests als offene Punkte"]}
+]}
