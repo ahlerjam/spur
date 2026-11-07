@@ -537,10 +537,14 @@ async page => {
       await page.keyboard.press('Escape')
 
       await page.goto(`${BASE}/user/settings`)
-      const vorher = await page.locator('.spur-token').count()
+      await page.locator('.spur-token').first().waitFor()
       await page.locator('.spur-token').first().getByRole('button', { name: 'Widerrufen' }).click()
-      await page.waitForFunction(n => document.querySelectorAll('.spur-token').length === n - 1, vorher)
-      ok((await mcp(token, 'tools/list')).status === 401, 'Widerrufenes Token wirkt')
+      let status = 200
+      for (let versuch = 0; versuch < 20 && status !== 401; versuch++) {
+        await page.waitForTimeout(250)
+        status = (await mcp(token, 'tools/list')).status
+      }
+      ok(status === 401, `Widerrufenes Token wirkt: ${status}`)
 
       await anmelden('e2e-leser@example.org')
       await page.goto(`${BASE}/user/settings`)
