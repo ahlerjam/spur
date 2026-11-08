@@ -30,10 +30,20 @@ Zurückgestellt, nicht verworfen. Vor neuen Plänen hier nachsehen.
 ## Tests
 - Cypress-Tests von Overleaf (`server-ce/test`) im Dev-Stack und in der CI
 - Acceptance-Tests des web-Dienstes (`services/web/test/acceptance`)
+- P1-Frontend-Test „Prüfbericht-Panel blendet mit ‚Nur Probleme‘ grüne Zeilen aus“ schwankt im Gesamtlauf; auf `findBy…` umstellen
+- Sinngemäße Suche mit echtem Modell (`multilingual-e5-small`) automatisch prüfen, heute nur von Hand
 
 ## Betrieb
 - Semantische Suche über Postgres mit pgvector, falls Brute Force nicht mehr reicht
 - Kurze Tokens mit OAuth
+- Ratenlimits für Webseiten-Aufnahme und Kommentare; OCR-Grenze je Projekt und Seitenobergrenze
+- SSRF-Schutz (`netz.mjs`) auch für `linked-url-proxy` nutzen und `Settings.blockedNetworks` beachten
+
+## Oberfläche
+- Abzeichen „Nicht frei“ in der Recherche hat zu wenig Kontrast
+- Schmales Recherche-Panel: Suchfeld abgeschnitten, Reiter untereinander
+- Gemischte Menüsprache im Editor (File, Insert, View neben Bearbeiten, Hilfe)
+- Markierungen auch im Seitentext der Quellen-Vorschau hervorheben
 
 ## Vor dem jeweiligen Plan ins Image
 - P2: `@huggingface/transformers` für die semantische Suche
