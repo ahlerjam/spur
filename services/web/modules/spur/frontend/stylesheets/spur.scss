@@ -30,6 +30,14 @@
   }
 }
 
+// Im schmalen Panel ist ein langes Wort („Pseudonymisieren“) oder eine Adresse in einer Meldung
+// breiter als die Spalte neben dem Symbol: trennen statt rechts hinauslaufen.
+.spur-panel .notification-content {
+  min-width: 0;
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+
 .spur-loeschen {
   margin-top: var(--spacing-05);
 }
@@ -73,6 +81,8 @@
 .spur-zeile-auszug,
 .spur-leer {
   margin: var(--spacing-01) 0 0;
+  // Adressen und lange Wörter umbrechen, auch außerhalb einer Listenzeile.
+  overflow-wrap: anywhere;
   font-size: var(--font-size-02);
   color: var(--content-secondary);
 }
@@ -131,6 +141,46 @@
 .spur-zitate-titel {
   margin: var(--spacing-05) 0 var(--spacing-02);
   font-size: var(--font-size-03);
+}
+
+.spur-zitate .btn-group {
+  margin-bottom: var(--spacing-02);
+}
+
+.spur-kommentare {
+  margin: var(--spacing-02) 0;
+  padding-left: var(--spacing-04);
+  border-left: 2px solid var(--border-divider);
+  list-style: none;
+  font-size: var(--font-size-02);
+}
+
+.spur-kommentar-von {
+  font-weight: 600;
+}
+
+.spur-zugewiesen {
+  font-weight: 600;
+  color: var(--content-primary);
+}
+
+.spur-kommentar-form,
+.spur-web-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-02);
+  margin: var(--spacing-02) 0;
+}
+
+.spur-kommentar-form label,
+.spur-web-form label {
+  margin-bottom: 0;
+}
+
+.spur-kommentar-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-02);
 }
 
 .spur-panel-werkzeuge .btn {
@@ -220,4 +270,12 @@
   [id^='ide-redesign-sidebar-panel-spur-'] {
     flex: 0 0 calc(100vw - 40px) !important;
   }
+}
+
+// Der OCR-Status steht als Text da, nicht nur als Farbe (Quality Bar).
+.spur-ocr-hinweis {
+  margin: var(--spacing-03) 0 var(--spacing-02);
+  font-size: var(--font-size-02);
+  font-weight: 600;
+  color: var(--content-primary);
 }

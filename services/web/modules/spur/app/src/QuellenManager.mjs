@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import _ from 'lodash'
 import fs from 'node:fs/promises'
 import Path from 'node:path'
@@ -7,9 +8,11 @@ import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
 import { bearbeitungen, einstellungen, ereignisse, klone, laeufe, nachrichten, pruefCache, quellen, quellenSeiten, quotes } from './sammlungen.mjs'
-import { jetzt } from './schalter.mjs'
+import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
-import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { abrufen } from './WebSchnappschuss.mjs'
+import { quelleGeaendert } from './live.mjs'
 
 export const MAX_BYTES = 50 * 1024 * 1024
 const SEITE_LISTE = 100
@@ -91,17 +94,42 @@ function pruefeDateityp(dateiname) {
   }
 }
 
+const vorhandenFehler = name =>
+  new Problem(
+    409,
+    'quelle_vorhanden',
+    `„${name}“ ist schon vorhanden. Bitte die Datei umbenennen oder die alte Quelle löschen.`
+  )
+
+// Legt Quelle, Datei und Seiten an. Der eindeutige Index auf (projectId, key) entscheidet bei
+// gleichzeitigen Aufnahmen; scheitert danach etwas, bleibt nichts zurück.
+async function speichern(quelle, seitenListe, schreibeDatei) {
+  try {
+    await (await quellen()).insertOne(quelle)
+  } catch (error) {
+    if (error.code === 11000) throw vorhandenFehler(quelle.dateiname)
+    throw error
+  }
+  try {
+    const ziel = dateiPfad(quelle)
+    await fs.mkdir(Path.dirname(ziel), { recursive: true })
+    await schreibeDatei(ziel)
+    if (seitenListe.length) {
+      await (await quellenSeiten()).insertMany(
+        seitenListe.map(s => ({ quelleId: quelle._id, projectId: quelle.projectId, ...s }))
+      )
+    }
+  } catch (error) {
+    await loeschen(quelle)
+    throw error
+  }
+  return quelle
+}
+
 export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groesse }) {
   pruefeDateityp(dateiname)
-  const sammlung = await quellen()
   const key = schluesselAus(dateiname)
-  const vorhanden = () =>
-    new Problem(
-      409,
-      'quelle_vorhanden',
-      `„${dateiname}“ ist schon vorhanden. Bitte die Datei umbenennen oder die alte Quelle löschen.`
-    )
-  if (await sammlung.findOne({ projectId, key })) throw vorhanden()
+  if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
   const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
   const quelle = {
     _id: new ObjectId(),
@@ -120,27 +148,165 @@ export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groess
     angelegtVon: userId,
     angelegtAm: jetzt(),
   }
-  // Der eindeutige Index auf (projectId, key) entscheidet bei gleichzeitigen Uploads.
-  try {
-    await sammlung.insertOne(quelle)
-  } catch (error) {
-    if (error.code === 11000) throw vorhanden()
-    throw error
+  return await speichern(quelle, inhalt.seiten, ziel => fs.copyFile(tempPfad, ziel))
+}
+
+const slug = text =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/, '')
+
+// Ein datierter Schnappschuss: Text, Adresse, Abrufzeit und Hash des Textes; die HTML-Datei bleibt.
+export async function webAufnehmen({ projectId, userId, url }) {
+  // Im Dev-Stack liegt die Testseite im lokalen Netz.
+  const seite = await abrufen(url, IST_DEV ? { gesperrt: () => false } : {})
+  const adresse = new URL(seite.url)
+  const sammlung = await quellen()
+  // Viele Seiten heißen gleich („Startseite“): dann mit Zähler, statt zum Umbenennen aufzufordern.
+  const basis = slug(seite.titel ?? '') || slug(`${adresse.hostname}${adresse.pathname}`) || 'webseite'
+  const [gleich, belegteKeys] = await Promise.all([
+    sammlung.findOne({ projectId, 'web.url': seite.url }),
+    sammlung.distinct('key', { projectId, key: new RegExp(`^${_.escapeRegExp(basis)}(-\\d+)?$`) }),
+  ])
+  if (gleich) {
+    throw new Problem(
+      409,
+      'quelle_vorhanden',
+      `Diese Webseite ist schon als Quelle vorhanden („${gleich.meta?.titel ?? gleich.dateiname}“).`
+    )
   }
+  const belegt = new Set(belegteKeys)
+  let key = basis
+  for (let n = 2; belegt.has(key); n++) key = `${basis}-${n}`
+  const html = Buffer.from(seite.html)
+  const quelle = {
+    _id: new ObjectId(),
+    projectId,
+    dateiname: `${key}.html`,
+    key,
+    groesse: html.length,
+    art: 'web',
+    seitenzahl: 1,
+    status: seite.text ? 'text' : 'kein_text',
+    doi: null,
+    meta: { titel: seite.titel },
+    web: {
+      url: seite.url,
+      abgerufenAm: jetzt(),
+      hash: createHash('sha256').update(seite.text).digest('hex'),
+    },
+    versatz: null,
+    versatzQuelle: null,
+    fassung: '',
+    angelegtVon: userId,
+    angelegtAm: jetzt(),
+  }
+  return await speichern(quelle, [{ seite: 1, label: null, text: seite.text }], ziel =>
+    fs.writeFile(ziel, html)
+  )
+}
+
+// Schreibt die Seite nach jeder Seite fort; steht sie länger still, ist der Prozess weg (Neustart).
+const OCR_VERWAIST_MS = 10 * 60 * 1000
+
+export function ocrZustand(quelle) {
+  if (!quelle.ocr) return null
+  const { status, fertig, gesamt, konfidenz = null, aktualisiert } = quelle.ocr
+  const verwaist = status === 'laeuft' && jetzt() - aktualisiert > OCR_VERWAIST_MS
+  return { status: verwaist ? 'abgebrochen' : status, fertig, gesamt, konfidenz }
+}
+
+// Rastern und Tesseract brauchen viel Rechenzeit im Web-Prozess: höchstens zwei Läufe zugleich.
+const OCR_PARALLEL = 2
+let ocrLaeufe = 0
+
+export async function ocrStarten(quelle) {
+  // Auch eine fertige OCR-Quelle nicht neu erkennen: Bestätigte Stellen bezögen sich sonst auf
+  // einen Text, den es nicht mehr gibt.
+  if (quelle.art !== 'pdf' || quelle.status !== 'kein_text') {
+    throw new Problem(
+      409,
+      'ocr_unnoetig',
+      'Diese Quelle hat schon Text. Texterkennung gibt es nur für gescannte PDFs ohne Text.'
+    )
+  }
+  if (ocrLaeufe >= OCR_PARALLEL) {
+    throw new Problem(
+      429,
+      'ocr_ausgelastet',
+      'Gerade laufen schon zwei Texterkennungen. Bitte in einigen Minuten erneut starten.'
+    )
+  }
+  const nun = jetzt()
+  const neu = await (await quellen()).findOneAndUpdate(
+    {
+      _id: quelle._id,
+      $or: [
+        { 'ocr.status': { $ne: 'laeuft' } },
+        { 'ocr.aktualisiert': { $lt: new Date(nun - OCR_VERWAIST_MS) } },
+      ],
+    },
+    {
+      $set: {
+        ocr: { status: 'laeuft', fertig: 0, gesamt: quelle.seitenzahl, aktualisiert: nun },
+      },
+    },
+    { returnDocument: 'after' }
+  )
+  if (!neu) {
+    throw new Problem(409, 'ocr_laeuft', 'Die Texterkennung läuft schon. Bitte kurz warten.')
+  }
+  quelleGeaendert(neu)
+  ocrLaeufe++
+  const lauf = ocrAusfuehren(neu)
+    .catch(error => logger.error({ err: error, quelleId: neu._id }, 'spur: Texterkennung ohne Abschluss'))
+    .finally(() => ocrLaeufe--)
+  return { quelle: neu, lauf }
+}
+
+async function ocrAusfuehren(quelle) {
+  const sammlung = await quellen()
+  const seiten = await quellenSeiten()
+  const ergebnisse = []
   try {
-    const ziel = dateiPfad(quelle)
-    await fs.mkdir(Path.dirname(ziel), { recursive: true })
-    await fs.copyFile(tempPfad, ziel)
-    if (inhalt.seiten.length) {
-      await (await quellenSeiten()).insertMany(
-        inhalt.seiten.map(s => ({ quelleId: quelle._id, projectId, ...s }))
+    for (let nr = 1; nr <= quelle.seitenzahl; nr++) {
+      const ergebnis = await ocrSeite(dateiPfad(quelle), nr)
+      ergebnisse.push(ergebnis)
+      await seiten.updateOne(
+        { quelleId: quelle._id, seite: nr },
+        { $set: { text: ergebnis.text, ocrKonfidenz: ergebnis.konfidenz } }
       )
+      const { matchedCount } = await sammlung.updateOne(
+        { _id: quelle._id },
+        { $set: { 'ocr.fertig': nr, 'ocr.aktualisiert': jetzt() } }
+      )
+      // Quelle inzwischen gelöscht: nicht weiter rechnen.
+      if (!matchedCount) return
+      quelleGeaendert(quelle)
     }
+    const werte = ergebnisse.map(e => e.konfidenz).filter(k => k !== null)
+    await sammlung.updateOne(
+      { _id: quelle._id },
+      {
+        $set: {
+          status: ergebnisse.some(e => e.text.trim()) ? 'ocr' : 'kein_text',
+          'ocr.status': 'fertig',
+          'ocr.konfidenz': werte.length ? Math.round(_.mean(werte)) : null,
+          'ocr.aktualisiert': jetzt(),
+        },
+      }
+    )
   } catch (error) {
-    await loeschen(quelle)
-    throw error
+    logger.warn({ err: error, quelleId: quelle._id }, 'spur: Texterkennung fehlgeschlagen')
+    await sammlung.updateOne(
+      { _id: quelle._id },
+      { $set: { 'ocr.status': 'fehler', 'ocr.aktualisiert': jetzt() } }
+    )
   }
-  return quelle
+  quelleGeaendert(quelle)
 }
 
 export async function liste(projectId, { seite = 0 } = {}) {
@@ -159,6 +325,10 @@ export async function liste(projectId, { seite = 0 } = {}) {
 
 export async function alle(projectId) {
   return await (await quellen()).find({ projectId }).toArray()
+}
+
+export async function vonIds(projectId, ids) {
+  return await (await quellen()).find({ _id: { $in: ids }, projectId }).toArray()
 }
 
 export async function holen(projectId, quelleId) {
@@ -348,6 +518,8 @@ async function quelleKopieren(quelle, zielProjekt, userId) {
     projectId: zielProjekt,
     angelegtVon: userId,
     angelegtAm: jetzt(),
+    // Eine laufende Texterkennung gehört zum alten Projekt; dort läuft sie weiter.
+    ocr: quelle.ocr?.status === 'laeuft' ? null : (quelle.ocr ?? null),
   }
   try {
     await kopieAnlegen(quelle, neu, zielProjekt)
@@ -381,10 +553,14 @@ async function kopieAnlegen(quelle, neu, zielProjekt) {
   const marken = await (await quotes()).find({ quelleId: quelle._id }).toArray()
   if (marken.length) {
     await (await quotes()).insertMany(
+      // Kommentare und Zuweisungen gehören zum Team des alten Projekts. Die Bestätigung einer Stelle
+      // betrifft den Quelltext und gilt weiter.
       marken.map(({ _id, ...q }) => ({
         ...q,
         quelleId: neu._id,
         projectId: zielProjekt,
+        kommentare: [],
+        zugewiesen: null,
       }))
     )
   }

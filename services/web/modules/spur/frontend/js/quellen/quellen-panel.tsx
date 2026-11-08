@@ -6,17 +6,54 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
+import { useConnectionContext } from '@/features/ide-react/context/connection-context'
+import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
 import { anfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
-import type { Quelle, Treffer } from './typen'
+import Zugewiesen from './zugewiesen'
+import { anzeigename, datumLang, OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
+import WebAufnehmen from './web-aufnehmen'
 
 const MAX_BYTES = 50 * 1024 * 1024
 
-function QuellenZeile({ quelle, oeffnen }: { quelle: Quelle; oeffnen: () => void }) {
+function TextStatus({ quelle }: { quelle: Quelle }) {
   const { t } = useTranslation()
+  const ocr = quelle.ocr
+  if (ocr?.status === 'laeuft') {
+    return (
+      <span role="status">
+        <OLSpinner size="sm" />{' '}
+        {/* Die Seite, die gerade erkannt wird, nicht die Zahl der fertigen. */}
+        {t('spur_ocr_laeuft', { seite: Math.min(ocr.fertig + 1, ocr.gesamt), gesamt: ocr.gesamt })}
+      </span>
+    )
+  }
+  if (quelle.status === 'text') return <>{t('spur_text_erkannt')}</>
+  if (quelle.status === 'ocr') {
+    const unsicher = ocr?.konfidenz != null && ocr.konfidenz < OCR_SICHER_AB
+    return <>{t(unsicher ? 'spur_ocr_unsicher' : 'spur_ocr_pruefen')}</>
+  }
+  if (ocr?.status === 'fehler') return <>{t('spur_ocr_fehler')}</>
+  if (ocr?.status === 'abgebrochen') return <>{t('spur_ocr_abgebrochen')}</>
+  if (ocr?.status === 'fertig') return <>{t('spur_ocr_nichts')}</>
+  return <>{t('spur_kein_text')}</>
+}
+
+function QuellenZeile({
+  quelle,
+  oeffnen,
+  textErkennen,
+}: {
+  quelle: Quelle
+  oeffnen: () => void
+  textErkennen?: () => void
+}) {
+  const { t, i18n } = useTranslation()
+  const ocrMoeglich =
+    textErkennen && quelle.art === 'pdf' && quelle.status === 'kein_text' && quelle.ocr?.status !== 'laeuft'
   return (
     <li className="spur-zeile">
       <OLButton
@@ -25,16 +62,33 @@ function QuellenZeile({ quelle, oeffnen }: { quelle: Quelle; oeffnen: () => void
         className="spur-zeile-link"
         onClick={oeffnen}
       >
-        {quelle.dateiname}
+        {anzeigename(quelle)}
       </OLButton>
-      <p className="spur-zeile-meta">
-        {t(quelle.art === 'pdf' ? 'spur_seiten' : 'spur_abschnitte', {
-          count: quelle.seitenzahl,
-        })}
-        {' · '}
-        {quelle.status === 'text' ? t('spur_text_erkannt') : t('spur_kein_text')}
-        {quelle.fassung && ` · ${quelle.fassung}`}
-      </p>
+      {quelle.web ? (
+        <>
+          <p className="spur-zeile-meta">
+            {t('spur_webseite')}
+            {' · '}
+            {t('spur_abgerufen_am', { datum: datumLang(quelle.web.abgerufenAm, i18n.language) })}
+            {quelle.fassung && ` · ${quelle.fassung}`}
+          </p>
+          <p className="spur-zeile-auszug">{quelle.web.url}</p>
+        </>
+      ) : (
+        <p className="spur-zeile-meta">
+          {t(quelle.art === 'pdf' ? 'spur_seiten' : 'spur_abschnitte', {
+            count: quelle.seitenzahl,
+          })}
+          {' · '}
+          <TextStatus quelle={quelle} />
+          {quelle.fassung && ` · ${quelle.fassung}`}
+        </p>
+      )}
+      {ocrMoeglich && (
+        <OLButton variant="secondary" size="sm" onClick={textErkennen}>
+          {t('spur_text_erkennen')}
+        </OLButton>
+      )}
     </li>
   )
 }
@@ -46,12 +100,15 @@ export default function QuellenPanel() {
   const [gesamt, setGesamt] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
   const [laedtHoch, setLaedtHoch] = useState(false)
+  const [transkript, setTranskript] = useState(false)
   const [offen, setOffen] = useState<{ quelle: Quelle; seite: number } | null>(null)
   const [treffer, setTreffer] = useState<Treffer[] | null>(null)
   const [begriff, setBegriff] = useState('')
   const [andere, setAndere] = useState<Projekt[]>([])
   const [klonVon, setKlonVon] = useState<Projekt | null>(null)
   const [holenDialog, setHolenDialog] = useState<{ vorauswahl?: string } | null>(null)
+  const [webForm, setWebForm] = useState(false)
+  const webKnopf = useRef<HTMLButtonElement>(null)
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'info'; text: string } | null>(null)
   const dateiFeld = useRef<HTMLInputElement>(null)
   const sucheFeld = useRef<HTMLInputElement>(null)
@@ -95,6 +152,20 @@ export default function QuellenPanel() {
     andereLaden().catch(error => setFehler(error.message))
   }, [laden, andereLaden])
 
+  // Fortschritt der Texterkennung und Änderungen anderer an Quellen.
+  const { socket } = useConnectionContext()
+  useSocketListener(socket, 'spur:quellen', laden)
+
+  const textErkennen = async (quelle: Quelle) => {
+    setFehler(null)
+    try {
+      await anfrage(projektPfad(`/quellen/${quelle.id}/ocr`), { method: 'POST' })
+      await laden()
+    } catch (error) {
+      setFehler((error as Error).message)
+    }
+  }
+
   const hochladen = async (dateien: FileList | null) => {
     const datei = dateien?.[0]
     if (!datei) return
@@ -103,6 +174,8 @@ export default function QuellenPanel() {
       setFehler(t('spur_datei_zu_gross'))
       return
     }
+    // Interviews sind Sache der Nutzer; spur weist nur darauf hin (keine Sonderregeln).
+    setTranskript(datei.name.toLowerCase().endsWith('.vtt'))
     const formular = new FormData()
     formular.append('datei', datei)
     setLaedtHoch(true)
@@ -171,6 +244,15 @@ export default function QuellenPanel() {
               {t('spur_hochladen')}
             </OLButton>
             <OLButton
+              ref={webKnopf}
+              variant="secondary"
+              size="sm"
+              aria-expanded={webForm}
+              onClick={() => setWebForm(!webForm)}
+            >
+              {t('spur_webseite_aufnehmen')}
+            </OLButton>
+            <OLButton
               variant="secondary"
               size="sm"
               onClick={() => holenOeffnen()}
@@ -188,6 +270,27 @@ export default function QuellenPanel() {
           {t('spur_quellen_exportieren')}
         </OLButton>
       </div>
+      {transkript && (
+        <div className="spur-panel-hinweis">
+          <Notification type="info" content={t('spur_transkript_hinweis')} />
+        </div>
+      )}
+      {webForm && (
+        <div className="spur-panel-hinweis">
+          <WebAufnehmen
+            aufgenommen={() => {
+              setWebForm(false)
+              laden()
+              pruefenVerzoegert()
+              webKnopf.current?.focus()
+            }}
+            abbrechen={() => {
+              setWebForm(false)
+              webKnopf.current?.focus()
+            }}
+          />
+        </div>
+      )}
       {klonVon && darfSchreiben && (
         <div className="spur-panel-hinweis">
           <Notification
@@ -205,6 +308,7 @@ export default function QuellenPanel() {
           />
         </div>
       )}
+      <Zugewiesen oeffnen={(quelle, seite) => setOffen({ quelle, seite })} />
       <form
         className="spur-suche"
         role="search"
@@ -249,6 +353,7 @@ export default function QuellenPanel() {
                   key={quelle.id}
                   quelle={quelle}
                   oeffnen={() => setOffen({ quelle, seite: 1 })}
+                  textErkennen={darfSchreiben ? () => textErkennen(quelle) : undefined}
                 />
               ))}
             </ul>
