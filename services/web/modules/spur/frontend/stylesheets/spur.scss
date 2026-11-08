@@ -318,3 +318,31 @@
   margin-top: var(--spacing-02);
   font-size: var(--font-size-02);
 }
+
+.spur-import-teil + .spur-import-teil {
+  margin-top: var(--spacing-07);
+}
+
+.spur-import-titel {
+  font-size: var(--font-size-04);
+  margin-bottom: var(--spacing-03);
+}
+
+.spur-import-liste {
+  list-style: none;
+  margin: var(--spacing-03) 0 0;
+  padding: 0;
+
+  li {
+    padding: var(--spacing-02) 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.spur-import-name {
+  font-weight: 600;
+}
+
+.spur-import-fehler {
+  color: var(--content-danger);
+}

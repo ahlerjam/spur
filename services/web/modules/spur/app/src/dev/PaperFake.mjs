@@ -110,6 +110,14 @@ paperFake.post('/_steuerung', express.json(), (req, res) => {
   res.sendStatus(204)
 })
 
+paperFake.get('/zotero/collections', (req, res) => res.json(KATALOG.zotero.sammlungen))
+
+paperFake.get('/zotero/collections/:key/bibtex', (req, res) => {
+  const bibtex = KATALOG.zotero.bibtex[req.params.key]
+  if (!bibtex) return res.sendStatus(404)
+  res.type('text/plain').send(bibtex)
+})
+
 paperFake.get('/_protokoll', (req, res) => res.json({ abrufe: zustand.protokoll }))
 
 paperFake.use((req, res, next) => {

@@ -17,6 +17,7 @@ import { Problem, mitProblemen } from './probleme.mjs'
 import * as Recherche from './recherche/Recherche.mjs'
 import * as Aufnahme from './recherche/Aufnahme.mjs'
 import * as Beschaffung from './recherche/Beschaffung.mjs'
+import * as Import from './recherche/Import.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -405,4 +406,18 @@ export const beschaffungZuordnen = mitProblemen(async (req, res) => {
 
 export const bibliotheksvorlageSetzen = mitProblemen(async (req, res) => {
   res.json({ vorlage: await Beschaffung.vorlageSetzen(new ObjectId(nutzerId(req)), req.body?.vorlage) })
+})
+
+export const zoteroSammlungen = mitProblemen(async (req, res) => {
+  res.json({ sammlungen: await Import.zoteroSammlungen(new ObjectId(nutzerId(req))) })
+})
+
+export const zoteroImportieren = mitProblemen(async (req, res) => {
+  res.json(
+    await Import.zoteroImportieren({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      sammlung: String(req.body?.sammlung ?? ''),
+    })
+  )
 })

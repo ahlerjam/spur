@@ -29,7 +29,7 @@
 "Nutzer importiert eine Zotero-Sammlung: Einträge erscheinen mit den vorhandenen Keys",
 "Nutzer wählt mehrere PDFs auf einmal: Alle erscheinen mit Status, Fehlschläge einzeln benannt",
 "Ein erneuter Import erzeugt keine Dubletten"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f6", "title": "Notizen und Literaturmatrix", "steps": [
 "Nutzer schreibt eine Notiz zu Quelle und Zitat: Sie bleibt nach dem Neuladen erhalten",
 "Die Matrix zeigt Quellen als Zeilen und frei wählbare Spalten",

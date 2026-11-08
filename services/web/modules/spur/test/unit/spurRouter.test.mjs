@@ -93,6 +93,8 @@ describe('Rechte der Routen', () => {
     ['get', '/spur/project/:project_id/recherche/protokoll.csv', 'lesen', 'suchprotokollExport'],
     ['post', '/spur/project/:project_id/recherche/aufnehmen', 'schreiben', 'perDoiAufnehmen'],
     ['get', '/spur/project/:project_id/beschaffung', 'lesen', 'beschaffungsliste'],
+    ['get', '/spur/project/:project_id/import/zotero', 'schreiben', 'zoteroSammlungen'],
+    ['post', '/spur/project/:project_id/import/zotero', 'schreiben', 'zoteroImportieren'],
     ['post', '/spur/project/:project_id/beschaffung', 'schreiben', 'beschaffungHinzufuegen'],
     ['get', '/spur/project/:project_id/beschaffung/export/:format', 'lesen', 'beschaffungExport'],
     ['post', '/spur/project/:project_id/beschaffung/:eintrag_id/zuordnen', 'schreiben', 'beschaffungZuordnen'],

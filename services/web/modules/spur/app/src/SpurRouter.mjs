@@ -93,6 +93,8 @@ export default {
     webRouter.get(`${BESCHAFFUNG}/export/:format`, ...lesen, SpurController.beschaffungExport)
     webRouter.post(`${BESCHAFFUNG}/hochladen`, ...schreiben, hochladenMitGrenze, SpurController.beschaffungHochladen)
     webRouter.post(`${BESCHAFFUNG}/:eintrag_id/zuordnen`, ...schreiben, SpurController.beschaffungZuordnen)
+    webRouter.get('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroSammlungen)
+    webRouter.post('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroImportieren)
     webRouter.put('/spur/beschaffung/vorlage', angemeldet, SpurController.bibliotheksvorlageSetzen)
     webRouter.get('/spur/claude/tokens', angemeldet, SpurController.claudeTokens)
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)

@@ -8,6 +8,7 @@ import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
+import ImportModal from './import-modal'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
@@ -54,6 +55,7 @@ export default function QuellenPanel() {
   const [klonVon, setKlonVon] = useState<Projekt | null>(null)
   const [holenDialog, setHolenDialog] = useState<{ vorauswahl?: string } | null>(null)
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'info'; text: string } | null>(null)
+  const [importOffen, setImportOffen] = useState(false)
   const dateiFeld = useRef<HTMLInputElement>(null)
   const sucheFeld = useRef<HTMLInputElement>(null)
   const warOffen = useRef(false)
@@ -178,6 +180,9 @@ export default function QuellenPanel() {
             >
               {t('spur_aus_projekt_holen')}
             </OLButton>
+            <OLButton variant="secondary" size="sm" onClick={() => setImportOffen(true)}>
+              {t('spur_importieren')}
+            </OLButton>
           </>
         )}
         <OLButton
@@ -264,6 +269,15 @@ export default function QuellenPanel() {
           </>
         )}
       </div>
+      {importOffen && (
+        <ImportModal
+          schliessen={() => setImportOffen(false)}
+          importiert={() => {
+            laden()
+            pruefenVerzoegert()
+          }}
+        />
+      )}
       {holenDialog && (
         <QuellenHolenModal
           projekte={klonVon && !andere.length ? [klonVon] : andere}

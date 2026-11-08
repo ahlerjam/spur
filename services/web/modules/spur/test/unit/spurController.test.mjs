@@ -17,6 +17,7 @@ afterAll(() => rmSync(ordner, { recursive: true, force: true }))
 
 beforeEach(async () => {
   m = {
+    Import: { zoteroSammlungen: vi.fn(), zoteroImportieren: vi.fn() },
     Quellen: {
       liste: vi.fn(),
       aufnehmen: vi.fn(),
@@ -71,6 +72,7 @@ beforeEach(async () => {
     default: { promises: { getPrivilegeLevelForProject: async () => m.stufe } },
   }))
   vi.doMock('../../app/src/QuellenManager.mjs', () => m.Quellen)
+  vi.doMock('../../app/src/recherche/Import.mjs', () => m.Import)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.Zitate)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.Pruef)
   vi.doMock('../../app/src/ClaudeZugang.mjs', () => m.Zugang)

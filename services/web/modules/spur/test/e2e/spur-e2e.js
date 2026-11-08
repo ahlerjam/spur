@@ -1446,6 +1446,52 @@ async page => {
     await sichtbar('Offen: 0 · Beschafft: 2')
   }
 
+  features.p2f5 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Import')
+    await panelOeffnen('Quellen')
+    const dialog = page.locator('.modal')
+    const zotero = async () => {
+      await page.getByRole('button', { name: 'Importieren', exact: true }).click()
+      await dialog.getByLabel('Sammlung').selectOption({ label: 'Schlaf und Gedächtnis' })
+      await dialog.getByRole('button', { name: 'Aus Zotero importieren' }).click()
+    }
+    const dateien = async () =>
+      await dialog.getByLabel('PDFs wählen (mehrere möglich)').setInputFiles(
+        ['smith2024.pdf', 'retracted.pdf', 'ersetzen/kapitel.tex'].map(d => `${FIXTURES}/${d}`)
+      )
+    const zeile = name => dialog.locator('.spur-import-liste li', { hasText: name })
+
+    await zotero()
+    await dialog.getByText('Neu in der .bib: 2 · Schon vorhanden: 0').waitFor({ timeout: 20000 })
+    await zeile('diekelmann_memory_2010').getByText('neu in der .bib').waitFor()
+    await zeile('keller_spindles_2014').getByText('neu in der .bib').waitFor()
+
+    await dateien()
+    await zeile('smith2024.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
+    await zeile('retracted.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
+    await zeile('kapitel.tex').getByText('Dieser Dateityp wird nicht unterstützt', { exact: false }).waitFor({ timeout: 30000 })
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.waitFor({ state: 'detached' })
+    const quellen = page.locator('.spur-panel .spur-liste .spur-zeile-link')
+    await page.locator('.spur-panel').getByRole('button', { name: 'retracted.pdf' }).waitFor()
+    ok((await quellen.count()) === 2, `Quellen: ${await quellen.allTextContents()}`)
+
+    await zotero()
+    await dialog.getByText('Neu in der .bib: 0 · Schon vorhanden: 2').waitFor({ timeout: 20000 })
+    await dateien()
+    await zeile('smith2024.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
+    await zeile('retracted.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    ok((await quellen.count()) === 2, `Dubletten: ${await quellen.allTextContents()}`)
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Import')
+    const bib = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
+    ok(bib.split('@article{diekelmann_memory_2010,').length === 2, `.bib:\n${bib}`)
+    ok(bib.split('@article{keller_spindles_2014,').length === 2, `.bib:\n${bib}`)
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue
