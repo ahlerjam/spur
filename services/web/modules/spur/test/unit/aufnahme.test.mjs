@@ -170,24 +170,30 @@ describe('perDoi', () => {
 
   it('folgt keinem Redirect auf eine interne Adresse und keinem Namen, der intern auflöst', async () => {
     // Erste Station öffentlich, Ziel der Umleitung löst intern auf und geht durch die echte Anfrage.
+    let grund
     holen
       .mockResolvedValueOnce(antwort(null, { status: 302, kopf: { location: 'https://intern.example/geheim.pdf' } }))
-      .mockImplementationOnce((url, optionen) => echt(url, optionen))
+      .mockImplementationOnce((url, optionen) => echt(url, optionen).catch(error => { grund = error; throw error }))
     expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
     expect(holen).toHaveBeenCalledTimes(2)
+    expect(grund).toMatchObject({ typ: 'adresse_gesperrt' })
   })
 
   it('lehnt einen Namen ab, der beim Verbindungsaufbau intern auflöst (DNS-Rebinding)', async () => {
+    // Erste Auflösung öffentlich, die beim Verbinden intern: Nur die zweite darf entscheiden.
+    const antworten = ['93.184.216.34', '10.0.0.7']
     let aufrufe = 0
-    // Eine frühere Auflösung wäre öffentlich gewesen; entscheidend ist die Antwort beim Verbinden.
     Aufnahme.netz.lookup = (host, optionen, fertig) => {
-      aufrufe++
-      fertig(null, [{ address: '10.0.0.7', family: 4 }])
+      fertig(null, [{ address: antworten[Math.min(aufrufe++, 1)], family: 4 }])
     }
-    holen.mockImplementation((url, optionen) => echt(url, optionen))
+    // So hätte eine Prüfung vor der Anfrage den Namen gesehen.
+    Aufnahme.netz.lookup('wechsel.example', {}, () => {})
+    let grund
+    holen.mockImplementation((url, optionen) => echt(url, optionen).catch(error => { grund = error; throw error }))
     m.dienste.unpaywall.status.mockResolvedValue({ frei: true, pdf: 'https://wechsel.example/a.pdf', lizenz: null })
     expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ status: 502, typ: 'pdf_fehlt' })
-    expect(aufrufe).toBeGreaterThan(0)
+    expect(aufrufe).toBe(2)
+    expect(grund).toMatchObject({ typ: 'adresse_gesperrt' })
     expect(geladen).toEqual([])
   })
 
@@ -195,8 +201,11 @@ describe('perDoi', () => {
     'lehnt einen Namen ab, der auf %s auflöst',
     async adresse => {
       Aufnahme.netz.lookup = (host, optionen, fertig) => fertig(null, [{ address: adresse, family: 6 }])
-      holen.mockImplementation((url, optionen) => echt(url, optionen))
+      // Der Grund zählt: Ein gescheiterter Verbindungsversuch ergäbe ebenfalls pdf_fehlt.
+      let grund
+      holen.mockImplementation((url, optionen) => echt(url, optionen).catch(error => { grund = error; throw error }))
       expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
+      expect(grund).toMatchObject({ typ: 'adresse_gesperrt' })
     }
   )
 
