@@ -41,6 +41,12 @@ Befund: `spur-e2e.js` nach `vorbereiten.mjs` nicht vollständig grün, `p3f2` sc
 - /simplify: Altitude und Effizienz ohne neue Befunde. Wiederverwendung und Vereinfachung nennen nur Kosmetik: doppelte Lösch-Schleifen und eine Schleife über ein Element in `vorbereiten.mjs` (stammt aus P1/P2, im Diff nur eingerückt), den Namen `geklickt`, `.and()` statt eines verschachtelten Locators in p2f4. Nicht umgesetzt, weil nichts am Verhalten ändert und jede Änderung einen neuen Gesamtlauf bräuchte; siehe Vorschläge.
 - /code-review: Umgesetzt ist, dass CI jetzt auch `tools/tests/befehlsnamen.test.mjs` ausführt (vorher nur von Hand); der Schritt meldet 11/11 grün. Nicht umgesetzt: der Main-Guard in `vorbereiten.mjs` (belegt, `spur-dev run` meldet „E2E-Daten bereit“); `ablageFreigeben` nur im Skript (der Web-Prozess legt seine Dateien selbst an); Zählung 102 in p3f1 (die Suite setzt vorher zurück, also deterministisch); die übrigen Punkte wie oben.
 
+### /simplify, letzter Durchgang auf dem Endstand (37b2d9db3b..HEAD)
+- Wiederverwendung: keine Befunde. Effizienz: keine Befunde.
+- Vereinfachung: `workflowBefehl` hat nur einen Aufrufer; die Tests mit 202 und 501 Nachrichten in `inbox.test.mjs` decken ähnliche Grenzen ab. Beides bleibt: Der Helfer hält das Befehlsformat an einer Stelle, und der 202er-Test bildet genau den Abnahmefall nach.
+- Altitude: Der Namenstest prüft eine feste Dateiliste statt aller Dateien im Repo. Er bleibt, denn Schritt 2 von f1 nennt genau README, Panel-Quellen und Hilfetexte. Die Dev-Route lädt Code aus `test/`. Sie bleibt, denn `DevSchalter` lädt schon `test/fixtures`, die Route besteht nur mit `SPUR_DEV`, und ohne sie wäre die Suite wieder nicht wiederholbar; ein Umzug der Vorbereitung nach `app/src/dev` steht unter Vorschläge.
+- Keine Codeänderung; Lauf I (34/34, nach fa2e981c11) bleibt der Gesamtlauf nach der letzten Codeänderung.
+
 ## Abnahme
 Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in der Scratchpad-Ablage `bilder/`, je 360 und 1280 px. In keinem Bild horizontaler Überlauf von Seite oder Panel, keine Konsolenfehler.
 
@@ -147,6 +153,7 @@ Stand nach der letzten Codeänderung (84bfe96e45, 21:45; danach nur Belege):
 Keine.
 
 ## Vorschläge
+- E2E-Vorbereitung als Dev-Modul unter `app/src/dev/` führen, `test/e2e/vorbereiten.mjs` nur noch als Aufrufer.
 - `vorbereiten.mjs`: Lösch-Schleifen für Projekte und Konten in Helfer `projekteLoeschen(owner, name)` und `kontoEntfernen(email)` zusammenziehen.
 - Index `projectId_1_botId_1__id_-1` auf `spurMessages` in einer eigenen Migration entfernen; der Index `{projectId, botId, am, _id}` deckt alle Abfragen ab.
 - Der Verlauf zeigt höchstens 500 Nachrichten und wird bei jeder Abfrage (alle 5 s) ganz geladen, im schlimmsten Fall 500 × 20 000 Zeichen. Besser: erst den Verlauf, danach nur neue Nachrichten (`seit`), und „Ältere laden“ mit Cursor.
