@@ -33,3 +33,30 @@
   - `htmlZuText` in einen Worker: Eingabe ist auf 5 MB begrenzt; Vorschlag, falls große Seiten auffallen.
   - Gemeinsames Formular-Gerüst für Kommentar und Webseite, Team-Liste zwischenspeichern, gemeinsamer Namens-Helfer mit `ClaudeZugang` (dort andere Regel für den Bot-Namen): kleiner Gewinn, andere Felder bzw. Zwecke.
   - `ocrStarten` gibt `{ quelle, lauf }` zurück; `lauf` nutzen nur die Tests, um auf das Ende zu warten. Bleibt als Naht für Tests.
+- E2E nach /simplify (9c00667b18), nach `vorbereiten.mjs`: f1–f15 ok, p4f1–p4f4 ok.
+
+## /code-review medium 73b6bf177a..HEAD
+- Behoben (20ae90dcf8, Unit-Tests zuerst):
+  - SSRF: IPv4-gemappte IPv6-Adressen in Hex-Schreibweise (`[::ffff:127.0.0.1]` wird zu `::ffff:7f00:1`) umgingen die Sperre. Die Sperre nutzt jetzt `net.BlockList` (prüft gemappte Adressen gegen die IPv4-Regeln) und sperrt zusätzlich NAT64, 6to4, Teredo, `::/96`.
+  - OCR: höchstens zwei Läufe zugleich (429 `ocr_ausgelastet`), Abbruch, wenn die Quelle gelöscht wird, Fehler des Hintergrundlaufs werden geloggt statt als unbehandelte Rejection zu enden; eine fertige OCR-Quelle lässt sich nicht neu erkennen (bestätigte Stellen passten sonst nicht mehr zum Text).
+  - Holen aus anderem Projekt kopierte Kommentare, Zuweisungen und eine laufende Texterkennung mit; jetzt nicht mehr. Bestätigungen von Stellen gelten weiter, weil sie den Quelltext betreffen.
+  - Webseiten mit gleichem Titel: Schlüssel mit Zähler (`…-2`), dieselbe Adresse ergibt „Diese Webseite ist schon als Quelle vorhanden („Titel“).“ statt der Aufforderung, eine Datei umzubenennen.
+  - Hinweis auf Zuweisungen nennt bei Webseiten den Titel statt des Dateinamens; Kommentar ohne Zuweisung schickt kein leeres `$set`.
+- Abgleich mit Spec und Schritten: alle vier Features und die Zustände „Markierungen: keine, viele, von anderen“ und „OCR: läuft, fertig, unsicher“ (Status als Text) sind abgedeckt; nichts fehlt.
+
+## Sicherheitsprüfung (Subagent, `git diff 73b6bf177a..HEAD`)
+`/security-review` scheitert hier an fehlendem `origin/HEAD`; deshalb wie vom Skill vorgesehen ein Subagent.
+- Kein Befund mit Konfidenz ≥ 8. Geprüft: SSRF (Lookup im Socket, Umleitungen, IP-Literale, Zeit- und Größenlimit), Rechte und Projektbindung der neuen Routen, Inhalte der Echtzeit-Meldungen, `execFile` ohne Shell, XSS (nur React-Text, HTML-Datei nur als Download), `.bib`-Maskierung, Dev-Routen nur bei `SPUR_DEV=1`.
+- Kandidaten unter 8, nicht umgesetzt (Vorschläge): Grenze für Kommentare je Zitat oder Rate-Limit; Rate-Limit und Parallelgrenze für `/quellen/web`; OCR-Grenze je Projekt statt je Prozess und Seitenobergrenze; weitere reservierte Netze (`192.0.2.0/24`, `fec0::/10`).
+
+## Ansichten (taste, Quality bar), 360 und 1280 px
+Aufgenommen (`.playwright-mcp/*-360.png`, `*-1280.png`, nicht im Repo): Quellen-Panel mit Zuweisungshinweis, Zitatliste mit Namen, Zuweisung und Kommentaren, offenes Kommentarformular, Filter „Von mir“, Liste mit OCR-Status, „Text wird erkannt: Seite 1 von 2“, Scan-Vorschau mit OCR-Hinweis und bestätigtem Zitat, Prüfbericht mit „Wortlaut: von Mensch bestätigt“, Webseiten-Formular mit „Seite nicht erreichbar“, Liste mit Webseite (Titel, „Webseite · abgerufen am 1. November 2026“, URL), Webseiten-Vorschau, Transkript-Hinweis. Kein horizontaler Überlauf (`scrollWidth` = Fensterbreite in allen Aufnahmen). Konsolenfehler nur die gewollten 502/409 der Fehlerzustände.
+Behoben nach der Sichtprüfung:
+- Hinweise ohne Knopf (Transkript) liefen im 185 px breiten Panel rechts aus dem Kasten: langes Wort bestimmte die Mindestbreite. Jetzt `overflow-wrap: anywhere` und Silbentrennung.
+- URL in der Webseiten-Vorschau wurde abgeschnitten: Meta-Zeilen brechen um.
+- „Text wird erkannt: Seite 0 von 2“ zeigt jetzt die Seite, die gerade läuft („Seite 1 von 2“).
+- Zitate aus Webseiten zeigten „S. 1“: Schnappschüsse haben keine Seiten, die Angabe entfällt.
+- Die Zitatliste zeigte beim Öffnen kurz „Markieren Sie oben Text …“, bevor die Zitate geladen waren: Ladezustand ergänzt.
+- OCR-Hinweis in der Vorschau hatte die Schriftgröße des Fließtexts: jetzt Meta-Größe, fett.
+- Formular-IDs aus `useId()` statt aus dem API-Pfad; Zuweisungshinweis kürzt lange Zitate auf etwa 60 Zeichen.
+Offen (Kern-Layout, wie in P1): Bei der Standardbreite des Panels (185 px) werden Hinweise mit Symbol sehr schmal und hoch; das Panel lässt sich verbreitern.

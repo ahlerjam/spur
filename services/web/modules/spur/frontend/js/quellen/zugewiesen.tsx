@@ -10,6 +10,10 @@ import { anzeigename, type Quelle, type Zitat } from './typen'
 
 type Zuweisung = Zitat & { quelle: Quelle }
 
+// Das Panel ist schmal: Der Hinweis nennt nur den Anfang, das ganze Zitat zeigt „Öffnen“.
+const kurz = (text: string) =>
+  text.length <= 60 ? text : `${text.slice(0, 60).replace(/\s+\S*$/, '')} …`
+
 // Hinweise auf Zitate, die jemand der angemeldeten Person zugewiesen hat.
 export default function Zugewiesen({
   oeffnen,
@@ -67,7 +71,7 @@ export default function Zugewiesen({
           isActionBelowContent
           content={t('spur_ihnen_zugewiesen', {
             name: zitat.zugewiesen?.von.name,
-            text: zitat.text,
+            text: kurz(zitat.text),
             stelle: [
               anzeigename(zitat.quelle),
               zitat.quelle.art === 'pdf'

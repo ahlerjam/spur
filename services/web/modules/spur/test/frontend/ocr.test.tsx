@@ -76,11 +76,11 @@ describe('Texterkennung (OCR)', function () {
     render(<QuellenPanel />, { wrapper: mitProvidern(socket as unknown as Socket) })
     await screen.findByText(/Kein Text, nicht prüfbar/)
     fireEvent.click(screen.getByRole('button', { name: 'Text erkennen' }))
-    await screen.findByText('Text wird erkannt: Seite 0 von 2')
+    await screen.findByText('Text wird erkannt: Seite 1 von 2')
     expect(fetchMock.callHistory.called(OCR)).to.be.true
     expect(screen.queryByRole('button', { name: 'Text erkennen' })).to.not.exist
     socket.emitToClient('spur:quellen', { quelleId: 's1' })
-    await screen.findByText('Text wird erkannt: Seite 1 von 2')
+    await screen.findByText('Text wird erkannt: Seite 2 von 2')
     socket.emitToClient('spur:quellen', { quelleId: 's1' })
     await screen.findByText(/OCR, Sichtprüfung nötig/)
   })

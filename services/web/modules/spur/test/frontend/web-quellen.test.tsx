@@ -2,6 +2,7 @@ import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import QuellenPanel from '@modules/spur/frontend/js/quellen/quellen-panel'
+import Zitate from '@modules/spur/frontend/js/quellen/zitate'
 import type { Quelle } from '@modules/spur/frontend/js/quellen/typen'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
 import { deutschAktivieren } from './helpers/deutsch'
@@ -59,6 +60,14 @@ describe('Webseiten als Schnappschuss', function () {
     expect(JSON.parse(fetchMock.callHistory.lastCall(WEB)!.options.body as string)).to.deep.equal({ url: 'https://example.org/schlaf' })
     expect(screen.queryByLabelText('Adresse der Webseite')).to.not.exist
     await waitFor(() => expect(document.activeElement).to.equal(knopf))
+  })
+
+  it('zeigt bei Zitaten aus einem Schnappschuss keine Seite', async function () {
+    fetchMock.get(/\/quellen\/w1\/zitate$/, {
+      zitate: [{ id: 'z1', seite: 1, label: null, text: 'Regular sleep times help.', von: { id: 'x', name: 'Ben Berater' }, kommentare: [], zugewiesen: null, bestaetigt: null }],
+    })
+    render(<Zitate quelle={webQuelle} seite={1} textElement={null} />, { wrapper: EditorProviders })
+    await screen.findByText('von Ben Berater')
   })
 
   it('zeigt „Seite nicht erreichbar“ und behält die Adresse zum Korrigieren', async function () {

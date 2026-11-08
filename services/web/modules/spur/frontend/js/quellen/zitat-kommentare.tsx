@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
@@ -24,7 +24,7 @@ function KommentarFormular({
   const [fehler, setFehler] = useState<string | null>(null)
   const [sendet, setSendet] = useState(false)
   const feld = useRef<HTMLInputElement>(null)
-  const id = pfad.replace(/\W/g, '-')
+  const id = useId()
 
   useEffect(() => {
     feld.current?.focus()

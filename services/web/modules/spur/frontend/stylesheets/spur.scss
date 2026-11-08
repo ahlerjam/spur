@@ -28,6 +28,14 @@
     padding-left: 0;
     margin-left: 0;
   }
+
+  // Im schmalen Panel ist ein langes Wort („Pseudonymisieren“) breiter als die Spalte neben dem
+  // Symbol: trennen statt rechts hinauslaufen.
+  .notification-content {
+    min-width: 0;
+    hyphens: auto;
+    overflow-wrap: anywhere;
+  }
 }
 
 .spur-loeschen {
@@ -73,6 +81,8 @@
 .spur-zeile-auszug,
 .spur-leer {
   margin: var(--spacing-01) 0 0;
+  // Adressen und lange Wörter umbrechen, auch außerhalb einer Listenzeile.
+  overflow-wrap: anywhere;
   font-size: var(--font-size-02);
   color: var(--content-secondary);
 }
@@ -260,4 +270,12 @@
   [id^='ide-redesign-sidebar-panel-spur-'] {
     flex: 0 0 calc(100vw - 40px) !important;
   }
+}
+
+// Der OCR-Status steht als Text da, nicht nur als Farbe (Quality Bar).
+.spur-ocr-hinweis {
+  margin: var(--spacing-03) 0 var(--spacing-02);
+  font-size: var(--font-size-02);
+  font-weight: 600;
+  color: var(--content-primary);
 }

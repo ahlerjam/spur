@@ -80,7 +80,7 @@
   "spur_nur_probleme": "Nur Probleme",
   "spur_ocr_abgebrochen": "Texterkennung abgebrochen. Bitte erneut starten.",
   "spur_ocr_fehler": "Texterkennung fehlgeschlagen. Bitte erneut versuchen.",
-  "spur_ocr_laeuft": "Text wird erkannt: Seite __fertig__ von __gesamt__",
+  "spur_ocr_laeuft": "Text wird erkannt: Seite __seite__ von __gesamt__",
   "spur_ocr_nichts": "Kein Text erkannt, nicht prüfbar",
   "spur_ocr_pruefen": "OCR, Sichtprüfung nötig",
   "spur_ocr_seite": "Text dieser Seite per OCR erkannt. Bitte mit dem Bild vergleichen.",

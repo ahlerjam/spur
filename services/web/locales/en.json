@@ -81,7 +81,7 @@
   "spur_nur_probleme": "Problems only",
   "spur_ocr_abgebrochen": "Text recognition stopped. Please start it again.",
   "spur_ocr_fehler": "Text recognition failed. Please try again.",
-  "spur_ocr_laeuft": "Recognising text: page __fertig__ of __gesamt__",
+  "spur_ocr_laeuft": "Recognising text: page __seite__ of __gesamt__",
   "spur_ocr_nichts": "No text recognised, cannot be checked",
   "spur_ocr_pruefen": "OCR, needs visual check",
   "spur_ocr_seite": "Text on this page was recognised by OCR. Please compare it with the image.",

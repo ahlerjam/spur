@@ -26,7 +26,8 @@ function TextStatus({ quelle }: { quelle: Quelle }) {
     return (
       <span role="status">
         <OLSpinner size="sm" />{' '}
-        {t('spur_ocr_laeuft', { fertig: ocr.fertig, gesamt: ocr.gesamt })}
+        {/* Die Seite, die gerade erkannt wird, nicht die Zahl der fertigen. */}
+        {t('spur_ocr_laeuft', { seite: Math.min(ocr.fertig + 1, ocr.gesamt), gesamt: ocr.gesamt })}
       </span>
     )
   }

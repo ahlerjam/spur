@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { EditorSelection } from '@codemirror/state'
 import { useEditorViewContext } from '@/features/ide-react/context/editor-view-context'
 import OLButton from '@/shared/components/ol/ol-button'
+import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import OLToggleButton from '@/shared/components/ol/ol-toggle-button'
 import OLToggleButtonGroup from '@/shared/components/ol/ol-toggle-button-group'
@@ -47,7 +48,8 @@ export default function Zitate({
   } = usePermissionsContext()
   const { view } = useEditorViewContext()
   const { socket } = useConnectionContext()
-  const [zitate, setZitate] = useState<Zitat[]>([])
+  // null, solange die Zitate laden: sonst stünde kurz „Markieren Sie …“ da.
+  const [zitate, setZitate] = useState<Zitat[] | null>(null)
   const [nurEigene, setNurEigene] = useState(false)
   const [fehler, setFehler] = useState<string | null>(null)
   const auswahl = useAuswahlIn(textElement)
@@ -85,7 +87,8 @@ export default function Zitate({
   }
 
   const ich = getMeta('ol-user_id')
-  const sichtbar = nurEigene ? zitate.filter(z => z.von.id === ich) : zitate
+  const alle = zitate ?? []
+  const sichtbar = nurEigene ? alle.filter(z => z.von.id === ich) : alle
 
   const speichern = async () => {
     setFehler(null)
@@ -138,7 +141,8 @@ export default function Zitate({
         {t('spur_gespeicherte_zitate')}
       </h5>
       {fehler && <Notification type="error" content={fehler} />}
-      {zitate.length > 0 && (
+      {zitate === null && !fehler && <OLSpinner size="sm" />}
+      {alle.length > 0 && (
         <OLToggleButtonGroup
           type="radio"
           name="spur-zitate-filter"
@@ -155,11 +159,11 @@ export default function Zitate({
           </OLToggleButton>
         </OLToggleButtonGroup>
       )}
-      {zitate.length === 0 && <p className="spur-leer">{t('spur_keine_zitate_markiert')}</p>}
-      {zitate.length > 0 && sichtbar.length === 0 && (
+      {zitate?.length === 0 && <p className="spur-leer">{t('spur_keine_zitate_markiert')}</p>}
+      {alle.length > 0 && sichtbar.length === 0 && (
         <p className="spur-leer">{t('spur_keine_eigenen_zitate')}</p>
       )}
-      {!kannEinfuegen && zitate.length > 0 && (
+      {!kannEinfuegen && alle.length > 0 && (
         <p className="spur-zeile-meta" id="spur-einfuegen-hinweis">
           {t('spur_keine_schreibrechte')}
         </p>
@@ -169,8 +173,9 @@ export default function Zitate({
           <li className="spur-zeile" key={zitat.id}>
             <p className="spur-zeile-auszug">„{zitat.text}“</p>
             <p className="spur-zeile-meta">
-              {t('spur_seite_kurz', { seite: zitat.label ?? zitat.seite })}
-              {' · '}
+              {/* Ein Schnappschuss hat keine Seiten. */}
+              {quelle.art !== 'web' &&
+                `${t('spur_seite_kurz', { seite: zitat.label ?? zitat.seite })} · `}
               {zitat.von.id === ich ? t('spur_von_ihnen') : t('spur_von', { name: zitat.von.name })}
             </p>
             {quelle.status === 'ocr' && (
