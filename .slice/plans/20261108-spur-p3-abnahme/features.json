@@ -23,7 +23,7 @@
     "Nutzer A kommentiert „@claude prüfe diese Aussage“: Bot von A erhält `comment_mention` mit Dokument, Stelle und Kommentar-ID; Bot von B erhält nichts; die `reply` steht im selben Thread als „Claude (A)“; der Kommentartext von B steht nicht im Ereignis",
     "Für jeden Schritt liegen Befehlsausgabe oder Screenshot (360 und 1280 px) in `progress.md` unter „Abnahme“; ein Fehler wird zuerst mit rotem Test nachgestellt und behoben"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
