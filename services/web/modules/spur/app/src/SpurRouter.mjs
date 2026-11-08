@@ -9,6 +9,7 @@ import { MAX_BYTES } from './QuellenManager.mjs'
 import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
 import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
+import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
 import { testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
@@ -108,6 +109,17 @@ export default {
     webRouter.get('/spur/project/:project_id/pruefbericht', ...lesen, SpurController.pruefbericht)
     webRouter.get('/spur/project/:project_id/claude', ...lesen, SpurController.claudeStatus)
     webRouter.post('/spur/project/:project_id/claude/auftrag', ...lesen, SpurController.claudeAuftrag)
+    webRouter.get('/spur/project/:project_id/workflows', ...lesen, SpurController.workflows)
+    webRouter.post('/spur/project/:project_id/workflows/:name/starten', ...lesen, SpurController.workflowStarten)
+    const ADMIN_WORKFLOWS = '/spur/admin/workflows'
+    webRouter.get(ADMIN_WORKFLOWS, AuthorizationMiddleware.ensureUserIsSiteAdmin, WorkflowsAdminController.seite)
+    webRouter.get(`${ADMIN_WORKFLOWS}.json`, AuthorizationMiddleware.ensureUserIsSiteAdmin, WorkflowsAdminController.liste)
+    webRouter.put(`${ADMIN_WORKFLOWS}/:name`, AuthorizationMiddleware.ensureUserIsSiteAdmin, WorkflowsAdminController.setzen)
+    webRouter.delete(
+      `${ADMIN_WORKFLOWS}/:name`,
+      AuthorizationMiddleware.ensureUserIsSiteAdmin,
+      WorkflowsAdminController.zuruecksetzen
+    )
     const LAUF = '/spur/project/:project_id/laeufe/:lauf_id'
     webRouter.post(`${LAUF}/annehmen`, ...schreiben, SpurController.laufAnnehmen)
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)

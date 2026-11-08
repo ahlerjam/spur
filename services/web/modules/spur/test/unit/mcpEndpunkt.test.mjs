@@ -12,6 +12,7 @@ const zugang = { menschId: 'mensch1', botId: 'bot1', tokenId: 't1' }
 
 // Erst nach dem Zurücksetzen der Module gebaut: Fehlerklassen müssen dieselben sein wie im Endpunkt.
 let WERKZEUGE
+let workflowTexte
 let WerkzeugFehler
 let Problem
 
@@ -64,6 +65,10 @@ beforeAll(async () => {
     pruefen: async token => (token === 'gut' ? zugang : null),
   }))
   vi.doMock('../../app/src/mcp/werkzeuge.mjs', () => ({ WERKZEUGE }))
+  vi.doMock('../../app/src/workflows/Workflows.mjs', () => ({
+    NAMEN: ['literaturueberblick', 'methodenteil', 'folien'],
+    promptText: async (name, fokus) => workflowTexte[name] + (fokus ? ` Fokus: ${fokus}` : ''),
+  }))
   const { mcpAnfrage, mcpJson } = await import('../../app/src/mcp/McpEndpunkt.mjs')
   const app = express()
   app.use('/spur/mcp', mcpJson)
@@ -75,6 +80,7 @@ beforeAll(async () => {
 afterAll(() => new Promise(fertig => server.close(fertig)))
 
 beforeEach(() => {
+  workflowTexte = { literaturueberblick: 'Text L', methodenteil: 'Text M', folien: 'Text F' }
   aufgerufen = []
   verbrauchen.mockReset()
   verbrauchen.mockResolvedValue(undefined)
@@ -211,5 +217,28 @@ describe('Werkzeugaufrufe', () => {
     const daten = Array.isArray(antwort.daten) ? antwort.daten.at(-1) : antwort.daten
     expect(daten.error || daten.result?.isError).toBeTruthy()
     expect(aufgerufen).toEqual([])
+  })
+})
+
+describe('Workflows als MCP-Prompts', () => {
+  it('listet literaturueberblick, methodenteil und folien mit Titel und einem optionalen Fokuswort', async () => {
+    const { prompts } = ergebnisVon(await senden({ method: 'prompts/list' }))
+    expect(prompts.map(p => p.name)).toEqual(['literaturueberblick', 'methodenteil', 'folien'])
+    expect(prompts.map(p => p.title)).toEqual(['Literaturüberblick', 'Methodenteil', 'Folien aus Paper'])
+    expect(prompts[0].arguments).toEqual([expect.objectContaining({ name: 'fokus', required: false })])
+  })
+
+  it('prompts/get liefert den aktuellen Text, auch direkt nach einer Änderung', async () => {
+    const holen = async args =>
+      ergebnisVon(await senden({ method: 'prompts/get', params: { name: 'folien', arguments: args } })).messages[0].content.text
+    expect(await holen({})).toBe('Text F')
+    workflowTexte.folien = 'Neuer Text F'
+    expect(await holen({})).toBe('Neuer Text F')
+    expect(await holen({ fokus: 'Ergebnisse' })).toBe('Neuer Text F Fokus: Ergebnisse')
+  })
+
+  it('nimmt als Argument nur ein einzelnes Wort', async () => {
+    const { daten } = await senden({ method: 'prompts/get', params: { name: 'folien', arguments: { fokus: 'zwei Wörter' } } })
+    expect(JSON.stringify(daten)).toContain('error')
   })
 })

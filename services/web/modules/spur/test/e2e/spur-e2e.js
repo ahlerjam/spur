@@ -755,7 +755,9 @@ async page => {
         'paper_search', 'paper_citations', 'source_add', 'acquisition_add', 'matrix_suggest',
         'compile', 'job_status', 'compile_log', 'page_image',
       ]
-      const erwartet = [...P1, ...P2].sort()
+      // P3: Vorschläge ins Panel.
+      const P3 = ['suggest']
+      const erwartet = [...P1, ...P2, ...P3].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
@@ -2405,6 +2407,88 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const pause = (await ereignisseVon(ADA, 'suggest_trigger')).slice(vorPause)
     ok(pause.length === 1 && rest.length === 0, `Tipp-Pause: ${pause.length} Ereignisse`)
     ok(pause[0].daten.art === 'belegloses_argument' && pause[0].daten.doc_id === docId, `Tipp-Pause: ${JSON.stringify(pause[0].daten)}`)
+  }
+
+  const WORKFLOWS = ['literaturueberblick', 'methodenteil', 'folien']
+  const promptText = async name =>
+    (await mcp(ADA, 'prompts/get', { name, arguments: {} })).daten.result.messages[0].content.text
+
+  // Klickt im Claude-Panel einen Workflow und liefert das Ereignis, das der wartende Fake-Client erhält.
+  async function workflowKlicken(projekt, titel) {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen(projekt)
+    await panelOeffnen('Claude')
+    await verbinden(ADA)
+    await claudePanel().getByText('Workflows', { exact: true }).click()
+    await claudePanel().getByRole('button', { name: titel, exact: true }).click()
+    await page.waitForFunction(() => window.__spur.log.some(e => e.msg?.result), null, { timeout: 5000 })
+    await chatLog().getByText(`Workflow: ${titel}`).waitFor()
+    const { ereignis } = await page.evaluate(() =>
+      JSON.parse(window.__spur.log.find(e => e.msg?.result).msg.result.content[0].text)
+    )
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    return ereignis
+  }
+
+  async function adminWorkflowText(titel, aktion) {
+    await anmelden('e2e-admin@example.org')
+    await page.goto(`${BASE}/spur/admin/workflows`)
+    const abschnitt = page.locator('section', { has: page.getByRole('heading', { name: titel, exact: true }) })
+    await abschnitt.getByLabel(`Text für „${titel}“`).waitFor()
+    await aktion(abschnitt)
+  }
+
+  features.p3f5 = async () => {
+    const { daten } = await mcp(ADA, 'prompts/list')
+    const prompts = daten.result.prompts
+    ok(JSON.stringify(prompts.map(p => p.name)) === JSON.stringify(WORKFLOWS), `prompts/list: ${prompts.map(p => p.name)}`)
+    ok(prompts.every(p => p.arguments?.every(a => !a.required)), 'Prompt mit Pflichtargument')
+    const texte = {}
+    for (const name of WORKFLOWS) {
+      texte[name] = await promptText(name)
+      ok(texte[name].length > 300 && texte[name].includes('run_finish'), `prompts/get ${name}: ${texte[name].slice(0, 80)}`)
+    }
+    // In Claude Code heißen MCP-Prompts /<Server>:<Prompt>; der Server des Plugins heißt „spur“.
+    const mcpJson = JSON.parse(await repoDatei(`${FIXTURES}/../../../../../../plugins/spur/.mcp.json`))
+    ok(Object.keys(mcpJson.mcpServers ?? mcpJson).includes('spur'), `Server im Plugin: ${JSON.stringify(mcpJson)}`)
+
+    const titel = { literaturueberblick: 'Literaturüberblick', methodenteil: 'Methodenteil', folien: 'Folien aus Paper' }
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Workflows')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    await verbinden(ADA)
+    await claudePanel().getByText('Workflows', { exact: true }).click()
+    const knoepfe = await claudePanel().locator('.spur-workflow button').allInnerTexts()
+    ok(JSON.stringify(knoepfe) === JSON.stringify(WORKFLOWS.map(n => titel[n])), `Panel: ${knoepfe}`)
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    const nichtAdmin = await page.request.get(`${BASE}/spur/admin/workflows.json`, { maxRedirects: 0 })
+    ok(nichtAdmin.status() !== 200, `Workflows-Admin ohne Admin-Recht: ${nichtAdmin.status()}`)
+
+    const auftrag = await workflowKlicken('E2E Workflows', 'Literaturüberblick')
+    ok(
+      auftrag?.typ === 'task_created' && auftrag.project_id === pid && auftrag.daten.workflow === 'literaturueberblick' &&
+        auftrag.daten.text === texte.literaturueberblick,
+      `Auftrag aus dem Panel: ${JSON.stringify(auftrag).slice(0, 300)}`
+    )
+
+    const NEU = 'Workflow „Methodenteil“ (angepasst): Schreibe den Methodenteil in höchstens 600 Wörtern und beende mit run_finish.'
+    await adminWorkflowText('Methodenteil', async abschnitt => {
+      await abschnitt.getByLabel('Text für „Methodenteil“').fill(NEU)
+      await abschnitt.getByRole('button', { name: 'Speichern' }).click()
+      await abschnitt.getByText('Gespeichert. Der neue Text gilt ab sofort.').waitFor()
+    })
+    try {
+      ok((await promptText('methodenteil')) === NEU, 'prompts/get liefert den alten Text')
+      const geaendert = await workflowKlicken('E2E Workflows', 'Methodenteil')
+      ok(geaendert?.daten.text === NEU, `Panel liefert: ${geaendert?.daten.text.slice(0, 80)}`)
+    } finally {
+      await adminWorkflowText('Methodenteil', async abschnitt => {
+        await abschnitt.getByRole('button', { name: 'Standard wiederherstellen' }).click()
+        await abschnitt.getByText('Standardtext wiederhergestellt.').waitFor()
+      })
+    }
+    ok((await promptText('methodenteil')) === texte.methodenteil, 'Standardtext nicht wiederhergestellt')
   }
 
   const ergebnis = []

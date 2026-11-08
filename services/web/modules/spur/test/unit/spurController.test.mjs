@@ -65,6 +65,10 @@ beforeEach(async () => {
       automatikSetzen: vi.fn(async () => {}),
     },
     Lauf: { letzterLauf: vi.fn(async () => null) },
+    Workflows: {
+      liste: vi.fn(async () => [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B', text: 'T', angepasst: false }]),
+      starten: vi.fn(async () => ({ _id: 'n9' })),
+    },
     mitglied: true,
     stufe: 'readAndWrite',
   }
@@ -95,6 +99,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/Inbox.mjs', () => m.Inbox)
   vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => m.Aktionen)
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => m.Lauf)
+  vi.doMock('../../app/src/workflows/Workflows.mjs', () => m.Workflows)
   C = await import('../../app/src/SpurController.mjs')
 })
 
@@ -489,6 +494,18 @@ describe('Claude-Zugang und Läufe', () => {
       lauf: { id: 'l1' },
       aenderungen: [],
     })
+  })
+
+  it('workflows liefert Name, Titel, Beschreibung und aktuellen Text', async () => {
+    const { res } = await ausfuehren(C.workflows, req())
+    expect(res.body).toEqual({ workflows: [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B', text: 'T' }] })
+  })
+
+  it('workflowStarten legt den Workflow als Auftrag für den eigenen Bot an', async () => {
+    const { res } = await ausfuehren(C.workflowStarten, req({ params: { project_id: String(projekt), name: 'folien' } }))
+    expect(m.Workflows.starten).toHaveBeenCalledWith({ projectId: projekt, botId: 'bot1', name: 'folien' })
+    expect(res.statusCode).toBe(201)
+    expect(res.body).toEqual({ id: 'n9' })
   })
 
   it('claudeAuftrag legt den getrimmten Auftrag für den Bot an', async () => {

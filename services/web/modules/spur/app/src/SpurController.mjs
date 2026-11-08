@@ -22,6 +22,7 @@ import * as Import from './recherche/Import.mjs'
 import * as Literatur from './literatur/Literatur.mjs'
 import * as Offenlegung from './offenlegung/Offenlegung.mjs'
 import * as Semantik from './semantik/Semantik.mjs'
+import * as Workflows from './workflows/Workflows.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -362,6 +363,17 @@ export const claudeAuftrag = mitProblemen(async (req, res) => {
   }
   const bot = await botDesNutzers(req)
   const nachricht = await Inbox.auftragAnlegen({ projectId: projektId(req), botId: bot._id, text })
+  res.status(201).json({ id: nachricht._id })
+})
+
+export const workflows = mitProblemen(async (req, res) => {
+  const liste = await Workflows.liste()
+  res.json({ workflows: liste.map(({ name, titel, beschreibung, text }) => ({ name, titel, beschreibung, text })) })
+})
+
+export const workflowStarten = mitProblemen(async (req, res) => {
+  const bot = await botDesNutzers(req)
+  const nachricht = await Workflows.starten({ projectId: projektId(req), botId: bot._id, name: req.params.name })
   res.status(201).json({ id: nachricht._id })
 })
 

@@ -7,6 +7,15 @@ import { deutschAktivieren } from './helpers/deutsch'
 
 const STATUS = /\/spur\/project\/[^/]+\/claude$/
 const AUFTRAG = /\/spur\/project\/[^/]+\/claude\/auftrag$/
+const WORKFLOWS = /\/spur\/project\/[^/]+\/workflows$/
+const STARTEN = /\/workflows\/methodenteil\/starten$/
+const LISTE = {
+  workflows: [
+    { name: 'literaturueberblick', titel: 'Literaturüberblick', beschreibung: 'L', text: 'TL' },
+    { name: 'methodenteil', titel: 'Methodenteil', beschreibung: 'M', text: 'TM' },
+    { name: 'folien', titel: 'Folien aus Paper', beschreibung: 'F', text: 'TF' },
+  ],
+}
 
 const nachricht = (id: number, von: 'mensch' | 'claude', text: string) => ({
   id: `n${id}`,
@@ -33,6 +42,7 @@ describe('Claude-Panel', function () {
 
   beforeEach(function () {
     fetchMock.removeRoutes().clearHistory()
+    fetchMock.get(WORKFLOWS, LISTE)
   })
 
   afterEach(function () {
@@ -83,5 +93,23 @@ describe('Claude-Panel', function () {
     const body = JSON.parse(String(fetchMock.callHistory.lastCall(AUFTRAG)?.options.body))
     expect(body).to.deep.equal({ text: 'Fasse Abschnitt 2 zusammen' })
     await waitFor(() => expect((feld as HTMLTextAreaElement).value).to.equal(''))
+  })
+
+  it('listet unter „Workflows“ die drei Workflows und startet einen per Klick', async function () {
+    fetchMock.get(STATUS, status({}))
+    fetchMock.post(STARTEN, { status: 201, body: { id: 'n2' } })
+    zeigen()
+    fireEvent.click(await screen.findByText('Workflows'))
+    const knoepfe = await screen.findAllByRole('button', { name: /Literaturüberblick|Methodenteil|Folien aus Paper/ })
+    expect(knoepfe.map(k => k.textContent)).to.deep.equal(['Literaturüberblick', 'Methodenteil', 'Folien aus Paper'])
+    fireEvent.click(screen.getByRole('button', { name: 'Methodenteil' }))
+    await waitFor(() => expect(fetchMock.callHistory.called(STARTEN)).to.equal(true))
+  })
+
+  it('zeigt ohne Verbindung keine Workflows', async function () {
+    fetchMock.get(STATUS, status({ verbunden: false }))
+    zeigen()
+    await screen.findByText('Claude nicht verbunden')
+    expect(screen.queryByText('Workflows')).to.equal(null)
   })
 })

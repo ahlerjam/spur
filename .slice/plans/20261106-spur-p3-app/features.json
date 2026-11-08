@@ -58,7 +58,7 @@
     "Der Fake-Client erhält den Auftrag mit Workflow-Name und Text",
     "Ändert ein Admin einen Workflow-Text auf dem Server, liefern Panel und `prompts/get` sofort den neuen Text"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   }
  ]

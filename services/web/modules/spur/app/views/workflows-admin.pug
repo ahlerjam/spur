@@ -1,0 +1,10 @@
+extends ../../../../app/views/layout-react
+
+block entrypointVar
+	- entrypoint = 'modules/spur/pages/workflows-admin'
+
+block vars
+	- const suppressPugCookieBanner = true
+
+block content
+	main#spur-workflows-admin.content.content-alt

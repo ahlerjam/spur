@@ -616,3 +616,44 @@
   gap: var(--spacing-03);
   margin-top: var(--spacing-03);
 }
+
+.spur-workflows {
+  padding: var(--spacing-03) var(--spacing-05) 0;
+  border-top: 1px solid var(--border-divider);
+
+  summary {
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 24px;
+  }
+
+  .spur-liste {
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+}
+
+.spur-workflow {
+  padding: var(--spacing-02) 0;
+}
+
+.spur-workflows-admin {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--spacing-08) var(--spacing-05);
+
+  textarea {
+    font-family: var(--font-monospace, monospace);
+    font-size: var(--font-size-02);
+  }
+}
+
+.spur-workflow-admin {
+  padding: var(--spacing-06) 0;
+  border-top: 1px solid var(--border-divider);
+
+  h2 {
+    font-size: var(--font-size-05);
+    margin: 0 0 var(--spacing-02);
+  }
+}

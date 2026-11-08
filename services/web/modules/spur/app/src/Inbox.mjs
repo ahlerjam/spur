@@ -17,8 +17,9 @@ export async function ereignisAnlegen({ projectId, botId, typ, daten }) {
   wecker.emit(String(botId))
 }
 
-export async function auftragAnlegen({ projectId, botId, text, daten = {} }) {
-  const nachricht = { projectId, botId, von: 'mensch', text, am: jetzt() }
+// `anzeige` ersetzt im Chat einen langen Auftragstext (etwa einen Workflow) durch eine kurze Zeile.
+export async function auftragAnlegen({ projectId, botId, text, anzeige = text, daten = {} }) {
+  const nachricht = { projectId, botId, von: 'mensch', text: anzeige, am: jetzt() }
   await (await nachrichten()).insertOne(nachricht)
   await ereignisAnlegen({
     projectId,

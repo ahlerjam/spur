@@ -13,6 +13,7 @@ import LaufKarte, { type Aenderung, type Lauf } from './lauf-karte'
 import OffenlegungModal from './offenlegung-modal'
 
 type Nachricht ={ id: string; von: 'mensch' | 'claude'; text: string; am: string }
+type Workflow = { name: string; titel: string; beschreibung: string }
 type Status = {
   verbunden: boolean
   nachrichten: Nachricht[]
@@ -63,7 +64,12 @@ export default function ClaudePanel() {
         <>
           <Verbindung verbunden={status.verbunden} />
           <Verlauf status={status} neuLaden={laden} />
-          {status.verbunden && <Eingabe gesendet={laden} fehler={setFehler} />}
+          {status.verbunden && (
+            <>
+              <Workflows gestartet={laden} fehler={setFehler} />
+              <Eingabe gesendet={laden} fehler={setFehler} />
+            </>
+          )}
         </>
       )}
     </div>
@@ -147,6 +153,56 @@ function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise
         {wartet && <li className="spur-chat-wartet">{t('spur_claude_arbeitet')}</li>}
       </ol>
     </div>
+  )
+}
+
+// Claude kann MCP-Prompts nicht selbst aufrufen; der Knopf legt den vollen Workflow-Text als Auftrag ab.
+function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehler: (f: string | null) => void }) {
+  const { t } = useTranslation()
+  const [liste, setListe] = useState<Workflow[]>([])
+  const [laeuft, setLaeuft] = useState<string | null>(null)
+
+  useEffect(() => {
+    anfrage<{ workflows: Workflow[] }>(projektPfad('/workflows'))
+      .then(antwort => setListe(antwort.workflows))
+      .catch(error => fehler((error as Error).message))
+  }, [fehler])
+
+  const starten = async (name: string) => {
+    setLaeuft(name)
+    fehler(null)
+    try {
+      await jsonAnfrage('POST', projektPfad(`/workflows/${name}/starten`))
+      await gestartet()
+    } catch (error) {
+      fehler((error as Error).message)
+    } finally {
+      setLaeuft(null)
+    }
+  }
+
+  return (
+    <details className="spur-workflows">
+      <summary>{t('spur_workflows')}</summary>
+      <ul className="spur-liste">
+        {liste.map(w => (
+          <li className="spur-workflow" key={w.name}>
+            <OLButton
+              variant="secondary"
+              size="sm"
+              isLoading={laeuft === w.name}
+              aria-describedby={`spur-workflow-${w.name}`}
+              onClick={() => starten(w.name)}
+            >
+              {w.titel}
+            </OLButton>
+            <p className="spur-zeile-meta" id={`spur-workflow-${w.name}`}>
+              {w.beschreibung}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 
