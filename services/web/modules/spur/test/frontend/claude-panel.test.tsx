@@ -107,10 +107,11 @@ describe('Claude-Panel', function () {
   })
 
   it('sagt, wenn der Verlauf ältere Nachrichten nicht zeigt', async function () {
-    fetchMock.get(STATUS, status({ nachrichten: [nachricht(1, 'mensch', 'Neueste Frage')], aeltere: true }))
+    const nachrichten = [nachricht(1, 'claude', 'Antwort'), nachricht(2, 'mensch', 'Frage'), nachricht(3, 'mensch', 'Neueste Frage')]
+    fetchMock.get(STATUS, status({ nachrichten, aeltere: true }))
     zeigen()
     await screen.findByText('Neueste Frage')
-    screen.getByText('Ältere Nachrichten sind ausgeblendet; angezeigt werden die letzten 500.')
+    screen.getByText('Ältere Nachrichten sind ausgeblendet; angezeigt werden die letzten 3.')
   })
 
   it('zeigt keinen Hinweis, wenn der Verlauf vollständig ist', async function () {

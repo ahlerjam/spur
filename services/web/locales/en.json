@@ -42,7 +42,7 @@
   "spur_bibliothek_hilfe": "{doi} stands for the DOI. Default: https://doi.org/{doi}",
   "spur_bibliothek_vorlage": "Library link",
   "spur_bitte_pruefen": "Please check",
-  "spur_chat_aeltere": "Older messages are hidden; showing the latest 500.",
+  "spur_chat_aeltere": "Older messages are hidden; showing the latest __anzahl__.",
   "spur_claude": "Claude",
   "spur_claude_arbeitet": "Claude is working …",
   "spur_claude_nicht_verbunden": "Claude not connected",

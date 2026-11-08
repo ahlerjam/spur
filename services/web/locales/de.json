@@ -41,7 +41,7 @@
   "spur_bibliothek_hilfe": "{doi} steht für die DOI. Standard: https://doi.org/{doi}",
   "spur_bibliothek_vorlage": "Link zur Bibliothek",
   "spur_bitte_pruefen": "Bitte prüfen",
-  "spur_chat_aeltere": "Ältere Nachrichten sind ausgeblendet; angezeigt werden die letzten 500.",
+  "spur_chat_aeltere": "Ältere Nachrichten sind ausgeblendet; angezeigt werden die letzten __anzahl__.",
   "spur_claude": "Claude",
   "spur_claude_arbeitet": "Claude arbeitet …",
   "spur_claude_nicht_verbunden": "Claude nicht verbunden",

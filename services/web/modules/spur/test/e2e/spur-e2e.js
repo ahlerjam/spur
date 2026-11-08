@@ -2198,7 +2198,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     for (let cursor; ; ) {
       const { inhalt } = await werkzeug(token, 'events_since', cursor ? { cursor } : {})
       alle.push(...inhalt.ereignisse)
-      if (inhalt.ereignisse.length < 100) break
+      if (inhalt.ereignisse.length < 100 || !inhalt.cursor || inhalt.cursor === cursor) break
       cursor = inhalt.cursor
     }
     return alle.filter(e => !typ || e.typ === typ)

@@ -115,7 +115,11 @@ function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise
         {nachrichten.length === 0 && !status.lauf && (
           <p className="spur-leer">{t('spur_keine_nachrichten')}</p>
         )}
-        {status.aeltere && <p className="spur-zeile-meta spur-chat-aeltere">{t('spur_chat_aeltere')}</p>}
+        {status.aeltere && (
+          <p className="spur-zeile-meta spur-chat-aeltere">
+            {t('spur_chat_aeltere', { anzahl: nachrichten.length })}
+          </p>
+        )}
         <ol className="spur-chat" role="log" aria-label={t('spur_unterhaltung')}>
           {nachrichten.map((n, i) => [
             i === laufBei && laufKarte,

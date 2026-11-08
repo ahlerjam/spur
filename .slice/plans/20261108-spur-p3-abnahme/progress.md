@@ -79,8 +79,32 @@ Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in
 - Umgesetzt: Index `{projectId, botId, am: -1, _id: -1}` für den Verlauf (neue Migration `20261109090000_spur_verlauf_index.mjs`, ersetzt den Index nur nach `am`; `explain` zeigt IXSCAN → LIMIT ohne SORT; Rollback geprüft); `Inbox.verlauf` parallel zu Lauf, Verbindung und Automatik; grüner Rand als eine Regel für Claude-Nachricht und Erfolgsmeldung; Test der Befehlsnamen ohne Quelltext-Regex des Präfixes, doppelte Prüfungen auf `/spur:` in den Frontend-Tests entfernt (bleiben im Node-Test und in der E2E); Leerzeichen vor „·“ auf der Admin-Seite wiederhergestellt (beim Umstellen verloren).
 - Nicht umgesetzt: Panel-Abfrage nur mit neuen Nachrichten (`seit`) und „Ältere laden“ (größerer Umbau, siehe Vorschläge); eine allgemeine CSS-Regel für Overleafs Notification im schmalen Panel statt Zeilen ohne Kasten (stellt die Entscheidung aus P3 um, die Ursache in Overleafs Komponente ist nicht geklärt); Befehl vom Server mitliefern statt Präfix im Frontend (Präfix bliebe auch dann fest im Code); Seitengröße 100 und Cursor-Wiederverwendung im E2E-Helfer (nur Test); Befehl je Workflow unter dem Knopf statt eigener Hilfe-Liste (Schritt 3 verlangt die Hilfe mit genau den drei Befehlen).
 
+## /code-review medium 37b2d9db3b..HEAD
+- Umgesetzt: Hinweis auf ältere Nachrichten nennt die angezeigte Anzahl als Parameter statt fest „500“; Erfolgsmeldung im Vorschläge-Panel mit `--content-positive-themed` (dunkles Theme) statt `--green-70`; `ereignisseVon` bricht ab, wenn der Cursor fehlt oder sich nicht bewegt.
+- Nicht umgesetzt: Größe der Panel-Abfrage (siehe /simplify und Vorschläge); fest verdrahteter Präfix (siehe /simplify); `ok(daten?.result)` in `werkzeug` (vorher derselbe Abbruch als TypeError, jetzt mit Meldung); `anzahl === 102` in der E2E ist gewollt, die Suite läuft nach `vorbereiten.mjs`; Regex-Umfang des Namenstests (deckt die drei Workflows ab, die es gibt); älterer Index `projectId_1_botId_1__id_-1` bleibt (andere Abfragen sortieren nach `_id`); zweite Liste unter „Workflows“ ist die verlangte Hilfe, `<wbr>` fügt beim Kopieren kein Zeichen ein.
+- Abgleich mit Spec und Schritten: D3 umgesetzt (nur Text, Prompts und Plugin unverändert); README und Panel-Hilfe nennen die drei Befehle; Abnahme mit Belegen je Schritt; Handprüfungen unter „Menschlich zu prüfen“. Nichts fehlt.
+
+## Security-Review (Subagent; ohne `origin/HEAD` findet `/security-review` keinen Vergleichsstand)
+- Keine Befunde. Der Verlauf bleibt hinter `lesen` (Login und Leserecht am Projekt), der Bot kommt aus der Session; React escaped alle neuen Texte; die Migration legt den neuen Index vor dem Löschen des alten an.
+- Hinweis: Eine Abfrage kann bis 500 × 20 000 Zeichen tragen (nur eigene Nachrichten der Person); siehe Vorschläge.
+
 ## E2E und Tests
-(folgt nach dem letzten Lauf)
+Nach der letzten Codeänderung (Review-Befunde), Stack mit `spur-dev reload` neu gebaut:
+- `spur-dev test`: alle spur-Unit-Tests grün, Abdeckung Zeilen 94,59 % (Schwelle 80 %).
+- `spur-dev upstream frontend`: `bestanden: 1719, fehlgeschlagen: 14, bekannt: 14, neu: 0, ausgeschlossen: 2 Dateien` (enthält `modules/spur/test/frontend`).
+- `spur-dev upstream web`: `bestanden: 5775, fehlgeschlagen: 173, bekannt: 173, neu: 0, ausgeschlossen: 3 Dateien`.
+- `node --test tools/tests/befehlsnamen.test.mjs`: 2 bestanden, 0 fehlgeschlagen.
+- `spur-dev migrate migrate -t server-ce` und `rollback` von `20261109090000_spur_verlauf_index`: beide erfolgreich.
+- `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` („E2E-Daten bereit“), dann `spur-e2e.js` vollständig:
+  ```
+  f1 ok … f15 ok
+  p2f1 ok … p2f10 ok
+  p4f1 ok  p4f2 ok  p4f3 ok  p4f4 ok
+  p3f1 ok  p3f2 ok  p3f3 ok  p3f4 ok  p3f5 ok
+  Laufzeit 503 s
+  ```
+  (34 von 34 ok, Exit 0.)
+- Bilder nach der letzten Codeänderung, je 360 und 1280 px, ohne Überlauf und Konsolenfehler: `f1-workflows-hilfe`, `f2-chat-nicht-verbunden`, `f2-chat-antwort-lauf-karte`, `f2-chat-lang`, `f2-kommentar-thread`, `f3-vorschlaege-aus`, `-keine`, `-mehrere`, `-uebernommen`, `-tageslimit`, `f4-workflows-chat`, `f4-admin-angepasst`.
 
 ## Menschlich zu prüfen
 - Weckweg mit echter Claude-Session: Eine wartende echte Claude-Code-Session (Plugin installiert, `wait_for_event`) wird von „@claude“ im Kommentar und von einem Fehler-Compile mit Schalter „Vorschlag“ geweckt; Claude antwortet im Thread beziehungsweise legt mit `suggest` einen Vorschlag ab. Die Abnahme nutzte den Fake-Client.
@@ -90,5 +114,5 @@ Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in
 Keine.
 
 ## Vorschläge
-- Der Verlauf zeigt höchstens 500 Nachrichten. Für längere Unterhaltungen ein „Ältere laden“ mit Cursor.
+- Der Verlauf zeigt höchstens 500 Nachrichten und wird bei jeder Abfrage (alle 5 s) ganz geladen, im schlimmsten Fall 500 × 20 000 Zeichen. Besser: erst den Verlauf, danach nur neue Nachrichten (`seit`), und „Ältere laden“ mit Cursor.
 - `events_since` ohne Cursor liefert die ältesten 100 Ereignisse eines Bots. Ein Client, der ohne Cursor fragt, sieht neue Ereignisse erst nach Blättern; die Tool-Beschreibung könnte das sagen.
