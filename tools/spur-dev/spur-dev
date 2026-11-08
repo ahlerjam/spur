@@ -116,6 +116,9 @@ du_geaendert() {
 # Overleafs Suiten in einem eigenen Container aus dem Dev-Image, mit dem Quellstand von $2 (Standard:
 # dieser Worktree). Der laufende Stack bleibt unberührt; nur Mongo und Redis werden mitbenutzt.
 # Die Auswertung (tools/tests/upstream.mjs) kommt immer aus diesem Worktree, auch für main und ext-ce.
+# Die LaTeX-Grammatik ist generiert und gitignoriert; ohne `spur-dev up` (etwa im CI-Job upstream) fehlt sie,
+# und jeder Test, der den Parser lädt, scheitert schon beim Import.
+GRAMMATIK_FEHLT='g=/overleaf/services/web/frontend/js/features/source-editor/lezer-latex/latex.mjs; [ -e $g ] || (cd /overleaf/services/web && yarn run lezer-latex:generate >/dev/null 2>&1) || { echo "LaTeX-Grammatik ließ sich nicht erzeugen" >&2; exit 2; }'
 upstream_lauf() {
   local suite=$1 quelle=$2 name=$3 e
   local erg="$UPSTREAM_CACHE/upstream/$name"
@@ -127,7 +130,7 @@ upstream_lauf() {
     vol+=(-v "$quelle/$e:/overleaf/$e:ro")
   done
   SPUR_SRC="$quelle" dc run --rm --no-deps -T --entrypoint bash -e SPUR_PROTOKOLL="$erg" "${vol[@]}" web \
-    -lc "node /spur-tests/upstream.mjs $suite --ergebnis /ergebnis ${4:+$(printf '%q ' "${@:4}")}"
+    -lc "$GRAMMATIK_FEHLT; node /spur-tests/upstream.mjs $suite --ergebnis /ergebnis ${4:+$(printf '%q ' "${@:4}")}"
 }
 UPSTREAM_SUITEN="web frontend du"
 UPSTREAM_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev"
