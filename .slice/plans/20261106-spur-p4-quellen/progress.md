@@ -83,3 +83,8 @@ Offen (Kern-Layout, wie in P1): Bei der Standardbreite des Panels (185 px) werde
 - Voller E2E-Lauf nach `vorbereiten.mjs`: f1–f15 ok, p4f1–p4f4 ok.
 - Unit-Tests 516 grün (98,58 % Zeilen), spur-Frontend-Tests 25 grün.
 - Ansichten danach neu aufgenommen, ohne weitere Code-Änderung, je 1280 und 360 px, überall `scrollWidth` = Fensterbreite: team-hinweis, team-zitate, team-kommentar, team-filter, scan-liste, scan-vorschau, scan-zitat, scan-bericht, ocr-laeuft, web-fehler, web-liste, web-vorschau, transkript-hinweis.
+
+## /security-review (Skill, nach 8e61b1c908)
+- `origin/HEAD` fehlte; lokal mit `git remote set-head origin agent` auf `origin/agent` (`ea4707b8cc`, ein State-Commit vor der Plan-Basis) gesetzt, nur eine lokale Referenz. Danach lief `/security-review` regulär auf `origin/HEAD...HEAD`.
+- Ergebnis: kein Befund mit Konfidenz ≥ 8. Kandidaten nach Filter verworfen: Leselink-Nutzer auf den neuen `lesen`-Routen (2/10, `blockRestrictedUserFromProject` sperrt sie), Dev-Routen (1/10, nur bei `SPUR_DEV=1`).
+- Bekannte Upstream-Fehler: `tools/tests/upstream-bekannt.json` hat 187 Einträge (overleaf-cep 167, overleaf 20, keiner mit Herkunft spur) und ist in diesem Plan unverändert; `neu: 0` heißt, alle 173 Fehlschläge der web-Suite stehen darauf.
