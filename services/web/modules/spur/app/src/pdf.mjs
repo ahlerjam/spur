@@ -1,3 +1,4 @@
+import _ from 'lodash'
 import { execFile } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -67,9 +68,7 @@ export function tsvAuswerten(tsv) {
   const text = absaetze
     .map(a => a.zeilen.map(z => z.woerter.join(' ')).join('\n'))
     .join('\n\n')
-  const konfidenz = konfidenzen.length
-    ? Math.round(konfidenzen.reduce((a, b) => a + b, 0) / konfidenzen.length)
-    : null
+  const konfidenz = konfidenzen.length ? Math.round(_.mean(konfidenzen)) : null
   return { text, konfidenz }
 }
 

@@ -45,7 +45,7 @@ beforeEach(async () => {
     default: { promises: { appendToDoc, upsertDocWithPath } },
   }))
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ dokumente: async () => docs }))
-  vi.doMock('../../app/src/Team.mjs', () => ({ mitglieder: async () => [] }))
+  vi.doMock('../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs', () => ({ default: { promises: { getInvitedMemberIds: async () => [] } } }))
   Quellen = await import('../../app/src/QuellenManager.mjs')
   Zitate = await import('../../app/src/ZitatManager.mjs')
   quelle = await Quellen.aufnehmen({ projectId: projekt, userId: anna, dateiname: 'smith2024.pdf', tempPfad: fixture('smith2024.pdf'), groesse: 1 })

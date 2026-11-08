@@ -14,7 +14,7 @@ import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
 import Zugewiesen from './zugewiesen'
-import { datumLang, OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
+import { anzeigename, datumLang, OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
 import WebAufnehmen from './web-aufnehmen'
 
 const MAX_BYTES = 50 * 1024 * 1024
@@ -61,7 +61,7 @@ function QuellenZeile({
         className="spur-zeile-link"
         onClick={oeffnen}
       >
-        {quelle.web ? (quelle.titel ?? quelle.dateiname) : quelle.dateiname}
+        {anzeigename(quelle)}
       </OLButton>
       {quelle.web ? (
         <>

@@ -259,9 +259,7 @@ async function ocrAusfuehren(quelle) {
         $set: {
           status: ergebnisse.some(e => e.text.trim()) ? 'ocr' : 'kein_text',
           'ocr.status': 'fertig',
-          'ocr.konfidenz': werte.length
-            ? Math.round(werte.reduce((a, b) => a + b, 0) / werte.length)
-            : null,
+          'ocr.konfidenz': werte.length ? Math.round(_.mean(werte)) : null,
           'ocr.aktualisiert': jetzt(),
         },
       }
@@ -292,6 +290,10 @@ export async function liste(projectId, { seite = 0 } = {}) {
 
 export async function alle(projectId) {
   return await (await quellen()).find({ projectId }).toArray()
+}
+
+export async function vonIds(projectId, ids) {
+  return await (await quellen()).find({ _id: { $in: ids }, projectId }).toArray()
 }
 
 export async function holen(projectId, quelleId) {

@@ -4,6 +4,7 @@ import OLButton from '@/shared/components/ol/ol-button'
 import Notification from '@/shared/components/notification'
 import { useConnectionContext } from '@/features/ide-react/context/connection-context'
 import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
+import getMeta from '@/utils/meta'
 import { anfrage, projektPfad } from '../api'
 import type { Quelle, Zitat } from './typen'
 
@@ -33,7 +34,15 @@ export default function Zugewiesen({
   useEffect(() => {
     laden()
   }, [laden])
-  useSocketListener(socket, 'spur:zitate', laden)
+  // Nur Änderungen an eigenen Zuweisungen betreffen diesen Hinweis.
+  const ich = getMeta('ol-user_id')
+  const live = useCallback(
+    ({ an }: { an?: string }) => {
+      if (an === ich) laden()
+    },
+    [laden, ich]
+  )
+  useSocketListener(socket, 'spur:zitate', live)
 
   const erledigt = async (zitat: Zuweisung) => {
     try {

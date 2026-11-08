@@ -1365,11 +1365,20 @@ async page => {
     ok(versuch.status === 403, `Leserin markiert: ${versuch.status}`)
   }
 
-  async function editorVor(anker) {
-    await page.evaluate(text => {
+  // Fügt ein gespeichertes Zitat vor \printbibliography ein und wartet auf den Text im Editor.
+  async function vorBibliographieEinfuegen(zitat, erwartet) {
+    await page.evaluate(() => {
       const view = window.overleaf.unstable.store.get('editor.view')
-      view.dispatch({ selection: { anchor: view.state.doc.toString().indexOf(text) } })
-    }, anker)
+      view.dispatch({ selection: { anchor: view.state.doc.toString().indexOf('\\printbibliography') } })
+    })
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith('/einfuegen') && r.ok()),
+      zitat.getByRole('button', { name: 'Einfügen' }).click(),
+    ])
+    await page.waitForFunction(
+      text => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(text),
+      erwartet
+    )
   }
 
   features.p4f2 = async () => {
@@ -1396,15 +1405,7 @@ async page => {
       .locator('.spur-zitate li', { hasText: SATZ })
     await zitat.getByText('Wortlaut: OCR, nicht bestätigt').waitFor()
 
-    await editorVor('\\printbibliography')
-    await Promise.all([
-      page.waitForResponse(r => r.url().endsWith('/einfuegen') && r.ok()),
-      zitat.getByRole('button', { name: 'Einfügen' }).click(),
-    ])
-    await page.waitForFunction(
-      text => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(text),
-      `\\enquote{${SATZ}} \\autocite[1]{scan}`
-    )
+    await vorBibliographieEinfuegen(zitat, `\\enquote{${SATZ}} \\autocite[1]{scan}`)
     await panelOeffnen('Prüfbericht')
     const bericht = page
       .getByRole('tabpanel', { name: 'Prüfbericht' })
@@ -1460,15 +1461,7 @@ async page => {
     await page.getByRole('button', { name: 'Zitat speichern' }).click()
     const zitat = page.getByRole('tabpanel', { name: 'Quellen' }).locator('.spur-zitate li', { hasText: SATZ })
     await zitat.waitFor()
-    await editorVor('\\printbibliography')
-    await Promise.all([
-      page.waitForResponse(r => r.url().endsWith('/einfuegen') && r.ok()),
-      zitat.getByRole('button', { name: 'Einfügen' }).click(),
-    ])
-    await page.waitForFunction(
-      text => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(text),
-      `\\enquote{${SATZ}} \\autocite{schlafhygiene-im-schichtdienst}`
-    )
+    await vorBibliographieEinfuegen(zitat, `\\enquote{${SATZ}} \\autocite{schlafhygiene-im-schichtdienst}`)
     await panelOeffnen('Prüfbericht')
     const bericht = page.getByRole('tabpanel', { name: 'Prüfbericht' })
     await bericht.locator('.spur-zeile', { hasText: 'Regular sleep' }).getByText('Wortlaut: exakt').waitFor()

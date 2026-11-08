@@ -74,12 +74,17 @@ async function kontextLaden(projectId, docs) {
     if (!doc.pfad.endsWith('.bib')) continue
     for (const [key, eintrag] of bibLesen(doc.text)) bibEintraege.set(key, eintrag)
   }
-  const [quellen, bestaetigteZitate] = await Promise.all([
-    QuellenManager.alle(projectId),
-    (await quotes())
-      .find({ projectId, bestaetigt: { $ne: null } }, { projection: { quelleId: 1, text: 1 } })
-      .toArray(),
-  ])
+  const quellen = await QuellenManager.alle(projectId)
+  // Bestätigte Zitate zählen nur für OCR-Quellen (siehe bewertung.mjs).
+  const ocrIds = quellen.filter(q => q.status === 'ocr').map(q => q._id)
+  const bestaetigteZitate = ocrIds.length
+    ? await (await quotes())
+        .find(
+          { projectId, quelleId: { $in: ocrIds }, bestaetigt: { $ne: null } },
+          { projection: { quelleId: 1, text: 1 } }
+        )
+        .toArray()
+    : []
   const bestaetigt = new Map()
   for (const z of bestaetigteZitate) {
     const key = String(z.quelleId)

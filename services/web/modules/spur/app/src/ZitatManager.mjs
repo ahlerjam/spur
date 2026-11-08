@@ -8,7 +8,7 @@ import { Problem } from './probleme.mjs'
 import { quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
-import { mitglieder } from './Team.mjs'
+import CollaboratorsGetter from '../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs'
 import { zitateGeaendert as melden } from './live.mjs'
 
 const MAX_ZITAT = 2000
@@ -54,8 +54,8 @@ export async function markieren(quelle, { seite, text }, userId) {
 }
 
 async function zuweisungPruefen(projectId, zuweisen) {
-  const ids = await mitglieder(projectId)
-  if (typeof zuweisen !== 'string' || !ids.some(m => m.id === zuweisen)) {
+  const ids = await CollaboratorsGetter.promises.getInvitedMemberIds(projectId)
+  if (typeof zuweisen !== 'string' || !ids.some(id => String(id) === zuweisen)) {
     throw new Problem(422, 'zuweisung', 'Zuweisen geht nur an Mitglieder dieses Projekts.')
   }
   return new ObjectId(zuweisen)
@@ -82,7 +82,7 @@ export async function kommentieren(quelle, zitatId, { text, zuweisen }, userId) 
     { $push: { kommentare: kommentar }, $set: felder },
     { returnDocument: 'after' }
   )
-  melden(quelle)
+  melden(quelle, felder.zugewiesen?.an)
   return neu
 }
 
@@ -100,7 +100,7 @@ export async function bestaetigen(quelle, zitatId, userId) {
 export async function zuweisungLoesen(quelle, zitatId) {
   const zitat = await holen(quelle, zitatId)
   await (await quotes()).updateOne({ _id: zitat._id }, { $set: { zugewiesen: null } })
-  melden(quelle)
+  melden(quelle, zitat.zugewiesen?.an)
 }
 
 export async function zugewiesenAn(projectId, userId) {

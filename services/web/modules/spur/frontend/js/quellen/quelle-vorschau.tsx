@@ -11,7 +11,7 @@ import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import QuelleLoeschenModal from './quelle-loeschen-modal'
 import SeitenzahlBestaetigen from './seitenzahl-bestaetigen'
 import Zitate from './zitate'
-import { datumLang, OCR_SICHER_AB, type Quelle } from './typen'
+import { anzeigename, datumLang, OCR_SICHER_AB, type Quelle } from './typen'
 
 type Seite = {
   text: string
@@ -64,7 +64,7 @@ export default function QuelleVorschau({
 
   return (
     <div className="spur-panel">
-      <RailPanelHeader title={quelle.web ? (quelle.titel ?? quelle.dateiname) : quelle.dateiname} />
+      <RailPanelHeader title={anzeigename(quelle)} />
       <div className="spur-panel-werkzeuge">
         <OLButton variant="secondary" size="sm" onClick={schliessen}>
           {t('spur_zurueck')}

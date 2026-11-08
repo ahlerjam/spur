@@ -226,6 +226,8 @@ async function zitateFuerClient(liste) {
   }))
 }
 
+const zitatFuerClient = async zitat => (await zitateFuerClient([zitat]))[0]
+
 export const zitate = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   res.json({ zitate: await zitateFuerClient(await ZitatManager.liste(quelle)) })
@@ -239,7 +241,7 @@ export const zitatMarkieren = mitProblemen(async (req, res) => {
     { seite, text: req.body.text },
     new ObjectId(nutzerId(req))
   )
-  res.status(201).json((await zitateFuerClient([zitat]))[0])
+  res.status(201).json(await zitatFuerClient(zitat))
 })
 
 export const zitatKommentieren = mitProblemen(async (req, res) => {
@@ -251,13 +253,13 @@ export const zitatKommentieren = mitProblemen(async (req, res) => {
     { text, zuweisen },
     new ObjectId(nutzerId(req))
   )
-  res.status(201).json((await zitateFuerClient([zitat]))[0])
+  res.status(201).json(await zitatFuerClient(zitat))
 })
 
 export const zitatBestaetigen = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   const zitat = await ZitatManager.bestaetigen(quelle, req.params.zitat_id, new ObjectId(nutzerId(req)))
-  res.json((await zitateFuerClient([zitat]))[0])
+  res.json(await zitatFuerClient(zitat))
 })
 
 export const ocrStarten = mitProblemen(async (req, res) => {
@@ -273,15 +275,21 @@ export const zuweisungLoesen = mitProblemen(async (req, res) => {
 })
 
 export const team = mitProblemen(async (req, res) => {
-  res.json({ ich: nutzerId(req), mitglieder: await Team.mitglieder(projektId(req)) })
+  res.json({ mitglieder: await Team.mitglieder(projektId(req)) })
 })
 
 export const zugewiesen = mitProblemen(async (req, res) => {
   const liste = await ZitatManager.zugewiesenAn(projektId(req), new ObjectId(nutzerId(req)))
-  const fuerClient = await zitateFuerClient(liste)
-  const quellen = await Promise.all(liste.map(z => QuellenManager.holen(projektId(req), z.quelleId)))
+  const [fuerClient, quellen] = await Promise.all([
+    zitateFuerClient(liste),
+    QuellenManager.vonIds(projektId(req), liste.map(z => z.quelleId)),
+  ])
+  const nachId = new Map(quellen.map(q => [String(q._id), q]))
   res.json({
-    zitate: fuerClient.map((z, i) => ({ ...z, quelle: quelleFuerClient(quellen[i]) })),
+    zitate: fuerClient.map((z, i) => ({
+      ...z,
+      quelle: quelleFuerClient(nachId.get(String(liste[i].quelleId))),
+    })),
   })
 })
 

@@ -59,7 +59,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/schalter.mjs', () => schalter.modul)
   vi.doMock('../../app/src/Crossref.mjs', () => crossrefAttrappe().modul)
   vi.doMock('../../app/src/live.mjs', () => ({ quelleGeaendert: () => {}, zitateGeaendert: () => {} }))
-  vi.doMock('../../app/src/Team.mjs', () => ({ mitglieder: async () => [] }))
+  vi.doMock('../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs', () => ({ default: { promises: { getInvitedMemberIds: async () => [] } } }))
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ dokumente: async () => docs }))
   vi.doMock('../../../../app/src/Features/Editor/EditorController.mjs', () => ({
     default: { promises: { upsertDocWithPath, appendToDoc: vi.fn() } },

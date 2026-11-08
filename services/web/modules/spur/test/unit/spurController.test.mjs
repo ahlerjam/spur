@@ -33,6 +33,7 @@ beforeEach(async () => {
       klonHinweis: vi.fn(async () => null),
       uebernehmen: vi.fn(async () => 2),
       ocrZustand: q => q.ocr ?? null,
+      vonIds: vi.fn(async () => []),
       webAufnehmen: vi.fn(async () => ({ _id: 'w1', art: 'web', dateiname: 'seite.html', meta: { titel: 'Seite' }, web: { url: 'https://example.org/', abgerufenAm: new Date(0), hash: 'h' } })),
       ocrStarten: vi.fn(async q => ({ quelle: { ...q, ocr: { status: 'laeuft', fertig: 0, gesamt: 3 } }, lauf: Promise.resolve() })),
     },
@@ -404,17 +405,18 @@ describe('Zitate und Prüfbericht', () => {
     expect(res.statusCode).toBe(204)
   })
 
-  it('team nennt die Mitglieder und die eigene ID', async () => {
+  it('team nennt die Mitglieder', async () => {
     const { res } = await ausfuehren(C.team, req())
-    expect(res.body).toEqual({ ich: String(anna), mitglieder: [{ id: String(anna), name: 'Anna Autor' }] })
+    expect(res.body).toEqual({ mitglieder: [{ id: String(anna), name: 'Anna Autor' }] })
   })
 
   it('zugewiesen liefert eigene Zuweisungen mit Quelle und Namen', async () => {
     const q = quelle()
-    m.Quellen.holen.mockResolvedValue(q)
+    m.Quellen.vonIds.mockResolvedValue([q])
     m.Zitate.zugewiesenAn.mockResolvedValue([{ _id: 'z1', quelleId: q._id, seite: 3, label: '347', text: 'Satz', angelegtVon: anna, zugewiesen: { an: anna, von: 'ben', am: new Date(0) } }])
     const { res } = await ausfuehren(C.zugewiesen, req())
     expect(m.Zitate.zugewiesenAn).toHaveBeenCalledWith(projekt, anna)
+    expect(m.Quellen.vonIds).toHaveBeenCalledWith(projekt, [q._id])
     expect(res.body.zitate).toHaveLength(1)
     expect(res.body.zitate[0]).toMatchObject({ id: 'z1', text: 'Satz', zugewiesen: { von: { name: 'Ben' } }, quelle: { id: q._id, dateiname: 'a.pdf' } })
   })

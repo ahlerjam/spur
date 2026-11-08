@@ -21,5 +21,7 @@ describe('live', () => {
       ['p1', 'spur:zitate', { quelleId: 'q1' }],
       ['p1', 'spur:quellen', { quelleId: 'q1' }],
     ])
+    live.zitateGeaendert(quelle, 'u1')
+    expect(gesendet.at(-1)).toEqual(['p1', 'spur:zitate', { quelleId: 'q1', an: 'u1' }])
   })
 })

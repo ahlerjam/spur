@@ -91,7 +91,8 @@ describe('kommentieren und zuweisen', () => {
       { _id: expect.any(ObjectId), von: ben, text: 'Bitte prüfen', am: new Date('2026-11-07T10:00:00Z') },
     ])
     expect(neu.zugewiesen).toEqual({ an: anna, von: ben, am: new Date('2026-11-07T10:00:00Z') })
-    expect(gesendet).toHaveLength(1)
+    // Die Meldung nennt die Person, damit nur ihr Hinweis nachlädt.
+    expect(gesendet).toEqual([[String(projekt), 'spur:zitate', { quelleId: String(quelle._id), an: String(anna) }]])
     const gespeichert = await Zitate.holen(quelle, String(zitat._id))
     expect(gespeichert.kommentare).toHaveLength(1)
   })
@@ -129,7 +130,7 @@ describe('kommentieren und zuweisen', () => {
     gesendet.length = 0
     await Zitate.zuweisungLoesen(quelle, String(zitat._id))
     expect((await Zitate.holen(quelle, String(zitat._id))).zugewiesen).toBeNull()
-    expect(gesendet).toHaveLength(1)
+    expect(gesendet[0][2]).toEqual({ quelleId: String(quelle._id), an: String(anna) })
   })
 })
 

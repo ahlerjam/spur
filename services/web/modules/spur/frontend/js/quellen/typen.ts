@@ -22,6 +22,10 @@ export type Quelle = {
   web: { url: string; abgerufenAm: string } | null
 }
 
+// Webseiten heißen nach ihrem Titel, Dateien nach dem Dateinamen.
+export const anzeigename = (quelle: Quelle) =>
+  quelle.web ? (quelle.titel ?? quelle.dateiname) : quelle.dateiname
+
 export const datumLang = (iso: string, sprache: string) =>
   new Date(iso).toLocaleDateString(sprache, { day: 'numeric', month: 'long', year: 'numeric' })
 
