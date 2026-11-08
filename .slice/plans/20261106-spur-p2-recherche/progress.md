@@ -119,3 +119,6 @@
   - URL-Helfer für die Dienste.
   - `formatDate` im Suchprotokoll.
   - Diese Punkte sind Vorschläge für später.
+- p2f10 schwankte: Die erste Erfassung der Stichwortsuche las die Quellenliste, die dieselbe Klasse hat, bevor die Treffer da waren. Der Test wartet jetzt auf einen Treffer mit Seitenangabe.
+- Letzter E2E-Lauf auf `ed98d2afbe` (letzte Änderung): f1–f15 und p2f1–p2f10 ok, 287 s.
+- Seit den Screenshots haben sich nur Server- und Testcode geändert, keine Oberfläche. Die 20 Aufnahmen bei 360 und 1280 px gelten weiter.
