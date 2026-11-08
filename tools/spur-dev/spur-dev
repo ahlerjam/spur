@@ -118,7 +118,7 @@ du_geaendert() {
 # Die Auswertung (tools/tests/upstream.mjs) kommt immer aus diesem Worktree, auch für main und ext-ce.
 upstream_lauf() {
   local suite=$1 quelle=$2 name=$3 e
-  local erg="$UPSTREAM_ERG/$name"
+  local erg="$UPSTREAM_CACHE/upstream/$name"
   local -a vol=(-v "$SRC/tools/tests:/spur-tests:ro" -v "$erg:/ergebnis" -v "$quelle/tsconfig.backend.json:/overleaf/tsconfig.backend.json:ro")
   mkdir -p "$erg"
   # Alles aus services/web, was die Stack-Definition nicht schon einhängt (test, types, Konfigurationen …).
@@ -130,9 +130,10 @@ upstream_lauf() {
     -lc "node /spur-tests/upstream.mjs $suite --ergebnis /ergebnis ${4:+$(printf '%q ' "${@:4}")}"
 }
 UPSTREAM_SUITEN="web frontend du"
+UPSTREAM_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev"
 upstream_suite() { case " $UPSTREAM_SUITEN " in *" $1 "*) return 0 ;; esac; return 1; }
 upstream() {
-  local s q r rc=0 cache="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev" b
+  local s q r rc=0 b
   local -a suiten fehlt=()
   local hilfe="spur-dev upstream web|frontend|du [datei …] | alle | vergleich [web|frontend|du …]"
   # Argumente vor dem Docker-Start prüfen; ein unbekannter Name liefe sonst nirgends und endete mit Exit 0.
@@ -143,7 +144,6 @@ upstream() {
                done ;;
     *) upstream_suite "${1:-}" || { echo "$hilfe" >&2; return 2; } ;;
   esac
-  UPSTREAM_ERG="$cache/upstream"
   docker_bereit; check_mounts
   dc --profile upstream up -d --wait mongo redis redis-test >/dev/null
   case "$1" in
@@ -157,19 +157,19 @@ upstream() {
       # dieses Zweigs), damit die Liste zum Code passt, mit dem sie committet wird.
       git -C "$SRC" fetch -q origin main ext-ce
       for b in main ext-ce; do
-        if [ -d "$cache/vergleich/$b" ]; then git -C "$cache/vergleich/$b" checkout -q --detach "origin/$b"
-        else git -C "$SRC" worktree add -q --detach "$cache/vergleich/$b" "origin/$b"; fi
+        if [ -d "$UPSTREAM_CACHE/vergleich/$b" ]; then git -C "$UPSTREAM_CACHE/vergleich/$b" checkout -q --detach "origin/$b"
+        else git -C "$SRC" worktree add -q --detach "$UPSTREAM_CACHE/vergleich/$b" "origin/$b"; fi
       done
       # Ohne Argument alle Suiten; sonst nur die genannten, die übrigen Ergebnisse bleiben stehen.
       suiten=("${@:2}"); [ ${#suiten[@]} -gt 0 ] || read -ra suiten <<< "$UPSTREAM_SUITEN"
       for s in "${suiten[@]}"; do
-        for q in main:"$cache/vergleich/main" ext-ce:"$cache/vergleich/ext-ce" agent:"$SRC"; do
+        for q in main:"$UPSTREAM_CACHE/vergleich/main" ext-ce:"$UPSTREAM_CACHE/vergleich/ext-ce" agent:"$SRC"; do
           upstream_lauf "$s" "${q#*:}" "${q%%:*}" --nur-ergebnis || fehlt+=("$s auf ${q%%:*}")
         done
       done
       # Ohne Ergebnis eines Stands behält die Liste die alten Einträge dieser Suite; das muss rot enden.
       SPUR_SRC="$SRC" dc run --rm --no-deps -T --entrypoint bash \
-        -v "$SRC/tools/tests:/spur-tests" -v "$UPSTREAM_ERG:/ergebnis" web \
+        -v "$SRC/tools/tests:/spur-tests" -v "$UPSTREAM_CACHE/upstream:/ergebnis" web \
         -lc 'node /spur-tests/upstream.mjs liste --ergebnis /ergebnis' || rc=$?
       if [ ${#fehlt[@]} -gt 0 ]; then
         echo "spur-dev upstream vergleich: ohne Ergebnis: ${fehlt[*]}; deren Einträge blieben unverändert" >&2

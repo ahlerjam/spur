@@ -34,6 +34,7 @@ const dateien = args
 
 const lesen = datei => JSON.parse(fs.readFileSync(datei, 'utf8'))
 const lesenOder = (datei, standard) => (fs.existsSync(datei) ? lesen(datei) : standard)
+const fehlerZeile = t => `  ${ersteZeile(t.fehler).slice(0, 300)}`
 
 function ausfuehren(suite, teil, cwd, befehl, env) {
   const log = path.join(ergebnisOrdner, `${suite}${teil ? `-${teil}` : ''}.log`)
@@ -50,6 +51,9 @@ function ausfuehren(suite, teil, cwd, befehl, env) {
 function logEnde(log, zeilen = 15) {
   return fs.readFileSync(log, 'utf8').trimEnd().split('\n').slice(-zeilen).join('\n')
 }
+
+// Ein Lauf ohne Ergebnisdatei zählt als ein fehlgeschlagener Test, damit er nie als grün durchgeht.
+const ladefehler = (suite, test, log) => [{ suite, datei: '(Suite)', test, status: 'failed', fehler: logEnde(log) }]
 
 // vitest --reporter=json: eine Datei, die nicht lädt, hat keine assertionResults, nur eine message.
 function vitestLesen(suite, datei, basis) {
@@ -96,7 +100,7 @@ function mochaLauf(suite, teil, cwd, mochaArgs, env) {
   fs.rmSync(json, { force: true })
   const r = ausfuehren(suite, teil, cwd, ['mocha', ...mochaArgs, '--reporter', 'json', '--reporter-option', `output=${json}`], env)
   if (!fs.existsSync(json)) {
-    return [{ suite, datei: '(Suite)', test: `${teil} lädt nicht`, status: 'failed', fehler: logEnde(r.log) }]
+    return ladefehler(suite, `${teil} lädt nicht`, r.log)
   }
   return mochaLesen(suite, json, cwd)
 }
@@ -128,7 +132,7 @@ export default { ...basis, test: { ...basis.test, projects: basis.test.projects.
       ...dateien,
     ], env)
     if (!fs.existsSync(json)) {
-      return [{ suite: 'web', datei: '(Suite)', test: 'vitest lädt nicht', status: 'failed', fehler: logEnde(r.log) }]
+      return ladefehler('web', 'vitest lädt nicht', r.log)
     }
     return vitestLesen('web', json, WEB)
   },
@@ -137,7 +141,7 @@ export default { ...basis, test: { ...basis.test, projects: basis.test.projects.
     if (!fs.existsSync(path.join(WEB, 'frontend/js/features/source-editor/lezer-latex/latex.terms.mjs'))) {
       const r = ausfuehren('frontend', 'grammatik', WEB, ['run', 'lezer-latex:generate'], {})
       if (r.status !== 0) {
-        return [{ suite: 'frontend', datei: '(Suite)', test: 'Lezer-Grammatik nicht erzeugt', status: 'failed', fehler: logEnde(r.log) }]
+        return ladefehler('frontend', 'Lezer-Grammatik nicht erzeugt', r.log)
       }
     }
     // Wie `yarn run test:frontend`, nur mit JSON-Ausgabe.
@@ -196,7 +200,7 @@ function suiteLaufen(suite) {
   for (const t of a.jetztGruen) console.log(`Hinweis: bekannt, jetzt grün: ${t.datei} › ${t.test}`)
   for (const t of a.neu.slice(0, 30)) {
     console.log(`NEU: ${t.datei} › ${t.test}`)
-    console.log(`  ${ersteZeile(t.fehler).slice(0, 300)}`)
+    console.log(fehlerZeile(t))
   }
   if (a.neu.length > 30) console.log(`… und ${a.neu.length - 30} weitere neue Fehler, siehe ${suite}.json`)
   console.log(`${suite}: Laufzeit ${minuten(Date.now() - start)} min, Protokoll und ${suite}.json in ${process.env.SPUR_PROTOKOLL || ergebnisOrdner}`)
@@ -227,7 +231,7 @@ function listeSchreiben() {
   console.log(`Liste bekannter Fehler: ${neu.length} Einträge in tools/tests/upstream-bekannt.json`)
   for (const t of spur) {
     console.log(`NUR AUF SPUR: ${t.suite} ${t.datei} › ${t.test}`)
-    console.log(`  ${ersteZeile(t.fehler).slice(0, 300)}`)
+    console.log(fehlerZeile(t))
   }
   return spur.length > 0 ? 1 : 0
 }
