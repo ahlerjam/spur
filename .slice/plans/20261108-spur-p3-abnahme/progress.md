@@ -119,22 +119,20 @@ Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in
 - Ergebnis: keine Schwachstellen. Der Verlauf bleibt auf `{projectId, botId}` aus Route und Session beschränkt, es gibt keine neue Eingabe in Abfragen, alle neuen Texte sind React-Textknoten ohne `dangerouslySetInnerHTML`, `anzahl` ist eine Zahl, die Migration nutzt feste Indexdefinitionen. Damit entfiel die Prüfung auf Fehlalarme.
 
 ## E2E und Tests
-Nach der letzten Codeänderung (Review-Befunde), Stack mit `spur-dev reload` neu gebaut:
-- `spur-dev test`: alle spur-Unit-Tests grün, Abdeckung Zeilen 94,59 % (Schwelle 80 %).
-- `spur-dev upstream frontend`: `bestanden: 1719, fehlgeschlagen: 14, bekannt: 14, neu: 0, ausgeschlossen: 2 Dateien` (enthält `modules/spur/test/frontend`).
-- `spur-dev upstream web`: `bestanden: 5775, fehlgeschlagen: 173, bekannt: 173, neu: 0, ausgeschlossen: 3 Dateien`.
-- `node --test tools/tests/befehlsnamen.test.mjs`: 2 bestanden, 0 fehlgeschlagen.
-- `spur-dev migrate migrate -t server-ce` und `rollback` von `20261109090000_spur_verlauf_index`: beide erfolgreich.
-- `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` („E2E-Daten bereit“), dann `spur-e2e.js` vollständig:
+Stand nach der letzten Codeänderung (84bfe96e45, 21:45; danach nur Belege):
+- `spur-dev test`: alle spur-Unit-Tests grün, Abdeckung Zeilen 94,6 % (Schwelle 80 %), mit den neuen Tests der Dev-Route.
+- Overleafs Suiten (Lauf nach den letzten Änderungen an Oberfläche und Locales; danach nur spur-Testcode und die Dev-Route geändert): frontend `bestanden: 1719, fehlgeschlagen: 14, bekannt: 14, neu: 0`, web `bestanden: 5775, fehlgeschlagen: 173, bekannt: 173, neu: 0`.
+- `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` → „E2E-Daten bereit“ (Skript nach dem Umbau zur Funktion), dann Lauf G:
   ```
   f1 ok … f15 ok
   p2f1 ok … p2f10 ok
   p4f1 ok  p4f2 ok  p4f3 ok  p4f4 ok
   p3f1 ok  p3f2 ok  p3f3 ok  p3f4 ok  p3f5 ok
-  Laufzeit 503 s
+  Laufzeit 498 s   (34/34, Exit 0)
   ```
-  (34 von 34 ok, Exit 0.)
-- Bilder nach der letzten Codeänderung, je 360 und 1280 px, ohne Überlauf und Konsolenfehler: `f1-workflows-hilfe`, `f2-chat-nicht-verbunden`, `f2-chat-antwort-lauf-karte`, `f2-chat-lang`, `f2-kommentar-thread`, `f3-vorschlaege-aus`, `-keine`, `-mehrere`, `-uebernommen`, `-tageslimit`, `f4-workflows-chat`, `f4-admin-angepasst`.
+- Lauf H direkt danach, ohne `vorbereiten.mjs`, auf den Daten von Lauf G: 34/34 ok, Laufzeit 493 s, Exit 0.
+- `p3f2` allein dreimal hintereinander: `p3f2 ok` (10 s, 12 s, 12 s); bei 20-facher CPU-Drosselung zweimal `p3f2 ok` (132 s, 129 s).
+- Bilder nach der letzten Codeänderung (22:0x), je 360 und 1280 px, ohne Überlauf und Konsolenfehler: `f1-workflows-hilfe`, `f2-chat-nicht-verbunden`, `f2-chat-antwort-lauf-karte`, `f2-chat-lang`, `f2-kommentar-thread`, `f3-vorschlaege-aus`, `-keine`, `-mehrere`, `-uebernommen`, `-tageslimit`, `f4-workflows-chat`, `f4-admin-angepasst` (24 Bilder).
 
 ## Menschlich zu prüfen
 - Weckweg mit echter Claude-Session: Eine wartende echte Claude-Code-Session (Plugin installiert, `wait_for_event`) wird von „@claude“ im Kommentar und von einem Fehler-Compile mit Schalter „Vorschlag“ geweckt; Claude antwortet im Thread beziehungsweise legt mit `suggest` einen Vorschlag ab. Die Abnahme nutzte den Fake-Client.

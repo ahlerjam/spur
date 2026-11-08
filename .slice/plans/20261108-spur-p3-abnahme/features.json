@@ -49,7 +49,7 @@
     "`spur-dev test` läuft vollständig grün (bis auf die bekannte Upstream-Liste) und `test/e2e/spur-e2e.js` nach `vorbereiten.mjs` grün, Ausgabe nach der letzten Codeänderung in `progress.md`",
     "In `progress.md` steht unter „Abnahme“ je P3-Feature f1 bis f5 eine Zeile PASS oder FAIL mit Beleg, und unter „Menschlich zu prüfen“ der Weckweg mit echter Claude-Session sowie der interaktive Blick auf den Menütext `/plugin:spur:spur:…`"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   }
  ]
