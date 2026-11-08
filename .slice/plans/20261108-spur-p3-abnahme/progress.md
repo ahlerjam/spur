@@ -94,6 +94,10 @@ Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in
 - Keine Befunde. Der Verlauf bleibt hinter `lesen` (Login und Leserecht am Projekt), der Bot kommt aus der Session; React escaped alle neuen Texte; die Migration legt den neuen Index vor dem Löschen des alten an.
 - Hinweis: Eine Abfrage kann bis 500 × 20 000 Zeichen tragen (nur eigene Nachrichten der Person); siehe Vorschläge.
 
+## /security-review (Skill, gegen `origin/HEAD` = `origin/agent`, Merge-Basis = Plan-Commit 68d09824df)
+- Lokal `git remote set-head origin agent` gesetzt, damit der Skill einen Vergleichsstand hat (nichts gepusht).
+- Ergebnis: keine Schwachstellen. Der Verlauf bleibt auf `{projectId, botId}` aus Route und Session beschränkt, es gibt keine neue Eingabe in Abfragen, alle neuen Texte sind React-Textknoten ohne `dangerouslySetInnerHTML`, `anzahl` ist eine Zahl, die Migration nutzt feste Indexdefinitionen. Damit entfiel die Prüfung auf Fehlalarme.
+
 ## E2E und Tests
 Nach der letzten Codeänderung (Review-Befunde), Stack mit `spur-dev reload` neu gebaut:
 - `spur-dev test`: alle spur-Unit-Tests grün, Abdeckung Zeilen 94,59 % (Schwelle 80 %).
