@@ -11,7 +11,7 @@
 "„Suchprotokoll“ listet Datum, Datenbank, Anfrage und Trefferzahl",
 "„Protokoll exportieren“ lädt eine CSV mit diesen Spalten",
 "`paper_citations` liefert dieselben DOIs"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f3", "title": "Paper per DOI aufnehmen", "steps": [
 "Nutzer klickt „Aufnehmen“ bei einem Open-Access-Treffer: Quelle mit PDF erscheint, `.bib` enthält den Eintrag",
 "Ein zweites Aufnehmen meldet „Bereits vorhanden“",

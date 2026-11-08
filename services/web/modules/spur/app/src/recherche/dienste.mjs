@@ -32,7 +32,8 @@ function treffer(dienst, felder) {
 const arxiv = {
   name: 'arxiv',
   anzeige: 'arXiv',
-  abstandMs: 3000,
+  // arXiv erlaubt eine Anfrage alle 3 s; der Puffer fängt Schwankungen der Laufzeit ab.
+  abstandMs: 3100,
   async suchen(anfrage, seite) {
     const begriffe = anfrage.split(/\s+/).filter(Boolean).map(b => `all:${b}`).join(' AND ')
     const url = new URL(`${basis('arxiv')}/api/query`)

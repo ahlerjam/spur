@@ -6,6 +6,8 @@ import { EditorProviders } from '../../../../test/frontend/helpers/editor-provid
 import { deutschAktivieren } from './helpers/deutsch'
 
 const SUCHE = /\/spur\/project\/[^/]+\/recherche\?/
+const ZITATIONEN = /\/recherche\/zitationen\?/
+const PROTOKOLL = /\/recherche\/protokoll\?/
 
 const NRN = {
   doi: '10.1038/nrn2762',
@@ -86,5 +88,42 @@ describe('Recherche-Panel', function () {
       .filter(c => SUCHE.test(c.url))
       .map(c => new URL(c.url, 'http://x').searchParams.get('seite'))
     expect(seiten).to.deep.equal(['0', '1'])
+  })
+
+  it('klappt „Zitiert von“ auf und zeigt die zitierenden Arbeiten', async function () {
+    fetchMock.get(SUCHE, ergebnis({}))
+    fetchMock.get(ZITATIONEN, {
+      treffer: [{ ...NRN, doi: '10.1/b', titel: 'Sleep spindles' }],
+      fehler: [],
+    })
+    suchen('sleep')
+    fireEvent.click(await screen.findByRole('button', { name: 'Zitiert von' }))
+    const liste = await screen.findByRole('region', { name: 'Zitiert von' })
+    await screen.findByText('Sleep spindles')
+    expect(liste.textContent).to.contain('10.1/b')
+    const url = fetchMock.callHistory.calls().find(c => ZITATIONEN.test(c.url))!.url
+    expect(url).to.contain('richtung=zitiert_von')
+    expect(screen.getByRole('button', { name: 'Zitiert von' }).getAttribute('aria-expanded')).to.equal('true')
+  })
+
+  it('listet das Suchprotokoll und bietet den Export an', async function () {
+    fetchMock.get(PROTOKOLL, {
+      eintraege: [{ datum: '2026-11-08T10:00:00.000Z', dienst: 'OpenAlex', anfrage: 'sleep', treffer: 25 }],
+      gesamt: 1,
+      weiter: false,
+    })
+    render(<RecherchePanel />, { wrapper: EditorProviders })
+    fireEvent.click(screen.getByRole('tab', { name: 'Suchprotokoll' }))
+    await screen.findByText('sleep')
+    screen.getByText('OpenAlex · 25 Treffer ·', { exact: false })
+    const link = screen.getByRole('link', { name: 'Protokoll exportieren' })
+    expect(link.getAttribute('href')).to.match(/\/recherche\/protokoll\.csv$/)
+  })
+
+  it('zeigt ein leeres Suchprotokoll', async function () {
+    fetchMock.get(PROTOKOLL, { eintraege: [], gesamt: 0, weiter: false })
+    render(<RecherchePanel />, { wrapper: EditorProviders })
+    fireEvent.click(screen.getByRole('tab', { name: 'Suchprotokoll' }))
+    await screen.findByText('Noch keine Suchen protokolliert')
   })
 })

@@ -331,3 +331,16 @@ export const rechercheSuchen = mitProblemen(async (req, res) => {
     })
   )
 })
+
+export const rechercheZitationen = mitProblemen(async (req, res) => {
+  res.json(await Recherche.zitationen(String(req.query.doi ?? ''), String(req.query.richtung ?? '')))
+})
+
+export const suchprotokoll = mitProblemen(async (req, res) => {
+  res.json(await Recherche.protokoll(projektId(req), { seite: seiteAus(req.query.seite) }))
+})
+
+export const suchprotokollExport = mitProblemen(async (req, res) => {
+  res.attachment('suchprotokoll.csv').type('text/csv; charset=utf-8')
+  res.send(await Recherche.protokollCsv(projektId(req)))
+})

@@ -1320,6 +1320,45 @@ async page => {
     await page.locator('.spur-panel-inhalt').getByText('Keine Treffer', { exact: true }).waitFor()
   }
 
+  features.p2f2 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Recherche')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Treffer' }).click()
+    await paperSuchen('sleep memory consolidation')
+    const treffer = paperTreffer('The memory function of sleep')
+    await treffer.getByRole('button', { name: 'Zitiert von', exact: true }).click()
+    const zitiertVon = treffer.getByRole('region', { name: 'Zitiert von' })
+    await zitiertVon.getByText('Sleep spindles predict overnight memory consolidation').waitFor()
+    await treffer.getByRole('button', { name: 'Zitiert', exact: true }).click()
+    const zitiert = treffer.getByRole('region', { name: 'Zitiert', exact: true })
+    await zitiert.getByText('Sleep and Memory', { exact: true }).waitFor()
+    const imPanel = await zitiertVon.locator('.spur-paper-doi').allTextContents()
+    ok(imPanel.length === 3, `Zitiert von: ${imPanel}`)
+
+    const token = 'spur_e2e_fake'
+    const { inhalt } = await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })
+    const perTool = inhalt.treffer.map(t => t.doi)
+    ok(JSON.stringify(perTool) === JSON.stringify(imPanel), `paper_citations: ${perTool} statt ${imPanel}`)
+    const referenzen = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert' })).inhalt
+    ok(referenzen.treffer.map(t => t.doi).join() === '10.5555/spur.2024.001', `zitiert: ${JSON.stringify(referenzen)}`)
+
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    const eintrag = page.locator('.spur-protokoll .spur-zeile', { hasText: 'sleep memory consolidation' }).filter({ hasText: 'OpenAlex' }).first()
+    await eintrag.waitFor()
+    ok(/OpenAlex · \d+ Treffer · \d/.test(await eintrag.textContent()), `Protokolleintrag: ${await eintrag.textContent()}`)
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: 'Protokoll exportieren' }).click(),
+    ])
+    ok(download.suggestedFilename() === 'suchprotokoll.csv', `Datei: ${download.suggestedFilename()}`)
+    const csv = await (await page.request.get(download.url())).text()
+    const zeilen = csv.trim().split('\n')
+    ok(zeilen[0] === 'Datum,Datenbank,Anfrage,Trefferzahl', `Kopf: ${zeilen[0]}`)
+    ok(zeilen.some(z => /^\d{4}-\d\d-\d\dT[^,]+,OpenAlex,sleep memory consolidation,\d+$/.test(z)), `CSV:\n${csv}`)
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

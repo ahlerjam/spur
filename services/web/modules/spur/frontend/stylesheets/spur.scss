@@ -261,3 +261,44 @@
   gap: var(--spacing-03);
   margin-top: var(--spacing-04);
 }
+
+.spur-reiter {
+  display: flex;
+  gap: var(--spacing-02);
+  padding: 0 var(--spacing-05);
+  margin-bottom: var(--spacing-03);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.spur-reiter-knopf {
+  min-height: 32px;
+  padding: var(--spacing-02) var(--spacing-04);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--content-secondary);
+
+  &[aria-selected='true'] {
+    border-bottom-color: var(--border-active);
+    color: var(--content-primary);
+    font-weight: 600;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--border-active);
+    outline-offset: -2px;
+  }
+}
+
+.spur-zitationen {
+  flex-basis: 100%;
+  margin-top: var(--spacing-02);
+  padding-left: var(--spacing-04);
+  border-left: 2px solid var(--border-divider);
+}
+
+.spur-zitationen-titel {
+  margin: 0;
+  font-size: var(--font-size-02);
+  font-weight: 600;
+}

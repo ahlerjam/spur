@@ -1,11 +1,15 @@
 import logger from '@overleaf/logger'
+import { csv } from '../csv.mjs'
 import { Problem } from '../probleme.mjs'
 import { suchprotokoll } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { DienstFehler } from './abruf.mjs'
-import { aktiv, PRO_SEITE, SUCHDIENSTE } from './dienste.mjs'
+import { aktiv, PRO_SEITE, SUCHDIENSTE, ZITATIONSDIENSTE } from './dienste.mjs'
 
 const PROTOKOLL_SEITE = 50
+const CSV_MAX = 10000
+export const DOI_MUSTER = /^10\.\d{4,9}\/\S+$/
+const RICHTUNGEN = ['zitiert_von', 'zitiert']
 const ANZEIGE = Object.fromEntries(SUCHDIENSTE.map(d => [d.name, d.anzeige]))
 
 const titelSchluessel = titel => `titel:${titel?.toLowerCase().replace(/\W+/g, ' ').trim()}`
@@ -93,4 +97,36 @@ export async function protokoll(projectId, { seite = 0 } = {}) {
     sammlung.countDocuments({ projectId }),
   ])
   return { eintraege, gesamt: anzahl, weiter: (seite + 1) * PROTOKOLL_SEITE < anzahl }
+}
+
+export function doiPruefen(doi) {
+  const wert = doi?.trim().toLowerCase()
+  if (!DOI_MUSTER.test(wert ?? '')) {
+    throw new Problem(400, 'doi_ungueltig', 'Das ist keine DOI. Bitte eine DOI wie 10.1038/nrn2762 angeben.')
+  }
+  return wert
+}
+
+// richtung: 'zitiert_von' (Arbeiten, die dieses Paper zitieren) oder 'zitiert' (seine Referenzen).
+export async function zitationen(doi, richtung) {
+  if (!RICHTUNGEN.includes(richtung)) {
+    throw new Problem(400, 'richtung_ungueltig', 'Die Richtung ist „zitiert_von“ oder „zitiert“.')
+  }
+  const wert = doiPruefen(doi)
+  const dienste = ZITATIONSDIENSTE.filter(aktiv)
+  const ergebnisse = await Promise.allSettled(dienste.map(d => d.zitationen(wert, richtung)))
+  const { treffer, fehler } = auswerten(dienste, ergebnisse)
+  return { doi: wert, richtung, treffer, fehler }
+}
+
+export async function protokollCsv(projectId) {
+  const eintraege = await (await suchprotokoll())
+    .find({ projectId })
+    .sort({ datum: -1, _id: -1 })
+    .limit(CSV_MAX)
+    .toArray()
+  return csv(
+    ['Datum', 'Datenbank', 'Anfrage', 'Trefferzahl'],
+    eintraege.map(e => [e.datum.toISOString(), e.dienst, e.anfrage, e.treffer])
+  )
 }

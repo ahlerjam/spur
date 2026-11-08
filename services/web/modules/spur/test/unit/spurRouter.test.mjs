@@ -87,6 +87,9 @@ describe('Rechte der Routen', () => {
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/zuruecknehmen', 'schreiben', 'laufZuruecknehmen'],
     ['put', '/spur/project/:project_id/claude/automatik', 'schreiben', 'automatikSetzen'],
     ['get', '/spur/project/:project_id/recherche', 'lesen', 'rechercheSuchen'],
+    ['get', '/spur/project/:project_id/recherche/zitationen', 'lesen', 'rechercheZitationen'],
+    ['get', '/spur/project/:project_id/recherche/protokoll', 'lesen', 'suchprotokoll'],
+    ['get', '/spur/project/:project_id/recherche/protokoll.csv', 'lesen', 'suchprotokollExport'],
   ])('%s %s verlangt Anmeldung, Ausschluss von Leselink-Nutzern und %s', (methode, pfad, recht, handler) => {
     const r = route(methode, pfad)
     expect(r, `${methode} ${pfad}`).toBeTruthy()

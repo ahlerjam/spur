@@ -7,7 +7,15 @@ import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { anfrage, projektPfad } from '../api'
 import PaperEintrag from './paper-treffer'
+import Suchprotokoll from './suchprotokoll'
+import Zitationen from './zitationen'
 import type { SuchErgebnis } from './typen'
+
+type Ansicht = 'treffer' | 'protokoll'
+const ANSICHTEN: { id: Ansicht; titel: string }[] = [
+  { id: 'treffer', titel: 'spur_treffer_reiter' },
+  { id: 'protokoll', titel: 'spur_suchprotokoll' },
+]
 
 export default function RecherchePanel() {
   const { t } = useTranslation()
@@ -15,9 +23,11 @@ export default function RecherchePanel() {
   const [ergebnis, setErgebnis] = useState<SuchErgebnis | null>(null)
   const [laedt, setLaedt] = useState(false)
   const [fehler, setFehler] = useState<string | null>(null)
+  const [ansicht, setAnsicht] = useState<Ansicht>('treffer')
 
   const suchen = async (seite: number) => {
     setFehler(null)
+    setAnsicht('treffer')
     setLaedt(true)
     try {
       const parameter = new URLSearchParams({ anfrage: begriff.trim(), seite: String(seite) })
@@ -52,6 +62,22 @@ export default function RecherchePanel() {
           {t('spur_suchen')}
         </OLButton>
       </form>
+      <div className="spur-reiter" role="tablist" aria-label={t('spur_recherche_ansicht')}>
+        {ANSICHTEN.map(a => (
+          <button
+            key={a.id}
+            type="button"
+            role="tab"
+            className="spur-reiter-knopf"
+            aria-selected={ansicht === a.id}
+            onClick={() => setAnsicht(a.id)}
+          >
+            {t(a.titel)}
+          </button>
+        ))}
+      </div>
+      {ansicht === 'protokoll' && <Suchprotokoll />}
+      {ansicht === 'treffer' && (
       <div className="spur-panel-inhalt" aria-busy={laedt}>
         {fehler && <Notification type="error" content={fehler} />}
         {laedt && (
@@ -73,7 +99,13 @@ export default function RecherchePanel() {
             ) : (
               <ul className="spur-liste">
                 {ergebnis.treffer.map(treffer => (
-                  <PaperEintrag key={treffer.doi ?? treffer.titel} treffer={treffer} />
+                  <PaperEintrag key={treffer.doi ?? treffer.titel} treffer={treffer}>
+                    {treffer.doi && (
+                      <div className="spur-paper-aktionen">
+                        <Zitationen doi={treffer.doi} />
+                      </div>
+                    )}
+                  </PaperEintrag>
                 ))}
               </ul>
             )}
@@ -101,6 +133,7 @@ export default function RecherchePanel() {
           </>
         )}
       </div>
+      )}
     </div>
   )
 }

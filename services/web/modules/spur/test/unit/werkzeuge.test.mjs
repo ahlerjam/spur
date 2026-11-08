@@ -35,7 +35,7 @@ beforeEach(async () => {
     LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
     Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
     Crossref: { werk: vi.fn() },
-    Recherche: { suchen: vi.fn(async () => ({ treffer: [], fehler: [] })) },
+    Recherche: { suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -369,5 +369,10 @@ describe('Recherche', () => {
       anfrage: 'sleep',
       seite: 0,
     })
+  })
+
+  it('paper_citations reicht DOI und Richtung weiter', async () => {
+    await aufruf('paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert' })
+    expect(m.Recherche.zitationen).toHaveBeenCalledWith('10.1038/nrn2762', 'zitiert')
   })
 })

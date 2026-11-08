@@ -8,6 +8,7 @@ let datenbank
 let schalter
 let abrufe
 let ausfall
+let sonder
 
 const ATOM = `<?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -89,6 +90,7 @@ beforeEach(async () => {
   await datenbank.leeren()
   abrufe = []
   ausfall = new Set()
+  sonder = () => null
   schalter = schalterAttrappe()
   schalter.paperApiBasis = 'http://paper.test/fake'
   vi.resetModules()
@@ -100,6 +102,8 @@ beforeEach(async () => {
       const dienst = dienstAus(url)
       abrufe.push({ dienst, url: String(url), zeit: Date.now() })
       if (ausfall.has(dienst)) return { ok: false, status: 503 }
+      const extra = sonder(String(url))
+      if (extra) return { ok: true, status: 200, json: async () => extra }
       const { text, json } = ANTWORTEN[dienst]()
       return { ok: true, status: 200, text: async () => text, json: async () => json }
     })
@@ -220,5 +224,64 @@ describe('platzHolen', () => {
       art: 'limit',
       message: 'Semantic Scholar: Limit erreicht. Bitte in einigen Minuten erneut suchen.',
     })
+  })
+})
+
+describe('zitationen', () => {
+  const OPENALEX_WERK = { id: 'https://openalex.org/W1' }
+  const werk = (doi, titel) => ({ doi: `https://doi.org/${doi}`, display_name: titel, authorships: [], publication_year: 2020 })
+  const paper = (doi, titel) => ({ title: titel, year: 2020, authors: [], externalIds: { DOI: doi } })
+
+  beforeEach(() => {
+    sonder = url => {
+      if (url.includes('/works/doi:')) return OPENALEX_WERK
+      if (/filter=(cites|cited_by)/.test(url)) return { meta: { count: 1 }, results: [werk('10.1/a', 'A')] }
+      if (/\/(citations|references)/.test(url)) {
+        const feld = url.includes('/citations') ? 'citingPaper' : 'citedPaper'
+        return { data: [{ [feld]: paper('10.1/A', 'A') }, { [feld]: paper('10.1/b', 'B') }] }
+      }
+      return null
+    }
+  })
+
+  it('führt „Zitiert von“ aus OpenAlex und Semantic Scholar per DOI zusammen', async () => {
+    const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
+    expect(ergebnis.treffer.map(t => [t.doi, t.dienste])).toEqual([
+      ['10.1/a', ['OpenAlex', 'Semantic Scholar']],
+      ['10.1/b', ['Semantic Scholar']],
+    ])
+    const urls = abrufe.map(a => a.url)
+    expect(urls.some(u => u.includes('filter=cites%3AW1'))).toBe(true)
+    expect(urls.some(u => u.includes('/paper/DOI:10.1038/nrn2762/citations'))).toBe(true)
+  })
+
+  it('fragt für „Zitiert“ die Referenzen ab', async () => {
+    await Recherche.zitationen('10.1038/nrn2762', 'zitiert')
+    const urls = abrufe.map(a => a.url)
+    expect(urls.some(u => u.includes('filter=cited_by%3AW1'))).toBe(true)
+    expect(urls.some(u => u.includes('/references'))).toBe(true)
+  })
+
+  it('meldet einen ausgefallenen Dienst und liefert die übrigen Zitationen', async () => {
+    ausfall.add('openalex')
+    const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
+    expect(ergebnis.fehler.map(f => f.text)).toEqual(['OpenAlex nicht erreichbar'])
+    expect(ergebnis.treffer).toHaveLength(2)
+  })
+
+  it('lehnt eine ungültige Richtung oder DOI ab', async () => {
+    expect(await fehlerVon(Recherche.zitationen('10.1/a', 'quer'))).toMatchObject({ status: 400 })
+    expect(await fehlerVon(Recherche.zitationen('keine-doi', 'zitiert'))).toMatchObject({ status: 400 })
+  })
+})
+
+describe('protokollCsv', () => {
+  it('schreibt Datum, Datenbank, Anfrage und Trefferzahl als CSV', async () => {
+    await suchen('sleep, "memory"')
+    const csv = await Recherche.protokollCsv(projectId)
+    const zeilen = csv.trim().split('\n')
+    expect(zeilen[0]).toBe('Datum,Datenbank,Anfrage,Trefferzahl')
+    expect(zeilen).toContain('2026-11-07T10:00:00.000Z,OpenAlex,"sleep, ""memory""",25')
+    expect(zeilen).toHaveLength(5)
   })
 })

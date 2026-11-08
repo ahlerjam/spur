@@ -355,4 +355,14 @@ Object.assign(WERKZEUGE, {
       return await Recherche.suchen({ projectId, userId: menschId, anfrage, seite })
     },
   },
+
+  paper_citations: {
+    description:
+      'Folgt Zitationen einer DOI über OpenAlex und Semantic Scholar: richtung „zitiert_von“ liefert Arbeiten, die sie zitieren, ' +
+      '„zitiert“ ihre Referenzen.',
+    inputSchema: z.object({ doi: z.string().min(4).max(300), richtung: z.enum(['zitiert_von', 'zitiert']) }),
+    async ausfuehren({ doi, richtung }) {
+      return await Recherche.zitationen(doi, richtung)
+    },
+  },
 })
