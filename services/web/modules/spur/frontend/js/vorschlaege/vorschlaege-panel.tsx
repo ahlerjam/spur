@@ -190,7 +190,7 @@ function Liste({
       <h3 id="spur-vorschlaege-liste" className="spur-abschnitt" ref={ueberschrift} tabIndex={-1}>
         {t('spur_vorschlaege_offen', { anzahl: daten.vorschlaege.length })}
       </h3>
-      <div role="status">{meldung && <Notification type="success" content={meldung} />}</div>
+      <div role="status">{meldung && <p className="spur-vorschlag-meldung">{meldung}</p>}</div>
       {daten.vorschlaege.length === 0 && (
         <p className="spur-leer">{alleAus ? t('spur_vorschlaege_aus') : t('spur_vorschlaege_keine')}</p>
       )}

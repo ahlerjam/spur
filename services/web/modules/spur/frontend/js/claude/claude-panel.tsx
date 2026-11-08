@@ -12,12 +12,14 @@ import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { startBefehl } from './claude-verbinden'
 import LaufKarte, { type Aenderung, type Lauf } from './lauf-karte'
 import OffenlegungModal from './offenlegung-modal'
+import { WORKFLOW_PRAEFIX } from './workflow-befehl'
 
 type Nachricht = { id: string; von: 'mensch' | 'claude'; text: string; am: string }
 type Workflow = { name: string; titel: string; beschreibung: string }
 type Status = {
   verbunden: boolean
   nachrichten: Nachricht[]
+  aeltere?: boolean
   automatik: boolean
   lauf: Lauf | null
   aenderungen: Aenderung[]
@@ -113,6 +115,7 @@ function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise
         {nachrichten.length === 0 && !status.lauf && (
           <p className="spur-leer">{t('spur_keine_nachrichten')}</p>
         )}
+        {status.aeltere && <p className="spur-zeile-meta spur-chat-aeltere">{t('spur_chat_aeltere')}</p>}
         <ol className="spur-chat" role="log" aria-label={t('spur_unterhaltung')}>
           {nachrichten.map((n, i) => [
             i === laufBei && laufKarte,
@@ -180,6 +183,24 @@ function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehl
           </li>
         ))}
       </ul>
+      {liste.length > 0 && (
+        <div className="spur-workflows-hilfe">
+          <p className="spur-zeile-meta" id="spur-workflows-befehle">
+            {t('spur_workflows_befehle')}
+          </p>
+          <ul className="spur-liste" aria-labelledby="spur-workflows-befehle">
+            {liste.map(w => (
+              <li key={w.name}>
+                <code>
+                  {WORKFLOW_PRAEFIX}
+                  <wbr />
+                  {w.name}
+                </code>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </details>
   )
 }

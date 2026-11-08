@@ -76,6 +76,16 @@ claude plugin marketplace add ahlerjam/spur
 claude plugin install spur@spur --config server_url=https://ihre-spur-adresse/spur/mcp --config token=<Token>
 ```
 
+Die drei fertigen Workflows starten Sie im Claude-Panel unter „Workflows“ oder in Claude Code mit diesen Befehlen; Claude Code setzt für Prompts eines Plugins den Präfix `/plugin:spur:spur:` und zeigt sie im Menü mit „(MCP)“:
+
+| Befehl | Workflow |
+| --- | --- |
+| `/plugin:spur:spur:literaturueberblick` | Literaturüberblick |
+| `/plugin:spur:spur:methodenteil` | Methodenteil |
+| `/plugin:spur:spur:folien` | Folien aus Paper |
+
+Ein Admin passt die Texte unter `/spur/admin/workflows` an.
+
 Inhalte, die Claude liest, gehen an Anthropic. Dazu gehören Dokumente und Quellen, auch Interviews. Die Verantwortung dafür liegt bei Ihnen.
 
 Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen. spur zeigt diesen Hinweis beim Hochladen jeder VTT-Datei; weitere Regeln für Interviews gibt es nicht.

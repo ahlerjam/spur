@@ -54,7 +54,7 @@ beforeEach(async () => {
       widerrufen: vi.fn(async () => {}),
       botFuer: vi.fn(async () => ({ _id: 'bot1' })),
     },
-    Inbox: { verlauf: vi.fn(async () => []), verbunden: vi.fn(async () => true), auftragAnlegen: vi.fn(async () => ({ _id: 'n1' })) },
+    Inbox: { verlauf: vi.fn(async () => ({ nachrichten: [], aeltere: false })), verbunden: vi.fn(async () => true), auftragAnlegen: vi.fn(async () => ({ _id: 'n1' })) },
     Aktionen: {
       automatik: vi.fn(async () => false),
       laufDaten: vi.fn(async () => ({ lauf: null, aenderungen: [] })),
@@ -482,7 +482,10 @@ describe('Claude-Zugang und Läufe', () => {
   })
 
   it('claudeStatus zeigt Verlauf (älteste zuerst), Verbindung, Automatik und Lauf', async () => {
-    m.Inbox.verlauf.mockResolvedValue([{ _id: 'n2', von: 'claude', text: 'zwei', am: 2 }, { _id: 'n1', von: 'mensch', text: 'eins', am: 1 }])
+    m.Inbox.verlauf.mockResolvedValue({
+      nachrichten: [{ _id: 'n2', von: 'claude', text: 'zwei', am: 2 }, { _id: 'n1', von: 'mensch', text: 'eins', am: 1 }],
+      aeltere: true,
+    })
     m.Aktionen.automatik.mockResolvedValue(true)
     m.Aktionen.laufDaten.mockResolvedValue({ lauf: { id: 'l1' }, aenderungen: [] })
     const { res } = await ausfuehren(C.claudeStatus, req())
@@ -490,6 +493,7 @@ describe('Claude-Zugang und Läufe', () => {
     expect(res.body).toEqual({
       verbunden: true,
       nachrichten: [{ id: 'n1', von: 'mensch', text: 'eins', am: 1 }, { id: 'n2', von: 'claude', text: 'zwei', am: 2 }],
+      aeltere: true,
       automatik: true,
       lauf: { id: 'l1' },
       aenderungen: [],

@@ -7,6 +7,7 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import Notification from '@/shared/components/notification'
 import { anfrage, jsonAnfrage } from '../api'
+import { workflowBefehl } from '../claude/workflow-befehl'
 
 type Workflow = { name: string; titel: string; beschreibung: string; text: string; angepasst: boolean }
 
@@ -76,7 +77,7 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
         )}
       </div>
       <p className="spur-zeile-meta">
-        <code>/spur:{workflow.name}</code> · {workflow.beschreibung}
+        <code>{workflowBefehl(workflow.name)}</code> ·{workflow.beschreibung}
       </p>
       <form
         onSubmit={e => {

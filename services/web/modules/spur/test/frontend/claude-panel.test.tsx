@@ -106,6 +106,34 @@ describe('Claude-Panel', function () {
     await waitFor(() => expect(fetchMock.callHistory.called(STARTEN)).to.equal(true))
   })
 
+  it('sagt, wenn der Verlauf ältere Nachrichten nicht zeigt', async function () {
+    fetchMock.get(STATUS, status({ nachrichten: [nachricht(1, 'mensch', 'Neueste Frage')], aeltere: true }))
+    zeigen()
+    await screen.findByText('Neueste Frage')
+    screen.getByText('Ältere Nachrichten sind ausgeblendet; angezeigt werden die letzten 500.')
+  })
+
+  it('zeigt keinen Hinweis, wenn der Verlauf vollständig ist', async function () {
+    fetchMock.get(STATUS, status({ nachrichten: [nachricht(1, 'mensch', 'Erste Frage')], aeltere: false }))
+    zeigen()
+    await screen.findByText('Erste Frage')
+    expect(screen.queryByText(/Ältere Nachrichten/)).to.equal(null)
+  })
+
+  it('nennt in der Hilfe unter „Workflows“ die drei Befehle des Plugins', async function () {
+    fetchMock.get(STATUS, status({}))
+    zeigen()
+    fireEvent.click(await screen.findByText('Workflows'))
+    await screen.findByRole('button', { name: 'Folien aus Paper' })
+    const hilfe = screen.getByRole('list', { name: 'Befehle in Claude Code' })
+    expect(within(hilfe).getAllByRole('listitem').map(z => z.textContent)).to.deep.equal([
+      '/plugin:spur:spur:literaturueberblick',
+      '/plugin:spur:spur:methodenteil',
+      '/plugin:spur:spur:folien',
+    ])
+    expect(document.body.textContent).not.to.match(/(^|[^:])\/spur:\w/)
+  })
+
   it('zeigt ohne Verbindung keine Workflows', async function () {
     fetchMock.get(STATUS, status({ verbunden: false }))
     zeigen()

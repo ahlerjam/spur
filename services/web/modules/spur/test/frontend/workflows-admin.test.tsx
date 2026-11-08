@@ -39,6 +39,8 @@ describe('Workflows im Admin-Bereich', function () {
     render(<WorkflowsAdmin />)
     const feld = (await screen.findByLabelText('Text für „Folien aus Paper“')) as HTMLTextAreaElement
     expect(feld.value).to.equal('Text Folien aus Paper')
+    screen.getByText('/plugin:spur:spur:folien')
+    expect(document.body.textContent).not.to.match(/(^|[^:])\/spur:\w/)
     screen.getByLabelText('Text für „Literaturüberblick“')
     screen.getByLabelText('Text für „Methodenteil“')
     fireEvent.change(feld, { target: { value: 'Zehn Folien, nicht mehr.' } })

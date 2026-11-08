@@ -342,7 +342,7 @@ async function botDesNutzers(req) {
 
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)
-  const liste = await Inbox.verlauf(projektId(req), bot._id)
+  const { nachrichten, aeltere } = await Inbox.verlauf(projektId(req), bot._id)
   const [lauf, verbunden, automatik] = await Promise.all([
     LaufManager.letzterLauf(projektId(req), bot._id),
     Inbox.verbunden(bot._id),
@@ -350,7 +350,8 @@ export const claudeStatus = mitProblemen(async (req, res) => {
   ])
   res.json({
     verbunden,
-    nachrichten: liste.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
+    nachrichten: nachrichten.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
+    aeltere,
     automatik,
     ...(await LaufAktionen.laufDaten(projektId(req), lauf)),
   })

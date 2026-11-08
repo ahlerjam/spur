@@ -53,12 +53,12 @@
    "title": "Fertige Workflows starten",
    "steps": [
     "Der spur-Server liefert über `prompts/list` die MCP-Prompts `literaturueberblick`, `methodenteil` und `folien`; `prompts/get` gibt den vollen Workflow-Text zurück",
-    "In Claude Code erscheinen sie bei `/` als `/spur:literaturueberblick (MCP)`, `/spur:methodenteil (MCP)` und `/spur:folien (MCP)`",
+    "In Claude Code erscheinen die Workflows bei `/` über das Plugin als `/plugin:spur:spur:literaturueberblick (MCP)`, `/plugin:spur:spur:methodenteil (MCP)` und `/plugin:spur:spur:folien (MCP)`",
     "Im Panel listet „Workflows“ dieselben drei Einträge, ein Klick legt den Auftrag mit dem vollen Workflow-Text in die Inbox",
     "Der Fake-Client erhält den Auftrag mit Workflow-Name und Text",
     "Ändert ein Admin einen Workflow-Text auf dem Server, liefern Panel und `prompts/get` sofort den neuen Text"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   }
  ]

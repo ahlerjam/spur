@@ -36,13 +36,17 @@ export async function antwortSpeichern({ projectId, botId, text }) {
   return nachricht
 }
 
+const VERLAUF_GRENZE = 500
+
+// Neueste zuerst; `aeltere` sagt dem Panel, dass es frühere Nachrichten nicht zeigt.
 export async function verlauf(projectId, botId) {
-  return await (await nachrichten())
+  const liste = await (await nachrichten())
     .find({ projectId, botId })
     // Nachrichten kommen aus web (Panel) und web-api (MCP); ObjectIds beider Prozesse sortieren nicht nach Zeit.
     .sort({ am: -1, _id: -1 })
-    .limit(100)
+    .limit(VERLAUF_GRENZE + 1)
     .toArray()
+  return { nachrichten: liste.slice(0, VERLAUF_GRENZE), aeltere: liste.length > VERLAUF_GRENZE }
 }
 
 const fuerClient = e => ({

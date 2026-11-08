@@ -159,7 +159,8 @@ async page => {
   }
 
   async function werkzeug(token, name, args = {}) {
-    const { daten } = await mcp(token, 'tools/call', { name, arguments: args })
+    const { status, daten } = await mcp(token, 'tools/call', { name, arguments: args })
+    ok(daten?.result, `${name}: HTTP ${status} ${JSON.stringify(daten).slice(0, 200)}`)
     return {
       fehler: daten.result.isError === true,
       inhalt: JSON.parse(daten.result.content[0].text),
@@ -2111,10 +2112,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await feld.press('Control+Enter')
     await page.waitForFunction(() => window.__spur.log.some(e => e.msg?.result), null, { timeout: 5000 })
     await chatLog().getByText('Claude arbeitet …').waitFor()
-    const { inhalt } = await werkzeug(ADA, 'events_since')
+    const seit = await ereignisseVon(ADA)
     ok(
-      inhalt.ereignisse.some(e => e.project_id === pid && e.daten.text === 'Fasse Abschnitt 2 zusammen'),
-      `events_since: ${JSON.stringify(inhalt)}`
+      seit.some(e => e.project_id === pid && e.daten.text === 'Fasse Abschnitt 2 zusammen'),
+      `events_since: ${JSON.stringify(seit).slice(0, 500)}`
     )
 
     const edit = await werkzeug(ADA, 'doc_edit', {
@@ -2150,14 +2151,19 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await chatLog().getByText('Antwort 100').waitFor({ timeout: 15000 })
     const ladezeit = Date.now() - geladen
     ok(ladezeit < 3000, `Verlauf mit 100 Nachrichten nach ${ladezeit} ms`)
+    // Vollständig: die erste Frage, ihre Antwort und alle 100 weiteren Antworten.
     const anzahl = await chatLog().locator('.spur-chat-nachricht').count()
-    ok(anzahl >= 100, `Nach dem Neuladen nur ${anzahl} Nachrichten`)
+    ok(anzahl === 102, `Nach dem Neuladen ${anzahl} statt 102 Nachrichten`)
+    await chatLog().getByText('Fasse Abschnitt 2 zusammen', { exact: true }).waitFor()
+    ok((await claudePanel().getByText(/Ältere Nachrichten/).count()) === 0, 'Hinweis auf ältere Nachrichten bei 102')
+    // Die 100 Antworten kommen je 20 parallel; die neueste ist die letzte im Verlauf, nicht unbedingt „Antwort 100“.
+    const neueste = chatLog().locator('.spur-chat-nachricht').last()
     ok(
-      await chatLog().getByText('Antwort 100').evaluate(el => {
+      await neueste.evaluate(el => {
         const r = el.getBoundingClientRect()
         return r.bottom <= window.innerHeight && r.top >= 0
       }),
-      'Neueste Nachricht nach dem Laden nicht sichtbar'
+      `Neueste Nachricht nach dem Laden nicht sichtbar: ${await neueste.innerText()}`
     )
     await verbinden(ADA)
     const tippen = Date.now()
@@ -2186,9 +2192,16 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await page.mouse.up()
   }
 
+  // events_since liefert höchstens 100 Ereignisse je Seite; dem Cursor bis zum Ende folgen.
   async function ereignisseVon(token, typ) {
-    const { inhalt } = await werkzeug(token, 'events_since')
-    return inhalt.ereignisse.filter(e => !typ || e.typ === typ)
+    const alle = []
+    for (let cursor; ; ) {
+      const { inhalt } = await werkzeug(token, 'events_since', cursor ? { cursor } : {})
+      alle.push(...inhalt.ereignisse)
+      if (inhalt.ereignisse.length < 100) break
+      cursor = inhalt.cursor
+    }
+    return alle.filter(e => !typ || e.typ === typ)
   }
 
   async function bisEreignisse(token, typ, anzahl, timeout = 20000) {
@@ -2450,9 +2463,14 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       texte[name] = await promptText(name)
       ok(texte[name].length > 300 && texte[name].includes('run_finish'), `prompts/get ${name}: ${texte[name].slice(0, 80)}`)
     }
-    // In Claude Code heißen MCP-Prompts /<Server>:<Prompt>; der Server des Plugins heißt „spur“.
-    const mcpJson = JSON.parse(await repoDatei(`${FIXTURES}/../../../../../../plugins/spur/.mcp.json`))
+    // Über ein Plugin heißen MCP-Prompts in Claude Code /plugin:<Plugin>:<Server>:<Prompt> (MCP);
+    // Plugin und Server heißen „spur“ (Entscheidung D3).
+    const plugin = `${FIXTURES}/../../../../../../plugins/spur`
+    const mcpJson = JSON.parse(await repoDatei(`${plugin}/.mcp.json`))
     ok(Object.keys(mcpJson.mcpServers ?? mcpJson).includes('spur'), `Server im Plugin: ${JSON.stringify(mcpJson)}`)
+    const pluginJson = JSON.parse(await repoDatei(`${plugin}/.claude-plugin/plugin.json`))
+    ok(pluginJson.name === 'spur', `Plugin-Name: ${pluginJson.name}`)
+    const BEFEHLE = WORKFLOWS.map(n => `/plugin:${pluginJson.name}:spur:${n}`)
 
     const titel = { literaturueberblick: 'Literaturüberblick', methodenteil: 'Methodenteil', folien: 'Folien aus Paper' }
     await anmelden('e2e-p3a@example.org')
@@ -2463,6 +2481,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await claudePanel().getByText('Workflows', { exact: true }).click()
     const knoepfe = await claudePanel().locator('.spur-workflow button').allInnerTexts()
     ok(JSON.stringify(knoepfe) === JSON.stringify(WORKFLOWS.map(n => titel[n])), `Panel: ${knoepfe}`)
+    const hilfe = await claudePanel().getByRole('list', { name: 'Befehle in Claude Code' }).getByRole('listitem').allInnerTexts()
+    ok(JSON.stringify(hilfe) === JSON.stringify(BEFEHLE), `Hilfe im Panel: ${hilfe}`)
+    ok(!/(^|[^:])\/spur:\w/.test(await claudePanel().innerText()), 'Panel nennt noch /spur:<name>')
     await page.evaluate(() => window.__spur.abbruch.abort())
     const nichtAdmin = await page.request.get(`${BASE}/spur/admin/workflows.json`, { maxRedirects: 0 })
     ok(nichtAdmin.status() !== 200, `Workflows-Admin ohne Admin-Recht: ${nichtAdmin.status()}`)
@@ -2476,6 +2497,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
 
     const NEU = 'Workflow „Methodenteil“ (angepasst): Schreibe den Methodenteil in höchstens 600 Wörtern und beende mit run_finish.'
     await adminWorkflowText('Methodenteil', async abschnitt => {
+      await abschnitt.getByText(BEFEHLE[1], { exact: true }).waitFor()
       await abschnitt.getByLabel('Text für „Methodenteil“').fill(NEU)
       await abschnitt.getByRole('button', { name: 'Speichern' }).click()
       await abschnitt.getByText('Gespeichert. Der neue Text gilt ab sofort.').waitFor()

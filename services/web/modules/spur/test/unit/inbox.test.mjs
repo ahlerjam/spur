@@ -51,7 +51,7 @@ describe('Aufträge und Antworten', () => {
     await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'eins' })
     await Inbox.antwortSpeichern({ projectId: projekt, botId: bot, text: 'zwei' })
     await Inbox.antwortSpeichern({ projectId: new ObjectId(), botId: bot, text: 'fremd' })
-    expect((await Inbox.verlauf(projekt, bot)).map(n => n.text)).toEqual(['zwei', 'eins'])
+    expect((await Inbox.verlauf(projekt, bot)).nachrichten.map(n => n.text)).toEqual(['zwei', 'eins'])
   })
 
   it('verlauf ordnet nach Zeit, auch wenn die IDs aus zwei Prozessen anders sortieren', async () => {
@@ -62,7 +62,31 @@ describe('Aufträge und Antworten', () => {
       { _id: id('ffffffffff000001'), projectId: projekt, botId: bot, von: 'mensch', text: 'frage', am: new Date(1000) },
       { _id: id('0000000000000001'), projectId: projekt, botId: bot, von: 'claude', text: 'antwort', am: new Date(2000) },
     ])
-    expect((await Inbox.verlauf(projekt, bot)).map(n => n.text)).toEqual(['antwort', 'frage'])
+    expect((await Inbox.verlauf(projekt, bot)).nachrichten.map(n => n.text)).toEqual(['antwort', 'frage'])
+  })
+
+  const unterhaltung = anzahl =>
+    datenbank.db.collection('spurMessages').insertMany(
+      Array.from({ length: anzahl }, (_, i) => ({
+        projectId: projekt, botId: bot, von: i % 2 ? 'claude' : 'mensch', text: `n${i}`, am: new Date(1000 * (i + 1)),
+      }))
+    )
+
+  it('verlauf liefert 100 Fragen mit 100 Antworten und zwei frühere Nachrichten vollständig', async () => {
+    await unterhaltung(202)
+    const { nachrichten, aeltere } = await Inbox.verlauf(projekt, bot)
+    expect(nachrichten).toHaveLength(202)
+    expect(nachrichten.at(-1).text).toBe('n0')
+    expect(aeltere).toBe(false)
+  })
+
+  it('verlauf zeigt höchstens 500 Nachrichten und meldet, dass es ältere gibt', async () => {
+    await unterhaltung(501)
+    const { nachrichten, aeltere } = await Inbox.verlauf(projekt, bot)
+    expect(nachrichten).toHaveLength(500)
+    expect(nachrichten[0].text).toBe('n500')
+    expect(nachrichten.at(-1).text).toBe('n1')
+    expect(aeltere).toBe(true)
   })
 })
 

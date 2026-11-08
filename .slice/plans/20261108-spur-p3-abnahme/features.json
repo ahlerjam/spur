@@ -10,7 +10,7 @@
     "Claude Code headless mit `--plugin-dir` auf das Plugin (Adresse und Token der laufenden Instanz) meldet in der Init-Zeile `slash_commands` die drei Einträge `mcp__plugin_spur_spur__literaturueberblick`, `…methodenteil`, `…folien`; das Menümuster dazu ist `/plugin:spur:spur:<name> (MCP)`",
     "Der Test für die Befehlsnamen ist grün; die E2E-Suite läuft vollständig grün, und f5 von P3 wird in `features.json` von P3 auf `passes: true` gesetzt, sobald alle seine fünf Schritte am laufenden System belegt sind"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
