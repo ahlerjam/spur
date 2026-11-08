@@ -1,10 +1,11 @@
 {
-  "state": "running",
+  "state": "partial",
   "builderModel": "opus",
   "builderAdvisor": "opus",
   "where": "cloud",
   "cloudSession": "https://claude.ai/code/session_01XpJUcdj5K44eW234tR3Xra",
   "runBranch": "slice/run-20261107-spur-p11-tests",
   "sessionId": "4b46156d-06a2-47e0-a9a8-360e5a772486",
-  "started": "2026-11-07T21:05:47Z"
+  "started": "2026-11-07T21:05:47Z",
+  "finished": "2026-11-08T01:50:08Z"
 }

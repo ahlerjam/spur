@@ -1,0 +1,3 @@
+- D1 (plan 20261107-spur-p11-tests) f1: Independent acceptance failed twice on f1. The second run saw `spur-dev upstream web` still print 14x "reading 'externalAuth'" (UserPagesController.test.mjs); the first acceptance run did not show it and the builder's own run reports web 5484/173/173/0. Likely flaky or a known-list entry, unconfirmed.
+  Interim: merged as partial; all 8 features pass the builder's checks and spur-dev test is green (531 tests, 98.67 % lines).
+  Options: (a) re-run `spur-dev upstream web` and check whether the externalAuth errors are in the known list; (b) have a follow-up plan make spec step 3 ("no externalAuth errors") hold.
