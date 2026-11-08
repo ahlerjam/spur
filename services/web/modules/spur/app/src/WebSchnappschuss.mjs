@@ -1,12 +1,11 @@
 // Holt eine Webseite für einen datierten Schnappschuss. Die Adresse kommt von Nutzern: Sie darf
 // nicht ins lokale Netz zeigen (SSRF), auch nicht über DNS oder eine Umleitung.
-import dns from 'node:dns'
-import http from 'node:http'
-import https from 'node:https'
-import net from 'node:net'
 import _ from 'lodash'
 import sanitizeHtml from 'sanitize-html'
+import { adresseGesperrt, geschuetztHolen } from './netz.mjs'
 import { Problem } from './probleme.mjs'
+
+export { adresseGesperrt }
 
 const MAX_URL = 2000
 const MAX_BYTES = 5 * 1024 * 1024
@@ -20,48 +19,6 @@ const nichtErreichbar = () =>
     'seite_nicht_erreichbar',
     'Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.'
   )
-const gesperrtFehler = () =>
-  new Problem(
-    422,
-    'adresse_gesperrt',
-    'Adressen im lokalen Netz lassen sich nicht aufnehmen. Bitte eine öffentliche Webseite angeben.'
-  )
-
-// Nicht öffentlich erreichbare Netze. BlockList prüft IPv4-gemappte IPv6-Adressen (::ffff:…) in
-// jeder Schreibweise gegen die IPv4-Regeln.
-const GESPERRT = new net.BlockList()
-for (const [netz, bits] of [
-  ['0.0.0.0', 8],
-  ['10.0.0.0', 8],
-  ['100.64.0.0', 10],
-  ['127.0.0.0', 8],
-  ['169.254.0.0', 16],
-  ['172.16.0.0', 12],
-  ['192.0.0.0', 24],
-  ['192.168.0.0', 16],
-  ['198.18.0.0', 15],
-  ['224.0.0.0', 3],
-]) {
-  GESPERRT.addSubnet(netz, bits, 'ipv4')
-}
-for (const [netz, bits] of [
-  ['::', 96], // unbestimmt, Loopback und alte IPv4-kompatible Adressen
-  ['64:ff9b::', 96], // NAT64
-  ['64:ff9b:1::', 48],
-  ['100::', 64],
-  ['2001::', 32], // Teredo
-  ['2001:db8::', 32],
-  ['2002::', 16], // 6to4
-  ['fc00::', 7],
-  ['fe80::', 10],
-  ['ff00::', 8],
-]) {
-  GESPERRT.addSubnet(netz, bits, 'ipv6')
-}
-
-export function adresseGesperrt(ip) {
-  return GESPERRT.check(ip, net.isIPv6(ip) ? 'ipv6' : 'ipv4')
-}
 
 function adressePruefen(eingabe) {
   let url
@@ -80,31 +37,16 @@ function adressePruefen(eingabe) {
   return url
 }
 
-function anfrage(url, gesperrt, signal) {
-  const host = url.hostname.replace(/^\[|\]$/g, '')
-  if (net.isIP(host) && gesperrt(host)) return Promise.reject(gesperrtFehler())
-  // Prüft die Adresse, mit der sich der Socket wirklich verbindet, nicht eine frühere Auflösung.
-  const lookup = (name, optionen, fertig) =>
-    dns.lookup(name, optionen, (error, adresse, familie) => {
-      if (error) return fertig(error)
-      const liste = Array.isArray(adresse) ? adresse : [{ address: adresse }]
-      if (liste.some(a => gesperrt(a.address))) return fertig(gesperrtFehler())
-      fertig(null, adresse, familie)
+async function anfrage(url, gesperrt, signal) {
+  try {
+    return await geschuetztHolen(url, {
+      gesperrt,
+      signal,
+      headers: { 'User-Agent': 'spur (Schnappschuss)', Accept: 'text/html, text/plain;q=0.9' },
     })
-  const modul = url.protocol === 'https:' ? https : http
-  return new Promise((resolve, reject) => {
-    modul
-      .get(
-        url,
-        {
-          lookup,
-          signal,
-          headers: { 'User-Agent': 'spur (Schnappschuss)', Accept: 'text/html, text/plain;q=0.9' },
-        },
-        resolve
-      )
-      .on('error', error => reject(error instanceof Problem ? error : nichtErreichbar()))
-  })
+  } catch (error) {
+    throw error instanceof Problem ? error : nichtErreichbar()
+  }
 }
 
 async function koerperLesen(antwort) {
