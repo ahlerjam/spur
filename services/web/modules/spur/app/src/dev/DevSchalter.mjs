@@ -19,15 +19,11 @@ export function zeitSetzen(req, res) {
 }
 
 // Die E2E-Suite setzt ihre Daten vor dem Lauf selbst zurück, damit sie auch auf Daten eines früheren Laufs
-// grün bleibt. Das Testmodul wird erst beim Aufruf geladen; gleichzeitige Aufrufe teilen sich einen Lauf.
-let laufend = null
-
+// grün bleibt. Das Testmodul wird erst beim Aufruf geladen, nicht beim Start des Web-Prozesses.
 export async function e2eVorbereiten(_req, res) {
-  laufend ??= import('../../../test/e2e/vorbereiten.mjs')
-    .then(({ e2eDatenVorbereiten }) => e2eDatenVorbereiten())
-    .finally(() => (laufend = null))
   try {
-    await laufend
+    const { e2eDatenVorbereiten } = await import('../../../test/e2e/vorbereiten.mjs')
+    await e2eDatenVorbereiten()
     res.sendStatus(204)
   } catch (error) {
     res.status(500).send(`E2E-Daten nicht bereit: ${error.message}`)

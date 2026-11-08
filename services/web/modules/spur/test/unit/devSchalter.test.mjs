@@ -53,20 +53,6 @@ describe('e2eVorbereiten', () => {
     expect(res.statusCode).toBe(204)
   })
 
-  it('teilt gleichzeitige Aufrufe auf einen Lauf und startet danach einen neuen', async () => {
-    let fertig
-    vorbereitet.mockImplementationOnce(() => new Promise(r => (fertig = r)))
-    const [a, b] = [new Antwort(), new Antwort()]
-    const laeufe = [Dev.e2eVorbereiten(anfrage(), a), Dev.e2eVorbereiten(anfrage(), b)]
-    await vi.waitFor(() => expect(fertig).toBeTypeOf('function'))
-    fertig()
-    await Promise.all(laeufe)
-    expect(vorbereitet).toHaveBeenCalledTimes(1)
-    expect([a.statusCode, b.statusCode]).toEqual([204, 204])
-    await Dev.e2eVorbereiten(anfrage(), new Antwort())
-    expect(vorbereitet).toHaveBeenCalledTimes(2)
-  })
-
   it('meldet einen Fehler beim Zurücksetzen mit 500 und Text', async () => {
     vorbereitet.mockRejectedValueOnce(new Error('Mongo weg'))
     const res = new Antwort()

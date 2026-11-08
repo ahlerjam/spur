@@ -69,10 +69,25 @@ async page => {
   const DATEIBAUM = /^(Dateibaum|File tree)$/
   const railTab = name => page.getByRole('tab', { name, exact: true })
 
+  // Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her, auf langsamen Rechnern erst nach Sekunden,
+  // und überschreibt damit einen frühen Klick. Darum den Tab wählen, bis `bereit` sichtbar ist. Ein schon gewählter
+  // Tab wird erst nach 3 s erneut geklickt (eingeklappte Leiste), sonst schlösse der Klick das Panel wieder.
+  async function panelSichern(tab, bereit, timeout = 30000) {
+    const ende = Date.now() + timeout
+    let geklickt = 0
+    while (!(await bereit.isVisible())) {
+      ok(Date.now() < ende, `Panel ${tab}: nicht sichtbar nach ${timeout / 1000} s`)
+      const gewaehlt = (await railTab(tab).getAttribute('aria-selected')) === 'true'
+      if (!gewaehlt || Date.now() - geklickt > 3000) {
+        await railTab(tab).click()
+        geklickt = Date.now()
+      }
+      await page.waitForTimeout(250)
+    }
+  }
+
   async function panelOeffnen(name) {
-    const titel = page.locator('.rail-panel-title', { hasText: name })
-    if (!(await titel.first().isVisible())) await railTab(name).click()
-    await titel.first().waitFor()
+    await panelSichern(name, page.locator('.rail-panel-title', { hasText: name }).first())
   }
 
   async function sichtbar(text, timeout = 20000) {
@@ -122,7 +137,7 @@ async page => {
 
   async function bibText(name) {
     const eintrag = page.locator('.file-tree').getByRole('treeitem', { name })
-    if (!(await eintrag.isVisible())) await railTab(DATEIBAUM).click()
+    await panelSichern(DATEIBAUM, eintrag)
     await eintrag.click()
     await page.locator('.cm-content', { hasText: '@article{' }).waitFor()
     return await page.evaluate(() =>
@@ -132,8 +147,7 @@ async page => {
 
   async function texErsetzen(datei) {
     const name = datei.split('/').pop()
-    const eintrag = page.locator('.file-tree').getByRole('treeitem', { name })
-    if (!(await eintrag.isVisible())) await railTab(DATEIBAUM).click()
+    await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name }))
     await page.locator('.file-tree').getByRole('button', { name: /Hochladen|Upload/ }).first().click()
     await page.locator('.modal input[type=file]').first().setInputFiles(`${FIXTURES}/${datei}`)
     await page.locator('.modal').getByRole('button', { name: /Overwrite|Überschreiben/ }).click()
@@ -925,7 +939,7 @@ async page => {
     await imEditor('Ergänzt von Claude.')
     ok((await page.locator('.modal').count()) === 0, 'Modal erschienen')
     // Ohne Neuladen: Das Review-Panel nennt Claude, nicht „Deleted user“ (Bot ist kein Mitglied).
-    await railTab('Review panel').click()
+    await panelSichern('Review panel', page.locator('.review-panel-entry-user').first())
     await page
       .locator('.review-panel-entry-user', { hasText: 'Claude (e2e-a)' })
       .first()
@@ -1447,8 +1461,10 @@ async page => {
     // Die Liste lädt nach der Meldung neu; bis dahin zeigt der Link noch auf doi.org.
     const link = eintrag('Sleep and Memory').getByRole('link', { name: 'In der Bibliothek holen' })
     const BIB_LINK = 'https://bibliothek.example/?doi=10.5555/spur.2024.001'
-    await link.and(page.locator(`[href="${BIB_LINK}"]`)).waitFor({ timeout: 10000 }).catch(() => {})
-    ok((await link.getAttribute('href')) === BIB_LINK, `Link: ${await link.getAttribute('href')}`)
+    await link
+      .and(page.locator(`[href="${BIB_LINK}"]`))
+      .waitFor({ timeout: 10000 })
+      .catch(async () => fail(`Link: ${await link.getAttribute('href')}`))
 
     const dois = text => [...text.matchAll(/10\.\d{4,9}\/[^\s},"]+/g)].map(t => t[0]).sort().join()
     const erwartet = '10.1038/nrn2762,10.5555/spur.2024.001'
@@ -2219,17 +2235,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     fail(`${typ}: ${liste.length} statt ${anzahl} Ereignisse`)
   }
 
-  // Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her, auf langsamen Rechnern erst nach Sekunden;
-  // ein früher Klick auf „Review panel“ wird dann überschrieben. Darum öffnen, bis der Eintrag sichtbar ist.
   async function reviewEintrag(text) {
     const eintrag = page.locator('.review-panel-entry', { hasText: text })
-    const ende = Date.now() + 30000
-    while (!(await eintrag.isVisible())) {
-      ok(Date.now() < ende, `Review-Eintrag „${text}“ nicht sichtbar`)
-      const tab = railTab('Review panel')
-      if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click()
-      await page.waitForTimeout(1000)
-    }
+    await panelSichern('Review panel', eintrag)
     return eintrag
   }
 

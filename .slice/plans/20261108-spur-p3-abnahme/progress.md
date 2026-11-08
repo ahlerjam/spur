@@ -25,6 +25,10 @@ Befund: `spur-e2e.js` nach `vorbereiten.mjs` nicht vollständig grün, `p3f2` sc
 - Ursache `p3f2`: Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her; auf einem langsamen Rechner kommt das nach dem einmaligen Klick auf „Review panel“ (nach 5 s) und überschreibt ihn. Nachgestellt mit CPU-Drosselung per CDP: alter Test bei 20× `p3f2 FEHLER: locator.click … .review-panel-comment-input … element is not visible`; bei 6× noch grün. Behoben mit `reviewEintrag(text)`: öffnet das Review-Panel, bis der Eintrag sichtbar ist (bis 30 s), für Bo und Ada. Neuer Test bei 20×: zweimal `p3f2 ok` (100 s, 110 s).
 - Beleg Wiederholbarkeit: Lauf C auf den schmutzigen Daten von Lauf B, ohne `vorbereiten.mjs`: 34/34 ok (504 s). Lauf D direkt danach: 34/34 ok (496 s).
 
+### /simplify auf den Korrekturen (1611ebbaf5..HEAD)
+- Umgesetzt: ein allgemeines `panelSichern(tab, bereit)` statt eines nur für das Review-Panel gebauten Helfers (Altitude). Es wählt den Tab, bis `bereit` sichtbar ist, und klickt einen schon gewählten Tab erst nach 3 s erneut. `panelOeffnen`, `reviewEintrag`, der Dateibaum in `bibText`/`texErsetzen` und das Review-Panel in f11 nutzen es. Abfrage alle 250 ms statt 1 s. `p2f4` hat eine einzige Wartebedingung mit Meldung statt `waitFor().catch()` plus zweitem Vergleich. Die Dev-Route hat kein Sperr-Promise mehr (einziger Aufrufer ist die serielle Suite), der Unit-Test dazu entfällt.
+- Nicht umgesetzt: Projekte in `e2eDatenVorbereiten` parallel anlegen (Effizienz; das Zurücksetzen dauert 4,4 s je Lauf, parallel wäre es fehleranfälliger); `panelOeffnen` direkt im Review-Fall (der Titel heißt „Überprüfen“, der Tab „Review panel“); die beiden Klicks auf „Quellen“ in p4f3 (Wechsel ohne Neuladen, keine Wiederherstellung).
+
 ## Abnahme
 Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in der Scratchpad-Ablage `bilder/`, je 360 und 1280 px. In keinem Bild horizontaler Überlauf von Seite oder Panel, keine Konsolenfehler.
 
