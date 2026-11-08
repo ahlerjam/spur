@@ -137,12 +137,12 @@ function Einstellungen({
         </div>
       </form>
       <div role="status">
+        {/* Kein Notification-Kasten: Im schmalen Panel bräche dessen Symbolspalte den Text Wort für Wort um. */}
         {stand.limitErreicht ? (
-          <Notification
-            type="warning"
-            title={t('spur_vorschlag_limit_erreicht')}
-            content={t('spur_vorschlag_limit_erreicht_hinweis')}
-          />
+          <>
+            <OLBadge bg="warning">{t('spur_vorschlag_limit_erreicht')}</OLBadge>
+            <p className="spur-zeile-meta">{t('spur_vorschlag_limit_erreicht_hinweis')}</p>
+          </>
         ) : (
           <p className="spur-zeile-meta">
             {t('spur_vorschlag_heute', { heute: stand.heute, limit: stand.limit })}

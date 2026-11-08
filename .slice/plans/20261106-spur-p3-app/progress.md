@@ -1,6 +1,6 @@
 # Fortschritt 20261106-spur-p3-app
 
-f1 bis f4 bestehen. f5 bleibt offen: Schritte 1, 3, 4 und 5 bestehen in `p3f5`, Schritt 2 scheitert bei Installation über das Plugin (siehe „Needs decision“).
+f1 bis f4 bestehen. f5 bleibt offen: Schritte 1, 3, 4 und 5 bestehen in `p3f5`, Schritt 2 scheitert bei Installation über das Plugin (siehe „Needs decision“). `p3f5` läuft weiter in der Suite und ist nicht übersprungen: Es prüft nur Schritte, die bestehen; Schritt 2 lässt sich im Browser nicht prüfen.
 
 ## Recipe changes
 - Wie in P2 und P4: Das Setup-Skript der Cloud-Umgebung war nicht gelaufen (kein `spur-dev`, Docker ohne Images). Der Builder hat den unveränderten Stand mit `bash tools/spur-dev/spur-dev install --cloud` installiert und `dockerd` gestartet; `spur-dev up` zog die Images.
@@ -62,4 +62,6 @@ Der Plan-Commit liegt vor 90 Commits aus P2 und P4, die danach in diesen Zweig k
 ## Ansichten (360 und 1280 px)
 Chat nicht verbunden, lange Unterhaltung mit Lauf-Karte, Workflows, Vorschläge mit Karten, Kommentar-Thread mit Antwort „Claude (Ada)“, Workflow-Admin: kein horizontaler Überlauf, keine Konsolenfehler.
 - Behoben nach den Bildern: Uhrzeit in der Sprache der Oberfläche ohne Sekunden; Claude-Akzent grün statt blau (blau liest sich wie Fokus); Vorschläge-Panel einspaltig (Auswahlen waren bei 1280 px abgeschnitten, das Limit-Feld wenige Pixel breit), „Projekt: Aus“ statt „Projekt-Standard: Aus“; Admin-Seite mit Overleafs Navigationsleiste (`header-footer-react`) und Abstand darunter, „Standard“ als Text statt Badge mit zu wenig Kontrast.
+- Alle vier Zustände des Vorschläge-Panels aufgenommen (aus, keine, mehrere, Tageslimit erreicht). „Tageslimit erreicht“ als Badge mit Hinweiszeile statt Meldungskasten; dessen Symbolspalte brach den Text im schmalen Panel Wort für Wort um.
+- Gesehen, so gelassen: Bei 360 px bleibt Overleafs eigenes Review-Panel leer, weil der Editor, an dessen Zeilen die Kommentare hängen, dann verdeckt ist (Overleaf, nicht spur).
 - Gesehen, so gelassen: Die Reihenfolge „Antwort 098, 097, 099“ im Testbild kommt aus 100 parallel gesendeten `reply` in derselben Millisekunde (nur Testdaten).
