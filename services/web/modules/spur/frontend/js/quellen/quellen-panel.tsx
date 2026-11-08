@@ -10,9 +10,12 @@ import { useConnectionContext } from '@/features/ide-react/context/connection-co
 import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
 import { anfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
+import MatrixModal from '../literatur/matrix-modal'
+import ImportModal from './import-modal'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
+import Semantik from './semantik'
 import Zugewiesen from './zugewiesen'
 import { anzeigename, datumLang, OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
 import WebAufnehmen from './web-aufnehmen'
@@ -89,6 +92,7 @@ function QuellenZeile({
           {t('spur_text_erkennen')}
         </OLButton>
       )}
+      {quelle.nurProjekt && <p className="spur-zeile-meta">{t('spur_nur_projekt')}</p>}
     </li>
   )
 }
@@ -110,6 +114,8 @@ export default function QuellenPanel() {
   const [webForm, setWebForm] = useState(false)
   const webKnopf = useRef<HTMLButtonElement>(null)
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'info'; text: string } | null>(null)
+  const [importOffen, setImportOffen] = useState(false)
+  const [matrixOffen, setMatrixOffen] = useState(false)
   const dateiFeld = useRef<HTMLInputElement>(null)
   const sucheFeld = useRef<HTMLInputElement>(null)
   const warOffen = useRef(false)
@@ -259,6 +265,9 @@ export default function QuellenPanel() {
             >
               {t('spur_aus_projekt_holen')}
             </OLButton>
+            <OLButton variant="secondary" size="sm" onClick={() => setImportOffen(true)}>
+              {t('spur_importieren')}
+            </OLButton>
           </>
         )}
         <OLButton
@@ -268,6 +277,9 @@ export default function QuellenPanel() {
           download
         >
           {t('spur_quellen_exportieren')}
+        </OLButton>
+        <OLButton variant="secondary" size="sm" onClick={() => setMatrixOffen(true)}>
+          {t('spur_literaturmatrix')}
         </OLButton>
       </div>
       {transkript && (
@@ -341,6 +353,7 @@ export default function QuellenPanel() {
             <OLSpinner size="sm" /> {t('spur_quellen_laden')}
           </p>
         )}
+        <Semantik quellenAnzahl={gesamt} oeffnen={trefferOeffnen} />
         {treffer && <QuellenSuche treffer={treffer} oeffnen={trefferOeffnen} />}
         {!treffer && quellen?.length === 0 && (
           <p className="spur-leer">{t('spur_keine_quellen')}</p>
@@ -368,6 +381,16 @@ export default function QuellenPanel() {
           </>
         )}
       </div>
+      {matrixOffen && <MatrixModal schliessen={() => setMatrixOffen(false)} />}
+      {importOffen && (
+        <ImportModal
+          schliessen={() => setImportOffen(false)}
+          importiert={() => {
+            laden()
+            pruefenVerzoegert()
+          }}
+        />
+      )}
       {holenDialog && (
         <QuellenHolenModal
           projekte={klonVon && !andere.length ? [klonVon] : andere}

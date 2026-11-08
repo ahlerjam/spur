@@ -16,7 +16,9 @@ const ANWEISUNGEN =
 
 const begrenzer = new RateLimiter('spur-mcp', { points: 600, duration: 60 })
 
+// Werkzeuge mit eigenem MCP-Inhalt (etwa Bilder) liefern content selbst.
 function antwortVon(ergebnis) {
+  if (Array.isArray(ergebnis?.content)) return ergebnis
   return { content: [{ type: 'text', text: JSON.stringify(ergebnis) }] }
 }
 

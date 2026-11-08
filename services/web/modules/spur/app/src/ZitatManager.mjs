@@ -1,7 +1,7 @@
 // EditorController meldet neue Dateien sofort an offene Editoren (Dateibaum).
 import EditorController from '../../../../app/src/Features/Editor/EditorController.mjs'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
-import { bibLesen } from './pruefung/bib.mjs'
+import { bibEintrag, bibLesen, latexSicher } from './pruefung/bib.mjs'
 import { zitierpaket } from './pruefung/latex.mjs'
 import { dokumente } from './pruefung/PruefManager.mjs'
 import { Problem } from './probleme.mjs'
@@ -123,50 +123,7 @@ export async function holen(quelle, zitatId) {
   return zitat
 }
 
-const LATEX_ZEICHEN = /[\\{}&%$#_^~]/g
-const LATEX_ERSATZ = {
-  '\\': '\\textbackslash{}',
-  '~': '\\textasciitilde{}',
-  '^': '\\textasciicircum{}',
-}
-
-function latexSicher(text) {
-  return text.replace(LATEX_ZEICHEN, c => LATEX_ERSATZ[c] ?? `\\${c}`)
-}
-
-// Crossref-Daten, Webseiten-Titel und Dateinamen sind fremder Text: maskieren, damit die Klammern
-// der .bib halten.
-const text = wert => wert && latexSicher(String(wert))
-const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
-const alsBib = (typ, key, felder) => {
-  const zeilen = felder.filter(([, wert]) => wert).map(([name, wert]) => `  ${name} = {${wert}}`)
-  return `@${typ}{${key},\n${zeilen.join(',\n')}\n}`
-}
-
-function webEintrag(key, quelle) {
-  return alsBib('online', key, [
-    ['title', text(quelle.meta?.titel ?? quelle.web.url)],
-    // Die URL steht in biblatex wörtlich; nur Klammern und Backslash würden die .bib brechen.
-    ['url', ohneKlammern(quelle.web.url)],
-    ['urldate', quelle.web.abgerufenAm.toISOString().slice(0, 10)],
-  ])
-}
-
-function bibEintrag(key, quelle) {
-  if (quelle.art === 'web') return webEintrag(key, quelle)
-  const meta = quelle.meta?.gefunden ? quelle.meta : {}
-  const felder = [
-    ['author', text(meta.autoren?.map(a => [a.family, a.given].filter(Boolean).join(', ')).join(' and '))],
-    ['title', text(meta.titel ?? quelle.dateiname)],
-    ['journal', text(meta.journal)],
-    ['year', ohneKlammern(meta.jahr)],
-    ['pages', ohneKlammern(meta.seiten?.replace('-', '--'))],
-    ['doi', ohneKlammern(quelle.doi)],
-  ]
-  return alsBib('article', key, felder)
-}
-
-async function bibSicherstellen(projectId, docs, quelle, userId) {
+export async function bibSicherstellen(projectId, docs, quelle, userId) {
   const bibDocs = docs.filter(d => d.pfad.endsWith('.bib'))
   for (const doc of bibDocs) {
     for (const eintrag of bibLesen(doc.text).values()) {

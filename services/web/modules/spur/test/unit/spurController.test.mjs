@@ -17,6 +17,10 @@ afterAll(() => rmSync(ordner, { recursive: true, force: true }))
 
 beforeEach(async () => {
   m = {
+    Import: { zoteroSammlungen: vi.fn(), zoteroImportieren: vi.fn() },
+    Literatur: {},
+    Offenlegung: {},
+    Semantik: {},
     Quellen: {
       liste: vi.fn(),
       aufnehmen: vi.fn(),
@@ -80,6 +84,10 @@ beforeEach(async () => {
     default: { promises: { getPrivilegeLevelForProject: async () => m.stufe } },
   }))
   vi.doMock('../../app/src/QuellenManager.mjs', () => m.Quellen)
+  vi.doMock('../../app/src/recherche/Import.mjs', () => m.Import)
+  vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
+  vi.doMock('../../app/src/offenlegung/Offenlegung.mjs', () => m.Offenlegung)
+  vi.doMock('../../app/src/semantik/Semantik.mjs', () => m.Semantik)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.Zitate)
   vi.doMock('../../app/src/Team.mjs', () => m.Team)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.Pruef)
@@ -105,7 +113,7 @@ describe('Quellenliste und Suche', () => {
     m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
     const { res } = await ausfuehren(C.quellenListe, req({ query: { seite: '2' } }))
     expect(m.Quellen.liste).toHaveBeenCalledWith(projekt, { seite: 2 })
-    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', ocr: null, web: null })
+    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, ocr: null, web: null })
     expect(res.body).toMatchObject({ gesamt: 1, seitengroesse: 100 })
   })
 

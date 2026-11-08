@@ -31,6 +31,7 @@ Stand: Entwurf vor Lauf 0. Änderungen an Namen und Fehlercodes gelten als Bruch
 | `paper_search`, `paper_lookup`, `paper_citations` | P2 | Recherche |
 | `source_add`, `acquisition_add` | P2 | Quelle aufnehmen oder auf die Beschaffungsliste setzen |
 | `job_status`, `compile`, `compile_log`, `page_image` | P2 | Kompilieren und Ergebnis sehen |
+| `matrix_suggest` | P2 | Zelle der Literaturmatrix vorschlagen; die Person bestätigt (Übergang, bis `suggest` in P3 kommt) |
 | `suggest` | P3 | Vorschlag ins Panel legen |
 
 ## MCP-Prompts
@@ -52,6 +53,21 @@ Stand: Entwurf vor Lauf 0. Änderungen an Namen und Fehlercodes gelten als Bruch
 | `pfad_ungueltig` | `doc_create` und `doc_edit`: Der Pfad ist nicht erlaubt (wie im Web: keine Teile wie `..`, keine verbotenen Zeichen, jeder Name unter 150 Zeichen) |
 
 Unerkannte Zitatformen und nicht auflösbare DOIs werden angenommen, aber rot markiert und nie automatisch übernommen.
+
+## Fehlercodes der Recherche-Werkzeuge
+
+| Code | Bedeutung |
+|---|---|
+| `doi_ungueltig` | Der Wert ist keine DOI |
+| `doi_nicht_gefunden` | Das DOI-Register kennt die DOI nicht („DOI nicht gefunden“) |
+| `quelle_vorhanden` | Zur DOI gibt es schon eine Quelle („Bereits vorhanden“) |
+| `beschaffung_vorhanden` | Die DOI steht schon auf der Beschaffungsliste |
+| `nicht_frei` | `source_add`: kein freier Volltext, stattdessen `acquisition_add` |
+| `pdf_fehlt` | Der freie Volltext ließ sich nicht laden |
+| `dienst_fehlt` | Crossref antwortet nicht |
+| `spalte_fehlt` | `matrix_suggest`: Die Spalte gibt es in der Matrix nicht |
+
+`paper_search` und `paper_citations` scheitern nicht an einem einzelnen Dienst: `fehler` nennt ausgefallene Dienste mit Namen, die übrigen Treffer kommen trotzdem.
 
 ## Ereignisse für `events_since`
 `task_created`, `chat_message`, `comment_mention`, `suggest_trigger`. Jedes Ereignis gilt für genau einen Bot.

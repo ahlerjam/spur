@@ -48,6 +48,12 @@ async page => {
 
   async function projektOeffnen(name) {
     await page.goto(`${BASE}/project`)
+    // Die Liste zeigt nur 20 Projekte; e2e-a hat mehr. Wie ein Mensch über die Suche filtern.
+    await page
+      .getByPlaceholder(/^(Suche in allen Projekten|Search in all projects)…$/)
+      .filter({ visible: true })
+      .first()
+      .fill(name)
     await page.getByRole('link', { name, exact: true }).first().click()
     await page.waitForURL(/\/project\/[0-9a-f]{24}/)
     await page.getByRole('button', { name: KOMPILIEREN }).first().waitFor()
@@ -258,6 +264,25 @@ async page => {
       },
       [alt, neu]
     )
+  }
+
+  const FAKE = `${BASE}/spur/dev/crossref`
+
+  async function fakeSteuern(einstellung) {
+    const r = await page.request.post(`${FAKE}/_steuerung`, { data: einstellung })
+    ok(r.status() === 204, `Fake-Steuerung: ${r.status()}`)
+  }
+
+  async function paperSuchen(anfrage) {
+    await page.getByRole('searchbox', { name: 'Paper suchen' }).fill(anfrage)
+    await page.getByRole('button', { name: 'Suchen', exact: true }).click()
+    await page.waitForFunction(() => !document.querySelector('.spur-panel-inhalt[aria-busy="true"]'), null, { timeout: 30000 })
+  }
+
+  const paperTreffer = titel => page.locator('.spur-paper', { has: page.getByText(titel, { exact: true }) }).first()
+
+  async function trefferDois() {
+    return await page.locator('.spur-paper-doi').allTextContents()
   }
 
   const features = {
@@ -724,8 +749,14 @@ async page => {
         'project_list', 'doc_list', 'doc_read', 'sources_list', 'source_search', 'source_read',
         'quote_mark', 'check_report', 'bib_list', 'doc_edit', 'doc_create', 'run_status',
         'run_finish', 'wait_for_event', 'events_since', 'reply',
-      ].sort()
-      ok(JSON.stringify(namen) === JSON.stringify(P1), `Tools: ${namen}`)
+      ]
+      // P2 ergänzt laut docs/mcp-vertrag.md Recherche, Aufnahme, Matrix und Compile.
+      const P2 = [
+        'paper_search', 'paper_citations', 'source_add', 'acquisition_add', 'matrix_suggest',
+        'compile', 'job_status', 'compile_log', 'page_image',
+      ]
+      const erwartet = [...P1, ...P2].sort()
+      ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
 
@@ -1257,6 +1288,535 @@ async page => {
       })).status
     }, pid)
     ok(reviewPut === 403, `review setzt Automatik: ${reviewPut}`)
+  }
+
+  // P2: Recherche und Design
+  features.p2f1 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Recherche')
+    await panelOeffnen('Recherche')
+    await paperSuchen('sleep memory consolidation')
+    const treffer = paperTreffer('The memory function of sleep')
+    await treffer.waitFor({ timeout: 30000 })
+    await treffer.getByText('Susanne Diekelmann, Jan Born · 2010').waitFor()
+    await treffer.getByText('Gefunden über OpenAlex, Crossref, Semantic Scholar').waitFor()
+    const imPanel = await trefferDois()
+    ok(imPanel.length >= 10, `Treffer auf Seite 1: ${imPanel.length}`)
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Recherche')
+    const { inhalt } = await werkzeug(token, 'paper_search', { project_id: pid, anfrage: 'sleep memory consolidation' })
+    const perTool = inhalt.treffer.map(t => t.doi)
+    ok(JSON.stringify(perTool) === JSON.stringify(imPanel), `paper_search: ${perTool} statt ${imPanel}`)
+
+    await page.getByRole('button', { name: 'Nächste Seite' }).click()
+    await sichtbar('Seite 2')
+    await page.waitForFunction(() => !document.querySelector('.spur-panel-inhalt[aria-busy="true"]'))
+    ok(!(await trefferDois()).includes(imPanel[0]), 'Seite 2 zeigt Seite 1')
+
+    await fakeSteuern({ ausfall: ['s2'] })
+    try {
+      await paperSuchen('memory consolidation during sleep')
+      await sichtbar('Semantic Scholar nicht erreichbar', 30000)
+      await paperTreffer('The memory function of sleep').waitFor()
+    } finally {
+      await fakeSteuern({ ausfall: [] })
+    }
+
+    await fakeSteuern({ ausfall: [], protokollLeeren: true })
+    await Promise.all(
+      ['sleep replay', 'sleep spindles'].map(anfrage =>
+        werkzeug(token, 'paper_search', { project_id: pid, anfrage })
+      )
+    )
+    const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe
+    const arxiv = abrufe.filter(a => a.dienst === 'arxiv').map(a => a.zeit)
+    ok(arxiv.length === 2, `arXiv-Abrufe: ${arxiv.length}`)
+    ok(Math.abs(arxiv[1] - arxiv[0]) >= 3000, `arXiv-Abstand ${Math.abs(arxiv[1] - arxiv[0])} ms`)
+
+    await paperSuchen('xyzzy')
+    await page.locator('.spur-panel-inhalt').getByText('Keine Treffer', { exact: true }).waitFor()
+  }
+
+  features.p2f2 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Recherche')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Treffer' }).click()
+    await paperSuchen('sleep memory consolidation')
+    const treffer = paperTreffer('The memory function of sleep')
+    await treffer.getByRole('button', { name: 'Zitiert von', exact: true }).click()
+    const zitiertVon = treffer.getByRole('region', { name: 'Zitiert von' })
+    await zitiertVon.getByText('Sleep spindles predict overnight memory consolidation').waitFor()
+    await treffer.getByRole('button', { name: 'Zitiert', exact: true }).click()
+    const zitiert = treffer.getByRole('region', { name: 'Zitiert', exact: true })
+    await zitiert.getByText('Sleep and Memory', { exact: true }).waitFor()
+    const imPanel = await zitiertVon.locator('.spur-paper-doi').allTextContents()
+    ok(imPanel.length === 3, `Zitiert von: ${imPanel}`)
+
+    const token = 'spur_e2e_fake'
+    const { inhalt } = await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })
+    const perTool = inhalt.treffer.map(t => t.doi)
+    ok(JSON.stringify(perTool) === JSON.stringify(imPanel), `paper_citations: ${perTool} statt ${imPanel}`)
+    const referenzen = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert' })).inhalt
+    ok(referenzen.treffer.map(t => t.doi).join() === '10.5555/spur.2024.001', `zitiert: ${JSON.stringify(referenzen)}`)
+
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    const eintrag = page.locator('.spur-protokoll .spur-zeile', { hasText: 'sleep memory consolidation' }).filter({ hasText: 'OpenAlex' }).first()
+    await eintrag.waitFor()
+    ok(/OpenAlex · \d+ Treffer · \d/.test(await eintrag.textContent()), `Protokolleintrag: ${await eintrag.textContent()}`)
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: 'Protokoll exportieren' }).click(),
+    ])
+    ok(download.suggestedFilename() === 'suchprotokoll.csv', `Datei: ${download.suggestedFilename()}`)
+    const csv = await (await page.request.get(download.url())).text()
+    const zeilen = csv.trim().split('\n')
+    ok(zeilen[0] === 'Datum,Datenbank,Anfrage,Trefferzahl', `Kopf: ${zeilen[0]}`)
+    ok(zeilen.some(z => /^\d{4}-\d\d-\d\dT[^,]+,OpenAlex,sleep memory consolidation,\d+$/.test(z)), `CSV:\n${csv}`)
+  }
+
+  features.p2f3 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Recherche')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Treffer' }).click()
+    await paperSuchen('sleep memory consolidation')
+    const keller = paperTreffer('Sleep spindles predict overnight memory consolidation')
+    await keller.getByRole('button', { name: 'Aufnehmen' }).click()
+    await keller.getByText('Aufgenommen als „keller2014“: Quelle mit PDF und Eintrag in der .bib').waitFor({ timeout: 30000 })
+    await keller.getByRole('button', { name: 'Aufnehmen' }).click()
+    await keller.getByText('Bereits vorhanden', { exact: true }).waitFor()
+
+    const arxiv = paperTreffer('Sleep-like replay improves memory consolidation in artificial neural networks')
+    await arxiv.getByRole('button', { name: 'Aufnehmen' }).click()
+    await arxiv.getByText('Aufgenommen als „smith2024“', { exact: false }).waitFor({ timeout: 30000 })
+
+    await panelOeffnen('Quellen')
+    const zeile = name => page.locator('.spur-panel .spur-zeile', { hasText: name })
+    await zeile('keller2014.pdf').getByText('2 Seiten · Text erkannt').waitFor()
+    await zeile('smith2024.pdf').getByText('Volltext nur in diesem Projekt').waitFor()
+    ok((await zeile('keller2014.pdf').getByText('Volltext nur in diesem Projekt').count()) === 0, 'keller nur im Projekt')
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Recherche')
+    const bib = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
+    ok(bib.includes('@article{keller2014,') && bib.includes('doi = {10.1371/journal.pone.0099999}'), `.bib:\n${bib}`)
+    ok(bib.includes('title = {Sleep spindles predict overnight memory consolidation}'), `.bib-Titel:\n${bib}`)
+    ok(bib.includes('@article{smith2024,') && bib.includes('author = {Smith, Alice and Lee, Ben}'), `.bib arXiv:\n${bib}`)
+
+    // Der arXiv-Volltext ohne Lizenz bleibt im Projekt: „Holen“ in ein anderes Projekt nimmt nur keller2014 mit.
+    await projektOeffnen('E2E Recherche Ziel')
+    await panelOeffnen('Quellen')
+    await quelleHolen('E2E Recherche')
+    await sichtbar('1 Quelle geholt')
+    await zeile('keller2014.pdf').waitFor()
+    ok((await zeile('smith2024.pdf').count()) === 0, 'arXiv-Volltext wurde mitkopiert')
+
+    const unbekannt = await werkzeug(token, 'source_add', { project_id: pid, doi: '10.9999/gibt.es.nicht' })
+    ok(unbekannt.fehler && unbekannt.inhalt.fehler === 'doi_nicht_gefunden' && unbekannt.inhalt.detail === 'DOI nicht gefunden', `source_add: ${JSON.stringify(unbekannt.inhalt)}`)
+  }
+
+  features.p2f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Beschaffung')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Treffer' }).click()
+    await paperSuchen('sleep memory consolidation')
+    for (const titel of ['Sleep and Memory', 'The memory function of sleep']) {
+      const treffer = paperTreffer(titel)
+      ok((await treffer.getByRole('button', { name: 'Aufnehmen' }).count()) === 0, `${titel} wäre frei`)
+      await treffer.getByRole('button', { name: 'Auf die Beschaffungsliste' }).click()
+      await treffer.getByText('Steht jetzt auf der Beschaffungsliste').waitFor()
+    }
+
+    await page.getByRole('tab', { name: 'Beschaffung' }).click()
+    const eintrag = titel => page.locator('.spur-panel-inhalt .spur-paper', { has: page.getByText(titel, { exact: true }) })
+    await eintrag('Sleep and Memory').getByText('Offen', { exact: true }).waitFor()
+    await sichtbar('Offen: 2 · Beschafft: 0')
+
+    await page.getByLabel('Link zur Bibliothek').fill('https://bibliothek.example/?doi={doi}')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    await sichtbar('Link zur Bibliothek gespeichert')
+    const link = eintrag('Sleep and Memory').getByRole('link', { name: 'In der Bibliothek holen' })
+    ok((await link.getAttribute('href')) === 'https://bibliothek.example/?doi=10.5555/spur.2024.001', `Link: ${await link.getAttribute('href')}`)
+
+    const dois = text => [...text.matchAll(/10\.\d{4,9}\/[^\s},"]+/g)].map(t => t[0]).sort().join()
+    const erwartet = '10.1038/nrn2762,10.5555/spur.2024.001'
+    for (const format of ['.bib', '.ris', 'CSV']) {
+      const knopf = page.getByRole('link', { name: `Als ${format} exportieren` })
+      const [download] = await Promise.all([page.waitForEvent('download'), knopf.click()])
+      const text = await (await page.request.get(download.url())).text()
+      ok(dois(text) === erwartet, `${format}: ${dois(text)}`)
+    }
+
+    await page.getByLabel('Beschafftes PDF wählen').setInputFiles(`${FIXTURES}/smith2024.pdf`)
+    await sichtbar('„smith2024.pdf“ ist zugeordnet: beschafft', 30000)
+    await eintrag('Sleep and Memory').getByText('Beschafft', { exact: true }).waitFor()
+
+    await page.getByLabel('Beschafftes PDF wählen').setInputFiles(`${FIXTURES}/scan.pdf`)
+    await sichtbar('In „scan.pdf“ steht keine bekannte DOI. Zu welchem Eintrag gehört das PDF?', 30000)
+    await page.getByLabel('Eintrag', { exact: true }).selectOption({ label: 'The memory function of sleep' })
+    await page.getByRole('button', { name: 'Zuordnen' }).click()
+    await sichtbar('„scan.pdf“ ist zugeordnet: beschafft')
+    await eintrag('The memory function of sleep').getByText('Beschafft', { exact: true }).waitFor()
+    await sichtbar('Offen: 0 · Beschafft: 2')
+  }
+
+  features.p2f5 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Import')
+    await panelOeffnen('Quellen')
+    const dialog = page.locator('.modal')
+    const zotero = async () => {
+      await page.getByRole('button', { name: 'Importieren', exact: true }).click()
+      await dialog.getByLabel('Sammlung').selectOption({ label: 'Schlaf und Gedächtnis' })
+      await dialog.getByRole('button', { name: 'Aus Zotero importieren' }).click()
+    }
+    const dateien = async () =>
+      await dialog.getByLabel('PDFs wählen (mehrere möglich)').setInputFiles(
+        ['smith2024.pdf', 'retracted.pdf', 'ersetzen/kapitel.tex'].map(d => `${FIXTURES}/${d}`)
+      )
+    const zeile = name => dialog.locator('.spur-import-liste li', { hasText: name })
+
+    await zotero()
+    await dialog.getByText('Neu in der .bib: 2 · Schon vorhanden: 0').waitFor({ timeout: 20000 })
+    await zeile('diekelmann_memory_2010').getByText('neu in der .bib').waitFor()
+    await zeile('keller_spindles_2014').getByText('neu in der .bib').waitFor()
+
+    await dateien()
+    await zeile('smith2024.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
+    await zeile('retracted.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
+    await zeile('kapitel.tex').getByText('Dieser Dateityp wird nicht unterstützt', { exact: false }).waitFor({ timeout: 30000 })
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.waitFor({ state: 'detached' })
+    const quellen = page.locator('.spur-panel .spur-liste .spur-zeile-link')
+    await page.locator('.spur-panel').getByRole('button', { name: 'retracted.pdf' }).waitFor()
+    ok((await quellen.count()) === 2, `Quellen: ${await quellen.allTextContents()}`)
+
+    await zotero()
+    await dialog.getByText('Neu in der .bib: 0 · Schon vorhanden: 2').waitFor({ timeout: 20000 })
+    await dateien()
+    await zeile('smith2024.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
+    await zeile('retracted.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    ok((await quellen.count()) === 2, `Dubletten: ${await quellen.allTextContents()}`)
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Import')
+    const bib = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
+    ok(bib.split('@article{diekelmann_memory_2010,').length === 2, `.bib:\n${bib}`)
+    ok(bib.split('@article{keller_spindles_2014,').length === 2, `.bib:\n${bib}`)
+  }
+
+  features.p2f6 = async () => {
+    const SATZ = 'Sleep supports the consolidation of declarative memory.'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Literatur')
+    await panelOeffnen('Quellen')
+    await hochladen('smith2024.pdf')
+    const vorschauOeffnen = async () => {
+      await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+      await page.getByRole('button', { name: 'Nächste Seite' }).click()
+      await page.getByRole('button', { name: 'Nächste Seite' }).click()
+      await sichtbar('Seite 347 (PDF-Seite 3 von 8)')
+    }
+    await vorschauOeffnen()
+    await textMarkieren(SATZ)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    const zitat = page.locator('.spur-zitate li', { hasText: SATZ }).first()
+    await zitat.waitFor()
+    const notizQuelle = page.getByLabel('Notiz zur Quelle')
+    await notizQuelle.fill('Gute Methodik, kleine Stichprobe')
+    await page.locator('.spur-notiz', { has: notizQuelle }).getByRole('button', { name: 'Notiz speichern' }).click()
+    await page.locator('.spur-notiz', { has: notizQuelle }).getByText('Gespeichert').waitFor()
+    await zitat.getByLabel('Notiz zum Zitat').fill('Kernaussage für Kapitel 2')
+    await zitat.getByRole('button', { name: 'Notiz speichern' }).click()
+    await zitat.getByText('Gespeichert').waitFor()
+
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Quellen')
+    await vorschauOeffnen()
+    await page.waitForFunction(() => document.querySelector('.spur-notiz textarea')?.value)
+    ok((await page.getByLabel('Notiz zur Quelle').inputValue()) === 'Gute Methodik, kleine Stichprobe', 'Quellennotiz weg')
+    const zitatNachher = page.locator('.spur-zitate li', { hasText: SATZ }).first()
+    ok((await zitatNachher.getByLabel('Notiz zum Zitat').inputValue()) === 'Kernaussage für Kapitel 2', 'Zitatnotiz weg')
+    await page.getByRole('button', { name: 'Zurück' }).first().click()
+
+    const dialog = page.locator('.modal')
+    const matrixOeffnen = async () => {
+      await page.getByRole('button', { name: 'Literaturmatrix' }).click()
+      await dialog.locator('caption').waitFor({ timeout: 10000 })
+    }
+    await matrixOeffnen()
+    await dialog.getByPlaceholder('Neue Spalte, etwa „Methode“').fill('Methode')
+    await dialog.getByRole('button', { name: 'Spalte hinzufügen' }).click()
+    await dialog.getByRole('columnheader', { name: 'Methode' }).waitFor()
+    await dialog.getByRole('rowheader', { name: 'smith2024.pdf' }).waitFor()
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Literatur')
+    const quelle = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege[0]
+    const VORSCHLAG = 'Zwei Nächte, gemischte Modelle'
+    const vorschlag = await werkzeug(token, 'matrix_suggest', { project_id: pid, source_id: quelle.id, spalte: 'Methode', text: VORSCHLAG })
+    ok(!vorschlag.fehler, `matrix_suggest: ${JSON.stringify(vorschlag.inhalt)}`)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await matrixOeffnen()
+    const zelle = dialog.locator('.spur-matrix-zelle', { has: page.getByLabel('Methode: smith2024.pdf') })
+    await zelle.getByText(VORSCHLAG).waitFor()
+    ok((await zelle.getByLabel('Methode: smith2024.pdf').inputValue()) === '', 'Vorschlag ohne Bestätigung übernommen')
+    await zelle.getByRole('button', { name: 'Übernehmen' }).click()
+    await page.waitForFunction(t => document.querySelector('.spur-matrix-zelle input')?.value === t, VORSCHLAG)
+    ok((await zelle.getByText('Vorschlag von Claude:').count()) === 0, 'Vorschlag bleibt stehen')
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      dialog.getByRole('link', { name: 'Als CSV exportieren' }).click(),
+    ])
+    const csv = await (await page.request.get(download.url())).text()
+    ok(csv.startsWith('Quelle,Key,Methode\n') && csv.includes(`smith2024.pdf,smith2024,"${VORSCHLAG}"`), `CSV:\n${csv}`)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+
+    // 300 Zeilen: seitenweise, Eingaben wirken auch auf späteren Seiten.
+    await projektOeffnen('E2E Viele')
+    await panelOeffnen('Quellen')
+    const start = Date.now()
+    await matrixOeffnen()
+    await dialog.getByText('Zeilen 1–50 von 300').waitFor()
+    ok(Date.now() - start < 5000, `Matrix öffnet in ${Date.now() - start} ms`)
+    await dialog.getByPlaceholder('Neue Spalte, etwa „Methode“').fill('Ergebnis')
+    await dialog.getByRole('button', { name: 'Spalte hinzufügen' }).click()
+    await dialog.getByRole('columnheader', { name: 'Ergebnis' }).waitFor()
+    await dialog.getByRole('button', { name: 'Nächste Seite' }).click()
+    await dialog.getByText('Zeilen 51–100 von 300').waitFor()
+    const feld = dialog.getByLabel('Ergebnis: quelle-077.pdf')
+    await feld.fill('signifikant')
+    await feld.blur()
+    await page.waitForResponse(r => r.url().includes('/matrix') && r.request().method() === 'GET')
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    const viele = await projektId(token, 'E2E Viele')
+    const export300 = await (await page.request.get(`${BASE}/spur/project/${viele}/matrix.csv`)).text()
+    const zeilen = export300.trim().split('\n')
+    ok(zeilen.length === 301, `CSV mit ${zeilen.length} Zeilen`)
+    ok(zeilen.includes('quelle-077.pdf,quelle-77,signifikant'), `Zelle fehlt: ${zeilen.find(z => z.startsWith('quelle-077'))}`)
+  }
+
+  async function kompiliertBeiClaude(token, pid) {
+    const start = await werkzeug(token, 'compile', { project_id: pid })
+    ok(!start.fehler && start.inhalt.job_id && start.inhalt.status === 'laeuft', `compile: ${JSON.stringify(start.inhalt)}`)
+    for (let i = 0; i < 240; i++) {
+      const { inhalt } = await werkzeug(token, 'job_status', { job_id: start.inhalt.job_id })
+      if (inhalt.status !== 'laeuft') return inhalt
+      await page.waitForTimeout(500)
+    }
+    fail('Compile wurde nicht fertig')
+  }
+
+  async function seitenPng(token, pid, seite) {
+    const { daten } = await mcp(token, 'tools/call', { name: 'page_image', arguments: { project_id: pid, seite } })
+    const [inhalt] = daten.result.content
+    ok(!daten.result.isError && inhalt.type === 'image' && inhalt.mimeType === 'image/png', `page_image: ${JSON.stringify(daten.result).slice(0, 300)}`)
+    const png = Buffer.from(inhalt.data, 'base64')
+    ok(png.subarray(1, 4).toString() === 'PNG', 'Kein PNG')
+    return { breite: png.readUInt32BE(16), hoehe: png.readUInt32BE(20) }
+  }
+
+  features.p2f7 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Compile')
+    const job = await kompiliertBeiClaude(token, pid)
+    ok(job.status === 'fertig' && job.ergebnis.compile === 'success', `job_status: ${JSON.stringify(job)}`)
+    const seite = await seitenPng(token, pid, 2)
+    ok(seite.hoehe > seite.breite, `Artikelseite ${seite.breite}×${seite.hoehe}`)
+    const zuWeit = await werkzeug(token, 'page_image', { project_id: pid, seite: 3 })
+    ok(zuWeit.fehler && zuWeit.inhalt.fehler === 'seite_fehlt', `Seite 3: ${JSON.stringify(zuWeit.inhalt)}`)
+
+    const kaputt = await projektId(token, 'E2E Kaputt')
+    ok((await kompiliertBeiClaude(token, kaputt)).status === 'fertig', 'Kaputtes Dokument nicht fertig')
+    const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: kaputt })
+    const fehler = log.fehler.find(f => f.meldung === 'Undefined control sequence.')
+    ok(fehler?.zeile === 4 && fehler.kontext.includes('\\kaputtesmakro'), `compile_log: ${JSON.stringify(log.fehler)}`)
+
+    const folien = await projektId(token, 'E2E Folien')
+    const BEAMER = String.raw`\documentclass{beamer}
+\begin{document}
+\begin{frame}{Schlaf und Gedächtnis}
+Slow-wave sleep stabilisiert Gedächtnisspuren.
+\end{frame}
+\begin{frame}{Ergebnisse}
+\begin{itemize}
+\item Zwei Nächte
+\item Gemischte Modelle
+\end{itemize}
+\end{frame}
+\end{document}
+`
+    const edit = await werkzeug(token, 'doc_edit', { project_id: folien, pfad: 'main.tex', alt: 'Folien folgen.\n', neu: BEAMER, idempotenz_schluessel: `folien-${Date.now()}` })
+    ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
+    const quelltext = (await werkzeug(token, 'doc_read', { project_id: folien, pfad: 'main.tex' })).inhalt.text
+    ok(quelltext.includes('\\begin{frame}{Ergebnisse}'), `Quelltext: ${quelltext}`)
+    const folienJob = await kompiliertBeiClaude(token, folien)
+    ok(folienJob.ergebnis.compile === 'success', `Beamer: ${JSON.stringify(folienJob)}`)
+    const folie = await seitenPng(token, folien, 2)
+    ok(folie.breite > folie.hoehe, `Folie ${folie.breite}×${folie.hoehe} ist kein Querformat`)
+  }
+
+  features.p2f8 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Zahlen')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const aufruf = (name, args) => werkzeug(token, name, { project_id: pid, idempotenz_schluessel: schluessel(), ...args })
+    await panelOeffnen('Claude')
+
+    const anlegen = await aufruf('doc_create', { pfad: 'ergebnisse.tex', inhalt: '\\newcommand{\\nGesamt}{412}\n' })
+    ok(!anlegen.fehler && anlegen.inhalt.zahlen_ohne_beleg.length === 0, `doc_create: ${JSON.stringify(anlegen.inhalt)}`)
+    const changes = (await jsonVon(`/project/${pid}/ranges`)).flatMap(d => d.ranges?.changes ?? [])
+    ok(changes.some(c => c.op.i?.includes('\\newcommand{\\nGesamt}{412}')), `Kein Track Change: ${JSON.stringify(changes)}`)
+
+    const einbinden = await aufruf('doc_edit', {
+      pfad: 'main.tex',
+      alt: 'Platzhalter.',
+      neu: '\\input{ergebnisse}\nInsgesamt nahmen \\nGesamt{} Personen teil.',
+    })
+    ok(!einbinden.fehler && einbinden.inhalt.zahlen_ohne_beleg.length === 0, `Makro: ${JSON.stringify(einbinden.inhalt)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zahlen eingebunden' })
+    await karte().getByText('Zahlen eingebunden').waitFor({ timeout: 20000 })
+    ok((await karte().getByText('Zahl ohne Beleg').count()) === 0, 'Warnung trotz Makro')
+
+    await kompilieren()
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.pdf-viewer .textLayer')].some(e => /Insgesamt nahmen\s*412\s*Personen/.test(e.textContent)),
+      null,
+      { timeout: 60000 }
+    )
+
+    const frei = await aufruf('doc_edit', { pfad: 'main.tex', alt: 'Personen teil.', neu: 'Personen teil. Davon waren 412 Personen erwachsen.' })
+    ok(JSON.stringify(frei.inhalt.zahlen_ohne_beleg) === '["412"]', `Fließtext: ${JSON.stringify(frei.inhalt)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Satz mit Zahl' })
+    await karte().getByText('Satz mit Zahl').waitFor({ timeout: 20000 })
+    await karte().getByText('Zahl ohne Beleg', { exact: true }).waitFor()
+    await karte().getByText('„412“ in main.tex: Bitte als Makro aus ergebnisse.tex einsetzen.').waitFor()
+
+    const erlaubt = await aufruf('doc_edit', {
+      pfad: 'main.tex',
+      alt: 'erwachsen.',
+      neu: 'erwachsen. Seit 2019 belegen das Studien \\autocite[S.~12]{smith2024} auf Seite 5 mit $n = 30$.',
+    })
+    ok(erlaubt.inhalt.zahlen_ohne_beleg.length === 0, `Jahr, Seite, Mathe: ${JSON.stringify(erlaubt.inhalt)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Nur Jahr, Seite und Mathe' })
+    await karte().getByText('Nur Jahr, Seite und Mathe').waitFor({ timeout: 20000 })
+    ok((await karte().getByText('Zahl ohne Beleg').count()) === 0, 'Warnung für Jahr, Seite oder Mathe')
+  }
+
+  features.p2f9 = async () => {
+    await anmelden('e2e-a@example.org')
+    const dialog = page.locator('.modal')
+    const offenlegungOeffnen = async () => {
+      await panelOeffnen('Claude')
+      await page.getByRole('button', { name: 'KI-Offenlegung' }).click()
+      await dialog.locator('.spur-offenlegung-text').waitFor({ timeout: 20000 })
+    }
+    await projektOeffnen('E2E Recherche')
+    await offenlegungOeffnen()
+    await dialog.getByText('Keine KI-Nutzung protokolliert.').waitFor()
+    ok(await dialog.getByRole('button', { name: 'Als .tex-Abschnitt einfügen' }).isDisabled(), 'Einfügen ohne Läufe')
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+
+    await projektOeffnen('E2E Offenlegung')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const edit = (alt, neu) => werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: schluessel() })
+    ok(!(await edit('Alpha.', 'Alpha, klarer.')).fehler, 'Edit 1')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Einleitung überarbeitet' })
+    const erster = (await werkzeug(token, 'run_status', { project_id: pid })).inhalt.lauf
+    ok((await laufAktion(pid, erster.id, 'annehmen')).status < 300, 'Annehmen')
+    ok(!(await edit('Omega.', 'Omega mit Fazit.')).fehler, 'Edit 2')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Fazit ergänzt' })
+
+    await offenlegungOeffnen()
+    const text = await dialog.locator('.spur-offenlegung-text').textContent()
+    for (const teil of [
+      'Protokolliert sind 2 Läufe am',
+      'Zweck: Einleitung überarbeitet; Fazit ergänzt.',
+      'Betroffene Dateien: main.tex.',
+      'Angenommen wurden 1 von 1 abgeschlossenen Läufen (100 %).',
+      '1 Lauf wartet noch auf eine Entscheidung.',
+    ]) {
+      ok(text.includes(teil), `Offenlegung ohne „${teil}“:\n${text}`)
+    }
+    ok(!text.includes('Modell'), 'Modell ohne Angabe genannt')
+    await dialog.getByLabel('Modell (optional, wird nur genannt, wenn Sie es eintragen)').fill('Claude Opus 5.5')
+    await dialog.getByText('Modell: Claude Opus 5.5.', { exact: false }).waitFor()
+
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await dialog.getByRole('button', { name: 'Text kopieren' }).click()
+    await dialog.getByText('Kopiert', { exact: true }).waitFor()
+    const kopiert = await page.evaluate(() => navigator.clipboard.readText())
+    ok(kopiert.includes('Zweck: Einleitung überarbeitet; Fazit ergänzt.'), `Zwischenablage: ${kopiert}`)
+
+    await dialog.getByRole('button', { name: 'Als .tex-Abschnitt einfügen' }).click()
+    await dialog.getByText('In ki-offenlegung.tex eingefügt.', { exact: false }).waitFor()
+    const tex = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'ki-offenlegung.tex' })).inhalt.text
+    ok(tex.startsWith('\\section*{Nutzung von KI-Werkzeugen}\n') && tex.includes('Modell: Claude Opus 5.5.'), `.tex:\n${tex}`)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+  }
+
+  features.p2f10 = async () => {
+    const AUS = { ausfall: [], schalter: {} }
+    const modellVorhanden = async () => (await (await page.request.get(`${FAKE}/_semantik`)).json()).modellVorhanden
+    const stichworte = async () => {
+      await suchen('consolidation')
+      const liste = page.locator('.spur-panel-inhalt > .spur-liste .spur-zeile')
+      // Die Quellenliste hat dieselbe Klasse: erst lesen, wenn ein Suchtreffer mit Seite da ist.
+      await liste.filter({ hasText: 'S. 347' }).first().waitFor()
+      return await liste.allTextContents()
+    }
+    const panelNeu = async () => {
+      await page.reload()
+      await page.locator('.cm-content').first().waitFor()
+      await panelOeffnen('Quellen')
+    }
+    await fakeSteuern(AUS)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Semantik')
+    await panelOeffnen('Quellen')
+    await hochladen('smith2024.pdf')
+    ok((await page.getByText('Sinngemäß suchen').count()) === 0, 'Hinweis auf semantische Suche ohne Schalter')
+    ok(!(await modellVorhanden()), 'Modell im Volume ohne Schalter')
+    const vorher = await stichworte()
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Semantik')
+    const bericht = async () => JSON.stringify((await werkzeug(token, 'check_report', { project_id: pid })).inhalt.eintraege)
+    const berichtVorher = await bericht()
+    ok(berichtVorher.includes('exakt'), `Prüfbericht ohne Status: ${berichtVorher}`)
+
+    try {
+      await fakeSteuern({ ausfall: [], schalter: { SPUR_SEMANTIC_SEARCH: 'true', SPUR_FAKE_EMBEDDINGS: '1' } })
+      await panelNeu()
+      await sichtbar('Indexiert 3 von 8 Seiten', 30000)
+      await sichtbar('Bereit: 8 Seiten indexiert', 30000)
+      ok(!(await modellVorhanden()), 'Fake-Einbettung legt ein Modell ab')
+      await page.getByRole('searchbox', { name: 'Sinngemäß suchen' }).fill('memories get stronger in deep slow wave sleep')
+      await page.locator('.spur-semantik').getByRole('button', { name: 'Suchen' }).click()
+      const erster = page.locator('.spur-semantik .spur-zeile').first()
+      await erster.waitFor()
+      const text = await erster.textContent()
+      ok(text.includes('smith2024.pdf') && text.includes('S. 347') && text.includes('Sleep supports the consolidation'), `Erster Treffer: ${text}`)
+      await page.locator('.spur-semantik').getByText('Sie belegen kein Zitat.', { exact: false }).waitFor()
+      ok((await bericht()) === berichtVorher, 'Semantische Treffer ändern den Prüfbericht')
+    } finally {
+      await fakeSteuern(AUS)
+    }
+
+    await panelNeu()
+    await page.getByRole('searchbox', { name: 'Quellen durchsuchen' }).waitFor()
+    ok((await page.getByText('Sinngemäß suchen').count()) === 0, 'Semantik nach dem Ausschalten sichtbar')
+    const nachher = await stichworte()
+    ok(JSON.stringify(nachher) === JSON.stringify(vorher), `Stichwortsuche verändert:\n${vorher}\n${nachher}`)
   }
 
   // P4: Mehr Quellen und Team. Schlüssel p4f1 … p4f4, damit sie neben P1 stehen können.

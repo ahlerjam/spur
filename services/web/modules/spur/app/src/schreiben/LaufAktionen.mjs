@@ -182,9 +182,9 @@ export async function automatikSetzen(projectId, userId, an) {
   )
 }
 
-// Sammelannahme am Laufende, nur ohne rote Status und nur, wenn der Mensch sie im Browser eingeschaltet hat.
+// Sammelannahme am Laufende, nur ohne rote Status und Zahlen ohne Beleg und nur, wenn der Mensch sie im Browser eingeschaltet hat.
 export async function nachLaufende(projectId, lauf, menschId) {
-  if (lauf.rot.length || !(await automatik(projectId, menschId))) return
+  if (lauf.rot.length || lauf.zahlen?.length || !(await automatik(projectId, menschId))) return
   // Die Einstellung überdauert eine Herabstufung; annehmen darf nur, wer jetzt schreiben darf.
   if (!['readAndWrite', 'owner'].includes(await rolleFuerClaude(menschId, projectId))) return
   await annehmen(projectId, lauf, menschId)

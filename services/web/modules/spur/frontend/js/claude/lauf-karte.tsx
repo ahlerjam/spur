@@ -13,6 +13,7 @@ export type Lauf = {
   dateien: number
   aenderungen: number
   rot: { grund: string; auszug: string }[]
+  zahlen: { zahl: string; pfad: string }[]
   zusammenfassung: string | null
 }
 
@@ -87,6 +88,18 @@ export default function LaufKarte({
             {lauf.rot.map((r, i) => (
               <li key={i} className="spur-zeile-meta">
                 {t('spur_nicht_pruefbar')}: {r.auszug}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {lauf.zahlen.length > 0 && (
+        <div className="spur-lauf-rot" role="status">
+          <OLBadge bg="warning">{t('spur_zahl_ohne_beleg')}</OLBadge>
+          <ul className="spur-liste">
+            {lauf.zahlen.map((z, i) => (
+              <li key={i} className="spur-zeile-meta">
+                {t('spur_zahl_ohne_beleg_text', { zahl: z.zahl, pfad: z.pfad })}
               </li>
             ))}
           </ul>

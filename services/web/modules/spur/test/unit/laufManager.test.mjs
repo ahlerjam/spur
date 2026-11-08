@@ -84,6 +84,13 @@ describe('Lauf weiterführen', () => {
     expect(gespeichert).toMatchObject({ aenderungen: 2, docs: [doc], rot: [{ grund: 'nicht_pruefbar', auszug: 'X' }] })
   })
 
+  it('aenderungMerken sammelt Zahlen ohne Beleg für die Lauf-Karte', async () => {
+    const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
+    await LaufManager.aenderungMerken(lauf, { docId: new ObjectId(), rot: [], zahlen: [{ zahl: '412', pfad: 'main.tex' }] })
+    const gespeichert = await LaufManager.offenerLauf(projekt, bot)
+    expect(LaufManager.laufFuerClient(gespeichert).zahlen).toEqual([{ zahl: '412', pfad: 'main.tex' }])
+  })
+
   it('beenden schließt den Lauf mit Zusammenfassung und Zeit; offenerLauf findet ihn dann nicht mehr', async () => {
     const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
     schalter.zeit = new Date('2026-11-07T11:00:00Z')
@@ -123,6 +130,7 @@ describe('laufFuerClient', () => {
       dateien: 1,
       aenderungen: 1,
       rot: [],
+      zahlen: [],
       zusammenfassung: null,
     })
   })

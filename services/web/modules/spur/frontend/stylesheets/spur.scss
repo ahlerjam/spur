@@ -272,6 +272,214 @@
   }
 }
 
+.spur-recherche-suche {
+  display: flex;
+  gap: var(--spacing-03);
+
+  .form-control {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.spur-paper-titel {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.spur-paper-badge {
+  margin-left: var(--spacing-03);
+}
+
+.spur-paper-doi {
+  overflow-wrap: anywhere;
+}
+
+.spur-paper-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-02);
+  margin-top: var(--spacing-02);
+}
+
+.spur-blaettern {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-03);
+  margin-top: var(--spacing-04);
+}
+
+.spur-reiter {
+  display: flex;
+  gap: var(--spacing-02);
+  padding: 0 var(--spacing-05);
+  margin-bottom: var(--spacing-03);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.spur-reiter-knopf {
+  min-height: 32px;
+  padding: var(--spacing-02) var(--spacing-04);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--content-secondary);
+
+  &[aria-selected='true'] {
+    border-bottom-color: var(--border-active);
+    color: var(--content-primary);
+    font-weight: 600;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--border-active);
+    outline-offset: -2px;
+  }
+}
+
+.spur-zitationen {
+  flex-basis: 100%;
+  margin-top: var(--spacing-02);
+  padding-left: var(--spacing-04);
+  border-left: 2px solid var(--border-divider);
+}
+
+.spur-zitationen-titel {
+  margin: 0;
+  font-size: var(--font-size-02);
+  font-weight: 600;
+}
+
+.spur-vorlage,
+.spur-zuordnen {
+  margin-bottom: var(--spacing-04);
+
+  .form-label {
+    margin-bottom: var(--spacing-02);
+    font-size: var(--font-size-02);
+  }
+}
+
+.spur-bibliothek-link {
+  display: inline-block;
+  margin-top: var(--spacing-02);
+  font-size: var(--font-size-02);
+}
+
+.spur-import-teil + .spur-import-teil {
+  margin-top: var(--spacing-07);
+}
+
+.spur-import-titel {
+  font-size: var(--font-size-04);
+  margin-bottom: var(--spacing-03);
+}
+
+.spur-import-liste {
+  list-style: none;
+  margin: var(--spacing-03) 0 0;
+  padding: 0;
+
+  li {
+    padding: var(--spacing-02) 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.spur-import-name {
+  font-weight: 600;
+}
+
+.spur-import-fehler {
+  color: var(--content-danger);
+}
+
+.spur-notiz {
+  margin: var(--spacing-03) 0;
+
+  .form-label {
+    margin-bottom: var(--spacing-02);
+    font-size: var(--font-size-02);
+  }
+}
+
+.spur-notiz-aktion {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-03);
+  margin-top: var(--spacing-02);
+}
+
+.spur-matrix-werkzeuge {
+  margin-bottom: var(--spacing-04);
+}
+
+.spur-matrix-rahmen {
+  overflow-x: auto;
+}
+
+.spur-matrix {
+  caption {
+    caption-side: top;
+    color: var(--content-secondary);
+  }
+
+  th[scope='row'] {
+    min-width: 12rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .spur-matrix-zelle {
+    min-width: 12rem;
+  }
+}
+
+.spur-matrix-vorschlag {
+  margin-top: var(--spacing-02);
+  padding: var(--spacing-02) var(--spacing-03);
+  border-left: 3px solid var(--border-active);
+  background: var(--bg-light-secondary);
+
+  p {
+    margin: 0 0 var(--spacing-02);
+  }
+}
+
+@media (min-width: 768px) {
+  .spur-matrix-dialog {
+    max-width: min(1140px, 95vw);
+  }
+}
+
+.spur-offenlegung-text {
+  margin-top: var(--spacing-05);
+  padding: var(--spacing-04);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-base, 4px);
+  white-space: pre-wrap;
+}
+
+.spur-semantik {
+  margin-bottom: var(--spacing-05);
+  padding-bottom: var(--spacing-04);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+// Im schmalen Panel umbrechen statt abschneiden.
+.spur-reiter {
+  flex-wrap: wrap;
+}
+
+.spur-paper-aktionen .btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
 // Der OCR-Status steht als Text da, nicht nur als Farbe (Quality Bar).
 .spur-ocr-hinweis {
   margin: var(--spacing-03) 0 var(--spacing-02);

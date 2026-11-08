@@ -10,6 +10,7 @@ import Notification from '@/shared/components/notification'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { startBefehl } from './claude-verbinden'
 import LaufKarte, { type Aenderung, type Lauf } from './lauf-karte'
+import OffenlegungModal from './offenlegung-modal'
 
 type Nachricht = { id: string; von: 'mensch' | 'claude'; text: string; am: string }
 type Status = {
@@ -26,6 +27,7 @@ export default function ClaudePanel() {
   const { t } = useTranslation()
   const [status, setStatus] = useState<Status | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
+  const [offenlegung, setOffenlegung] = useState(false)
   const [text, setText] = useState('')
   const [sendet, setSendet] = useState(false)
   const [leer, setLeer] = useState(false)
@@ -71,6 +73,12 @@ export default function ClaudePanel() {
   return (
     <div className="spur-panel">
       <RailPanelHeader title={t('spur_claude')} />
+      <div className="spur-panel-werkzeuge">
+        <OLButton variant="secondary" size="sm" onClick={() => setOffenlegung(true)}>
+          {t('spur_ki_offenlegung')}
+        </OLButton>
+      </div>
+      {offenlegung && <OffenlegungModal schliessen={() => setOffenlegung(false)} />}
       <div className="spur-panel-inhalt">
         {fehler && <Notification type="error" content={fehler} />}
         {status && (

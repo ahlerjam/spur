@@ -153,6 +153,27 @@ writeFileSync(
   join(here, 'scan.pdf'),
   buildPdf({ pages: [[], []], title: 'Scan', images: [graustufenBild(SCAN)] })
 )
+// Freie Volltexte für den Paper-Fake (papers.json).
+writeFileSync(
+  join(here, 'keller2014.pdf'),
+  buildPdf({
+    pages: [
+      ['Sleep spindles predict overnight memory consolidation', 'M. Keller, T. Ruiz', 'DOI 10.1371/journal.pone.0099999'],
+      ['Spindle density correlated with recall after one night.', ...filler(2)],
+    ],
+    title: 'Sleep spindles predict overnight memory consolidation',
+  })
+)
+writeFileSync(
+  join(here, 'arxiv2401.01234.pdf'),
+  buildPdf({
+    pages: [
+      ['Sleep-like replay improves memory consolidation', 'in artificial neural networks', 'arXiv:2401.01234'],
+      ['Offline replay reduced catastrophic forgetting.'],
+    ],
+    title: 'Sleep-like replay improves memory consolidation in artificial neural networks',
+  })
+)
 writeFileSync(
   join(here, 'interview.vtt'),
   `WEBVTT

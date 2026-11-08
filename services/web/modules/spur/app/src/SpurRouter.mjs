@@ -2,12 +2,14 @@ import Settings from '@overleaf/settings'
 import AuthorizationMiddleware from '../../../../app/src/Features/Authorization/AuthorizationMiddleware.mjs'
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
 import { multerUploadHandler } from '../../../../app/src/infrastructure/Multer.mjs'
+import RateLimiterMiddleware from '../../../../app/src/Features/Security/RateLimiterMiddleware.mjs'
+import { RateLimiter } from '../../../../app/src/infrastructure/RateLimiter.mjs'
 import { Problem, problemSenden } from './probleme.mjs'
 import { MAX_BYTES } from './QuellenManager.mjs'
 import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
-import { crossrefFake } from './dev/CrossrefFake.mjs'
 import { testseite, zeitSetzen } from './dev/DevSchalter.mjs'
+import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
 const lesen = [
@@ -27,6 +29,9 @@ const schreiben = [
 ]
 
 const angemeldet = AuthenticationController.requireLogin()
+
+// Begrenzt teure Aufrufe (Paper-Dienste mit installationsweiter Drossel, Einbetten mit dem Modell) je Anmeldung.
+const fremdDienste = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-recherche', { points: 30, duration: 60 }))
 
 const upload = multerUploadHandler({
   dest: Settings.path.uploadFolder,
@@ -60,11 +65,16 @@ export default {
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
     webRouter.post(`${QUELLEN}/web`, ...schreiben, SpurController.webQuelleAufnehmen)
     webRouter.get(`${QUELLEN}/suche`, ...lesen, SpurController.quellenSuche)
+    webRouter.get(`${QUELLEN}/semantik`, ...lesen, SpurController.semantikStand)
+    webRouter.post(`${QUELLEN}/semantik/indexieren`, ...schreiben, SpurController.semantikIndexieren)
+    webRouter.get(`${QUELLEN}/semantik/suche`, ...lesen, fremdDienste, SpurController.semantikSuchen)
     webRouter.get(`${QUELLEN}/export`, ...lesen, SpurController.quellenExport)
     webRouter.get(`${QUELLEN}/andere`, ...lesen, SpurController.andereProjekte)
     webRouter.post(`${QUELLEN}/holen`, ...schreiben, SpurController.quellenHolen)
     webRouter.delete(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleLoeschen)
     webRouter.get(`${QUELLEN}/:quelle_id/zitate`, ...lesen, SpurController.zitate)
+    webRouter.get(`${QUELLEN}/:quelle_id/notizen`, ...lesen, SpurController.notizen)
+    webRouter.put(`${QUELLEN}/:quelle_id/notizen`, ...schreiben, SpurController.notizSetzen)
     webRouter.post(`${QUELLEN}/:quelle_id/zitate`, ...schreiben, SpurController.zitatMarkieren)
     // Kommentieren dürfen wie in Overleaf alle Mitglieder, auch mit Leserecht.
     webRouter.post(
@@ -102,12 +112,36 @@ export default {
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)
     webRouter.post(`${LAUF}/zuruecknehmen`, ...schreiben, SpurController.laufZuruecknehmen)
     webRouter.put('/spur/project/:project_id/claude/automatik', ...schreiben, SpurController.automatikSetzen)
+    const RECHERCHE = '/spur/project/:project_id/recherche'
+    webRouter.get(RECHERCHE, ...lesen, fremdDienste, SpurController.rechercheSuchen)
+    webRouter.get(`${RECHERCHE}/zitationen`, ...lesen, fremdDienste, SpurController.rechercheZitationen)
+    webRouter.get(`${RECHERCHE}/protokoll`, ...lesen, SpurController.suchprotokoll)
+    webRouter.get(`${RECHERCHE}/protokoll.csv`, ...lesen, SpurController.suchprotokollExport)
+    webRouter.post(`${RECHERCHE}/aufnehmen`, ...schreiben, fremdDienste, SpurController.perDoiAufnehmen)
+    const BESCHAFFUNG = '/spur/project/:project_id/beschaffung'
+    webRouter.get(BESCHAFFUNG, ...lesen, SpurController.beschaffungsliste)
+    webRouter.post(BESCHAFFUNG, ...schreiben, fremdDienste, SpurController.beschaffungHinzufuegen)
+    webRouter.get(`${BESCHAFFUNG}/export/:format`, ...lesen, SpurController.beschaffungExport)
+    webRouter.post(`${BESCHAFFUNG}/hochladen`, ...schreiben, hochladenMitGrenze, SpurController.beschaffungHochladen)
+    webRouter.post(`${BESCHAFFUNG}/:eintrag_id/zuordnen`, ...schreiben, SpurController.beschaffungZuordnen)
+    const MATRIX = '/spur/project/:project_id/matrix'
+    webRouter.get(MATRIX, ...lesen, SpurController.matrix)
+    webRouter.get(`${MATRIX}.csv`, ...lesen, SpurController.matrixExport)
+    webRouter.post(`${MATRIX}/spalten`, ...schreiben, SpurController.matrixSpalte)
+    webRouter.put(`${MATRIX}/zellen`, ...schreiben, SpurController.matrixZelle)
+    webRouter.post(`${MATRIX}/zellen/bestaetigen`, ...schreiben, SpurController.matrixBestaetigen)
+    webRouter.post(`${MATRIX}/zellen/verwerfen`, ...schreiben, SpurController.matrixVerwerfen)
+    webRouter.get('/spur/project/:project_id/offenlegung', ...lesen, SpurController.offenlegung)
+    webRouter.post('/spur/project/:project_id/offenlegung/tex', ...schreiben, SpurController.offenlegungTex)
+    webRouter.get('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroSammlungen)
+    webRouter.post('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroImportieren)
+    webRouter.put('/spur/beschaffung/vorlage', angemeldet, SpurController.bibliotheksvorlageSetzen)
     webRouter.get('/spur/claude/tokens', angemeldet, SpurController.claudeTokens)
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
     webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)
     publicApiRouter.all('/spur/mcp', mcpAnfrage)
     if (IST_DEV) {
-      publicApiRouter.get('/spur/dev/crossref/works/:doi', crossrefFake)
+      publicApiRouter.use('/spur/dev/crossref', paperFake)
       publicApiRouter.get('/spur/dev/web/testseite', testseite)
       publicApiRouter.post('/spur/dev/zeit', zeitSetzen)
     }

@@ -7,7 +7,7 @@ import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
-import { bearbeitungen, einstellungen, ereignisse, klone, laeufe, nachrichten, pruefCache, quellen, quellenSeiten, quotes } from './sammlungen.mjs'
+import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll } from './sammlungen.mjs'
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { ocrSeite, seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
@@ -126,9 +126,10 @@ async function speichern(quelle, seitenListe, schreibeDatei) {
   return quelle
 }
 
-export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groesse }) {
+// key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF.
+export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, nurProjekt = false }) {
   pruefeDateityp(dateiname)
-  const key = schluesselAus(dateiname)
+  const key = vorgabe ?? schluesselAus(dateiname)
   if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
   const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
   const quelle = {
@@ -140,8 +141,9 @@ export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groess
     art: Path.extname(dateiname).slice(1).toLowerCase(),
     seitenzahl: inhalt.seiten.length,
     status: inhalt.hatText ? 'text' : 'kein_text',
-    doi: inhalt.doi,
-    meta: inhalt.meta,
+    doi: doi ?? inhalt.doi,
+    meta: meta ?? inhalt.meta,
+    nurProjekt,
     versatz: inhalt.versatz,
     versatzQuelle: inhalt.versatzQuelle,
     fassung: '',
@@ -462,6 +464,14 @@ export async function aendern(quelle, { fassung, versatz }) {
 export async function loeschen(quelle) {
   await (await quotes()).deleteMany({ quelleId: quelle._id })
   await (await quellenSeiten()).deleteMany({ quelleId: quelle._id })
+  const zuQuelle = { projectId: quelle.projectId, quelleId: quelle._id }
+  await (await notizen()).deleteMany(zuQuelle)
+  await (await matrixZellen()).deleteMany(zuQuelle)
+  // Ohne PDF ist der Eintrag wieder offen und lässt sich neu beschaffen.
+  await (await beschaffungen()).updateMany(
+    zuQuelle,
+    { $set: { status: 'offen' }, $unset: { quelleId: '', beschafftAm: '' } }
+  )
   await (await quellen()).deleteOne({ _id: quelle._id })
   const ordner = Path.dirname(dateiPfad(quelle))
   for (const name of await fs.readdir(ordner).catch(() => [])) {
@@ -485,6 +495,12 @@ export async function projektAufraeumen(projectId) {
     (await laeufe()).deleteMany({ projectId: id }),
     (await bearbeitungen()).deleteMany({ projectId: id }),
     (await einstellungen()).deleteMany({ projectId: id }),
+    (await suchprotokoll()).deleteMany({ projectId: id }),
+    (await beschaffungen()).deleteMany({ projectId: id }),
+    (await notizen()).deleteMany({ projectId: id }),
+    (await matrixSpalten()).deleteOne({ _id: id }),
+    (await matrixZellen()).deleteMany({ projectId: id }),
+    (await jobs()).deleteMany({ projectId: id }),
   ])
   await fs.rm(Path.join(ablageWurzel(), String(id)), { recursive: true, force: true })
 }
@@ -569,7 +585,7 @@ async function kopieAnlegen(quelle, neu, zielProjekt) {
 
 export async function uebernehmen(zielProjekt, vonProjekt, userId) {
   const vorhanden = new Set((await alle(zielProjekt)).map(q => q.key))
-  const neu = (await alle(vonProjekt)).filter(q => !vorhanden.has(q.key))
+  const neu = (await alle(vonProjekt)).filter(q => !vorhanden.has(q.key) && !q.nurProjekt)
   for (const quelle of neu) await quelleKopieren(quelle, zielProjekt, userId)
   await (await klone()).deleteOne({ _id: zielProjekt })
   return neu.length
@@ -592,6 +608,7 @@ export async function projekteMitQuellen(userId, ohneProjekt) {
     .toArray()
   const mitQuellen = await (await quellen()).distinct('projectId', {
     projectId: { $in: projekte.map(p => p._id) },
+    nurProjekt: { $ne: true },
   })
   const ids = new Set(mitQuellen.map(String))
   return projekte

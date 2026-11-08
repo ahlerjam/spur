@@ -12,6 +12,7 @@ export type Quelle = {
   titel: string | null
   fassung: string
   versatz: number | null
+  nurProjekt?: boolean
   versatzQuelle: 'pagelabels' | 'bestaetigt' | null
   ocr: {
     status: 'laeuft' | 'fertig' | 'fehler' | 'abgebrochen'

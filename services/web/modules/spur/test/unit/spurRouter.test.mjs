@@ -41,11 +41,15 @@ async function laden({ dev = false } = {}) {
     },
   }))
   vi.doMock('../../app/src/QuellenManager.mjs', () => ({ MAX_BYTES: MAX }))
+  vi.doMock('../../../../app/src/Features/Security/RateLimiterMiddleware.mjs', () => ({
+    default: { rateLimit: limiter => Object.assign(() => {}, { limiter: limiter.name }) },
+  }))
+  vi.doMock('../../../../app/src/infrastructure/RateLimiter.mjs', () => ({ RateLimiter: class { constructor(name) { this.name = name } } }))
   vi.doMock('../../app/src/schalter.mjs', () => ({ IST_DEV: dev }))
   vi.doMock('../../app/src/SpurController.mjs', () =>
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
   )
-  vi.doMock('../../app/src/dev/CrossrefFake.mjs', () => ({ crossrefFake: Object.assign(() => {}, { handler: 'crossrefFake' }) }))
+  vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
   vi.doMock('../../app/src/dev/DevSchalter.mjs', () => ({
     testseite: Object.assign(() => {}, { handler: 'testseite' }),
     zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
@@ -54,11 +58,12 @@ async function laden({ dev = false } = {}) {
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
   routen = []
   const router = Object.fromEntries(
-    ['get', 'post', 'put', 'patch', 'delete', 'all'].map(methode => [methode, (pfad, ...kette) => routen.push({ methode, pfad, kette })])
+    ['get', 'post', 'put', 'patch', 'delete', 'all', 'use'].map(methode => [methode, (pfad, ...kette) => routen.push({ methode, pfad, kette })])
   )
   const oeffentlich = { ...router, all: (pfad, ...kette) => routen.push({ methode: 'all', pfad, kette, oeffentlich: true }) }
   Router.apply(router, {}, oeffentlich)
   hochladen = routen.find(r => r.methode === 'post' && r.pfad.endsWith('/quellen')).kette.at(-2)
+  marken.beschaffungHochladen = routen.find(r => r.pfad.endsWith('/beschaffung/hochladen'))
 }
 
 beforeEach(async () => await laden())
@@ -73,6 +78,9 @@ describe('Rechte der Routen', () => {
     ['get', Q, 'lesen', 'quellenListe'],
     ['get', `${Q}/suche`, 'lesen', 'quellenSuche'],
     ['get', `${Q}/export`, 'lesen', 'quellenExport'],
+    ['get', `${Q}/semantik`, 'lesen', 'semantikStand'],
+    ['post', `${Q}/semantik/indexieren`, 'schreiben', 'semantikIndexieren'],
+    ['get', `${Q}/semantik/suche`, 'lesen', 'semantikSuchen'],
     ['get', `${Q}/:quelle_id/datei`, 'lesen', 'quelleDatei'],
     ['get', `${Q}/:quelle_id/seiten/:seite`, 'lesen', 'quelleSeite'],
     ['get', `${Q}/:quelle_id/seiten/:seite/bild`, 'lesen', 'quelleBild'],
@@ -97,6 +105,27 @@ describe('Rechte der Routen', () => {
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/ablehnen', 'pruefen', 'laufAblehnen'],
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/zuruecknehmen', 'schreiben', 'laufZuruecknehmen'],
     ['put', '/spur/project/:project_id/claude/automatik', 'schreiben', 'automatikSetzen'],
+    ['get', '/spur/project/:project_id/recherche', 'lesen', 'rechercheSuchen'],
+    ['get', '/spur/project/:project_id/recherche/zitationen', 'lesen', 'rechercheZitationen'],
+    ['get', '/spur/project/:project_id/recherche/protokoll', 'lesen', 'suchprotokoll'],
+    ['get', '/spur/project/:project_id/recherche/protokoll.csv', 'lesen', 'suchprotokollExport'],
+    ['post', '/spur/project/:project_id/recherche/aufnehmen', 'schreiben', 'perDoiAufnehmen'],
+    ['get', '/spur/project/:project_id/beschaffung', 'lesen', 'beschaffungsliste'],
+    ['get', '/spur/project/:project_id/import/zotero', 'schreiben', 'zoteroSammlungen'],
+    ['get', `${Q}/:quelle_id/notizen`, 'lesen', 'notizen'],
+    ['put', `${Q}/:quelle_id/notizen`, 'schreiben', 'notizSetzen'],
+    ['get', '/spur/project/:project_id/matrix', 'lesen', 'matrix'],
+    ['get', '/spur/project/:project_id/offenlegung', 'lesen', 'offenlegung'],
+    ['post', '/spur/project/:project_id/offenlegung/tex', 'schreiben', 'offenlegungTex'],
+    ['get', '/spur/project/:project_id/matrix.csv', 'lesen', 'matrixExport'],
+    ['post', '/spur/project/:project_id/matrix/spalten', 'schreiben', 'matrixSpalte'],
+    ['put', '/spur/project/:project_id/matrix/zellen', 'schreiben', 'matrixZelle'],
+    ['post', '/spur/project/:project_id/matrix/zellen/bestaetigen', 'schreiben', 'matrixBestaetigen'],
+    ['post', '/spur/project/:project_id/matrix/zellen/verwerfen', 'schreiben', 'matrixVerwerfen'],
+    ['post', '/spur/project/:project_id/import/zotero', 'schreiben', 'zoteroImportieren'],
+    ['post', '/spur/project/:project_id/beschaffung', 'schreiben', 'beschaffungHinzufuegen'],
+    ['get', '/spur/project/:project_id/beschaffung/export/:format', 'lesen', 'beschaffungExport'],
+    ['post', '/spur/project/:project_id/beschaffung/:eintrag_id/zuordnen', 'schreiben', 'beschaffungZuordnen'],
   ])('%s %s verlangt Anmeldung, Ausschluss von Leselink-Nutzern und %s', (methode, pfad, recht, handler) => {
     const r = route(methode, pfad)
     expect(r, `${methode} ${pfad}`).toBeTruthy()
@@ -108,6 +137,7 @@ describe('Rechte der Routen', () => {
     ['get', '/spur/claude/tokens', 'claudeTokens'],
     ['post', '/spur/claude/tokens', 'claudeTokenErzeugen'],
     ['delete', '/spur/claude/tokens/:token_id', 'claudeTokenWiderrufen'],
+    ['put', '/spur/beschaffung/vorlage', 'bibliotheksvorlageSetzen'],
   ])('%s %s verlangt nur die Anmeldung', (methode, pfad, handler) => {
     const r = route(methode, pfad)
     expect(prueferVon(r)).toEqual(['angemeldet'])
@@ -121,9 +151,9 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('registriert die Dev-Routen (Crossref-Fake, Testseite, Zeit) nur in der Dev-Umgebung', async () => {
+  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit) nur in der Dev-Umgebung', async () => {
     const dev = [
-      ['get', '/spur/dev/crossref/works/:doi', 'crossrefFake'],
+      ['use', '/spur/dev/crossref', 'paperFake'],
       ['get', '/spur/dev/web/testseite', 'testseite'],
       ['post', '/spur/dev/zeit', 'zeitSetzen'],
     ]
@@ -131,6 +161,13 @@ describe('Rechte der Routen', () => {
     await laden({ dev: true })
     for (const [methode, pfad, handler] of dev) expect(handlerVon(route(methode, pfad))).toBe(handler)
   })
+})
+
+it('lädt PDFs für die Beschaffungsliste mit Schreibrecht und derselben Größengrenze hoch', () => {
+  const r = marken.beschaffungHochladen
+  expect(prueferVon(r)).toEqual(['angemeldet', 'eingeschraenkt', 'schreiben'])
+  expect(r.kette.at(-2)).toBe(hochladen)
+  expect(handlerVon(r)).toBe('beschaffungHochladen')
 })
 
 describe('Hochladen mit Fehlerbehandlung', () => {
@@ -182,4 +219,16 @@ describe('Hochladen mit Fehlerbehandlung', () => {
     expect(next).toHaveBeenCalledWith(fehler)
     expect(res.body).toBeUndefined()
   })
+})
+
+it('begrenzt Aufrufe der Paper-Dienste je Nutzer', () => {
+  for (const [methode, pfad] of [
+    ['get', '/spur/project/:project_id/recherche'],
+    ['get', '/spur/project/:project_id/recherche/zitationen'],
+    ['post', '/spur/project/:project_id/recherche/aufnehmen'],
+    ['post', '/spur/project/:project_id/beschaffung'],
+    ['get', `${Q}/semantik/suche`],
+  ]) {
+    expect(route(methode, pfad).kette.some(f => f.limiter === 'spur-recherche'), pfad).toBe(true)
+  }
 })

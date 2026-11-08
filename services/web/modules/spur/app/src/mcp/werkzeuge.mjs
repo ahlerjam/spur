@@ -11,6 +11,11 @@ import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
+import * as Recherche from '../recherche/Recherche.mjs'
+import * as Aufnahme from '../recherche/Aufnahme.mjs'
+import * as Beschaffung from '../recherche/Beschaffung.mjs'
+import * as Literatur from '../literatur/Literatur.mjs'
+import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
 
 const SEITE = 50
 const MAX_TEXT = 40000
@@ -341,6 +346,98 @@ Object.assign(WERKZEUGE, {
       await LaufManager.beenden(lauf, zusammenfassung)
       await LaufAktionen.nachLaufende(projectId, lauf, menschId)
       return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
+    },
+  },
+
+  paper_search: {
+    description:
+      'Sucht Paper über arXiv, OpenAlex, Crossref und Semantic Scholar. Treffer mit DOI, Titel, Autoren, Jahr, ' +
+      'Diensten und Open-Access-Status; fehler nennt ausgefallene Dienste. Die Suche landet im Suchprotokoll des Projekts.',
+    inputSchema: z.object({ project_id: id, anfrage: z.string().min(1).max(300), seite: z.number().int().min(0).max(50).optional() }),
+    async ausfuehren({ project_id: pid, anfrage, seite = 0 }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await Recherche.suchen({ projectId, userId: menschId, anfrage, seite })
+    },
+  },
+
+  paper_citations: {
+    description:
+      'Folgt Zitationen einer DOI über OpenAlex und Semantic Scholar: richtung „zitiert_von“ liefert Arbeiten, die sie zitieren, ' +
+      '„zitiert“ ihre Referenzen.',
+    inputSchema: z.object({ doi: z.string().min(4).max(300), richtung: z.enum(['zitiert_von', 'zitiert']) }),
+    async ausfuehren({ doi, richtung }) {
+      return await Recherche.zitationen(doi, richtung)
+    },
+  },
+
+  source_add: {
+    description:
+      'Nimmt ein Paper per DOI auf: lädt den freien Volltext, legt die Quelle an und ergänzt die .bib mit den ' +
+      'DOI-Metadaten. Ohne freien Volltext: acquisition_add.',
+    inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
+    async ausfuehren({ project_id: pid, doi }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      const quelle = await Aufnahme.perDoi({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi }
+    },
+  },
+
+  acquisition_add: {
+    description:
+      'Setzt ein nicht freies Paper per DOI auf die Beschaffungsliste des Projekts. Die Person holt es in der Bibliothek ' +
+      'und lädt das PDF hoch; spur ordnet es per DOI zu.',
+    inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
+    async ausfuehren({ project_id: pid, doi }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      const eintrag = await Beschaffung.hinzufuegen({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+      return { eintrag_id: eintrag._id, doi: eintrag.doi, titel: eintrag.meta.titel, status: eintrag.status }
+    },
+  },
+
+  matrix_suggest: {
+    description:
+      'Schlägt den Inhalt einer Zelle der Literaturmatrix vor (Quelle als Zeile, Spalte per Name). Die Person bestätigt ' +
+      'oder verwirft den Vorschlag; vorhandener Text bleibt bis dahin stehen.',
+    inputSchema: z.object({ project_id: id, source_id: id, spalte: z.string().min(1).max(80), text: z.string().min(1).max(2000) }),
+    async ausfuehren({ project_id: pid, source_id: quelleId, spalte, text }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, SCHREIBEN)
+      return await Literatur.vorschlagen(projectId, { quelleId, spalte, text, botId })
+    },
+  },
+
+  compile: {
+    description: 'Kompiliert das Projekt wie der Knopf im Editor. Liefert sofort ein Job-Handle; den Stand meldet job_status.',
+    inputSchema: z.object({ project_id: id }),
+    async ausfuehren({ project_id: pid }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await Kompilieren.starten({ projectId, menschId, botId })
+    },
+  },
+
+  job_status: {
+    description: 'Stand eines Jobs: „laeuft“, „fertig“ oder „fehlgeschlagen“, dazu das Ergebnis.',
+    inputSchema: z.object({ job_id: id }),
+    async ausfuehren({ job_id: jobId }, { botId }) {
+      return await Kompilieren.status(jobId, botId)
+    },
+  },
+
+  compile_log: {
+    description: 'Fehler des letzten Compiles mit Zeile und Meldung, dazu das Ende des LaTeX-Logs.',
+    inputSchema: z.object({ project_id: id }),
+    async ausfuehren({ project_id: pid }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await Kompilieren.log({ projectId, botId })
+    },
+  },
+
+  page_image: {
+    description: 'Eine Seite des zuletzt kompilierten PDFs als PNG, etwa um Layout und Folien zu prüfen.',
+    inputSchema: z.object({ project_id: id, seite: z.number().int().min(1).max(2000) }),
+    async ausfuehren({ project_id: pid, seite }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      const bild = await Kompilieren.seitenBild({ projectId, botId, seite })
+      return { content: [{ type: 'image', data: bild.toString('base64'), mimeType: 'image/png' }] }
     },
   },
 })

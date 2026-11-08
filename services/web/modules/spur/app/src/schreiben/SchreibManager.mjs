@@ -12,6 +12,7 @@ import { bereichPruefen } from '../pruefung/PruefManager.mjs'
 import { bearbeitungen } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import * as LaufManager from './LaufManager.mjs'
+import { zahlenOhneBeleg } from './zahlen.mjs'
 import { opsFuer } from './ops.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
 
@@ -187,14 +188,20 @@ async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
   const neuerText = text.slice(0, start) + neu + text.slice(start + alt.length)
   const rot = await pruefSperre(projectId, neuerText, start, start + neu.length)
 
+  // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt.
+  const zahlen = /(^|\/)ergebnisse\.tex$/.test(doc.pfad) ? [] : zahlenOhneBeleg(neu)
   const op = opsFuer(start, alt, neu)
   const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
-  let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot }
+  let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot, zahlen_ohne_beleg: zahlen }
   if (op.length) {
     await spurUpdate(projectId, doc.docId, op, version, { userId: botId, tracked: true })
     ergebnis = { ...ergebnis, aenderung: true }
     try {
-      await LaufManager.aenderungMerken(lauf, { docId: doc.docId, rot })
+      await LaufManager.aenderungMerken(lauf, {
+        docId: doc.docId,
+        rot,
+        zahlen: zahlen.map(zahl => ({ zahl, pfad: doc.pfad })),
+      })
     } catch (error) {
       // Geschrieben ist geschrieben: Ein Fehler beim Mitzählen darf die Reservierung nicht freigeben,
       // sonst schriebe eine Wiederholung doppelt.

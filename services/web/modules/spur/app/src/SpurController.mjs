@@ -15,6 +15,13 @@ import * as LaufAktionen from './schreiben/LaufAktionen.mjs'
 import * as LaufManager from './schreiben/LaufManager.mjs'
 import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
+import * as Recherche from './recherche/Recherche.mjs'
+import * as Aufnahme from './recherche/Aufnahme.mjs'
+import * as Beschaffung from './recherche/Beschaffung.mjs'
+import * as Import from './recherche/Import.mjs'
+import * as Literatur from './literatur/Literatur.mjs'
+import * as Offenlegung from './offenlegung/Offenlegung.mjs'
+import * as Semantik from './semantik/Semantik.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -42,6 +49,7 @@ function quelleFuerClient(q) {
     fassung: q.fassung,
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
+    nurProjekt: q.nurProjekt === true,
     ocr: QuellenManager.ocrZustand(q),
     web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }
@@ -67,22 +75,25 @@ export const quellenListe = mitProblemen(async (req, res) => {
   res.json({ ...ergebnis, quellen: ergebnis.quellen.map(quelleFuerClient) })
 })
 
-export const quelleHochladen = mitProblemen(async (req, res) => {
+async function hochgeladeneQuelle(req) {
   if (!req.file) {
     throw new Problem(400, 'datei_fehlt', 'Es kam keine Datei an. Bitte erneut hochladen.')
   }
   try {
-    const quelle = await QuellenManager.aufnehmen({
+    return await QuellenManager.aufnehmen({
       projectId: projektId(req),
       userId: new ObjectId(nutzerId(req)),
       dateiname: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
       tempPfad: req.file.path,
       groesse: req.file.size,
     })
-    res.status(201).json(quelleFuerClient(quelle))
   } finally {
     await rm(req.file.path, { force: true })
   }
+}
+
+export const quelleHochladen = mitProblemen(async (req, res) => {
+  res.status(201).json(quelleFuerClient(await hochgeladeneQuelle(req)))
 })
 
 export const webQuelleAufnehmen = mitProblemen(async (req, res) => {
@@ -395,4 +406,170 @@ export const automatikSetzen = mitProblemen(async (req, res) => {
   }
   await LaufAktionen.automatikSetzen(projektId(req), new ObjectId(nutzerId(req)), req.body.an)
   res.sendStatus(204)
+})
+
+const seiteAus = wert => Math.max(0, Number.parseInt(wert ?? '0', 10) || 0)
+
+export const rechercheSuchen = mitProblemen(async (req, res) => {
+  res.json(
+    await Recherche.suchen({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      anfrage: String(req.query.anfrage ?? ''),
+      seite: Math.min(50, seiteAus(req.query.seite)),
+    })
+  )
+})
+
+export const rechercheZitationen = mitProblemen(async (req, res) => {
+  res.json(await Recherche.zitationen(String(req.query.doi ?? ''), String(req.query.richtung ?? '')))
+})
+
+export const suchprotokoll = mitProblemen(async (req, res) => {
+  res.json(await Recherche.protokoll(projektId(req), { seite: seiteAus(req.query.seite) }))
+})
+
+export const suchprotokollExport = mitProblemen(async (req, res) => {
+  res.attachment('suchprotokoll.csv').type('text/csv; charset=utf-8')
+  res.send(await Recherche.protokollCsv(projektId(req)))
+})
+
+export const perDoiAufnehmen = mitProblemen(async (req, res) => {
+  const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
+  const quelle = await Aufnahme.perDoi({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
+  res.status(201).json(quelleFuerClient(quelle))
+})
+
+function beschaffungFuerClient(eintrag, vorlage) {
+  return {
+    id: eintrag._id,
+    doi: eintrag.doi,
+    titel: eintrag.meta.titel,
+    autoren: (eintrag.meta.autoren ?? []).map(a => [a.given, a.family].filter(Boolean).join(' ')),
+    jahr: eintrag.meta.jahr,
+    status: eintrag.status,
+    quelleId: eintrag.quelleId ?? null,
+    link: Beschaffung.link(vorlage, eintrag.doi),
+  }
+}
+
+export const beschaffungsliste = mitProblemen(async (req, res) => {
+  const [liste, vorlage] = await Promise.all([
+    Beschaffung.liste(projektId(req), { seite: seiteAus(req.query.seite) }),
+    Beschaffung.vorlage(new ObjectId(nutzerId(req))),
+  ])
+  res.json({ ...liste, vorlage, eintraege: liste.eintraege.map(e => beschaffungFuerClient(e, vorlage)) })
+})
+
+export const beschaffungHinzufuegen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
+  const eintrag = await Beschaffung.hinzufuegen({ projectId: projektId(req), userId, doi })
+  res.status(201).json(beschaffungFuerClient(eintrag, await Beschaffung.vorlage(userId)))
+})
+
+export const beschaffungExport = mitProblemen(async (req, res) => {
+  const { dateiname, typ, inhalt } = await Beschaffung.exportieren(projektId(req), req.params.format)
+  res.attachment(dateiname).type(`${typ}; charset=utf-8`).send(inhalt)
+})
+
+export const beschaffungHochladen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const quelle = await hochgeladeneQuelle(req)
+  const eintrag = await Beschaffung.perDoiZuordnen(projektId(req), quelle, userId)
+  res.status(201).json({ quelle: quelleFuerClient(quelle), zugeordnet: eintrag ? String(eintrag._id) : null })
+})
+
+export const beschaffungZuordnen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const eintrag = await Beschaffung.zuordnen(projektId(req), req.params.eintrag_id, String(req.body?.quelle_id ?? ''), userId)
+  res.json(beschaffungFuerClient(eintrag, await Beschaffung.vorlage(userId)))
+})
+
+export const bibliotheksvorlageSetzen = mitProblemen(async (req, res) => {
+  res.json({ vorlage: await Beschaffung.vorlageSetzen(new ObjectId(nutzerId(req)), req.body?.vorlage) })
+})
+
+export const zoteroSammlungen = mitProblemen(async (req, res) => {
+  res.json({ sammlungen: await Import.zoteroSammlungen(new ObjectId(nutzerId(req))) })
+})
+
+export const zoteroImportieren = mitProblemen(async (req, res) => {
+  res.json(
+    await Import.zoteroImportieren({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      sammlung: String(req.body?.sammlung ?? ''),
+    })
+  )
+})
+
+export const notizen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  res.json({ notizen: await Literatur.notizen(quelle) })
+})
+
+export const notizSetzen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitatId = req.body?.zitat_id ? String(req.body.zitat_id) : null
+  if (zitatId) await ZitatManager.holen(quelle, zitatId)
+  await Literatur.notizSetzen(projektId(req), quelle, {
+    zitatId,
+    text: req.body?.text,
+    userId: new ObjectId(nutzerId(req)),
+  })
+  res.sendStatus(204)
+})
+
+export const matrix = mitProblemen(async (req, res) => {
+  res.json(await Literatur.matrix(projektId(req), { seite: Math.max(1, seiteAus(req.query.seite)) }))
+})
+
+export const matrixExport = mitProblemen(async (req, res) => {
+  res.attachment('literaturmatrix.csv').type('text/csv; charset=utf-8')
+  res.send(await Literatur.matrixCsv(projektId(req)))
+})
+
+export const matrixSpalte = mitProblemen(async (req, res) => {
+  res.status(201).json(await Literatur.spalteAnlegen(projektId(req), req.body?.name))
+})
+
+const zellAdresse = req => ({ quelleId: String(req.body?.quelle_id ?? ''), spalteId: String(req.body?.spalte_id ?? '') })
+
+export const matrixZelle = mitProblemen(async (req, res) => {
+  await Literatur.zelleSetzen(projektId(req), { ...zellAdresse(req), text: req.body?.text })
+  res.sendStatus(204)
+})
+
+export const matrixBestaetigen = mitProblemen(async (req, res) => {
+  await Literatur.vorschlagBestaetigen(projektId(req), zellAdresse(req))
+  res.sendStatus(204)
+})
+
+export const matrixVerwerfen = mitProblemen(async (req, res) => {
+  await Literatur.vorschlagVerwerfen(projektId(req), zellAdresse(req))
+  res.sendStatus(204)
+})
+
+const modellAus = wert => String(wert ?? '').slice(0, 200)
+
+export const offenlegung = mitProblemen(async (req, res) => {
+  res.json(await Offenlegung.text(projektId(req), { modell: modellAus(req.query.modell) }))
+})
+
+export const offenlegungTex = mitProblemen(async (req, res) => {
+  res.json(await Offenlegung.alsTex(projektId(req), new ObjectId(nutzerId(req)), { modell: modellAus(req.body?.modell) }))
+})
+
+export const semantikStand = mitProblemen(async (req, res) => {
+  res.json(await Semantik.stand(projektId(req)))
+})
+
+export const semantikIndexieren = mitProblemen(async (req, res) => {
+  const { job_id: jobId } = await Semantik.indexieren(projektId(req))
+  res.status(202).json({ job_id: jobId })
+})
+
+export const semantikSuchen = mitProblemen(async (req, res) => {
+  res.json({ treffer: await Semantik.suchen(projektId(req), req.query.q) })
 })

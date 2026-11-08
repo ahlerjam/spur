@@ -35,6 +35,16 @@ beforeEach(async () => {
     LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
     Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
     Crossref: { werk: vi.fn() },
+    Beschaffung: { hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })) },
+    Literatur: { vorschlagen: vi.fn(async () => ({ quelle_id: 'q', spalte: 'Methode' })) },
+    Kompilieren: {
+      starten: vi.fn(async () => ({ job_id: 'j1', status: 'laeuft' })),
+      seitenBild: vi.fn(async () => Buffer.from('PNG')),
+      log: vi.fn(),
+      status: vi.fn(),
+    },
+    Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
+    Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -47,6 +57,11 @@ beforeEach(async () => {
   vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => m.LaufAktionen)
   vi.doMock('../../app/src/Inbox.mjs', () => m.Inbox)
   vi.doMock('../../app/src/Crossref.mjs', () => m.Crossref)
+  vi.doMock('../../app/src/recherche/Recherche.mjs', () => m.Recherche)
+  vi.doMock('../../app/src/recherche/Aufnahme.mjs', () => m.Aufnahme)
+  vi.doMock('../../app/src/kompilieren/Kompilieren.mjs', () => m.Kompilieren)
+  vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
+  vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
   ;({ WERKZEUGE } = await import('../../app/src/mcp/werkzeuge.mjs'))
   recht.vergeben(anna, projekt, { stufe: 'owner' })
 })
@@ -65,6 +80,10 @@ describe('Rechte der Werkzeuge', () => {
     ['bib_list', {}],
     ['reply', { text: 'Hallo' }],
     ['run_status', {}],
+    ['paper_search', { anfrage: 'sleep' }],
+    ['compile', {}],
+    ['compile_log', {}],
+    ['page_image', { seite: 1 }],
   ]
 
   it.each(alleLesen)('%s verweigert Nutzern ohne Zugriff mit keine_rechte', async (name, args) => {
@@ -352,5 +371,69 @@ describe('Eingabeprüfung', () => {
     expect(WERKZEUGE.doc_list.inputSchema.safeParse({ project_id: projekt }).success).toBe(true)
     expect(WERKZEUGE.doc_edit.inputSchema.safeParse({ project_id: projekt, neu: 'x', idempotenz_schluessel: 'kurz' }).success).toBe(false)
     expect(WERKZEUGE.doc_create.inputSchema.safeParse({ project_id: projekt, pfad: 'a.exe', inhalt: '', idempotenz_schluessel: 'schluessel-0001' }).success).toBe(false)
+  })
+})
+
+describe('Recherche', () => {
+  it('paper_search sucht für Projekt und Person und reicht das Ergebnis durch', async () => {
+    m.Recherche.suchen.mockResolvedValue({ treffer: [{ doi: '10.1038/nrn2762' }], fehler: [] })
+    const ergebnis = await aufruf('paper_search', { project_id: projekt, anfrage: 'sleep' })
+    expect(ergebnis.treffer[0].doi).toBe('10.1038/nrn2762')
+    expect(m.Recherche.suchen).toHaveBeenCalledWith({
+      projectId: new ObjectId(projekt),
+      userId: anna,
+      anfrage: 'sleep',
+      seite: 0,
+    })
+  })
+
+  it('paper_citations reicht DOI und Richtung weiter', async () => {
+    await aufruf('paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert' })
+    expect(m.Recherche.zitationen).toHaveBeenCalledWith('10.1038/nrn2762', 'zitiert')
+  })
+
+  it('source_add verlangt Schreibrechte und nimmt per DOI auf', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('source_add', { project_id: projekt, doi: '10.1/X' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('owner')
+    expect(await aufruf('source_add', { project_id: projekt, doi: '10.1/X' })).toEqual({
+      quelle_id: 'q1',
+      key: 'keller2014',
+      dateiname: 'keller2014.pdf',
+      doi: '10.1/x',
+    })
+    expect(m.Aufnahme.perDoi).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
+  })
+
+  it('acquisition_add verlangt Schreibrechte und setzt die DOI auf die Liste', async () => {
+    mitStufe('review')
+    expect(await fehlerVon(aufruf('acquisition_add', { project_id: projekt, doi: '10.1/X' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    expect(await aufruf('acquisition_add', { project_id: projekt, doi: '10.1/X' })).toEqual({
+      eintrag_id: 'b1',
+      doi: '10.1/x',
+      titel: 'T',
+      status: 'offen',
+    })
+  })
+
+  it('matrix_suggest legt nur einen Vorschlag des Bots an und verlangt Schreibrechte', async () => {
+    const quelle = String(new ObjectId())
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('matrix_suggest', { project_id: projekt, source_id: quelle, spalte: 'Methode', text: 'x' }))).toMatchObject({
+      code: 'keine_rechte',
+    })
+    mitStufe('review')
+    await aufruf('matrix_suggest', { project_id: projekt, source_id: quelle, spalte: 'Methode', text: 'x' })
+    expect(m.Literatur.vorschlagen).toHaveBeenCalledWith(new ObjectId(projekt), { quelleId: quelle, spalte: 'Methode', text: 'x', botId: bot })
+  })
+
+  it('compile startet als Person und Bot, page_image liefert ein PNG als MCP-Bild', async () => {
+    mitStufe('readOnly')
+    expect(await aufruf('compile', { project_id: projekt })).toEqual({ job_id: 'j1', status: 'laeuft' })
+    expect(m.Kompilieren.starten).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot })
+    expect(await aufruf('page_image', { project_id: projekt, seite: 2 })).toEqual({
+      content: [{ type: 'image', data: Buffer.from('PNG').toString('base64'), mimeType: 'image/png' }],
+    })
   })
 })

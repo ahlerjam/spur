@@ -35,3 +35,15 @@ export function jetzt() {
   const fest = festeZeit ?? schalter().SPUR_NOW
   return fest ? new Date(fest) : new Date()
 }
+
+// Nur im Dev-Stack: Die E2E-Suite schaltet ohne Neustart um (POST …/_steuerung des Paper-Fakes).
+let devUeberschreibung = {}
+
+export function devSchalterSetzen(werte) {
+  if (IST_DEV) devUeberschreibung = { ...werte }
+}
+
+const wert = name => (IST_DEV && name in devUeberschreibung ? devUeberschreibung[name] : process.env[name])
+
+export const semantikAn = () => wert('SPUR_SEMANTIC_SEARCH') === 'true'
+export const fakeEmbeddings = () => wert('SPUR_FAKE_EMBEDDINGS') === '1'
