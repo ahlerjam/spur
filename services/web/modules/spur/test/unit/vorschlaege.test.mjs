@@ -165,4 +165,22 @@ describe('Vorschläge im Panel', () => {
     expect((await fehlerVon(V.uebernehmen(projekt, ada, String(vorschlag_id)))).status).toBe(404)
     expect((await fehlerVon(V.uebernehmen(projekt, ada, 'kaputt'))).status).toBe(404)
   })
+
+  it('Übernehmen lässt den Vorschlag offen, wenn der Auftrag nicht angelegt werden kann', async () => {
+    const { vorschlag_id } = await vorschlag()
+    await datenbank.db.collection('spurMessages').createIndex({ text: 1 }, { unique: true })
+    // Ein eindeutiger Index auf dem Text lässt das Anlegen des Auftrags scheitern.
+    await datenbank.db.collection('spurMessages').insertOne({ text: 'Bitte diesen Vorschlag umsetzen (main.tex): Beleg fehlt\n\nFür „Schlaf verdoppelt die Gedächtnisleistung“ fehlt eine Quelle.' })
+    await fehlerVon(V.uebernehmen(projekt, ada, String(vorschlag_id)))
+    expect((await V.liste(projekt, ada)).map(v => String(v.id))).toEqual([String(vorschlag_id)])
+    await datenbank.db.collection('spurMessages').dropIndexes()
+  })
+
+  it('nimmt höchstens 100 offene Vorschläge je Projekt an', async () => {
+    await datenbank.db.collection('spurSuggestions').insertMany(
+      Array.from({ length: 100 }, (_, i) => ({ projectId: projekt, botId: adasBot, status: 'offen', titel: `V${i}`, am: new Date() }))
+    )
+    const fehler = await fehlerVon(vorschlag())
+    expect(fehler).toMatchObject({ status: 409, typ: 'vorschlaege_voll' })
+  })
 })

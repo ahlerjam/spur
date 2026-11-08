@@ -67,6 +67,7 @@ Unerkannte Zitatformen und nicht auflösbare DOIs werden angenommen, aber rot ma
 | `dienst_fehlt` | Crossref antwortet nicht |
 | `spalte_fehlt` | `matrix_suggest`: Die Spalte gibt es in der Matrix nicht |
 | `kommentar_fehlt` | `reply` mit `kommentar_id`: Den Kommentar-Thread gibt es im Projekt nicht |
+| `vorschlaege_voll` | `suggest`: Im Panel liegen schon 100 offene Vorschläge |
 
 `paper_search` und `paper_citations` scheitern nicht an einem einzelnen Dienst: `fehler` nennt ausgefallene Dienste mit Namen, die übrigen Treffer kommen trotzdem.
 

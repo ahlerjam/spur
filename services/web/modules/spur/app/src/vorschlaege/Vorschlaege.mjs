@@ -9,6 +9,8 @@ export const ARTEN = ['compile_fehler', 'belegloses_argument']
 const WERTE = ['aus', 'vorschlag']
 const STANDARD_LIMIT = 50
 const MAX_LIMIT = 1000
+// So viele offene Vorschläge zeigt das Panel; mehr lehnt suggest ab.
+const MAX_OFFEN = 100
 
 function artPruefen(art) {
   if (!ARTEN.includes(art)) {
@@ -124,7 +126,15 @@ export async function ausloesen({ projectId, menschId, art, daten }) {
 }
 
 export async function vorschlagen({ projectId, botId, art, titel, text, pfad }) {
-  const { insertedId } = await (await vorschlaege()).insertOne({
+  const sammlung = await vorschlaege()
+  if ((await sammlung.countDocuments({ projectId, botId, status: 'offen' })) >= MAX_OFFEN) {
+    throw new Problem(
+      409,
+      'vorschlaege_voll',
+      `Im Panel liegen schon ${MAX_OFFEN} offene Vorschläge. Bitte erst warten, bis die Person welche übernimmt oder verwirft.`
+    )
+  }
+  const { insertedId } = await sammlung.insertOne({
     projectId,
     botId,
     art,
@@ -157,10 +167,16 @@ export async function verwerfen(projectId, menschId, id) {
 export async function uebernehmen(projectId, menschId, id) {
   const vorschlag = await erledigen(projectId, menschId, id, 'uebernommen')
   const ort = vorschlag.pfad ? ` (${vorschlag.pfad})` : ''
-  await Inbox.auftragAnlegen({
-    projectId,
-    botId: vorschlag.botId,
-    text: `Bitte diesen Vorschlag umsetzen${ort}: ${vorschlag.titel}\n\n${vorschlag.text}`,
-    daten: { vorschlag_id: vorschlag._id },
-  })
+  try {
+    await Inbox.auftragAnlegen({
+      projectId,
+      botId: vorschlag.botId,
+      text: `Bitte diesen Vorschlag umsetzen${ort}: ${vorschlag.titel}\n\n${vorschlag.text}`,
+      daten: { vorschlag_id: vorschlag._id },
+    })
+  } catch (error) {
+    // Ohne Auftrag bliebe der Vorschlag sonst verloren: wieder offen, damit die Person es erneut versuchen kann.
+    await (await vorschlaege()).updateOne({ _id: vorschlag._id }, { $set: { status: 'offen' }, $unset: { erledigt: '' } })
+    throw error
+  }
 }

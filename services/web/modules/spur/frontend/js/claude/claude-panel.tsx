@@ -13,7 +13,7 @@ import { startBefehl } from './claude-verbinden'
 import LaufKarte, { type Aenderung, type Lauf } from './lauf-karte'
 import OffenlegungModal from './offenlegung-modal'
 
-type Nachricht ={ id: string; von: 'mensch' | 'claude'; text: string; am: string }
+type Nachricht = { id: string; von: 'mensch' | 'claude'; text: string; am: string }
 type Workflow = { name: string; titel: string; beschreibung: string }
 type Status = {
   verbunden: boolean
