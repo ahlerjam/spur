@@ -46,19 +46,33 @@ export function latexSicher(text) {
 
 export const autorName = a => [a.family, a.given].filter(Boolean).join(', ')
 
+// Crossref-Daten, Webseiten-Titel und Dateinamen sind fremder Text: maskieren, damit die Klammern
+// der .bib halten.
+const text = wert => wert && latexSicher(String(wert))
+const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
+const alsBib = (typ, key, felder) => {
+  const zeilen = felder.filter(([, wert]) => wert).map(([name, wert]) => `  ${name} = {${wert}}`)
+  return `@${typ}{${key},\n${zeilen.join(',\n')}\n}`
+}
+
+function webEintrag(key, quelle) {
+  return alsBib('online', key, [
+    ['title', text(quelle.meta?.titel ?? quelle.web.url)],
+    // Die URL steht in biblatex wörtlich; nur Klammern und Backslash würden die .bib brechen.
+    ['url', ohneKlammern(quelle.web.url)],
+    ['urldate', quelle.web.abgerufenAm.toISOString().slice(0, 10)],
+  ])
+}
+
 export function bibEintrag(key, quelle) {
+  if (quelle.art === 'web') return webEintrag(key, quelle)
   const meta = quelle.meta?.gefunden ? quelle.meta : {}
-  // Crossref-Daten und Dateinamen sind fremder Text: maskieren, damit die Klammern der .bib halten.
-  const text = wert => wert && latexSicher(String(wert))
-  const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
-  const felder = [
+  return alsBib('article', key, [
     ['author', text(meta.autoren?.map(autorName).join(' and '))],
     ['title', text(meta.titel ?? quelle.dateiname)],
     ['journal', text(meta.journal)],
     ['year', ohneKlammern(meta.jahr)],
     ['pages', ohneKlammern(meta.seiten?.replace('-', '--'))],
     ['doi', ohneKlammern(quelle.doi)],
-  ].filter(([, wert]) => wert)
-  const zeilen = felder.map(([name, wert]) => `  ${name} = {${wert}}`)
-  return `@article{${key},\n${zeilen.join(',\n')}\n}`
+  ])
 }

@@ -8,6 +8,7 @@ import { Problem, problemSenden } from './probleme.mjs'
 import { MAX_BYTES } from './QuellenManager.mjs'
 import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
+import { testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
@@ -62,6 +63,7 @@ export default {
   apply(webRouter, _privateApiRouter, publicApiRouter) {
     webRouter.get(QUELLEN, ...lesen, SpurController.quellenListe)
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
+    webRouter.post(`${QUELLEN}/web`, ...schreiben, SpurController.webQuelleAufnehmen)
     webRouter.get(`${QUELLEN}/suche`, ...lesen, SpurController.quellenSuche)
     webRouter.get(`${QUELLEN}/semantik`, ...lesen, SpurController.semantikStand)
     webRouter.post(`${QUELLEN}/semantik/indexieren`, ...schreiben, SpurController.semantikIndexieren)
@@ -74,6 +76,25 @@ export default {
     webRouter.get(`${QUELLEN}/:quelle_id/notizen`, ...lesen, SpurController.notizen)
     webRouter.put(`${QUELLEN}/:quelle_id/notizen`, ...schreiben, SpurController.notizSetzen)
     webRouter.post(`${QUELLEN}/:quelle_id/zitate`, ...schreiben, SpurController.zitatMarkieren)
+    // Kommentieren dürfen wie in Overleaf alle Mitglieder, auch mit Leserecht.
+    webRouter.post(
+      `${QUELLEN}/:quelle_id/zitate/:zitat_id/kommentare`,
+      ...lesen,
+      SpurController.zitatKommentieren
+    )
+    webRouter.delete(
+      `${QUELLEN}/:quelle_id/zitate/:zitat_id/zuweisung`,
+      ...lesen,
+      SpurController.zuweisungLoesen
+    )
+    webRouter.post(
+      `${QUELLEN}/:quelle_id/zitate/:zitat_id/bestaetigen`,
+      ...pruefen,
+      SpurController.zitatBestaetigen
+    )
+    webRouter.post(`${QUELLEN}/:quelle_id/ocr`, ...schreiben, SpurController.ocrStarten)
+    webRouter.get('/spur/project/:project_id/team', ...lesen, SpurController.team)
+    webRouter.get('/spur/project/:project_id/zitate/zugewiesen', ...lesen, SpurController.zugewiesen)
     webRouter.post(
       `${QUELLEN}/:quelle_id/zitate/:zitat_id/einfuegen`,
       ...schreiben,
@@ -119,6 +140,10 @@ export default {
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
     webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)
     publicApiRouter.all('/spur/mcp', mcpAnfrage)
-    if (IST_DEV) publicApiRouter.use('/spur/dev/crossref', paperFake)
+    if (IST_DEV) {
+      publicApiRouter.use('/spur/dev/crossref', paperFake)
+      publicApiRouter.get('/spur/dev/web/testseite', testseite)
+      publicApiRouter.post('/spur/dev/zeit', zeitSetzen)
+    }
   },
 }

@@ -1,5 +1,5 @@
 {
-  "state": "running",
+  "state": "done",
   "builderModel": "opus",
   "builderAdvisor": "opus",
   "dependsOn": [
@@ -8,5 +8,8 @@
   ],
   "where": "cloud",
   "cloudSession": "https://claude.ai/code/session_01XpJUcfdWWEwVeRHPh3w2Us",
-  "started": "2026-11-08T09:21:44Z"
+  "started": "2026-11-08T09:22:42Z",
+  "runBranch": "slice/run-20261106-spur-p4-quellen",
+  "sessionId": "55005a49-6b06-4fc6-979e-5759247f5de5",
+  "finished": "2026-11-08T13:08:38Z"
 }

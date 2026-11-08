@@ -1,12 +1,13 @@
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import QuellenPanel from '@modules/spur/frontend/js/quellen/quellen-panel'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
 import { deutschAktivieren } from './helpers/deutsch'
 
 const QUELLEN = /\/spur\/project\/[^/]+\/quellen$/
 const ANDERE = /\/spur\/project\/[^/]+\/quellen\/andere$/
+const ZUGEWIESEN = /\/spur\/project\/[^/]+\/zitate\/zugewiesen$/
 
 function zeigen() {
   render(<QuellenPanel />, { wrapper: EditorProviders })
@@ -18,6 +19,7 @@ describe('Quellen-Panel', function () {
   beforeEach(function () {
     fetchMock.removeRoutes().clearHistory()
     fetchMock.get(ANDERE, { projekte: [], klonVon: null })
+    fetchMock.get(ZUGEWIESEN, { zitate: [] })
   })
 
   afterEach(function () {
@@ -45,6 +47,7 @@ describe('Quellen-Panel', function () {
           fassung: '',
           versatz: null,
           versatzQuelle: null,
+          ocr: null,
         },
       ],
       gesamt: 1,
@@ -52,6 +55,49 @@ describe('Quellen-Panel', function () {
     zeigen()
     await screen.findByText('mueller2020.pdf')
     expect(screen.queryByText('Noch keine Quellen')).to.not.exist
+  })
+
+  it('zeigt Zitate, die mir zugewiesen sind, und öffnet sie', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(ANDERE, { projekte: [], klonVon: null })
+    fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
+    fetchMock.get(
+      ZUGEWIESEN,
+      {
+        zitate: [
+          {
+            id: 'z1',
+            seite: 3,
+            label: '347',
+            text: 'Sleep supports',
+            von: { id: 'a', name: 'Anna Autor' },
+            kommentare: [],
+            zugewiesen: { an: { id: 'b', name: 'Ben' }, von: { id: 'a', name: 'Anna Autor' }, am: '2026-11-07T10:00:00Z' },
+            quelle: { id: 'q1', dateiname: 'smith2024.pdf', art: 'pdf', seitenzahl: 8 },
+          },
+        ],
+      }
+    )
+    fetchMock.get(/\/quellen\/q1\/seiten\/3$/, { text: 'Sleep supports', label: '347', seite: 3, seitenzahl: 8 })
+    fetchMock.get(/\/quellen\/q1\/zitate$/, { zitate: [] })
+    zeigen()
+    await screen.findByText('Anna Autor hat Ihnen ein Zitat zugewiesen: „Sleep supports“ (smith2024.pdf, S. 347)')
+    screen.getByRole('button', { name: 'Öffnen' }).click()
+    await screen.findByText('Seite 347 (PDF-Seite 3 von 8)')
+  })
+
+  it('weist beim Hochladen eines Transkripts auf den KI-Anbieter hin, bei einem PDF nicht', async function () {
+    const HINWEIS =
+      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.'
+    fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
+    fetchMock.post(QUELLEN, { status: 201, body: {} })
+    zeigen()
+    await screen.findByText('Noch keine Quellen')
+    const feld = screen.getByLabelText('Datei wählen')
+    fireEvent.change(feld, { target: { files: [new File(['WEBVTT'], 'interview.vtt')] } })
+    await screen.findByText(HINWEIS)
+    fireEvent.change(feld, { target: { files: [new File(['%PDF'], 'smith2024.pdf')] } })
+    await waitFor(() => expect(screen.queryByText(HINWEIS)).to.not.exist)
   })
 
   it('zeigt nach einem API-Fehler die Fehlermeldung als Text', async function () {

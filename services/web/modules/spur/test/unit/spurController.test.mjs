@@ -36,8 +36,17 @@ beforeEach(async () => {
       projekteMitQuellen: vi.fn(async () => []),
       klonHinweis: vi.fn(async () => null),
       uebernehmen: vi.fn(async () => 2),
+      ocrZustand: q => q.ocr ?? null,
+      vonIds: vi.fn(async () => []),
+      webAufnehmen: vi.fn(async () => ({ _id: 'w1', art: 'web', dateiname: 'seite.html', meta: { titel: 'Seite' }, web: { url: 'https://example.org/', abgerufenAm: new Date(0), hash: 'h' } })),
+      ocrStarten: vi.fn(async q => ({ quelle: { ...q, ocr: { status: 'laeuft', fertig: 0, gesamt: 3 } }, lauf: Promise.resolve() })),
     },
-    Zitate: { liste: vi.fn(), markieren: vi.fn(), holen: vi.fn(), einfuegen: vi.fn() },
+    Zitate: { liste: vi.fn(), markieren: vi.fn(), holen: vi.fn(), einfuegen: vi.fn(), kommentieren: vi.fn(), bestaetigen: vi.fn(), zuweisungLoesen: vi.fn(async () => {}), zugewiesenAn: vi.fn(async () => []) },
+    Team: {
+      namen: vi.fn(async () => new Map([[String(anna), 'Anna Autor'], ['ben', 'Ben']])),
+      nameAus: (namen, id) => namen.get(String(id)) ?? 'Gelöschtes Konto',
+      mitglieder: vi.fn(async () => [{ id: String(anna), name: 'Anna Autor' }]),
+    },
     Pruef: { bericht: vi.fn(async () => ({ zeilen: [] })) },
     Zugang: {
       tokens: vi.fn(async () => []),
@@ -80,6 +89,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/offenlegung/Offenlegung.mjs', () => m.Offenlegung)
   vi.doMock('../../app/src/semantik/Semantik.mjs', () => m.Semantik)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.Zitate)
+  vi.doMock('../../app/src/Team.mjs', () => m.Team)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.Pruef)
   vi.doMock('../../app/src/ClaudeZugang.mjs', () => m.Zugang)
   vi.doMock('../../app/src/Inbox.mjs', () => m.Inbox)
@@ -103,7 +113,7 @@ describe('Quellenliste und Suche', () => {
     m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
     const { res } = await ausfuehren(C.quellenListe, req({ query: { seite: '2' } }))
     expect(m.Quellen.liste).toHaveBeenCalledWith(projekt, { seite: 2 })
-    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false })
+    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, ocr: null, web: null })
     expect(res.body).toMatchObject({ gesamt: 1, seitengroesse: 100 })
   })
 
@@ -129,6 +139,16 @@ describe('Quellenliste und Suche', () => {
       expect.objectContaining({ quelleId: q._id, imDateinamen: true, seite: 1, quelle: expect.objectContaining({ id: q._id }) }),
       { quelleId: 'q2', seite: 3 },
     ])
+  })
+})
+
+describe('Webseite aufnehmen', () => {
+  it('gibt die Adresse weiter und antwortet mit 201, Titel, Adresse und Abrufdatum, ohne Hash', async () => {
+    const { res } = await ausfuehren(C.webQuelleAufnehmen, req({ body: { url: 'https://example.org/' } }))
+    expect(m.Quellen.webAufnehmen).toHaveBeenCalledWith({ projectId: projekt, userId: anna, url: 'https://example.org/' })
+    expect(res.statusCode).toBe(201)
+    expect(res.body).toMatchObject({ id: 'w1', art: 'web', titel: 'Seite', web: { url: 'https://example.org/', abgerufenAm: new Date(0) } })
+    expect(res.body.web.hash).toBeUndefined()
   })
 })
 
@@ -181,7 +201,7 @@ describe('Seiten, Bilder und Dateien', () => {
   it('quelleSeite liefert Text, Label und Seitenzahl', async () => {
     const { res } = await ausfuehren(C.quelleSeite, mitQuelle())
     expect(m.Quellen.seite).toHaveBeenCalledWith(expect.anything(), 3)
-    expect(res.body).toEqual({ text: 'Text', label: '347', seite: 3, seitenzahl: 8, art: 'pdf' })
+    expect(res.body).toEqual({ text: 'Text', label: '347', seite: 3, seitenzahl: 8, art: 'pdf', ocrKonfidenz: null })
   })
 
   it('quelleBild sendet das PNG einer PDF-Seite', async () => {
@@ -343,10 +363,70 @@ describe('Zitate und Prüfbericht', () => {
   const mitQuelle = extra => req({ params: { project_id: String(projekt), quelle_id: 'q1', zitat_id: 'z1' }, ...extra })
   beforeEach(() => m.Quellen.holen.mockResolvedValue(quelle()))
 
-  it('zitate listet Fundstellen ohne interne Felder', async () => {
-    m.Zitate.liste.mockResolvedValue([{ _id: 'z1', seite: 3, label: '347', text: 'Satz', projectId: 'geheim' }])
+  it('zitate listet Fundstellen ohne interne Felder, mit Namen statt IDs', async () => {
+    const am = new Date('2026-11-07T10:00:00Z')
+    m.Zitate.liste.mockResolvedValue([
+      { _id: 'z1', seite: 3, label: '347', text: 'Satz', projectId: 'geheim', angelegtVon: anna, kommentare: [{ _id: 'k1', von: 'ben', text: 'Prüfen', am }], zugewiesen: { an: anna, von: 'ben', am } },
+      { _id: 'z2', seite: 4, label: null, text: 'Alt', angelegtVon: new ObjectId() },
+    ])
     const { res } = await ausfuehren(C.zitate, mitQuelle())
-    expect(res.body).toEqual({ zitate: [{ id: 'z1', seite: 3, label: '347', text: 'Satz' }] })
+    expect(res.body).toEqual({
+      zitate: [
+        {
+          id: 'z1', seite: 3, label: '347', text: 'Satz',
+          von: { id: anna, name: 'Anna Autor' },
+          kommentare: [{ id: 'k1', von: { id: 'ben', name: 'Ben' }, text: 'Prüfen', am }],
+          zugewiesen: { an: { id: anna, name: 'Anna Autor' }, von: { id: 'ben', name: 'Ben' }, am },
+          bestaetigt: null,
+        },
+        { id: 'z2', seite: 4, label: null, text: 'Alt', von: { id: expect.any(ObjectId), name: 'Gelöschtes Konto' }, kommentare: [], zugewiesen: null, bestaetigt: null },
+      ],
+    })
+  })
+
+  it('zitatKommentieren gibt Text und Zuweisung weiter und antwortet mit 201', async () => {
+    m.Zitate.kommentieren.mockResolvedValue({ _id: 'z1', seite: 3, label: null, text: 'Satz', angelegtVon: anna, kommentare: [], zugewiesen: null })
+    const { res } = await ausfuehren(C.zitatKommentieren, mitQuelle({ body: { text: 'Prüfen', zuweisen: String(anna), anderes: 1 } }))
+    expect(m.Zitate.kommentieren).toHaveBeenCalledWith(expect.anything(), 'z1', { text: 'Prüfen', zuweisen: String(anna) }, anna)
+    expect(res.statusCode).toBe(201)
+    expect(res.body.id).toBe('z1')
+  })
+
+  it('zitatBestaetigen nennt, wer bestätigt hat', async () => {
+    const am = new Date(0)
+    m.Zitate.bestaetigen.mockResolvedValue({ _id: 'z1', seite: 1, label: null, text: 'Satz', angelegtVon: anna, bestaetigt: { von: 'ben', am } })
+    const { res } = await ausfuehren(C.zitatBestaetigen, mitQuelle())
+    expect(m.Zitate.bestaetigen).toHaveBeenCalledWith(expect.anything(), 'z1', anna)
+    expect(res.body.bestaetigt).toEqual({ von: { id: 'ben', name: 'Ben' }, am })
+  })
+
+  it('ocrStarten antwortet mit 202 und dem Fortschritt', async () => {
+    const { res } = await ausfuehren(C.ocrStarten, mitQuelle())
+    expect(m.Quellen.ocrStarten).toHaveBeenCalled()
+    expect(res.statusCode).toBe(202)
+    expect(res.body.ocr).toEqual({ status: 'laeuft', fertig: 0, gesamt: 3 })
+  })
+
+  it('zuweisungLoesen antwortet mit 204', async () => {
+    const { res } = await ausfuehren(C.zuweisungLoesen, mitQuelle())
+    expect(m.Zitate.zuweisungLoesen).toHaveBeenCalledWith(expect.anything(), 'z1')
+    expect(res.statusCode).toBe(204)
+  })
+
+  it('team nennt die Mitglieder', async () => {
+    const { res } = await ausfuehren(C.team, req())
+    expect(res.body).toEqual({ mitglieder: [{ id: String(anna), name: 'Anna Autor' }] })
+  })
+
+  it('zugewiesen liefert eigene Zuweisungen mit Quelle und Namen', async () => {
+    const q = quelle()
+    m.Quellen.vonIds.mockResolvedValue([q])
+    m.Zitate.zugewiesenAn.mockResolvedValue([{ _id: 'z1', quelleId: q._id, seite: 3, label: '347', text: 'Satz', angelegtVon: anna, zugewiesen: { an: anna, von: 'ben', am: new Date(0) } }])
+    const { res } = await ausfuehren(C.zugewiesen, req())
+    expect(m.Zitate.zugewiesenAn).toHaveBeenCalledWith(projekt, anna)
+    expect(m.Quellen.vonIds).toHaveBeenCalledWith(projekt, [q._id])
+    expect(res.body.zitate).toHaveLength(1)
+    expect(res.body.zitate[0]).toMatchObject({ id: 'z1', text: 'Satz', zugewiesen: { von: { name: 'Ben' } }, quelle: { id: q._id, dateiname: 'a.pdf' } })
   })
 
   it('zitatMarkieren legt die Fundstelle an und antwortet mit 201', async () => {

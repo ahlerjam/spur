@@ -5,7 +5,7 @@ import ProjectEntityHandler from '../../../../../app/src/Features/Project/Projec
 import ProjectGetter from '../../../../../app/src/Features/Project/ProjectGetter.mjs'
 import * as Crossref from '../Crossref.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
-import { pruefCache } from '../sammlungen.mjs'
+import { pruefCache, quotes } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { bibLesen } from './bib.mjs'
 import { istProblem, quelleZu, zeileBewerten } from './bewertung.mjs'
@@ -75,12 +75,30 @@ async function kontextLaden(projectId, docs) {
     for (const [key, eintrag] of bibLesen(doc.text)) bibEintraege.set(key, eintrag)
   }
   const quellen = await QuellenManager.alle(projectId)
+  // Bestätigte Zitate zählen nur für OCR-Quellen (siehe bewertung.mjs).
+  const ocrIds = quellen.filter(q => q.status === 'ocr').map(q => q._id)
   const dois = [...bibEintraege.values()].map(e => e.doi).filter(Boolean)
   const werke = new Map()
-  await promiseMapWithLimit(CROSSREF_PARALLEL, [...new Set(dois)], async doi => {
-    werke.set(doi.toLowerCase(), await Crossref.werk(doi))
-  })
-  return { bibEintraege, quellen, werke, seitenJeQuelle: new Map() }
+  const [bestaetigteZitate] = await Promise.all([
+    ocrIds.length
+      ? (await quotes())
+          .find(
+            { projectId, quelleId: { $in: ocrIds }, bestaetigt: { $ne: null } },
+            { projection: { quelleId: 1, text: 1 } }
+          )
+          .toArray()
+      : [],
+    promiseMapWithLimit(CROSSREF_PARALLEL, [...new Set(dois)], async doi => {
+      werke.set(doi.toLowerCase(), await Crossref.werk(doi))
+    }),
+  ])
+  const bestaetigt = new Map()
+  for (const z of bestaetigteZitate) {
+    const key = String(z.quelleId)
+    if (!bestaetigt.has(key)) bestaetigt.set(key, [])
+    bestaetigt.get(key).push(z.text)
+  }
+  return { bibEintraege, quellen, werke, bestaetigt, seitenJeQuelle: new Map() }
 }
 
 function stempel(kontext) {
@@ -90,7 +108,8 @@ function stempel(kontext) {
     werke: [...kontext.werke.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([d, w]) => [d, w?.gefunden, w?.retraction]),
-    quellen: kontext.quellen.map(q => [q._id, q.key, q.doi, q.versatz, q.versatzQuelle]),
+    quellen: kontext.quellen.map(q => [q._id, q.key, q.doi, q.versatz, q.versatzQuelle, q.status]),
+    bestaetigt: [...kontext.bestaetigt.entries()].sort(([a], [b]) => a.localeCompare(b)),
   })
 }
 

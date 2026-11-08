@@ -8,8 +8,11 @@ import { Problem } from './probleme.mjs'
 import { quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
+import { mitgliederIds } from './Team.mjs'
+import { zitateGeaendert as melden } from './live.mjs'
 
 const MAX_ZITAT = 2000
+const MAX_KOMMENTAR = 2000
 
 export async function liste(quelle) {
   return await (await quotes())
@@ -46,7 +49,65 @@ export async function markieren(quelle, { seite, text }, userId) {
     angelegtAm: jetzt(),
   }
   await (await quotes()).insertOne(zitat)
+  melden(quelle)
   return zitat
+}
+
+async function zuweisungPruefen(projectId, zuweisen) {
+  if (typeof zuweisen !== 'string' || !(await mitgliederIds(projectId)).includes(zuweisen)) {
+    throw new Problem(422, 'zuweisung', 'Zuweisen geht nur an Mitglieder dieses Projekts.')
+  }
+  return new ObjectId(zuweisen)
+}
+
+export async function kommentieren(quelle, zitatId, { text, zuweisen }, userId) {
+  const zitat = await holen(quelle, zitatId)
+  const inhalt = typeof text === 'string' ? text.trim() : ''
+  if (!inhalt || inhalt.length > MAX_KOMMENTAR) {
+    throw new Problem(
+      422,
+      'kommentar_text',
+      `Bitte einen Kommentar mit 1 bis ${MAX_KOMMENTAR} Zeichen schreiben.`
+    )
+  }
+  const am = jetzt()
+  const kommentar = { _id: new ObjectId(), von: userId, text: inhalt, am }
+  const zugewiesen =
+    zuweisen === undefined
+      ? undefined
+      : { an: await zuweisungPruefen(quelle.projectId, zuweisen), von: userId, am }
+  const neu = await (await quotes()).findOneAndUpdate(
+    { _id: zitat._id },
+    { $push: { kommentare: kommentar }, ...(zugewiesen ? { $set: { zugewiesen } } : {}) },
+    { returnDocument: 'after' }
+  )
+  melden(quelle, zugewiesen?.an)
+  return neu
+}
+
+export async function bestaetigen(quelle, zitatId, userId) {
+  const zitat = await holen(quelle, zitatId)
+  const neu = await (await quotes()).findOneAndUpdate(
+    { _id: zitat._id },
+    { $set: { bestaetigt: { von: userId, am: jetzt() } } },
+    { returnDocument: 'after' }
+  )
+  melden(quelle)
+  return neu
+}
+
+export async function zuweisungLoesen(quelle, zitatId) {
+  const zitat = await holen(quelle, zitatId)
+  await (await quotes()).updateOne({ _id: zitat._id }, { $set: { zugewiesen: null } })
+  melden(quelle, zitat.zugewiesen?.an)
+}
+
+export async function zugewiesenAn(projectId, userId) {
+  return await (await quotes())
+    .find({ projectId, 'zugewiesen.an': userId })
+    .sort({ 'zugewiesen.am': -1 })
+    .limit(20)
+    .toArray()
 }
 
 export async function holen(quelle, zitatId) {
@@ -99,10 +160,11 @@ export async function einfuegen(projectId, quelle, zitat, userId) {
   // Das Label kann sich nach dem Markieren ändern, wenn jemand den Versatz bestätigt.
   const { label } = await QuellenManager.seite(quelle, zitat.seite)
   const seite = label ?? String(zitat.seite)
-  const text = latexSicher(zitat.text)
-  const latex =
-    paket === 'natbib'
-      ? `\\enquote{${text}} \\citep[S.~${seite}]{${key}}`
-      : `\\enquote{${text}} \\autocite[${seite}]{${key}}`
+  const wortlaut = latexSicher(zitat.text)
+  // Webseiten haben keine Seiten: zitiert wird ohne Seitenangabe.
+  const stelle =
+    quelle.art === 'web' ? '' : paket === 'natbib' ? `[S.~${seite}]` : `[${seite}]`
+  const befehl = paket === 'natbib' ? 'citep' : 'autocite'
+  const latex = `\\enquote{${wortlaut}} \\${befehl}${stelle}{${key}}`
   return { latex, key, paket }
 }

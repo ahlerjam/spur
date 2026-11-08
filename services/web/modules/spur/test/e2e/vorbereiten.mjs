@@ -348,6 +348,26 @@ for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCac
 }
 await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))
 
+// P4: zwei Menschen mit Namen im selben Projekt, dazu eine Leserin.
+async function mitNamen(email, first_name, last_name) {
+  const nutzer = await konto(email)
+  await db.users.updateOne({ _id: nutzer._id }, { $set: { first_name, last_name } })
+  return nutzer
+}
+const teamA = await mitNamen('e2e-team-a@example.org', 'Anna', 'Autor')
+const teamB = await mitNamen('e2e-team-b@example.org', 'Ben', 'Berater')
+const team = await neuAnlegen(teamA, 'E2E Team', { 'main.tex': LEER })
+await db.projects.updateOne(
+  { _id: team._id },
+  { $set: { collaberator_refs: [teamB._id], readOnly_refs: [leser._id] } }
+)
+await quelleAusFixture(team._id, teamA._id, 'smith2024.pdf')
+
+const scanProjekt = await neuAnlegen(a, 'E2E Scan', { 'main.tex': APA, 'references.bib': BIB })
+await quelleAusFixture(scanProjekt._id, a._id, 'scan.pdf')
+await neuAnlegen(a, 'E2E Web', { 'main.tex': APA, 'references.bib': BIB })
+await neuAnlegen(a, 'E2E Transkript', { 'main.tex': LEER })
+
 await ablageFreigeben()
 console.log('E2E-Daten bereit')
 process.exit(0)

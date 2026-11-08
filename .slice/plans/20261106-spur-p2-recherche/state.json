@@ -1,5 +1,5 @@
 {
-  "state": "running",
+  "state": "halted",
   "builderModel": "opus",
   "builderAdvisor": "opus",
   "dependsOn": [
@@ -10,5 +10,7 @@
   "cloudSession": "https://claude.ai/code/session_01XpJUcg9zpDJcq1NZw9uQq4",
   "started": "2026-11-08T11:17:08Z",
   "runBranch": "slice/run-20261106-spur-p2-recherche",
-  "sessionId": "433b6958-1dba-4962-af86-8a6cd40251ac"
+  "sessionId": "433b6958-1dba-4962-af86-8a6cd40251ac",
+  "finished": "2026-11-08T14:10:00Z",
+  "haltReason": "merge conflict with agent branch (p4-quellen landed on same files)"
 }

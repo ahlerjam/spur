@@ -50,6 +50,10 @@ async function laden({ dev = false } = {}) {
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
   )
   vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
+  vi.doMock('../../app/src/dev/DevSchalter.mjs', () => ({
+    testseite: Object.assign(() => {}, { handler: 'testseite' }),
+    zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
+  }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
   routen = []
@@ -81,11 +85,18 @@ describe('Rechte der Routen', () => {
     ['get', `${Q}/:quelle_id/seiten/:seite`, 'lesen', 'quelleSeite'],
     ['get', `${Q}/:quelle_id/seiten/:seite/bild`, 'lesen', 'quelleBild'],
     ['get', `${Q}/:quelle_id/zitate`, 'lesen', 'zitate'],
+    ['post', `${Q}/:quelle_id/zitate/:zitat_id/kommentare`, 'lesen', 'zitatKommentieren'],
+    ['delete', `${Q}/:quelle_id/zitate/:zitat_id/zuweisung`, 'lesen', 'zuweisungLoesen'],
+    ['get', '/spur/project/:project_id/team', 'lesen', 'team'],
+    ['post', `${Q}/:quelle_id/zitate/:zitat_id/bestaetigen`, 'pruefen', 'zitatBestaetigen'],
+    ['post', `${Q}/:quelle_id/ocr`, 'schreiben', 'ocrStarten'],
+    ['get', '/spur/project/:project_id/zitate/zugewiesen', 'lesen', 'zugewiesen'],
     ['get', '/spur/project/:project_id/pruefbericht', 'lesen', 'pruefbericht'],
     ['get', '/spur/project/:project_id/claude', 'lesen', 'claudeStatus'],
     ['post', '/spur/project/:project_id/claude/auftrag', 'lesen', 'claudeAuftrag'],
     ['post', Q, 'schreiben', 'quelleHochladen'],
     ['post', `${Q}/holen`, 'schreiben', 'quellenHolen'],
+    ['post', `${Q}/web`, 'schreiben', 'webQuelleAufnehmen'],
     ['patch', `${Q}/:quelle_id`, 'schreiben', 'quelleAendern'],
     ['delete', `${Q}/:quelle_id`, 'schreiben', 'quelleLoeschen'],
     ['post', `${Q}/:quelle_id/zitate`, 'schreiben', 'zitatMarkieren'],
@@ -140,10 +151,15 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('hängt den Paper-Fake nur in der Dev-Umgebung ein', async () => {
-    expect(route('use', '/spur/dev/crossref')).toBeUndefined()
+  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit) nur in der Dev-Umgebung', async () => {
+    const dev = [
+      ['use', '/spur/dev/crossref', 'paperFake'],
+      ['get', '/spur/dev/web/testseite', 'testseite'],
+      ['post', '/spur/dev/zeit', 'zeitSetzen'],
+    ]
+    for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()
     await laden({ dev: true })
-    expect(handlerVon(route('use', '/spur/dev/crossref'))).toBe('paperFake')
+    for (const [methode, pfad, handler] of dev) expect(handlerVon(route(methode, pfad))).toBe(handler)
   })
 })
 

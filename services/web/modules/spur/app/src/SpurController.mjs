@@ -8,6 +8,7 @@ import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import * as PruefManager from './pruefung/PruefManager.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
 import * as ZitatManager from './ZitatManager.mjs'
+import * as Team from './Team.mjs'
 import * as ClaudeZugang from './ClaudeZugang.mjs'
 import * as Inbox from './Inbox.mjs'
 import * as LaufAktionen from './schreiben/LaufAktionen.mjs'
@@ -49,6 +50,8 @@ function quelleFuerClient(q) {
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
     nurProjekt: q.nurProjekt === true,
+    ocr: QuellenManager.ocrZustand(q),
+    web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }
 }
 
@@ -93,6 +96,15 @@ export const quelleHochladen = mitProblemen(async (req, res) => {
   res.status(201).json(quelleFuerClient(await hochgeladeneQuelle(req)))
 })
 
+export const webQuelleAufnehmen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.webAufnehmen({
+    projectId: projektId(req),
+    userId: new ObjectId(nutzerId(req)),
+    url: req.body.url,
+  })
+  res.status(201).json(quelleFuerClient(quelle))
+})
+
 export const quellenSuche = mitProblemen(async (req, res) => {
   const begriff = String(req.query.q ?? '').trim()
   if (!begriff) return res.json({ treffer: [] })
@@ -117,8 +129,8 @@ export const quellenSuche = mitProblemen(async (req, res) => {
 export const quelleSeite = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   const nummer = Number.parseInt(req.params.seite, 10)
-  const { text, label, seite } = await QuellenManager.seite(quelle, nummer)
-  res.json({ text, label, seite, seitenzahl: quelle.seitenzahl, art: quelle.art })
+  const { text, label, seite, ocrKonfidenz = null } = await QuellenManager.seite(quelle, nummer)
+  res.json({ text, label, seite, seitenzahl: quelle.seitenzahl, art: quelle.art, ocrKonfidenz })
 })
 
 export const quelleBild = mitProblemen(async (req, res) => {
@@ -202,16 +214,34 @@ export const quellenHolen = mitProblemen(async (req, res) => {
   res.json({ anzahl })
 })
 
-const zitatFuerClient = z => ({
-  id: z._id,
-  seite: z.seite,
-  label: z.label,
-  text: z.text,
-})
+async function zitateFuerClient(liste) {
+  const ids = liste.flatMap(z => [
+    z.angelegtVon,
+    ...(z.kommentare ?? []).map(k => k.von),
+    ...(z.zugewiesen ? [z.zugewiesen.an, z.zugewiesen.von] : []),
+    z.bestaetigt?.von,
+  ])
+  const namen = await Team.namen(ids.filter(Boolean))
+  const person = id => ({ id, name: Team.nameAus(namen, id) })
+  return liste.map(z => ({
+    id: z._id,
+    seite: z.seite,
+    label: z.label,
+    text: z.text,
+    von: person(z.angelegtVon),
+    kommentare: (z.kommentare ?? []).map(k => ({ id: k._id, von: person(k.von), text: k.text, am: k.am })),
+    zugewiesen: z.zugewiesen
+      ? { an: person(z.zugewiesen.an), von: person(z.zugewiesen.von), am: z.zugewiesen.am }
+      : null,
+    bestaetigt: z.bestaetigt ? { von: person(z.bestaetigt.von), am: z.bestaetigt.am } : null,
+  }))
+}
+
+const zitatFuerClient = async zitat => (await zitateFuerClient([zitat]))[0]
 
 export const zitate = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
-  res.json({ zitate: (await ZitatManager.liste(quelle)).map(zitatFuerClient) })
+  res.json({ zitate: await zitateFuerClient(await ZitatManager.liste(quelle)) })
 })
 
 export const zitatMarkieren = mitProblemen(async (req, res) => {
@@ -222,7 +252,56 @@ export const zitatMarkieren = mitProblemen(async (req, res) => {
     { seite, text: req.body.text },
     new ObjectId(nutzerId(req))
   )
-  res.status(201).json(zitatFuerClient(zitat))
+  res.status(201).json(await zitatFuerClient(zitat))
+})
+
+export const zitatKommentieren = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const { text, zuweisen } = req.body
+  const zitat = await ZitatManager.kommentieren(
+    quelle,
+    req.params.zitat_id,
+    { text, zuweisen },
+    new ObjectId(nutzerId(req))
+  )
+  res.status(201).json(await zitatFuerClient(zitat))
+})
+
+export const zitatBestaetigen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitat = await ZitatManager.bestaetigen(quelle, req.params.zitat_id, new ObjectId(nutzerId(req)))
+  res.json(await zitatFuerClient(zitat))
+})
+
+export const ocrStarten = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const { quelle: neu } = await QuellenManager.ocrStarten(quelle)
+  res.status(202).json(quelleFuerClient(neu))
+})
+
+export const zuweisungLoesen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  await ZitatManager.zuweisungLoesen(quelle, req.params.zitat_id)
+  res.sendStatus(204)
+})
+
+export const team = mitProblemen(async (req, res) => {
+  res.json({ mitglieder: await Team.mitglieder(projektId(req)) })
+})
+
+export const zugewiesen = mitProblemen(async (req, res) => {
+  const liste = await ZitatManager.zugewiesenAn(projektId(req), new ObjectId(nutzerId(req)))
+  const [fuerClient, quellen] = await Promise.all([
+    zitateFuerClient(liste),
+    QuellenManager.vonIds(projektId(req), liste.map(z => z.quelleId)),
+  ])
+  const nachId = new Map(quellen.map(q => [String(q._id), q]))
+  res.json({
+    zitate: fuerClient.map((z, i) => ({
+      ...z,
+      quelle: quelleFuerClient(nachId.get(String(liste[i].quelleId))),
+    })),
+  })
 })
 
 export const zitatEinfuegen = mitProblemen(async (req, res) => {
