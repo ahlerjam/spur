@@ -12,18 +12,20 @@ const HERZSCHLAG_MS = 5000
 const VERBUNDEN_MS = 45 * 1000
 const FORTSCHRITT_MS = 30 * 1000
 
-export async function auftragAnlegen({ projectId, botId, text }) {
+export async function ereignisAnlegen({ projectId, botId, typ, daten }) {
+  await (await ereignisse()).insertOne({ botId, projectId, typ, daten, am: jetzt(), zugestellt: false })
+  wecker.emit(String(botId))
+}
+
+export async function auftragAnlegen({ projectId, botId, text, daten = {} }) {
   const nachricht = { projectId, botId, von: 'mensch', text, am: jetzt() }
   await (await nachrichten()).insertOne(nachricht)
-  await (await ereignisse()).insertOne({
-    botId,
+  await ereignisAnlegen({
     projectId,
+    botId,
     typ: 'task_created',
-    daten: { text, nachricht_id: nachricht._id },
-    am: jetzt(),
-    zugestellt: false,
+    daten: { ...daten, text, nachricht_id: nachricht._id },
   })
-  wecker.emit(String(botId))
   return nachricht
 }
 
@@ -36,7 +38,8 @@ export async function antwortSpeichern({ projectId, botId, text }) {
 export async function verlauf(projectId, botId) {
   return await (await nachrichten())
     .find({ projectId, botId })
-    .sort({ _id: -1 })
+    // Nachrichten kommen aus web (Panel) und web-api (MCP); ObjectIds beider Prozesse sortieren nicht nach Zeit.
+    .sort({ am: -1, _id: -1 })
     .limit(100)
     .toArray()
 }

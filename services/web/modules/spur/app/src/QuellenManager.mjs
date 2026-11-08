@@ -7,7 +7,7 @@ import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
-import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll } from './sammlungen.mjs'
+import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, vorschlaege } from './sammlungen.mjs'
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { ocrSeite, seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
@@ -489,7 +489,7 @@ export async function projektAufraeumen(projectId) {
     (await quellen()).deleteMany({ projectId: id }),
     (await pruefCache()).deleteMany({ projectId: id }),
     (await klone()).deleteOne({ _id: id }),
-    // Aufträge, Antworten, Läufe samt Kontextauszügen und Einstellungen gehören zum Projekt.
+    // Aufträge, Antworten, Läufe samt Kontextauszügen, Vorschläge und Einstellungen gehören zum Projekt.
     (await nachrichten()).deleteMany({ projectId: id }),
     (await ereignisse()).deleteMany({ projectId: id }),
     (await laeufe()).deleteMany({ projectId: id }),
@@ -501,6 +501,7 @@ export async function projektAufraeumen(projectId) {
     (await matrixSpalten()).deleteOne({ _id: id }),
     (await matrixZellen()).deleteMany({ projectId: id }),
     (await jobs()).deleteMany({ projectId: id }),
+    (await vorschlaege()).deleteMany({ projectId: id }),
   ])
   await fs.rm(Path.join(ablageWurzel(), String(id)), { recursive: true, force: true })
 }

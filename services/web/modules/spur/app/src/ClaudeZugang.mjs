@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserCreator from '../../../../app/src/Features/User/UserCreator.mjs'
 import { Problem } from './probleme.mjs'
-import { bearbeitungen, einstellungen, ereignisse, herzschlaege, laeufe, nachrichten } from './sammlungen.mjs'
+import { bearbeitungen, einstellungen, ereignisse, herzschlaege, laeufe, nachrichten, vorschlaege } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 
 export const SCOPE = 'spur_mcp'
@@ -107,12 +107,13 @@ export async function kontoAufraeumen(menschId) {
   const id = new ObjectId(menschId)
   const bots = (await db.users.find({ 'spur.botFuer': id }, { projection: { _id: 1 } }).toArray()).map(b => b._id)
   await db.oauthAccessTokens.deleteMany({ user_id: id, scope: SCOPE })
-  // Was der Bot hinterlassen hat (Aufträge, Antworten, Läufe, Herzschläge), geht mit dem Konto.
+  // Was der Bot hinterlassen hat (Aufträge, Antworten, Läufe, Vorschläge, Herzschläge), geht mit dem Konto.
   await Promise.all([
     (await ereignisse()).deleteMany({ botId: { $in: bots } }),
     (await nachrichten()).deleteMany({ botId: { $in: bots } }),
     (await laeufe()).deleteMany({ botId: { $in: bots } }),
     (await bearbeitungen()).deleteMany({ botId: { $in: bots } }),
+    (await vorschlaege()).deleteMany({ botId: { $in: bots } }),
     (await herzschlaege()).deleteMany({ _id: { $in: bots } }),
     (await einstellungen()).deleteMany({ userId: id }),
   ])

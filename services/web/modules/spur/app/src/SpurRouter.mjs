@@ -8,6 +8,7 @@ import { Problem, problemSenden } from './probleme.mjs'
 import { MAX_BYTES } from './QuellenManager.mjs'
 import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
+import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import { testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
@@ -112,6 +113,14 @@ export default {
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)
     webRouter.post(`${LAUF}/zuruecknehmen`, ...schreiben, SpurController.laufZuruecknehmen)
     webRouter.put('/spur/project/:project_id/claude/automatik', ...schreiben, SpurController.automatikSetzen)
+    const VORSCHLAEGE = '/spur/project/:project_id/vorschlaege'
+    webRouter.get(VORSCHLAEGE, ...lesen, VorschlaegeController.status)
+    webRouter.put(`${VORSCHLAEGE}/eigene`, ...lesen, VorschlaegeController.eigeneSetzen)
+    webRouter.put(`${VORSCHLAEGE}/projekt`, ...schreiben, VorschlaegeController.projektSetzen)
+    webRouter.post(`${VORSCHLAEGE}/tipp-pause`, ...lesen, VorschlaegeController.tippPause)
+    webRouter.post(`${VORSCHLAEGE}/:vorschlag_id/uebernehmen`, ...lesen, VorschlaegeController.uebernehmen)
+    webRouter.post(`${VORSCHLAEGE}/:vorschlag_id/verwerfen`, ...lesen, VorschlaegeController.verwerfen)
+    webRouter.put('/spur/vorschlaege/limit', angemeldet, VorschlaegeController.limitSetzen)
     const RECHERCHE = '/spur/project/:project_id/recherche'
     webRouter.get(RECHERCHE, ...lesen, fremdDienste, SpurController.rechercheSuchen)
     webRouter.get(`${RECHERCHE}/zitationen`, ...lesen, fremdDienste, SpurController.rechercheZitationen)

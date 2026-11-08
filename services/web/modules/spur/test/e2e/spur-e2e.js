@@ -827,6 +827,12 @@ async page => {
     await panelOeffnen('Claude')
     await sichtbar('Claude nicht verbunden')
     await sichtbar('claude --allowedTools')
+    const zahl = await seitenPost(`/spur/project/${demo}/claude/auftrag`, { text: 123 })
+    ok(zahl.status === 422, `Auftrag mit Zahl: ${zahl.status}`)
+
+    // Das Eingabefeld gibt es erst mit Verbindung (P3).
+    await warteStarten(token)
+    await sichtbar('Claude verbunden', 20000)
     await page.getByRole('button', { name: 'Senden' }).click()
     await sichtbar('Bitte zuerst einen Auftrag schreiben.')
     ok(
@@ -840,11 +846,6 @@ async page => {
       (await page.getByLabel('Auftrag an Claude').getAttribute('aria-invalid')) === 'true',
       'Leeres Auftragsfeld nicht als ungültig markiert'
     )
-    const zahl = await seitenPost(`/spur/project/${demo}/claude/auftrag`, { text: 123 })
-    ok(zahl.status === 422, `Auftrag mit Zahl: ${zahl.status}`)
-
-    await warteStarten(token)
-    await sichtbar('Claude verbunden', 20000)
     await page.evaluate(() => window.__spur.abbruch.abort())
     const abgebrochen = Date.now()
     await sichtbar('Claude nicht verbunden', 65000)
@@ -2078,6 +2079,313 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const readme = await repoDatei(`${FIXTURES}/../../../../../../README.md`)
     const abschnitt = readme.split('\n## ').find(teil => teil.startsWith('Claude und Ihre Daten'))
     ok(abschnitt?.includes(HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude und Ihre Daten“')
+  }
+
+  // P3: Ada (e2e-p3a) und Bo (e2e-p3b) haben je ein festes Test-Token aus vorbereiten.mjs.
+  const ADA = 'spur_e2e_p3a'
+  const BO = 'spur_e2e_p3b'
+  const claudePanel = () => page.getByRole('tabpanel', { name: 'Claude' })
+  const chatLog = () => claudePanel().getByRole('log', { name: 'Unterhaltung mit Claude' })
+
+  async function verbinden(token) {
+    await warteStarten(token)
+    await claudePanel().getByText('Claude verbunden').waitFor({ timeout: 20000 })
+  }
+
+  features.p3f1 = async () => {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Chat')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    await claudePanel().getByText('Claude nicht verbunden').waitFor()
+    await claudePanel().getByText(/claude --allowedTools/).waitFor()
+    ok((await claudePanel().getByLabel('Auftrag an Claude').count()) === 0, 'Eingabefeld ohne Verbindung')
+
+    await verbinden(ADA)
+    const feld = claudePanel().getByLabel('Auftrag an Claude')
+    await feld.fill('Fasse Abschnitt 2 zusammen')
+    await feld.press('Control+Enter')
+    await page.waitForFunction(() => window.__spur.log.some(e => e.msg?.result), null, { timeout: 5000 })
+    await chatLog().getByText('Claude arbeitet …').waitFor()
+    const { inhalt } = await werkzeug(ADA, 'events_since')
+    ok(
+      inhalt.ereignisse.some(e => e.project_id === pid && e.daten.text === 'Fasse Abschnitt 2 zusammen'),
+      `events_since: ${JSON.stringify(inhalt)}`
+    )
+
+    const edit = await werkzeug(ADA, 'doc_edit', {
+      project_id: pid,
+      pfad: 'main.tex',
+      alt: 'Zweiter Abschnitt über Schlaf und Gedächtnis.',
+      neu: 'Zweiter Abschnitt über Schlaf und Gedächtnis, kurz gefasst.',
+      idempotenz_schluessel: schluessel(),
+    })
+    ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
+    await chatLog().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
+    await werkzeug(ADA, 'reply', { project_id: pid, text: 'Abschnitt 2: Schlaf stärkt das Gedächtnis.' })
+    await chatLog().getByText('Abschnitt 2: Schlaf stärkt das Gedächtnis.').waitFor({ timeout: 10000 })
+    const reihenfolge = await chatLog().locator('.spur-chat-nachricht .spur-nachricht-text').allInnerTexts()
+    ok(
+      reihenfolge.indexOf('Fasse Abschnitt 2 zusammen') < reihenfolge.indexOf('Abschnitt 2: Schlaf stärkt das Gedächtnis.'),
+      `Reihenfolge: ${reihenfolge}`
+    )
+    await chatLog().getByText('Claude arbeitet …').waitFor({ state: 'detached' })
+
+    // Lange Unterhaltung: 100 weitere Antworten, dann neu laden.
+    for (let i = 0; i < 100; i += 20) {
+      await Promise.all(
+        Array.from({ length: 20 }, (_, j) =>
+          werkzeug(ADA, 'reply', { project_id: pid, text: `Antwort ${String(i + j + 1).padStart(3, '0')}` })
+        )
+      )
+    }
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Claude')
+    const geladen = Date.now()
+    await chatLog().getByText('Antwort 100').waitFor({ timeout: 15000 })
+    const ladezeit = Date.now() - geladen
+    ok(ladezeit < 3000, `Verlauf mit 100 Nachrichten nach ${ladezeit} ms`)
+    const anzahl = await chatLog().locator('.spur-chat-nachricht').count()
+    ok(anzahl >= 100, `Nach dem Neuladen nur ${anzahl} Nachrichten`)
+    ok(
+      await chatLog().getByText('Antwort 100').evaluate(el => {
+        const r = el.getBoundingClientRect()
+        return r.bottom <= window.innerHeight && r.top >= 0
+      }),
+      'Neueste Nachricht nach dem Laden nicht sichtbar'
+    )
+    await verbinden(ADA)
+    const tippen = Date.now()
+    await claudePanel().getByLabel('Auftrag an Claude').pressSequentially('Danke, weiter mit Abschnitt 3')
+    const tippzeit = Date.now() - tippen
+    ok(tippzeit < 3000, `Tippen bei 100 Nachrichten dauerte ${tippzeit} ms`)
+    await claudePanel().getByLabel('Auftrag an Claude').press('Control+Enter')
+    await chatLog().getByText('Danke, weiter mit Abschnitt 3').waitFor({ timeout: 10000 })
+    await page.evaluate(() => window.__spur.abbruch.abort())
+  }
+
+  const AUSSAGE = 'Schlaf verdoppelt die Gedächtnisleistung.'
+
+  async function textAuswaehlen(text) {
+    await page.evaluate(t => {
+      const view = window.overleaf.unstable.store.get('editor.view')
+      const von = view.state.doc.toString().indexOf(t)
+      view.focus()
+      view.dispatch({ selection: { anchor: von, head: von + t.length } })
+    }, text)
+  }
+
+  async function ereignisseVon(token, typ) {
+    const { inhalt } = await werkzeug(token, 'events_since')
+    return inhalt.ereignisse.filter(e => !typ || e.typ === typ)
+  }
+
+  async function bisEreignisse(token, typ, anzahl, timeout = 20000) {
+    const ende = Date.now() + timeout
+    let liste = []
+    while (Date.now() < ende) {
+      liste = await ereignisseVon(token, typ)
+      if (liste.length >= anzahl) return liste
+      await page.waitForTimeout(500)
+    }
+    fail(`${typ}: ${liste.length} statt ${anzahl} Ereignisse`)
+  }
+
+  features.p3f2 = async () => {
+    await anmelden('e2e-p3b@example.org')
+    await projektOeffnen('E2E Kommentar')
+    const pid = page.url().split('/').pop()
+    await textAuswaehlen(AUSSAGE)
+    await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
+    await page.locator('.review-panel-add-comment-editor .cm-content').first().click()
+    await page.keyboard.type('Bo meint: Das ist zu stark.')
+    await page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click()
+    const thread = page.locator('.review-panel-entry', { hasText: 'Bo meint: Das ist zu stark.' })
+    await thread.waitFor()
+
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Kommentar')
+    await railTab('Review panel').click()
+    await thread.waitFor()
+    await thread.locator('.review-panel-comment-input .cm-content').click()
+    await page.keyboard.type('@claude prüfe diese Aussage')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await thread.getByText('@claude prüfe diese Aussage').waitFor()
+
+    const [erwaehnung] = await bisEreignisse(ADA, 'comment_mention', 1)
+    const d = erwaehnung.daten
+    ok(erwaehnung.project_id === pid, `Projekt: ${erwaehnung.project_id}`)
+    ok(
+      d.text === '@claude prüfe diese Aussage' && d.pfad === 'main.tex' && /^[0-9a-f]{24}$/.test(d.doc_id) &&
+        /^[0-9a-f]{24}$/.test(d.kommentar_id) && d.stelle?.zeile === 3 && d.stelle.markiert === AUSSAGE,
+      `comment_mention: ${JSON.stringify(d)}`
+    )
+    ok(d.andere_nachrichten.length === 1, `Andere Nachrichten: ${JSON.stringify(d.andere_nachrichten)}`)
+    ok(!JSON.stringify(erwaehnung).includes('Bo meint'), 'Kommentartext von Bo im Ereignis')
+    const beiBo = await ereignisseVon(BO)
+    ok(beiBo.length === 0, `Bot von Bo erhielt: ${JSON.stringify(beiBo)}`)
+
+    const antwort = await werkzeug(ADA, 'reply', {
+      project_id: pid,
+      kommentar_id: d.kommentar_id,
+      text: 'Die Verdopplung ist in den Quellen nicht belegt.',
+    })
+    ok(!antwort.fehler, `reply: ${JSON.stringify(antwort.inhalt)}`)
+    await thread.getByText('Die Verdopplung ist in den Quellen nicht belegt.').waitFor({ timeout: 10000 })
+    await thread.locator('.review-panel-entry-user', { hasText: 'Claude (Ada)' }).first().waitFor()
+    const fremd = await werkzeug(ADA, 'reply', { project_id: pid, kommentar_id: 'ffffffffffffffffffffffff', text: 'x' })
+    ok(fremd.inhalt.fehler === 'kommentar_fehlt', `Fremder Thread: ${JSON.stringify(fremd.inhalt)}`)
+  }
+
+  const vorschlaegePanel = () => page.getByRole('tabpanel', { name: 'Vorschläge' })
+  const auswahlText = async label =>
+    await vorschlaegePanel().getByLabel(label, { exact: true }).evaluate(el => el.selectedOptions[0].textContent)
+
+  async function aufAntwort(pfadEnde, handlung) {
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith(pfadEnde) && r.request().method() !== 'GET'),
+      handlung(),
+    ])
+  }
+
+  async function fehlerKompilieren() {
+    await Promise.all([
+      page.waitForResponse(r => /\/compile\?/.test(r.url()) && r.request().method() === 'POST', { timeout: 120000 }),
+      page.getByRole('button', { name: KOMPILIEREN }).first().click(),
+    ])
+  }
+
+  features.p3f3 = async () => {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Vorschläge')
+    await panelOeffnen('Vorschläge')
+    ok((await auswahlText('Compile-Fehler')) === 'Projekt-Standard: Aus', `Compile-Fehler: ${await auswahlText('Compile-Fehler')}`)
+    ok(
+      (await auswahlText('Belegloses Argument')) === 'Projekt-Standard: Aus',
+      `Belegloses Argument: ${await auswahlText('Belegloses Argument')}`
+    )
+    await aufAntwort('/vorschlaege/projekt', () =>
+      vorschlaegePanel().getByLabel('Compile-Fehler (Projekt)').selectOption('vorschlag')
+    )
+
+    await anmelden('e2e-p3b@example.org')
+    await projektOeffnen('E2E Vorschläge')
+    await panelOeffnen('Vorschläge')
+    await page.waitForFunction(() => document.querySelector('#spur-schalter-compile_fehler'))
+    ok(
+      (await auswahlText('Compile-Fehler')) === 'Projekt-Standard: Vorschlag',
+      `Projekt-Standard gilt nicht: ${await auswahlText('Compile-Fehler')}`
+    )
+    ok((await vorschlaegePanel().getByText('Projekt-Standard für alle Mitglieder').count()) === 1, 'Bo darf schreiben')
+    await aufAntwort('/vorschlaege/eigene', () => vorschlaegePanel().getByLabel('Compile-Fehler', { exact: true }).selectOption('aus'))
+    ok((await auswahlText('Compile-Fehler')) === 'Aus', `Eigene Einstellung: ${await auswahlText('Compile-Fehler')}`)
+
+    await fehlerKompilieren()
+    await page.waitForTimeout(4000)
+    const aus = await ereignisseVon(BO, 'suggest_trigger')
+    ok(aus.length === 0, `Mit Aus: ${JSON.stringify(aus)}`)
+
+    await aufAntwort('/vorschlaege/eigene', () =>
+      vorschlaegePanel().getByLabel('Compile-Fehler', { exact: true }).selectOption('vorschlag')
+    )
+    await page.waitForTimeout(1500)
+    await fehlerKompilieren()
+    const [ausgeloest] = await bisEreignisse(BO, 'suggest_trigger', 1)
+    await page.waitForTimeout(3000)
+    const alle = await ereignisseVon(BO, 'suggest_trigger')
+    ok(alle.length === 1, `Mit Vorschlag ${alle.length} Ereignisse`)
+    ok(
+      ausgeloest.daten.art === 'compile_fehler' && ausgeloest.daten.fehler.some(f => /Undefined control sequence/.test(f.meldung)),
+      `suggest_trigger: ${JSON.stringify(ausgeloest.daten)}`
+    )
+    ok((await ereignisseVon(ADA, 'suggest_trigger')).length === 0, 'Compile von Bo löste bei Ada aus')
+  }
+
+  features.p3f4 = async () => {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Vorschläge')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Vorschläge')
+    await aufAntwort('/vorschlaege/eigene', () =>
+      vorschlaegePanel().getByLabel('Belegloses Argument', { exact: true }).selectOption('vorschlag')
+    )
+    const vorher = (await werkzeug(ADA, 'doc_read', { project_id: pid, pfad: 'main.tex' })).inhalt.text
+    const BELEG = 'Für die Verdopplung der Gedächtnisleistung fehlt eine Quelle; Diekelmann und Born (2010) belegen nur eine Verbesserung.'
+    const s1 = await werkzeug(ADA, 'suggest', {
+      project_id: pid, art: 'belegloses_argument', titel: 'Beleg fehlt', text: BELEG, pfad: 'main.tex',
+    })
+    ok(!s1.fehler, `suggest: ${JSON.stringify(s1.inhalt)}`)
+    const karte = vorschlaegePanel().locator('.spur-vorschlag-karte', { hasText: 'Beleg fehlt' })
+    await karte.getByText(BELEG).waitFor({ timeout: 10000 })
+    const nachher = (await werkzeug(ADA, 'doc_read', { project_id: pid, pfad: 'main.tex' })).inhalt.text
+    ok(nachher === vorher, 'Vorschlag hat den Text verändert')
+
+    await werkzeug(ADA, 'suggest', {
+      project_id: pid, art: 'compile_fehler', titel: 'Makro unbekannt', text: '\\kaputtesmakro ist nicht definiert.',
+    })
+    const zweite = vorschlaegePanel().locator('.spur-vorschlag-karte', { hasText: 'Makro unbekannt' })
+    await zweite.waitFor({ timeout: 10000 })
+    await zweite.getByRole('button', { name: 'Verwerfen' }).click()
+    await zweite.waitFor({ state: 'detached' })
+
+    const vorAuftraegen = (await ereignisseVon(ADA, 'task_created')).length
+    await karte.getByRole('button', { name: 'Übernehmen' }).click()
+    await vorschlaegePanel().getByText('Claude hat den Auftrag. Den Lauf sehen Sie im Claude-Panel.').waitFor()
+    await karte.waitFor({ state: 'detached' })
+    const auftraege = await bisEreignisse(ADA, 'task_created', vorAuftraegen + 1)
+    ok(auftraege.at(-1).daten.text.includes(BELEG), `Auftrag: ${JSON.stringify(auftraege.at(-1).daten)}`)
+    const edit = await werkzeug(ADA, 'doc_edit', {
+      project_id: pid, pfad: 'main.tex', alt: AUSSAGE,
+      neu: 'Schlaf verbessert die Gedächtnisleistung \\autocite{diekelmann2010}.', idempotenz_schluessel: schluessel(),
+    })
+    ok(!edit.fehler, `doc_edit nach Übernehmen: ${JSON.stringify(edit.inhalt)}`)
+    await panelOeffnen('Claude')
+    await chatLog().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
+
+    // Tageslimit 2 an einem festen Tag: der dritte Auslöser erzeugt nichts.
+    await panelOeffnen('Vorschläge')
+    await vorschlaegePanel().getByLabel('Tageslimit, für alle Projekte').fill('2')
+    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().getByRole('button', { name: 'Limit speichern' }).click())
+    const docId = (await werkzeug(ADA, 'doc_list', { project_id: pid })).inhalt.eintraege.find(e => e.pfad === 'main.tex').id
+    const vorLimit = (await ereignisseVon(ADA, 'suggest_trigger')).length
+    await zeitSetzen('2026-11-20T09:00:00.000Z')
+    const antworten = []
+    try {
+      for (let i = 0; i < 3; i++) {
+        antworten.push((await seitenPost(`/spur/project/${pid}/vorschlaege/tipp-pause`, { doc_id: docId })).daten)
+      }
+      await vorschlaegePanel().getByText('Tageslimit erreicht').waitFor({ timeout: 10000 })
+    } finally {
+      await zeitSetzen(null)
+    }
+    ok(
+      JSON.stringify(antworten) ===
+        JSON.stringify([{ ausgeloest: true }, { ausgeloest: true }, { ausgeloest: false, grund: 'limit' }]),
+      `Auslöser mit Limit 2: ${JSON.stringify(antworten)}`
+    )
+    ok((await ereignisseVon(ADA, 'suggest_trigger')).length === vorLimit + 2, 'Dritter Auslöser erzeugte ein Ereignis')
+    await vorschlaegePanel().getByLabel('Tageslimit, für alle Projekte').fill('50')
+    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().getByRole('button', { name: 'Limit speichern' }).click())
+    await vorschlaegePanel().getByText('Tageslimit erreicht').waitFor({ state: 'detached', timeout: 10000 })
+
+    // 60 Sekunden Tipp-Pause: vorher nichts, danach genau ein Ereignis.
+    const vorPause = (await ereignisseVon(ADA, 'suggest_trigger')).length
+    for (const wort of [' Erstens', ' zweitens', ' drittens.']) {
+      await editorEinfuegen('\\kaputtesmakro', wort)
+      await page.waitForTimeout(1000)
+    }
+    const getippt = Date.now()
+    await page.waitForTimeout(50000)
+    ok((await ereignisseVon(ADA, 'suggest_trigger')).length === vorPause, 'Ereignis vor Ablauf der Minute')
+    const [, ...rest] = (await bisEreignisse(ADA, 'suggest_trigger', vorPause + 1, 25000)).slice(vorPause)
+    const nach = (Date.now() - getippt) / 1000
+    ok(nach >= 59, `Ereignis nach ${nach} s`)
+    await page.waitForTimeout(5000)
+    const pause = (await ereignisseVon(ADA, 'suggest_trigger')).slice(vorPause)
+    ok(pause.length === 1 && rest.length === 0, `Tipp-Pause: ${pause.length} Ereignisse`)
+    ok(pause[0].daten.art === 'belegloses_argument' && pause[0].daten.doc_id === docId, `Tipp-Pause: ${JSON.stringify(pause[0].daten)}`)
   }
 
   const ergebnis = []

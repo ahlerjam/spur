@@ -241,7 +241,7 @@ describe('Löschen und Aufräumen', () => {
     const fremd = new ObjectId()
     const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf')
     await aufnehmen('scan.pdf', 'scan.pdf', { projectId: fremd })
-    for (const name of ['spurQuotes', 'spurCheckSections', 'spurMessages', 'spurEvents', 'spurRuns', 'spurEdits', 'spurSettings']) {
+    for (const name of ['spurQuotes', 'spurCheckSections', 'spurMessages', 'spurEvents', 'spurRuns', 'spurEdits', 'spurSettings', 'spurSuggestions']) {
       await datenbank.db.collection(name).insertMany([
         { projectId: projekt, hash: 'a', quelleId: quelle._id, botId: 'a', schluessel: 'a', status: 'fertig' },
         { projectId: fremd, hash: 'b', botId: 'b', schluessel: 'b', status: 'fertig' },
@@ -249,7 +249,7 @@ describe('Löschen und Aufräumen', () => {
     }
     await datenbank.db.collection('spurClones').insertOne({ _id: projekt, vonProjekt: fremd })
     await Quellen.projektAufraeumen(String(projekt))
-    for (const name of ['spurSources', 'spurSourcePages', 'spurQuotes', 'spurCheckSections', 'spurMessages', 'spurEvents', 'spurRuns', 'spurEdits', 'spurSettings']) {
+    for (const name of ['spurSources', 'spurSourcePages', 'spurQuotes', 'spurCheckSections', 'spurMessages', 'spurEvents', 'spurRuns', 'spurEdits', 'spurSettings', 'spurSuggestions']) {
       expect(await datenbank.db.collection(name).countDocuments({ projectId: projekt }), name).toBe(0)
       expect(await datenbank.db.collection(name).countDocuments({ projectId: fremd }), name).toBeGreaterThan(0)
     }

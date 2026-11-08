@@ -22,6 +22,8 @@ import {
   drossel,
   paperCache,
   suchprotokoll,
+  vorschlaege,
+  workflows,
 } from '../../app/src/sammlungen.mjs'
 import { createHash } from 'node:crypto'
 import { botFuer, kontoAufraeumen, SCOPE } from '../../app/src/ClaudeZugang.mjs'
@@ -367,6 +369,34 @@ const scanProjekt = await neuAnlegen(a, 'E2E Scan', { 'main.tex': APA, 'referenc
 await quelleAusFixture(scanProjekt._id, a._id, 'scan.pdf')
 await neuAnlegen(a, 'E2E Web', { 'main.tex': APA, 'references.bib': BIB })
 await neuAnlegen(a, 'E2E Transkript', { 'main.tex': LEER })
+
+// P3: zwei Menschen mit eigenem Claude in denselben Projekten.
+const p3a = await mitNamen('e2e-p3a@example.org', 'Ada', 'Autorin')
+const p3b = await mitNamen('e2e-p3b@example.org', 'Bo', 'Berater')
+const ABSCHNITTE = String.raw`\documentclass{article}
+\begin{document}
+\section{Eins}
+Erster Abschnitt.
+\section{Zwei}
+Zweiter Abschnitt über Schlaf und Gedächtnis.
+\end{document}`
+await neuAnlegen(p3a, 'E2E Chat', { 'main.tex': ABSCHNITTE })
+for (const name of ['E2E Kommentar', 'E2E Vorschläge']) {
+  const p = await neuAnlegen(p3a, name, {
+    'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Schlaf verdoppelt die Gedächtnisleistung.
+\kaputtesmakro{}
+\end{document}`,
+  })
+  await db.projects.updateOne({ _id: p._id }, { $set: { collaberator_refs: [p3b._id] } })
+}
+await neuAnlegen(p3a, 'E2E Workflows', { 'main.tex': ABSCHNITTE })
+await testToken(p3a, 'spur_e2e_p3a', new Date(Date.now() + 24 * 3600 * 1000))
+await testToken(p3b, 'spur_e2e_p3b', new Date(Date.now() + 24 * 3600 * 1000))
+for (const sammlung of [vorschlaege, workflows]) {
+  await (await sammlung()).deleteMany({})
+}
 
 await ablageFreigeben()
 console.log('E2E-Daten bereit')

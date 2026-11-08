@@ -53,6 +53,17 @@ describe('Aufträge und Antworten', () => {
     await Inbox.antwortSpeichern({ projectId: new ObjectId(), botId: bot, text: 'fremd' })
     expect((await Inbox.verlauf(projekt, bot)).map(n => n.text)).toEqual(['zwei', 'eins'])
   })
+
+  it('verlauf ordnet nach Zeit, auch wenn die IDs aus zwei Prozessen anders sortieren', async () => {
+    // web und web-api erzeugen ObjectIds mit eigenem Zufallsteil; in derselben Sekunde sagt die ID nichts über die Reihenfolge.
+    const sekunde = Math.floor(Date.now() / 1000)
+    const id = zufall => ObjectId.createFromHexString(sekunde.toString(16).padStart(8, '0') + zufall)
+    await datenbank.db.collection('spurMessages').insertMany([
+      { _id: id('ffffffffff000001'), projectId: projekt, botId: bot, von: 'mensch', text: 'frage', am: new Date(1000) },
+      { _id: id('0000000000000001'), projectId: projekt, botId: bot, von: 'claude', text: 'antwort', am: new Date(2000) },
+    ])
+    expect((await Inbox.verlauf(projekt, bot)).map(n => n.text)).toEqual(['antwort', 'frage'])
+  })
 })
 
 describe('warteAufEreignis', () => {

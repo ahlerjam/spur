@@ -16,6 +16,8 @@ import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
+import * as Erwaehnung from '../erwaehnung/Erwaehnung.mjs'
+import * as Vorschlaege from '../vorschlaege/Vorschlaege.mjs'
 
 const SEITE = 50
 const MAX_TEXT = 40000
@@ -269,12 +271,31 @@ export const WERKZEUGE = {
   },
 
   reply: {
-    description: 'Antwortet im Claude-Panel des Projekts.',
-    inputSchema: z.object({ project_id: id, text: z.string().min(1).max(20000) }),
-    async ausfuehren({ project_id: pid, text }, { menschId, botId }) {
+    description:
+      'Antwortet im Claude-Panel des Projekts. Mit kommentar_id (aus comment_mention) steht die Antwort stattdessen im Kommentar-Thread.',
+    inputSchema: z.object({ project_id: id, text: z.string().min(1).max(20000), kommentar_id: id.optional() }),
+    async ausfuehren({ project_id: pid, text, kommentar_id: threadId }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
+      if (threadId) return await Erwaehnung.imThreadAntworten({ projectId, threadId, botId, text })
       const nachricht = await Inbox.antwortSpeichern({ projectId, botId, text })
       return { nachricht_id: nachricht._id }
+    },
+  },
+
+  suggest: {
+    description:
+      'Legt einen Vorschlag ins Vorschläge-Panel der Person (nach suggest_trigger). Der Text im Dokument bleibt unverändert; ' +
+      'übernimmt die Person den Vorschlag, kommt er als Auftrag zurück.',
+    inputSchema: z.object({
+      project_id: id,
+      art: z.enum(Vorschlaege.ARTEN),
+      titel: z.string().min(1).max(120),
+      text: z.string().min(1).max(4000),
+      pfad: z.string().max(300).optional(),
+    }),
+    async ausfuehren({ project_id: pid, art, titel, text, pfad }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await Vorschlaege.vorschlagen({ projectId, botId, art, titel, text, pfad })
     },
   },
 }

@@ -5,11 +5,13 @@ import SpurRouter from './app/src/SpurRouter.mjs'
 import * as QuellenManager from './app/src/QuellenManager.mjs'
 import * as ClaudeZugang from './app/src/ClaudeZugang.mjs'
 import { mcpJson } from './app/src/mcp/McpEndpunkt.mjs'
+import { beobachten } from './app/src/Beobachter.mjs'
 
 const SpurModule = {
   router: SpurRouter,
   appMiddleware(app) {
     app.use('/spur/mcp', mcpJson)
+    app.use(beobachten)
   },
   hooks: {
     promises: {

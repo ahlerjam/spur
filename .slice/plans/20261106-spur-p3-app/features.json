@@ -10,7 +10,7 @@
     "Schreibt der Fake-Client dabei, erscheint die Lauf-Karte im Chat",
     "100 Nachrichten bleiben flüssig bedienbar, nach dem Neuladen ist der Verlauf da"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
