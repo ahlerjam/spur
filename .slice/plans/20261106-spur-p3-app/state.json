@@ -1,1 +1,1 @@
-{"state": "parked", "builderModel": "opus", "builderAdvisor": "opus", "dependsOn": ["20261106-spur-p2-recherche"]}
+{"state": "queued", "builderModel": "opus", "builderAdvisor": "opus", "dependsOn": ["20261106-spur-p2-recherche"], "where": "cloud"}
