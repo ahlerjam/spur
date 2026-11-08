@@ -136,6 +136,7 @@ Stand nach der letzten Codeänderung (84bfe96e45, 21:45; danach nur Belege):
   ```
 - Lauf H direkt danach, ohne `vorbereiten.mjs`, auf den Daten von Lauf G: 34/34 ok, Laufzeit 493 s, Exit 0.
 - `p3f2` allein dreimal hintereinander: `p3f2 ok` (10 s, 12 s, 12 s); bei 20-facher CPU-Drosselung zweimal `p3f2 ok` (132 s, 129 s).
+- Lauf I nach dem letzten Commit mit Änderung (fa2e981c11, CI-Schritt), wieder ohne `vorbereiten.mjs` auf den Daten der Läufe davor: 34/34 ok, Laufzeit 502 s, Exit 0 (22:10–22:18).
 - Bilder nach der letzten Codeänderung (22:0x), je 360 und 1280 px, ohne Überlauf und Konsolenfehler: `f1-workflows-hilfe`, `f2-chat-nicht-verbunden`, `f2-chat-antwort-lauf-karte`, `f2-chat-lang`, `f2-kommentar-thread`, `f3-vorschlaege-aus`, `-keine`, `-mehrere`, `-uebernommen`, `-tageslimit`, `f4-workflows-chat`, `f4-admin-angepasst` (24 Bilder).
 
 ## Menschlich zu prüfen
