@@ -4,7 +4,7 @@ spur ist eine selbst gehostete Schreibumgebung für wissenschaftliche Arbeiten a
 
 ## Installation
 
-Sie brauchen Docker mit Compose und `make`.
+Sie brauchen Docker mit Compose und `make`. MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13 ([SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912)); Server brauchen einen Kernel bis 6.18 oder ab 7.0.14.
 
 ```sh
 git clone https://github.com/ahlerjam/spur.git
@@ -50,6 +50,22 @@ spur.example.org {
 ```
 
 `flush_interval -1` reicht Antworten sofort durch. Das braucht der MCP-Endpunkt `/spur/mcp`, der lange auf Aufträge wartet und alle 30 Sekunden Fortschritt sendet. Läuft der Proxy nicht auf demselben Rechner, ergänzen Sie seine Adresse in `OVERLEAF_TRUSTED_PROXY_IPS` (zum Beispiel `loopback,10.0.0.5`).
+
+## Entwicklung und Tests
+
+Entwickelt wird mit `spur-dev` aus `tools/spur-dev/`: `tools/spur-dev/spur-dev install` legt den Befehl an, `spur-dev up` startet den Stack aus dem Dev-Image mit dem eingehängten Quellcode.
+
+| Befehl | Wirkung |
+|---|---|
+| `spur-dev test` | spur-Unit-Tests mit Abdeckungsbericht für `modules/spur/app/src` (mindestens 80 % der Zeilen) |
+| `spur-dev upstream web` | Overleafs web-Unit-Suite |
+| `spur-dev upstream frontend` | Overleafs Frontend-Suite, mit den Tests unter `modules/spur/test/frontend` |
+| `spur-dev upstream du` | Unit- und Acceptance-Tests des document-updater |
+| `spur-dev upstream alle` | Alle drei Suiten nacheinander |
+| `spur-dev upstream vergleich` | Dieselben Suiten auf `main` (Overleaf), `ext-ce` (overleaf-cep) und dem aktuellen Stand; schreibt die Liste bekannter Fehler neu |
+| `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` | Bereitet die E2E-Suite vor; danach `make e2e` |
+
+Die `upstream`-Befehle laufen in einem eigenen Container mit `NODE_ENV=test` und einer eigenen Test-Datenbank und enden mit der Zeile `bestanden, fehlgeschlagen, bekannt, neu`. Sie scheitern mit Exit 1 nur an neuen Fehlern und mit Exit 2, wenn eine angegebene Datei fehlt, ausgeschlossen ist oder keine Tests enthält, oder wenn gar kein Test läuft. Fehler, die schon in Overleaf oder overleaf-cep auftreten, stehen mit Herkunft und Grund in `tools/tests/upstream-bekannt.json`; Testdateien, die Module von Overleaf Server Pro brauchen, stehen in `tools/tests/upstream-ausschluss.json`. Ein Eintrag mit Herkunft `spur` ist nicht erlaubt: Was spur kaputt macht, wird behoben. Einzelne Dateien prüfen Sie mit `spur-dev upstream web test/unit/src/…`. In jedem Pull Request laufen die Jobs `test` (Stack, Unit-Tests, E2E) und `upstream`.
 
 ## Claude und Ihre Daten
 

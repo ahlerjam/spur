@@ -95,6 +95,7 @@ grammatik() { docker exec spur-dev-web bash -lc 'cd /overleaf/services/web && ya
 # Testschalter (gitignoriert): ohne Datei ginge die Prüfung an die echte Crossref-API.
 schalter_anlegen() {
   local f="$SRC/services/web/modules/spur/dev-schalter.json"
+  [ -d "${f%/*}" ] || return 0
   [ -e "$f" ] || printf '{"SPUR_PAPER_API_BASE": "http://127.0.0.1/spur/dev/crossref"}\n' > "$f"
 }
 up() { docker_bereit; check_mounts; schalter_anlegen; dc up -d --force-recreate web >/dev/null; grammatik; wait_up; build_sicher; restart; }
@@ -112,17 +113,88 @@ du_geaendert() {
   basis=$(git -C "$SRC" merge-base HEAD origin/ext-ce 2>/dev/null) || return 0
   ! git -C "$SRC" diff --quiet "$basis" -- services/document-updater libraries/ranges-tracker
 }
+# Overleafs Suiten in einem eigenen Container aus dem Dev-Image, mit dem Quellstand von $2 (Standard:
+# dieser Worktree). Der laufende Stack bleibt unberührt; nur Mongo und Redis werden mitbenutzt.
+# Die Auswertung (tools/tests/upstream.mjs) kommt immer aus diesem Worktree, auch für main und ext-ce.
+upstream_lauf() {
+  local suite=$1 quelle=$2 name=$3 e
+  local erg="$UPSTREAM_CACHE/upstream/$name"
+  local -a vol=(-v "$SRC/tools/tests:/spur-tests:ro" -v "$erg:/ergebnis" -v "$quelle/tsconfig.backend.json:/overleaf/tsconfig.backend.json:ro")
+  mkdir -p "$erg"
+  # Alles aus services/web, was die Stack-Definition nicht schon einhängt (test, types, Konfigurationen …).
+  for e in $(git -C "$quelle" ls-tree --name-only HEAD services/web/); do
+    case " $MOUNTS " in *" $e "*) continue ;; esac
+    vol+=(-v "$quelle/$e:/overleaf/$e:ro")
+  done
+  SPUR_SRC="$quelle" dc run --rm --no-deps -T --entrypoint bash -e SPUR_PROTOKOLL="$erg" "${vol[@]}" web \
+    -lc "node /spur-tests/upstream.mjs $suite --ergebnis /ergebnis ${4:+$(printf '%q ' "${@:4}")}"
+}
+UPSTREAM_SUITEN="web frontend du"
+UPSTREAM_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/spur-dev"
+upstream_suite() { case " $UPSTREAM_SUITEN " in *" $1 "*) return 0 ;; esac; return 1; }
+upstream() {
+  local s q r rc=0 b
+  local -a suiten fehlt=()
+  local hilfe="spur-dev upstream web|frontend|du [datei …] | alle | vergleich [web|frontend|du …]"
+  # Argumente vor dem Docker-Start prüfen; ein unbekannter Name liefe sonst nirgends und endete mit Exit 0.
+  case "${1:-}" in
+    alle) [ $# -eq 1 ] || { echo "spur-dev upstream alle nimmt keine Dateien. $hilfe" >&2; return 2; } ;;
+    vergleich) for s in "${@:2}"; do
+                 upstream_suite "$s" || { echo "spur-dev upstream vergleich: unbekannte Suite „$s“. $hilfe" >&2; return 2; }
+               done ;;
+    *) upstream_suite "${1:-}" || { echo "$hilfe" >&2; return 2; } ;;
+  esac
+  docker_bereit; check_mounts
+  dc --profile upstream up -d --wait mongo redis redis-test >/dev/null
+  case "$1" in
+    # Der schwerste Exit-Code zählt: 2 (nichts gelaufen) darf nicht von einer späteren 1 überdeckt werden.
+    alle) for s in $UPSTREAM_SUITEN; do
+            upstream_lauf "$s" "$SRC" aktuell || { r=$?; [ "$r" -le "$rc" ] || rc=$r; }
+          done
+          return "$rc" ;;
+    vergleich)
+      # main ist Overleaf, ext-ce overleaf-cep; die spur-Seite ist dieser Worktree (agent mit den Änderungen
+      # dieses Zweigs), damit die Liste zum Code passt, mit dem sie committet wird.
+      git -C "$SRC" fetch -q origin main ext-ce
+      for b in main ext-ce; do
+        if [ -d "$UPSTREAM_CACHE/vergleich/$b" ]; then git -C "$UPSTREAM_CACHE/vergleich/$b" checkout -q --detach "origin/$b"
+        else git -C "$SRC" worktree add -q --detach "$UPSTREAM_CACHE/vergleich/$b" "origin/$b"; fi
+      done
+      # Ohne Argument alle Suiten; sonst nur die genannten, die übrigen Ergebnisse bleiben stehen.
+      suiten=("${@:2}"); [ ${#suiten[@]} -gt 0 ] || read -ra suiten <<< "$UPSTREAM_SUITEN"
+      for s in "${suiten[@]}"; do
+        for q in main:"$UPSTREAM_CACHE/vergleich/main" ext-ce:"$UPSTREAM_CACHE/vergleich/ext-ce" agent:"$SRC"; do
+          upstream_lauf "$s" "${q#*:}" "${q%%:*}" --nur-ergebnis || fehlt+=("$s auf ${q%%:*}")
+        done
+      done
+      # Ohne Ergebnis eines Stands behält die Liste die alten Einträge dieser Suite; das muss rot enden.
+      SPUR_SRC="$SRC" dc run --rm --no-deps -T --entrypoint bash \
+        -v "$SRC/tools/tests:/spur-tests" -v "$UPSTREAM_CACHE/upstream:/ergebnis" web \
+        -lc 'node /spur-tests/upstream.mjs liste --ergebnis /ergebnis' || rc=$?
+      if [ ${#fehlt[@]} -gt 0 ]; then
+        echo "spur-dev upstream vergleich: ohne Ergebnis: ${fehlt[*]}; deren Einträge blieben unverändert" >&2
+        return 2
+      fi
+      return "$rc" ;;
+    *) upstream_lauf "$1" "$SRC" aktuell "${@:2}" ;;
+  esac
+}
 case "${1:-}" in
   up)      up ;;
-  down)    dc down ;;
-  reset)   dc down -v ;;
+  upstream) shift; upstream "$@" ;;
+  down)    dc --profile upstream down ;;
+  reset)   dc --profile upstream down -v ;;
   status)  dc ps --format '{{.Service}} {{.State}}' ;;
   reload)  ensure; build_sicher; restart ;;
   restart) ensure; restart ;;
   test)    ensure
            rc=0
            if [ -d "$SRC/services/web/modules/spur" ]; then
-             web 'yarn run vitest run modules/spur 2>&1 | tail -20' || rc=$?
+             # Abdeckung nur für die spur-Serverlogik; dev/ (Fakes für Tests) zählt nicht.
+             web "yarn run vitest run modules/spur --coverage.enabled --coverage.provider=istanbul \
+               --coverage.include='modules/spur/app/src/**' --coverage.exclude='modules/spur/app/src/dev/**' \
+               --coverage.reporter=text --coverage.reporter=text-summary --coverage.reportsDirectory=/tmp/spur-coverage \
+               --coverage.thresholds.lines=80 2>&1 | grep -vE '^ +[^|]*\| +100 \| +100 \| +100 \| +100 \|' | tail -60" || rc=$?
            else echo "Noch keine spur-Tests."; fi
            if du_geaendert; then
              docker exec -i spur-dev-web bash -lc 'set -o pipefail; cd /overleaf/services/document-updater && TEST_NAME_PATTERN= yarn run test:unit 2>&1 | tail -8' || rc=$?
@@ -137,5 +209,5 @@ case "${1:-}" in
   migrate) ensure; shift; docker exec -i spur-dev-web bash -lc "cd /overleaf/tools/migrations && yarn run east $(printf '%q ' "$@")" ;;
   user)    web "node modules/server-ce-scripts/scripts/create-user.mjs --email='${2:?E-Mail fehlt}' --admin 2>&1" | tr -d '\r' | grep -m1 -oE 'token=[0-9a-f]+&user_id=[0-9a-f]+' | sed 's#^#http://localhost:8080/user/activate?#' ;;
   logs)    docker exec spur-dev-web tail -n "${3:-60}" "/var/log/overleaf/${2:-web}.log" 2>/dev/null || docker logs --tail "${3:-60}" spur-dev-web ;;
-  *) echo "Befehle: install up down reset status reload restart test run mongo dump restore migrate user logs" >&2; exit 2 ;;
+  *) echo "Befehle: install up down reset status reload restart test upstream run mongo dump restore migrate user logs" >&2; exit 2 ;;
 esac

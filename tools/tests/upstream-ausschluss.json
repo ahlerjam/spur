@@ -1,0 +1,7 @@
+[
+ {"suite": "web", "datei": "test/unit/src/Authentication/AuthenticationController.test.mjs", "grund": "Die requireOauth-Tests laden das Modul oauth2-server, das es nur in Overleaf Server Pro gibt."},
+ {"suite": "web", "datei": "test/unit/src/Settings/Settings.test.mjs", "grund": "Lädt config/settings.overrides.saas.js, die nur in Overleafs SaaS-Repo liegt."},
+ {"suite": "web", "datei": "test/unit/src/Subscription/SubscriptionController.test.mjs", "grund": "Importiert das Modul subscriptions, das es nur in Overleafs SaaS-Repo gibt."},
+ {"suite": "frontend", "datei": "test/frontend/features/source-editor/workbench-assistant-pointer-detection.test.ts", "grund": "Importiert das Modul workbench, das es nur in Overleaf Server Pro und SaaS gibt."},
+ {"suite": "frontend", "datei": "modules/user-activate/test/frontend/js/components/user-activate-register.test.jsx", "grund": "Importiert Testdaten aus dem Modul dropbox, das es nur in Overleaf Server Pro und SaaS gibt."}
+]

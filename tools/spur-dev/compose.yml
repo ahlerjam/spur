@@ -45,4 +45,10 @@ services:
   redis:
     image: redis:6.2
     container_name: spur-dev-redis
+  # Eigene Redis für die Acceptance-Tests des document-updater: an der Stack-Redis würde der laufende
+  # document-updater die Updates der Tests abholen.
+  redis-test:
+    image: redis:6.2
+    container_name: spur-dev-redis-test
+    profiles: [upstream]
 volumes: {data: {}, mongo: {}}
