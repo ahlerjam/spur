@@ -63,7 +63,7 @@ Entwickelt wird mit `spur-dev` aus `tools/spur-dev/`: `tools/spur-dev/spur-dev i
 | `spur-dev upstream du` | Unit- und Acceptance-Tests des document-updater |
 | `spur-dev upstream alle` | Alle drei Suiten nacheinander |
 | `spur-dev upstream vergleich` | Dieselben Suiten auf `main` (Overleaf), `ext-ce` (overleaf-cep) und dem aktuellen Stand; schreibt die Liste bekannter Fehler neu |
-| `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` | Bereitet die E2E-Suite vor; danach `make e2e` |
+| `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` | Setzt die E2E-Daten zurück; `make e2e` tut das vor dem ersten Feature auch selbst |
 
 Die `upstream`-Befehle laufen in einem eigenen Container mit `NODE_ENV=test` und einer eigenen Test-Datenbank und enden mit der Zeile `bestanden, fehlgeschlagen, bekannt, neu`. Sie scheitern mit Exit 1 nur an neuen Fehlern und mit Exit 2, wenn eine angegebene Datei fehlt, ausgeschlossen ist oder keine Tests enthält, oder wenn gar kein Test läuft. Fehler, die schon in Overleaf oder overleaf-cep auftreten, stehen mit Herkunft und Grund in `tools/tests/upstream-bekannt.json`; Testdateien, die Module von Overleaf Server Pro brauchen, stehen in `tools/tests/upstream-ausschluss.json`. Ein Eintrag mit Herkunft `spur` ist nicht erlaubt: Was spur kaputt macht, wird behoben. Einzelne Dateien prüfen Sie mit `spur-dev upstream web test/unit/src/…`. In jedem Pull Request laufen die Jobs `test` (Stack, Unit-Tests, E2E) und `upstream`.
 

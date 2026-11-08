@@ -12,7 +12,7 @@ Agentische Schreibumgebung für wissenschaftliche Arbeiten auf Basis von Overlea
 - Dreier-Vergleich `main`, `ext-ce`, aktueller Stand: `spur-dev upstream vergleich` schreibt `tools/tests/upstream-bekannt.json` neu (etwa 40 Minuten). Ausschlüsse mit Grund in `tools/tests/upstream-ausschluss.json`
 - Tests der Auswertung: `node --test tools/tests/upstream-auswertung.test.mjs`
 - Testkonto: `spur-dev user mail@example.org` liefert den Aktivierungslink. Das Konto ist Admin; Rechteprüfungen brauchen Konten ohne Admin.
-- E2E: erst `spur-dev run modules/spur/test/e2e/vorbereiten.mjs`, dann alle Features in einem Lauf. `spur-dev up` legt `services/web/modules/spur/dev-schalter.json` mit dem Crossref-Fake an, falls sie fehlt
+- E2E: alle Features in einem Lauf. Die Suite setzt ihre Daten vorher selbst zurück (Dev-Route `POST /spur/dev/e2e/vorbereiten`, nur mit `SPUR_DEV`); `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` tut dasselbe von außen. `spur-dev up` legt `services/web/modules/spur/dev-schalter.json` mit dem Crossref-Fake an, falls sie fehlt
 - Skript im Container: `spur-dev run modules/spur/test/skript.mjs` (Pfad relativ zu `services/web`)
 - Mongo: `spur-dev mongo 'db.users.countDocuments()'`, Sicherung: `spur-dev dump`, `spur-dev restore`
 - Migrationen: `spur-dev migrate migrate -t server-ce`, zurück: `spur-dev migrate rollback -t server-ce <name>`
