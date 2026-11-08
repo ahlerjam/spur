@@ -4,6 +4,7 @@ import dns from 'node:dns'
 import http from 'node:http'
 import https from 'node:https'
 import net from 'node:net'
+import _ from 'lodash'
 import sanitizeHtml from 'sanitize-html'
 import { Problem } from './probleme.mjs'
 
@@ -127,15 +128,15 @@ async function koerperLesen(antwort) {
   return dekodierer.decode(Buffer.concat(teile))
 }
 
+// sanitize-html maskiert im Text nur &, < und >; _.unescape macht das rückgängig.
 const ohneMarkup = html =>
-  sanitizeHtml(html, {
-    allowedTags: [],
-    allowedAttributes: {},
-    nonTextTags: ['head', 'script', 'style', 'noscript', 'template', 'textarea', 'option', 'title'],
-  })
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
+  _.unescape(
+    sanitizeHtml(html, {
+      allowedTags: [],
+      allowedAttributes: {},
+      nonTextTags: ['head', 'script', 'style', 'noscript', 'template', 'textarea', 'option', 'title'],
+    })
+  )
 
 const BLOCK = /<\/?(p|div|h[1-6]|ul|ol|table|section|article|header|footer|nav|main|aside|blockquote|pre|dl|figure|figcaption|form|hr)\b[^>]*>/gi
 const ZEILE = /<(br|li|tr|dt|dd)\b[^>]*>/gi

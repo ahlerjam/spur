@@ -73,3 +73,8 @@ Offen (Kern-Layout, wie in P1): Bei der Standardbreite des Panels (185 px) werde
 - Rate-Limit für `/quellen/web` und Kommentare; OCR-Grenze je Projekt und Seitenobergrenze.
 - `dev-schalter.json` im Dev-Stack beschreibbar einhängen; dann kann `zeitFestlegen` entfallen.
 - Markierungen auch im Seitentext der Vorschau hervorheben (heute nur in der Liste).
+
+## /simplify (zweite Runde, Endstand 73b6bf177a..5de8f6701f, alle vier Prüfer abgewartet)
+- Umgesetzt: Teamregel an einer Stelle (`Team.mitgliederIds`, auch für die Zuweisungsprüfung); `_.unescape` statt drei handgeschriebener Ersetzungen; Notification-Regeln für schmale Panels gelten für alle Meldungen im Panel (`.spur-panel .notification-content`), nicht nur für Hinweise; Tesseract-Optionen als Konstante neben `GRENZEN`; tote Klasse `spur-ocr-wortlaut` entfernt; bestätigte Zitate ohne Kopieren je Eintrag gruppiert; Crossref-Abruf und Abfrage der bestätigten Zitate parallel; Duplikat- und Schlüsselprüfung in `webAufnehmen` parallel; Namensabfrage mit entdoppelten IDs; Ladebedingungen der Zitatliste über `geladen`.
+- Nicht umgesetzt: `UserGetter.getUsers` statt direkter Abfrage (zieht schwere Abhängigkeiten in die Unit-Tests, die nur `mongodb` ersetzen); `_.truncate` (anderes Kürzungsverhalten); gemeinsamer Lade-Hook über die P1-Panels (Umbau ohne Verhaltensgewinn, wie in P1); doppeltes Nachladen nach eigenen Aktionen durch das Echo der Live-Meldung (ein GET mehr je Aktion; Absender-Filter wäre ein Vorschlag); doppelter `IST_DEV`-Schutz bei `zeitFestlegen` (bewusst zweite Absicherung); Roh-Buffer statt UTF-8-Neukodierung (die Datei soll als UTF-8 liegen); Vorab-Lesen in `kommentieren` (liefert den 404 sauber).
+- Danach: Unit-Tests 516 grün, spur-Frontend-Tests 25 grün.

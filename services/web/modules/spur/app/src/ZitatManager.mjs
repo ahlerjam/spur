@@ -8,7 +8,7 @@ import { Problem } from './probleme.mjs'
 import { quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
-import CollaboratorsGetter from '../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs'
+import { mitgliederIds } from './Team.mjs'
 import { zitateGeaendert as melden } from './live.mjs'
 
 const MAX_ZITAT = 2000
@@ -54,8 +54,7 @@ export async function markieren(quelle, { seite, text }, userId) {
 }
 
 async function zuweisungPruefen(projectId, zuweisen) {
-  const ids = await CollaboratorsGetter.promises.getInvitedMemberIds(projectId)
-  if (typeof zuweisen !== 'string' || !ids.some(id => String(id) === zuweisen)) {
+  if (typeof zuweisen !== 'string' || !(await mitgliederIds(projectId)).includes(zuweisen)) {
     throw new Problem(422, 'zuweisung', 'Zuweisen geht nur an Mitglieder dieses Projekts.')
   }
   return new ObjectId(zuweisen)

@@ -77,24 +77,27 @@ async function kontextLaden(projectId, docs) {
   const quellen = await QuellenManager.alle(projectId)
   // Bestätigte Zitate zählen nur für OCR-Quellen (siehe bewertung.mjs).
   const ocrIds = quellen.filter(q => q.status === 'ocr').map(q => q._id)
-  const bestaetigteZitate = ocrIds.length
-    ? await (await quotes())
-        .find(
-          { projectId, quelleId: { $in: ocrIds }, bestaetigt: { $ne: null } },
-          { projection: { quelleId: 1, text: 1 } }
-        )
-        .toArray()
-    : []
+  const dois = [...bibEintraege.values()].map(e => e.doi).filter(Boolean)
+  const werke = new Map()
+  const [bestaetigteZitate] = await Promise.all([
+    ocrIds.length
+      ? (await quotes())
+          .find(
+            { projectId, quelleId: { $in: ocrIds }, bestaetigt: { $ne: null } },
+            { projection: { quelleId: 1, text: 1 } }
+          )
+          .toArray()
+      : [],
+    promiseMapWithLimit(CROSSREF_PARALLEL, [...new Set(dois)], async doi => {
+      werke.set(doi.toLowerCase(), await Crossref.werk(doi))
+    }),
+  ])
   const bestaetigt = new Map()
   for (const z of bestaetigteZitate) {
     const key = String(z.quelleId)
-    bestaetigt.set(key, [...(bestaetigt.get(key) ?? []), z.text])
+    if (!bestaetigt.has(key)) bestaetigt.set(key, [])
+    bestaetigt.get(key).push(z.text)
   }
-  const dois = [...bibEintraege.values()].map(e => e.doi).filter(Boolean)
-  const werke = new Map()
-  await promiseMapWithLimit(CROSSREF_PARALLEL, [...new Set(dois)], async doi => {
-    werke.set(doi.toLowerCase(), await Crossref.werk(doi))
-  })
   return { bibEintraege, quellen, werke, bestaetigt, seitenJeQuelle: new Map() }
 }
 

@@ -165,7 +165,12 @@ export async function webAufnehmen({ projectId, userId, url }) {
   const seite = await abrufen(url, IST_DEV ? { gesperrt: () => false } : {})
   const adresse = new URL(seite.url)
   const sammlung = await quellen()
-  const gleich = await sammlung.findOne({ projectId, 'web.url': seite.url })
+  // Viele Seiten heißen gleich („Startseite“): dann mit Zähler, statt zum Umbenennen aufzufordern.
+  const basis = slug(seite.titel ?? '') || slug(`${adresse.hostname}${adresse.pathname}`) || 'webseite'
+  const [gleich, belegteKeys] = await Promise.all([
+    sammlung.findOne({ projectId, 'web.url': seite.url }),
+    sammlung.distinct('key', { projectId, key: new RegExp(`^${_.escapeRegExp(basis)}(-\\d+)?$`) }),
+  ])
   if (gleich) {
     throw new Problem(
       409,
@@ -173,11 +178,7 @@ export async function webAufnehmen({ projectId, userId, url }) {
       `Diese Webseite ist schon als Quelle vorhanden („${gleich.meta?.titel ?? gleich.dateiname}“).`
     )
   }
-  // Viele Seiten heißen gleich („Startseite“): dann mit Zähler, statt zum Umbenennen aufzufordern.
-  const basis = slug(seite.titel ?? '') || slug(`${adresse.hostname}${adresse.pathname}`) || 'webseite'
-  const belegt = new Set(
-    await sammlung.distinct('key', { projectId, key: new RegExp(`^${_.escapeRegExp(basis)}(-\\d+)?$`) })
-  )
+  const belegt = new Set(belegteKeys)
   let key = basis
   for (let n = 2; belegt.has(key); n++) key = `${basis}-${n}`
   const html = Buffer.from(seite.html)

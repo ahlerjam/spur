@@ -7,6 +7,9 @@ import { promisify } from 'node:util'
 
 const ausfuehren = promisify(execFile)
 const GRENZEN = { timeout: 120000, maxBuffer: 256 * 1024 * 1024 }
+// Ein Thread je Tesseract-Lauf: OpenMP belegte sonst alle Kerne des Web-Containers, und die
+// (höchstens zwei, siehe QuellenManager) parallelen Läufe überbuchten sich gegenseitig.
+const TESSERACT = { ...GRENZEN, env: { ...process.env, OMP_THREAD_LIMIT: '1' } }
 
 export async function seitenTexte(pfad) {
   const { stdout } = await ausfuehren('pdftotext', ['-raw', '-enc', 'UTF-8', pfad, '-'], GRENZEN)
@@ -82,12 +85,10 @@ export async function ocrSeite(pfad, seite) {
       ['-png', '-gray', '-r', '300', '-singlefile', '-f', String(seite), '-l', String(seite), pfad, bild],
       GRENZEN
     )
-    // Ein Thread je Lauf: OpenMP belegte sonst alle Kerne des Web-Containers, und parallele
-    // Läufe überbuchten sich gegenseitig.
     const { stdout } = await ausfuehren(
       'tesseract',
       [`${bild}.png`, 'stdout', '-l', 'deu+eng', 'tsv'],
-      { ...GRENZEN, env: { ...process.env, OMP_THREAD_LIMIT: '1' } }
+      TESSERACT
     )
     return tsvAuswerten(stdout)
   } finally {

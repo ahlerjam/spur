@@ -28,14 +28,14 @@
     padding-left: 0;
     margin-left: 0;
   }
+}
 
-  // Im schmalen Panel ist ein langes Wort („Pseudonymisieren“) breiter als die Spalte neben dem
-  // Symbol: trennen statt rechts hinauslaufen.
-  .notification-content {
-    min-width: 0;
-    hyphens: auto;
-    overflow-wrap: anywhere;
-  }
+// Im schmalen Panel ist ein langes Wort („Pseudonymisieren“) oder eine Adresse in einer Meldung
+// breiter als die Spalte neben dem Symbol: trennen statt rechts hinauslaufen.
+.spur-panel .notification-content {
+  min-width: 0;
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 
 .spur-loeschen {

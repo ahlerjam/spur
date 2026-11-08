@@ -89,6 +89,7 @@ export default function Zitate({
   const ich = getMeta('ol-user_id')
   const alle = zitate ?? []
   const sichtbar = nurEigene ? alle.filter(z => z.von.id === ich) : alle
+  const geladen = zitate !== null
 
   const speichern = async () => {
     setFehler(null)
@@ -141,7 +142,7 @@ export default function Zitate({
         {t('spur_gespeicherte_zitate')}
       </h5>
       {fehler && <Notification type="error" content={fehler} />}
-      {zitate === null && !fehler && <OLSpinner size="sm" />}
+      {!geladen && !fehler && <OLSpinner size="sm" />}
       {alle.length > 0 && (
         <OLToggleButtonGroup
           type="radio"
@@ -159,7 +160,7 @@ export default function Zitate({
           </OLToggleButton>
         </OLToggleButtonGroup>
       )}
-      {zitate?.length === 0 && <p className="spur-leer">{t('spur_keine_zitate_markiert')}</p>}
+      {geladen && alle.length === 0 && <p className="spur-leer">{t('spur_keine_zitate_markiert')}</p>}
       {alle.length > 0 && sichtbar.length === 0 && (
         <p className="spur-leer">{t('spur_keine_eigenen_zitate')}</p>
       )}
@@ -180,7 +181,7 @@ export default function Zitate({
             </p>
             {quelle.status === 'ocr' && (
               <p
-                className="spur-zeile-meta spur-ocr-wortlaut"
+                className="spur-zeile-meta"
                 id={`spur-wortlaut-${zitat.id}`}
                 tabIndex={-1}
               >
