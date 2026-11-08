@@ -30,6 +30,8 @@ export default function QuellenSuche({
               ? t('spur_treffer_dateiname')
               : eintrag.art === 'vtt'
                 ? eintrag.label
+                : eintrag.art === 'web'
+                  ? t('spur_webseite')
                 : t('spur_seite_kurz', { seite: eintrag.label ?? eintrag.seite })}
           </p>
           {eintrag.auszug && <p className="spur-zeile-auszug">{eintrag.auszug}</p>}

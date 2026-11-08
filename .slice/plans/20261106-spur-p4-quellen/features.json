@@ -32,7 +32,7 @@
     "Ein Zitat daraus wird gegen den Schnappschuss geprüft",
     "Eine nicht erreichbare Adresse zeigt „Seite nicht erreichbar“ und speichert nichts"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

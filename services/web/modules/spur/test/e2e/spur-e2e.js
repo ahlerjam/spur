@@ -1422,6 +1422,74 @@ async page => {
     await bericht.getByText('Wortlaut: von Mensch bestätigt').waitFor()
   }
 
+  // SPUR_NOW gilt nur für diesen Schritt; sonst hingen Herzschläge und Token an einer festen Zeit.
+  async function zeitSetzen(jetzt) {
+    const r = await page.request.post(`${BASE}/spur/dev/zeit`, { data: { jetzt } })
+    ok(r.status() === 204, `SPUR_NOW setzen: ${r.status()}`)
+  }
+
+  features.p4f3 = async () => {
+    const SATZ = 'Regular sleep times help shift workers recover.'
+    const TESTSEITE = 'http://127.0.0.1/spur/dev/web/testseite'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Web')
+    await panelOeffnen('Quellen')
+    await sichtbar('Noch keine Quellen')
+    await zeitSetzen('2026-11-01T09:00:00.000Z')
+    try {
+      await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+      await page.getByLabel('Adresse der Webseite').fill(TESTSEITE)
+      // Erst nach der Antwort freigeben: Der Server liest die Zeit beim Speichern.
+      await Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/quellen/web')),
+        page.getByRole('button', { name: 'Aufnehmen', exact: true }).click(),
+      ])
+    } finally {
+      await zeitSetzen(null)
+    }
+    const zeile = page.locator('.spur-liste li', { hasText: 'Schlafhygiene im Schichtdienst' })
+    await zeile.getByText('Webseite · abgerufen am 1. November 2026').waitFor()
+    await zeile.getByText(TESTSEITE, { exact: true }).waitFor()
+
+    await zeile.getByRole('button', { name: 'Schlafhygiene im Schichtdienst' }).click()
+    await sichtbar(`Schnappschuss von ${TESTSEITE}.`)
+    await sichtbar('abgerufen am 1. November 2026')
+    await page.locator('.spur-seitentext', { hasText: SATZ }).waitFor()
+    ok(!(await page.locator('.spur-seitentext').textContent()).includes('console.log'), 'Skript im Schnappschuss')
+    await textMarkieren(SATZ)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    const zitat = page.getByRole('tabpanel', { name: 'Quellen' }).locator('.spur-zitate li', { hasText: SATZ })
+    await zitat.waitFor()
+    await editorVor('\\printbibliography')
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith('/einfuegen') && r.ok()),
+      zitat.getByRole('button', { name: 'Einfügen' }).click(),
+    ])
+    await page.waitForFunction(
+      text => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(text),
+      `\\enquote{${SATZ}} \\autocite{schlafhygiene-im-schichtdienst}`
+    )
+    await panelOeffnen('Prüfbericht')
+    const bericht = page.getByRole('tabpanel', { name: 'Prüfbericht' })
+    await bericht.locator('.spur-zeile', { hasText: 'Regular sleep' }).getByText('Wortlaut: exakt').waitFor()
+    await editorErsetzen('{Regular sleep times', '{Irregular sleep times')
+    await bericht.locator('.spur-zeile', { hasText: 'Irregular sleep' }).getByText('Wortlaut: abweichend').waitFor()
+
+    // Nicht erreichbar: Meldung, keine neue Quelle.
+    await railTab('Quellen').click()
+    await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+    await page.getByLabel('Adresse der Webseite').fill('http://nicht-erreichbar.invalid/')
+    await page.getByRole('button', { name: 'Aufnehmen', exact: true }).click()
+    await sichtbar('Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.')
+    ok(
+      (await page.getByLabel('Adresse der Webseite').inputValue()) === 'http://nicht-erreichbar.invalid/',
+      'Adresse nach Fehler verloren'
+    )
+    const quellenListe = page.getByRole('tabpanel', { name: 'Quellen' }).locator('.spur-liste li')
+    ok((await quellenListe.count()) === 1, `Nicht erreichbare Seite gespeichert: ${await quellenListe.count()}`)
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

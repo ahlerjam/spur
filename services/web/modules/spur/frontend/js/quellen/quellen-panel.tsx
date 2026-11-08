@@ -14,7 +14,8 @@ import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
 import Zugewiesen from './zugewiesen'
-import { OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
+import { datumLang, OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
+import WebAufnehmen from './web-aufnehmen'
 
 const MAX_BYTES = 50 * 1024 * 1024
 
@@ -49,7 +50,7 @@ function QuellenZeile({
   oeffnen: () => void
   textErkennen?: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const ocrMoeglich =
     textErkennen && quelle.art === 'pdf' && quelle.status === 'kein_text' && quelle.ocr?.status !== 'laeuft'
   return (
@@ -60,16 +61,28 @@ function QuellenZeile({
         className="spur-zeile-link"
         onClick={oeffnen}
       >
-        {quelle.dateiname}
+        {quelle.web ? (quelle.titel ?? quelle.dateiname) : quelle.dateiname}
       </OLButton>
-      <p className="spur-zeile-meta">
-        {t(quelle.art === 'pdf' ? 'spur_seiten' : 'spur_abschnitte', {
-          count: quelle.seitenzahl,
-        })}
-        {' · '}
-        <TextStatus quelle={quelle} />
-        {quelle.fassung && ` · ${quelle.fassung}`}
-      </p>
+      {quelle.web ? (
+        <>
+          <p className="spur-zeile-meta">
+            {t('spur_webseite')}
+            {' · '}
+            {t('spur_abgerufen_am', { datum: datumLang(quelle.web.abgerufenAm, i18n.language) })}
+            {quelle.fassung && ` · ${quelle.fassung}`}
+          </p>
+          <p className="spur-zeile-auszug">{quelle.web.url}</p>
+        </>
+      ) : (
+        <p className="spur-zeile-meta">
+          {t(quelle.art === 'pdf' ? 'spur_seiten' : 'spur_abschnitte', {
+            count: quelle.seitenzahl,
+          })}
+          {' · '}
+          <TextStatus quelle={quelle} />
+          {quelle.fassung && ` · ${quelle.fassung}`}
+        </p>
+      )}
       {ocrMoeglich && (
         <OLButton variant="secondary" size="sm" onClick={textErkennen}>
           {t('spur_text_erkennen')}
@@ -92,6 +105,8 @@ export default function QuellenPanel() {
   const [andere, setAndere] = useState<Projekt[]>([])
   const [klonVon, setKlonVon] = useState<Projekt | null>(null)
   const [holenDialog, setHolenDialog] = useState<{ vorauswahl?: string } | null>(null)
+  const [webForm, setWebForm] = useState(false)
+  const webKnopf = useRef<HTMLButtonElement>(null)
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'info'; text: string } | null>(null)
   const dateiFeld = useRef<HTMLInputElement>(null)
   const sucheFeld = useRef<HTMLInputElement>(null)
@@ -225,6 +240,15 @@ export default function QuellenPanel() {
               {t('spur_hochladen')}
             </OLButton>
             <OLButton
+              ref={webKnopf}
+              variant="secondary"
+              size="sm"
+              aria-expanded={webForm}
+              onClick={() => setWebForm(!webForm)}
+            >
+              {t('spur_webseite_aufnehmen')}
+            </OLButton>
+            <OLButton
               variant="secondary"
               size="sm"
               onClick={() => holenOeffnen()}
@@ -242,6 +266,22 @@ export default function QuellenPanel() {
           {t('spur_quellen_exportieren')}
         </OLButton>
       </div>
+      {webForm && (
+        <div className="spur-panel-hinweis">
+          <WebAufnehmen
+            aufgenommen={() => {
+              setWebForm(false)
+              laden()
+              pruefenVerzoegert()
+              webKnopf.current?.focus()
+            }}
+            abbrechen={() => {
+              setWebForm(false)
+              webKnopf.current?.focus()
+            }}
+          />
+        </div>
+      )}
       {klonVon && darfSchreiben && (
         <div className="spur-panel-hinweis">
           <Notification

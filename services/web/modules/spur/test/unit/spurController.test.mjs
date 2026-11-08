@@ -33,6 +33,7 @@ beforeEach(async () => {
       klonHinweis: vi.fn(async () => null),
       uebernehmen: vi.fn(async () => 2),
       ocrZustand: q => q.ocr ?? null,
+      webAufnehmen: vi.fn(async () => ({ _id: 'w1', art: 'web', dateiname: 'seite.html', meta: { titel: 'Seite' }, web: { url: 'https://example.org/', abgerufenAm: new Date(0), hash: 'h' } })),
       ocrStarten: vi.fn(async q => ({ quelle: { ...q, ocr: { status: 'laeuft', fertig: 0, gesamt: 3 } }, lauf: Promise.resolve() })),
     },
     Zitate: { liste: vi.fn(), markieren: vi.fn(), holen: vi.fn(), einfuegen: vi.fn(), kommentieren: vi.fn(), bestaetigen: vi.fn(), zuweisungLoesen: vi.fn(async () => {}), zugewiesenAn: vi.fn(async () => []) },
@@ -103,7 +104,7 @@ describe('Quellenliste und Suche', () => {
     m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
     const { res } = await ausfuehren(C.quellenListe, req({ query: { seite: '2' } }))
     expect(m.Quellen.liste).toHaveBeenCalledWith(projekt, { seite: 2 })
-    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', ocr: null })
+    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', ocr: null, web: null })
     expect(res.body).toMatchObject({ gesamt: 1, seitengroesse: 100 })
   })
 
@@ -129,6 +130,16 @@ describe('Quellenliste und Suche', () => {
       expect.objectContaining({ quelleId: q._id, imDateinamen: true, seite: 1, quelle: expect.objectContaining({ id: q._id }) }),
       { quelleId: 'q2', seite: 3 },
     ])
+  })
+})
+
+describe('Webseite aufnehmen', () => {
+  it('gibt die Adresse weiter und antwortet mit 201, Titel, Adresse und Abrufdatum, ohne Hash', async () => {
+    const { res } = await ausfuehren(C.webQuelleAufnehmen, req({ body: { url: 'https://example.org/' } }))
+    expect(m.Quellen.webAufnehmen).toHaveBeenCalledWith({ projectId: projekt, userId: anna, url: 'https://example.org/' })
+    expect(res.statusCode).toBe(201)
+    expect(res.body).toMatchObject({ id: 'w1', art: 'web', titel: 'Seite', web: { url: 'https://example.org/', abgerufenAm: new Date(0) } })
+    expect(res.body.web.hash).toBeUndefined()
   })
 })
 

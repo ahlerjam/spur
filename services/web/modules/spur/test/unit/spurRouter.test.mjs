@@ -46,6 +46,10 @@ async function laden({ dev = false } = {}) {
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
   )
   vi.doMock('../../app/src/dev/CrossrefFake.mjs', () => ({ crossrefFake: Object.assign(() => {}, { handler: 'crossrefFake' }) }))
+  vi.doMock('../../app/src/dev/DevSchalter.mjs', () => ({
+    testseite: Object.assign(() => {}, { handler: 'testseite' }),
+    zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
+  }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
   routen = []
@@ -84,6 +88,7 @@ describe('Rechte der Routen', () => {
     ['post', '/spur/project/:project_id/claude/auftrag', 'lesen', 'claudeAuftrag'],
     ['post', Q, 'schreiben', 'quelleHochladen'],
     ['post', `${Q}/holen`, 'schreiben', 'quellenHolen'],
+    ['post', `${Q}/web`, 'schreiben', 'webQuelleAufnehmen'],
     ['patch', `${Q}/:quelle_id`, 'schreiben', 'quelleAendern'],
     ['delete', `${Q}/:quelle_id`, 'schreiben', 'quelleLoeschen'],
     ['post', `${Q}/:quelle_id/zitate`, 'schreiben', 'zitatMarkieren'],
@@ -116,10 +121,15 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('registriert die Dev-Route für den Crossref-Fake nur in der Dev-Umgebung', async () => {
-    expect(route('get', '/spur/dev/crossref/works/:doi')).toBeUndefined()
+  it('registriert die Dev-Routen (Crossref-Fake, Testseite, Zeit) nur in der Dev-Umgebung', async () => {
+    const dev = [
+      ['get', '/spur/dev/crossref/works/:doi', 'crossrefFake'],
+      ['get', '/spur/dev/web/testseite', 'testseite'],
+      ['post', '/spur/dev/zeit', 'zeitSetzen'],
+    ]
+    for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()
     await laden({ dev: true })
-    expect(handlerVon(route('get', '/spur/dev/crossref/works/:doi'))).toBe('crossrefFake')
+    for (const [methode, pfad, handler] of dev) expect(handlerVon(route(methode, pfad))).toBe(handler)
   })
 })
 

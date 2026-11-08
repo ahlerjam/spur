@@ -135,11 +135,27 @@ function latexSicher(text) {
   return text.replace(LATEX_ZEICHEN, c => LATEX_ERSATZ[c] ?? `\\${c}`)
 }
 
+// Crossref-Daten, Webseiten-Titel und Dateinamen sind fremder Text: maskieren, damit die Klammern
+// der .bib halten.
+const text = wert => wert && latexSicher(String(wert))
+const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
+const alsBib = (typ, key, felder) => {
+  const zeilen = felder.filter(([, wert]) => wert).map(([name, wert]) => `  ${name} = {${wert}}`)
+  return `@${typ}{${key},\n${zeilen.join(',\n')}\n}`
+}
+
+function webEintrag(key, quelle) {
+  return alsBib('online', key, [
+    ['title', text(quelle.meta?.titel ?? quelle.web.url)],
+    // Die URL steht in biblatex wörtlich; nur Klammern und Backslash würden die .bib brechen.
+    ['url', ohneKlammern(quelle.web.url)],
+    ['urldate', quelle.web.abgerufenAm.toISOString().slice(0, 10)],
+  ])
+}
+
 function bibEintrag(key, quelle) {
+  if (quelle.art === 'web') return webEintrag(key, quelle)
   const meta = quelle.meta?.gefunden ? quelle.meta : {}
-  // Crossref-Daten und Dateinamen sind fremder Text: maskieren, damit die Klammern der .bib halten.
-  const text = wert => wert && latexSicher(String(wert))
-  const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
   const felder = [
     ['author', text(meta.autoren?.map(a => [a.family, a.given].filter(Boolean).join(', ')).join(' and '))],
     ['title', text(meta.titel ?? quelle.dateiname)],
@@ -147,9 +163,8 @@ function bibEintrag(key, quelle) {
     ['year', ohneKlammern(meta.jahr)],
     ['pages', ohneKlammern(meta.seiten?.replace('-', '--'))],
     ['doi', ohneKlammern(quelle.doi)],
-  ].filter(([, wert]) => wert)
-  const zeilen = felder.map(([name, wert]) => `  ${name} = {${wert}}`)
-  return `@article{${key},\n${zeilen.join(',\n')}\n}`
+  ]
+  return alsBib('article', key, felder)
 }
 
 async function bibSicherstellen(projectId, docs, quelle, userId) {
@@ -189,10 +204,11 @@ export async function einfuegen(projectId, quelle, zitat, userId) {
   // Das Label kann sich nach dem Markieren ändern, wenn jemand den Versatz bestätigt.
   const { label } = await QuellenManager.seite(quelle, zitat.seite)
   const seite = label ?? String(zitat.seite)
-  const text = latexSicher(zitat.text)
-  const latex =
-    paket === 'natbib'
-      ? `\\enquote{${text}} \\citep[S.~${seite}]{${key}}`
-      : `\\enquote{${text}} \\autocite[${seite}]{${key}}`
+  const wortlaut = latexSicher(zitat.text)
+  // Webseiten haben keine Seiten: zitiert wird ohne Seitenangabe.
+  const stelle =
+    quelle.art === 'web' ? '' : paket === 'natbib' ? `[S.~${seite}]` : `[${seite}]`
+  const befehl = paket === 'natbib' ? 'citep' : 'autocite'
+  const latex = `\\enquote{${wortlaut}} \\${befehl}${stelle}{${key}}`
   return { latex, key, paket }
 }

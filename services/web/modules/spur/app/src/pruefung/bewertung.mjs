@@ -13,6 +13,8 @@ function ocrWortlaut(wortlaut, quelle, zitiert, bestaetigt) {
 }
 
 function seitenStatus(beleg, quelle, gefunden, texte) {
+  // Ein Schnappschuss hat keine Seiten, es gibt nichts zu prüfen.
+  if (quelle.art === 'web') return { seite: null }
   if (quelle.versatz == null) return { seite: 'nicht_pruefbar' }
   const zitiert = seiteAusBeleg(beleg.seite)
   if (gefunden.length === 0 || !zitiert) return { seite: 'nicht_pruefbar' }

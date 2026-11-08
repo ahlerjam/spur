@@ -5,7 +5,7 @@ export type Quelle = {
   id: string
   dateiname: string
   key: string
-  art: 'pdf' | 'vtt'
+  art: 'pdf' | 'vtt' | 'web'
   seitenzahl: number
   status: 'text' | 'kein_text' | 'ocr'
   doi: string | null
@@ -19,7 +19,11 @@ export type Quelle = {
     gesamt: number
     konfidenz: number | null
   } | null
+  web: { url: string; abgerufenAm: string } | null
 }
+
+export const datumLang = (iso: string, sprache: string) =>
+  new Date(iso).toLocaleDateString(sprache, { day: 'numeric', month: 'long', year: 'numeric' })
 
 export type Treffer = {
   quelleId: string

@@ -148,3 +148,27 @@ describe('OCR-Quellen', () => {
     expect(zeileBewerten(fund({ roh: 'Rest supports memory.' }), ocrKontext([])).wortlaut).toBe('abweichend')
   })
 })
+
+describe('Webseiten', () => {
+  const WEB = { _id: 'w1', key: 'testseite', art: 'web', status: 'text', doi: null, versatz: null }
+  const webKontext = () =>
+    kontext({
+      bibEintraege: new Map([['testseite', { key: 'testseite' }]]),
+      quellen: [WEB],
+      seitenJeQuelle: new Map([['w1', [{ label: null, text: 'Regular sleep times help shift workers recover.' }]]]),
+    })
+
+  it('prüft den Wortlaut gegen den Schnappschuss und kennt keine Seite', () => {
+    const zeile = zeileBewerten(
+      fund({ roh: 'Regular sleep times help shift workers recover.', belege: [{ befehl: 'autocite', key: 'testseite', seite: null }] }),
+      webKontext()
+    )
+    expect(zeile).toMatchObject({ wortlaut: 'exakt', seite: null, quelleId: 'w1' })
+    expect(istProblem(zeile)).toBe(false)
+  })
+
+  it('meldet abweichenden Wortlaut', () => {
+    const zeile = zeileBewerten(fund({ roh: 'Irregular sleep helps.', belege: [{ key: 'testseite' }] }), webKontext())
+    expect(zeile.wortlaut).toBe('abweichend')
+  })
+})

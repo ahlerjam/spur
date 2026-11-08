@@ -43,6 +43,7 @@ function quelleFuerClient(q) {
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
     ocr: QuellenManager.ocrZustand(q),
+    web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }
 }
 
@@ -82,6 +83,15 @@ export const quelleHochladen = mitProblemen(async (req, res) => {
   } finally {
     await rm(req.file.path, { force: true })
   }
+})
+
+export const webQuelleAufnehmen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.webAufnehmen({
+    projectId: projektId(req),
+    userId: new ObjectId(nutzerId(req)),
+    url: req.body.url,
+  })
+  res.status(201).json(quelleFuerClient(quelle))
 })
 
 export const quellenSuche = mitProblemen(async (req, res) => {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import _ from 'lodash'
 import fs from 'node:fs/promises'
 import Path from 'node:path'
@@ -7,9 +8,10 @@ import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
 import { bearbeitungen, einstellungen, ereignisse, klone, laeufe, nachrichten, pruefCache, quellen, quellenSeiten, quotes } from './sammlungen.mjs'
-import { jetzt } from './schalter.mjs'
+import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { ocrSeite, seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { abrufen } from './WebSchnappschuss.mjs'
 import { quelleGeaendert } from './live.mjs'
 
 export const MAX_BYTES = 50 * 1024 * 1024
@@ -92,17 +94,42 @@ function pruefeDateityp(dateiname) {
   }
 }
 
+const vorhandenFehler = name =>
+  new Problem(
+    409,
+    'quelle_vorhanden',
+    `„${name}“ ist schon vorhanden. Bitte die Datei umbenennen oder die alte Quelle löschen.`
+  )
+
+// Legt Quelle, Datei und Seiten an. Der eindeutige Index auf (projectId, key) entscheidet bei
+// gleichzeitigen Aufnahmen; scheitert danach etwas, bleibt nichts zurück.
+async function speichern(quelle, seitenListe, schreibeDatei) {
+  try {
+    await (await quellen()).insertOne(quelle)
+  } catch (error) {
+    if (error.code === 11000) throw vorhandenFehler(quelle.dateiname)
+    throw error
+  }
+  try {
+    const ziel = dateiPfad(quelle)
+    await fs.mkdir(Path.dirname(ziel), { recursive: true })
+    await schreibeDatei(ziel)
+    if (seitenListe.length) {
+      await (await quellenSeiten()).insertMany(
+        seitenListe.map(s => ({ quelleId: quelle._id, projectId: quelle.projectId, ...s }))
+      )
+    }
+  } catch (error) {
+    await loeschen(quelle)
+    throw error
+  }
+  return quelle
+}
+
 export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groesse }) {
   pruefeDateityp(dateiname)
-  const sammlung = await quellen()
   const key = schluesselAus(dateiname)
-  const vorhanden = () =>
-    new Problem(
-      409,
-      'quelle_vorhanden',
-      `„${dateiname}“ ist schon vorhanden. Bitte die Datei umbenennen oder die alte Quelle löschen.`
-    )
-  if (await sammlung.findOne({ projectId, key })) throw vorhanden()
+  if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
   const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
   const quelle = {
     _id: new ObjectId(),
@@ -121,27 +148,49 @@ export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groess
     angelegtVon: userId,
     angelegtAm: jetzt(),
   }
-  // Der eindeutige Index auf (projectId, key) entscheidet bei gleichzeitigen Uploads.
-  try {
-    await sammlung.insertOne(quelle)
-  } catch (error) {
-    if (error.code === 11000) throw vorhanden()
-    throw error
+  return await speichern(quelle, inhalt.seiten, ziel => fs.copyFile(tempPfad, ziel))
+}
+
+const slug = text =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/, '')
+
+// Ein datierter Schnappschuss: Text, Adresse, Abrufzeit und Hash des Textes; die HTML-Datei bleibt.
+export async function webAufnehmen({ projectId, userId, url }) {
+  // Im Dev-Stack liegt die Testseite im lokalen Netz.
+  const seite = await abrufen(url, IST_DEV ? { gesperrt: () => false } : {})
+  const adresse = new URL(seite.url)
+  const key = slug(seite.titel ?? '') || slug(`${adresse.hostname}${adresse.pathname}`) || 'webseite'
+  const html = Buffer.from(seite.html)
+  const quelle = {
+    _id: new ObjectId(),
+    projectId,
+    dateiname: `${key}.html`,
+    key,
+    groesse: html.length,
+    art: 'web',
+    seitenzahl: 1,
+    status: seite.text ? 'text' : 'kein_text',
+    doi: null,
+    meta: { titel: seite.titel },
+    web: {
+      url: seite.url,
+      abgerufenAm: jetzt(),
+      hash: createHash('sha256').update(seite.text).digest('hex'),
+    },
+    versatz: null,
+    versatzQuelle: null,
+    fassung: '',
+    angelegtVon: userId,
+    angelegtAm: jetzt(),
   }
-  try {
-    const ziel = dateiPfad(quelle)
-    await fs.mkdir(Path.dirname(ziel), { recursive: true })
-    await fs.copyFile(tempPfad, ziel)
-    if (inhalt.seiten.length) {
-      await (await quellenSeiten()).insertMany(
-        inhalt.seiten.map(s => ({ quelleId: quelle._id, projectId, ...s }))
-      )
-    }
-  } catch (error) {
-    await loeschen(quelle)
-    throw error
-  }
-  return quelle
+  return await speichern(quelle, [{ seite: 1, label: null, text: seite.text }], ziel =>
+    fs.writeFile(ziel, html)
+  )
 }
 
 // Schreibt die Seite nach jeder Seite fort; steht sie länger still, ist der Prozess weg (Neustart).

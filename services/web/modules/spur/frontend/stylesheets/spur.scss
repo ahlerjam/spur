@@ -154,14 +154,16 @@
   color: var(--content-primary);
 }
 
-.spur-kommentar-form {
+.spur-kommentar-form,
+.spur-web-form {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-02);
   margin: var(--spacing-02) 0;
 }
 
-.spur-kommentar-form label {
+.spur-kommentar-form label,
+.spur-web-form label {
   margin-bottom: 0;
 }
 

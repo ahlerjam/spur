@@ -11,7 +11,7 @@ import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import QuelleLoeschenModal from './quelle-loeschen-modal'
 import SeitenzahlBestaetigen from './seitenzahl-bestaetigen'
 import Zitate from './zitate'
-import { OCR_SICHER_AB, type Quelle } from './typen'
+import { datumLang, OCR_SICHER_AB, type Quelle } from './typen'
 
 type Seite = {
   text: string
@@ -30,7 +30,7 @@ export default function QuelleVorschau({
   startSeite: number
   schliessen: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { write: darfSchreiben } = usePermissionsContext()
   const [nummer, setNummer] = useState(startSeite)
   const [seite, setSeite] = useState<Seite | null>(null)
@@ -64,36 +64,44 @@ export default function QuelleVorschau({
 
   return (
     <div className="spur-panel">
-      <RailPanelHeader title={quelle.dateiname} />
+      <RailPanelHeader title={quelle.web ? (quelle.titel ?? quelle.dateiname) : quelle.dateiname} />
       <div className="spur-panel-werkzeuge">
         <OLButton variant="secondary" size="sm" onClick={schliessen}>
           {t('spur_zurueck')}
         </OLButton>
-        <span className="spur-seitenzahl" aria-live="polite">
-          {seite?.label && quelle.art === 'pdf'
-            ? t('spur_seite_label_von', {
-                seite: seite.label,
-                nr: nummer,
-                gesamt: quelle.seitenzahl,
-              })
-            : t('spur_seite_von', { seite: nummer, gesamt: quelle.seitenzahl })}
-        </span>
-        <OLButton
-          variant="ghost"
-          size="sm"
-          disabled={nummer <= 1}
-          onClick={() => setNummer(nummer - 1)}
-        >
-          {t('spur_vorherige_seite')}
-        </OLButton>
-        <OLButton
-          variant="ghost"
-          size="sm"
-          disabled={nummer >= quelle.seitenzahl}
-          onClick={() => setNummer(nummer + 1)}
-        >
-          {t('spur_naechste_seite')}
-        </OLButton>
+        {quelle.web ? (
+          <span className="spur-seitenzahl">
+            {t('spur_abgerufen_am', { datum: datumLang(quelle.web.abgerufenAm, i18n.language) })}
+          </span>
+        ) : (
+          <>
+            <span className="spur-seitenzahl" aria-live="polite">
+              {seite?.label && quelle.art === 'pdf'
+                ? t('spur_seite_label_von', {
+                    seite: seite.label,
+                    nr: nummer,
+                    gesamt: quelle.seitenzahl,
+                  })
+                : t('spur_seite_von', { seite: nummer, gesamt: quelle.seitenzahl })}
+            </span>
+            <OLButton
+              variant="ghost"
+              size="sm"
+              disabled={nummer <= 1}
+              onClick={() => setNummer(nummer - 1)}
+            >
+              {t('spur_vorherige_seite')}
+            </OLButton>
+            <OLButton
+              variant="ghost"
+              size="sm"
+              disabled={nummer >= quelle.seitenzahl}
+              onClick={() => setNummer(nummer + 1)}
+            >
+              {t('spur_naechste_seite')}
+            </OLButton>
+          </>
+        )}
       </div>
       <div className="spur-panel-inhalt">
         {fehler && <Notification type="error" content={fehler} />}
@@ -107,6 +115,11 @@ export default function QuelleVorschau({
         )}
         {seite?.label && quelle.art === 'vtt' && (
           <p className="spur-zeile-meta">{seite.label}</p>
+        )}
+        {quelle.web && (
+          <p className="spur-zeile-auszug">
+            {t('spur_schnappschuss_von', { url: quelle.web.url })}
+          </p>
         )}
         {seite && quelle.status === 'ocr' && (
           <p className="spur-ocr-hinweis">
