@@ -12,6 +12,7 @@ const lauf: Lauf = {
   dateien: 1,
   aenderungen: 1,
   rot: [],
+  zahlen: [],
   zusammenfassung: 'Einleitung überarbeitet',
 }
 
@@ -70,5 +71,24 @@ describe('Lauf-Karte', function () {
   it('zeigt Lesenden keine Schaltflächen zum Entscheiden', function () {
     zeigen('readOnly')
     expect(screen.queryByRole('button')).to.not.exist
+  })
+
+  it('warnt bei Zahlen ohne Beleg', function () {
+    render(
+      <LaufKarte
+        lauf={{ ...lauf, zahlen: [{ zahl: '412', pfad: 'main.tex' }] }}
+        aenderungen={aenderungen}
+        automatik={false}
+        neuLaden={async () => {}}
+      />,
+      { wrapper: mitRolle('owner') }
+    )
+    expect(screen.getByText('Zahl ohne Beleg')).to.exist
+    expect(screen.getByText('„412“ in main.tex: Bitte als Makro aus ergebnisse.tex einsetzen.')).to.exist
+  })
+
+  it('zeigt ohne Zahlen keine Warnung', function () {
+    zeigen('owner')
+    expect(screen.queryByText('Zahl ohne Beleg')).to.not.exist
   })
 })

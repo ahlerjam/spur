@@ -186,6 +186,8 @@
   "spur_wortlaut_abweichend": "Wording: differs",
   "spur_wortlaut_exakt": "Wording: exact",
   "spur_wortlaut_trennung": "Wording: with hyphenation tolerance",
+  "spur_zahl_ohne_beleg": "Number without source",
+  "spur_zahl_ohne_beleg_text": "“__zahl__” in __pfad__: please use a macro from ergebnisse.tex.",
   "spur_zelle": "__spalte__: __quelle__",
   "spur_zitat_speichern": "Save quote",
   "spur_zitate_betroffen": "1 citation uses this source. The check report will show it as “Source missing”.",

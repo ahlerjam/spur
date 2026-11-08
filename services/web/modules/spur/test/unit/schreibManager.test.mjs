@@ -103,8 +103,18 @@ describe('docEdit', () => {
       5,
       { userId: bot, tracked: true }
     )
-    expect(ergebnis).toEqual({ doc_id: String(KAPITEL), version: 5, lauf_id: lauf._id, aenderung: true, rot: [] })
-    expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, { docId: String(KAPITEL), rot: [] })
+    expect(ergebnis).toEqual({ doc_id: String(KAPITEL), version: 5, lauf_id: lauf._id, aenderung: true, rot: [], zahlen_ohne_beleg: [] })
+    expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, { docId: String(KAPITEL), rot: [], zahlen: [] })
+  })
+
+  it('meldet frei getippte Zahlen und merkt sie am Lauf', async () => {
+    const ergebnis = await bearbeiten({ neu: 'Es waren 412 Personen, seit 2019.' })
+    expect(ergebnis.zahlen_ohne_beleg).toEqual(['412'])
+    expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, {
+      docId: String(KAPITEL),
+      rot: [],
+      zahlen: [{ zahl: '412', pfad: 'kapitel.tex' }],
+    })
   })
 
   it('findet das Dokument auch über die doc_id', async () => {
@@ -279,7 +289,7 @@ describe('Zitatprüfung beim Schreiben', () => {
       { grund: 'nicht_pruefbar', auszug: 'Eins' },
       { grund: 'nicht_pruefbar', auszug: 'Zwei' },
     ])
-    expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, { docId: String(KAPITEL), rot: ergebnis.rot })
+    expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, { docId: String(KAPITEL), rot: ergebnis.rot, zahlen: [] })
   })
 })
 

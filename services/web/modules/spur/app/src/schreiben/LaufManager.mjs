@@ -47,11 +47,12 @@ export async function laufFuerSchreiben(projectId, botId) {
   }
 }
 
-export async function aenderungMerken(lauf, { docId, rot }) {
+export async function aenderungMerken(lauf, { docId, rot, zahlen = [] }) {
+  const neu = { ...(rot.length && { rot: { $each: rot } }), ...(zahlen.length && { zahlen: { $each: zahlen } }) }
   await (await laeufe()).updateOne(
     { _id: lauf._id },
     {
-      ...(rot.length ? { $push: { rot: { $each: rot } } } : {}),
+      ...(Object.keys(neu).length ? { $push: neu } : {}),
       $addToSet: { docs: docId },
       $inc: { aenderungen: 1 },
     }
@@ -78,6 +79,7 @@ export function laufFuerClient(lauf) {
     dateien: lauf.docs.length,
     aenderungen: lauf.aenderungen,
     rot: lauf.rot,
+    zahlen: lauf.zahlen ?? [],
     zusammenfassung: lauf.zusammenfassung,
   }
 }

@@ -1646,6 +1646,54 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok(folie.breite > folie.hoehe, `Folie ${folie.breite}×${folie.hoehe} ist kein Querformat`)
   }
 
+  features.p2f8 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Zahlen')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const aufruf = (name, args) => werkzeug(token, name, { project_id: pid, idempotenz_schluessel: schluessel(), ...args })
+    await panelOeffnen('Claude')
+
+    const anlegen = await aufruf('doc_create', { pfad: 'ergebnisse.tex', inhalt: '\\newcommand{\\nGesamt}{412}\n' })
+    ok(!anlegen.fehler && anlegen.inhalt.zahlen_ohne_beleg.length === 0, `doc_create: ${JSON.stringify(anlegen.inhalt)}`)
+    const changes = (await jsonVon(`/project/${pid}/ranges`)).flatMap(d => d.ranges?.changes ?? [])
+    ok(changes.some(c => c.op.i?.includes('\\newcommand{\\nGesamt}{412}')), `Kein Track Change: ${JSON.stringify(changes)}`)
+
+    const einbinden = await aufruf('doc_edit', {
+      pfad: 'main.tex',
+      alt: 'Platzhalter.',
+      neu: '\\input{ergebnisse}\nInsgesamt nahmen \\nGesamt{} Personen teil.',
+    })
+    ok(!einbinden.fehler && einbinden.inhalt.zahlen_ohne_beleg.length === 0, `Makro: ${JSON.stringify(einbinden.inhalt)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zahlen eingebunden' })
+    await karte().getByText('Zahlen eingebunden').waitFor({ timeout: 20000 })
+    ok((await karte().getByText('Zahl ohne Beleg').count()) === 0, 'Warnung trotz Makro')
+
+    await kompilieren()
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.pdf-viewer .textLayer')].some(e => /Insgesamt nahmen\s*412\s*Personen/.test(e.textContent)),
+      null,
+      { timeout: 60000 }
+    )
+
+    const frei = await aufruf('doc_edit', { pfad: 'main.tex', alt: 'Personen teil.', neu: 'Personen teil. Davon waren 412 Personen erwachsen.' })
+    ok(JSON.stringify(frei.inhalt.zahlen_ohne_beleg) === '["412"]', `Fließtext: ${JSON.stringify(frei.inhalt)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Satz mit Zahl' })
+    await karte().getByText('Satz mit Zahl').waitFor({ timeout: 20000 })
+    await karte().getByText('Zahl ohne Beleg', { exact: true }).waitFor()
+    await karte().getByText('„412“ in main.tex: Bitte als Makro aus ergebnisse.tex einsetzen.').waitFor()
+
+    const erlaubt = await aufruf('doc_edit', {
+      pfad: 'main.tex',
+      alt: 'erwachsen.',
+      neu: 'erwachsen. Seit 2019 belegen das Studien \\autocite[S.~12]{smith2024} auf Seite 5 mit $n = 30$.',
+    })
+    ok(erlaubt.inhalt.zahlen_ohne_beleg.length === 0, `Jahr, Seite, Mathe: ${JSON.stringify(erlaubt.inhalt)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Nur Jahr, Seite und Mathe' })
+    await karte().getByText('Nur Jahr, Seite und Mathe').waitFor({ timeout: 20000 })
+    ok((await karte().getByText('Zahl ohne Beleg').count()) === 0, 'Warnung für Jahr, Seite oder Mathe')
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

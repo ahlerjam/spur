@@ -47,7 +47,7 @@
 "Im PDF steht nach `\\nGesamt` die Zahl 412",
 "Schreibt der Fake-Client „412 Personen“ im Fließtext, zeigt die Lauf-Karte „Zahl ohne Beleg“",
 "Jahreszahlen, Seitenzahlen und Mathe lösen keine Warnung aus"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f9", "title": "KI-Nutzung offenlegen", "steps": [
 "Nutzer klickt „KI-Offenlegung“: Der Text nennt Läufe, Zweck, Dateien und angenommene Anteile",
 "Der Text lässt sich kopieren und als `.tex`-Abschnitt einfügen",
