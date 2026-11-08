@@ -17,6 +17,14 @@
 - E2E-Helfer `ereignisseVon` las nur die erste Seite von `events_since` (100 Ereignisse). Bei mehr Ereignissen sah die Suite neue nicht (in der Abnahme nach 100 Panel-Nachrichten: „comment_mention: 0 statt 1“). Jetzt folgt er dem Cursor. `werkzeug` meldet eine Antwort ohne `result` mit Status und Text statt eines TypeError.
 - Vorschläge-Panel: Die Meldung „Claude hat den Auftrag …“ stand in einem Notification-Kasten, dessen Symbolspalte den Text im schmalen Panel Wort für Wort umbrach (Bild bei 1280 px). Jetzt eine Zeile mit grünem Rand wie beim Tageslimit.
 
+## Nach der unabhängigen Abnahme (f4 wieder offen)
+Befund: `spur-e2e.js` nach `vorbereiten.mjs` nicht vollständig grün, `p3f2` scheitert wiederholt („Bo meint …“ im Review-Panel nicht sichtbar); auf Daten eines früheren Laufs scheitern f3, f4, f5, f7, f8, p2f4 bis `vorbereiten.mjs` läuft. f4 auf `passes: false` gesetzt.
+- Nachgestellt: Lauf A nach `vorbereiten.mjs`: 33/34, `p2f4 FEHLER: Link: https://doi.org/10.5555/spur.2024.001`. Lauf B direkt danach ohne `vorbereiten.mjs`: 27 Features FEHLER (f3, f4, f5, f7, f8, f10, f11, f13–f15, p2f1, p2f3–p2f10, p4f1–p4f3, p3f1–p3f4).
+- Ursache Wiederholung: Die Suite setzt den Zustand von `vorbereiten.mjs` voraus (leere Quellenlisten, Texte, Token, Schalter). Behoben an der Wurzel: `vorbereiten.mjs` exportiert `e2eDatenVorbereiten()`; die Dev-Route `POST /spur/dev/e2e/vorbereiten` (nur mit `SPUR_DEV`, lädt das Testmodul erst beim Aufruf, gleichzeitige Aufrufe teilen einen Lauf) ruft sie im Web-Prozess auf; die Suite ruft die Route vor dem ersten Feature. Unit-Tests in `devSchalter.test.mjs` (204, ein gemeinsamer Lauf, 500 mit Text) und `spurRouter.test.mjs` (Route nur in Dev). Die Tests entstanden vor dem Code, ich habe sie aber nicht rot laufen lassen. Als Skript bleibt `vorbereiten.mjs` gleich (danach `ablageFreigeben`, nur als root nötig).
+- Ursache `p2f4`: Der Test las den Bibliothekslink direkt nach „Link zur Bibliothek gespeichert“, bevor die Liste neu geladen hatte. Jetzt wartet er bis 10 s auf den neuen `href`.
+- Ursache `p3f2`: Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her; auf einem langsamen Rechner kommt das nach dem einmaligen Klick auf „Review panel“ (nach 5 s) und überschreibt ihn. Nachgestellt mit CPU-Drosselung per CDP: alter Test bei 20× `p3f2 FEHLER: locator.click … .review-panel-comment-input … element is not visible`; bei 6× noch grün. Behoben mit `reviewEintrag(text)`: öffnet das Review-Panel, bis der Eintrag sichtbar ist (bis 30 s), für Bo und Ada. Neuer Test bei 20×: zweimal `p3f2 ok` (100 s, 110 s).
+- Beleg Wiederholbarkeit: Lauf C auf den schmutzigen Daten von Lauf B, ohne `vorbereiten.mjs`: 34/34 ok (504 s). Lauf D direkt danach: 34/34 ok (496 s).
+
 ## Abnahme
 Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in der Scratchpad-Ablage `bilder/`, je 360 und 1280 px. In keinem Bild horizontaler Überlauf von Seite oder Panel, keine Konsolenfehler.
 

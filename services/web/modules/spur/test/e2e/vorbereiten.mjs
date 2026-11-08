@@ -1,6 +1,7 @@
 // Legt Testkonten und Testprojekte an und setzt deren Quellen zurück.
 // Aufruf: spur-dev run modules/spur/test/e2e/vorbereiten.mjs
 import { randomUUID } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import logger from '@overleaf/logger'
 import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
@@ -30,7 +31,6 @@ import { botFuer, kontoAufraeumen, SCOPE } from '../../app/src/ClaudeZugang.mjs'
 import UserDeleter from '../../../../app/src/Features/User/UserDeleter.mjs'
 
 const PASSWORT = 'spur-e2e-Passwort-1'
-logger.logger.level('error')
 
 const APA = String.raw`\documentclass{article}
 \usepackage[style=apa,backend=biber]{biblatex}
@@ -190,55 +190,57 @@ Zweiter Absatz.
 \enquote{Erfunden und falsch.} \autocite[1]{smith2024}
 \end{document}`
 
-const a = await konto('e2e-a@example.org')
-const leser = await konto('e2e-leser@example.org')
-const link = await konto('e2e-link@example.org')
+// Auch die Dev-Route POST /spur/dev/e2e/vorbereiten ruft das auf, damit die Suite sich selbst zurücksetzt.
+export async function e2eDatenVorbereiten() {
+  const a = await konto('e2e-a@example.org')
+  const leser = await konto('e2e-leser@example.org')
+  const link = await konto('e2e-link@example.org')
 
-await neuAnlegen(a, 'E2E APA', { 'main.tex': APA, 'references.bib': BIB })
-await neuAnlegen(a, 'E2E natbib', { 'main.tex': NATBIB, 'references.bib': BIB })
-await neuAnlegen(a, 'E2E Ohne Bib', { 'main.tex': APA })
+  await neuAnlegen(a, 'E2E APA', { 'main.tex': APA, 'references.bib': BIB })
+  await neuAnlegen(a, 'E2E natbib', { 'main.tex': NATBIB, 'references.bib': BIB })
+  await neuAnlegen(a, 'E2E Ohne Bib', { 'main.tex': APA })
 
-const leer = await projekt(a, 'E2E Quellen', { 'main.tex': LEER })
-await projektAufraeumen(leer._id)
-await db.projects.updateOne(
-  { _id: leer._id },
-  {
-    $set: {
-      publicAccesLevel: 'tokenBased',
-      readOnly_refs: [leser._id],
-      tokenAccessReadAndWrite_refs: [link._id],
-    },
+  const leer = await projekt(a, 'E2E Quellen', { 'main.tex': LEER })
+  await projektAufraeumen(leer._id)
+  await db.projects.updateOne(
+    { _id: leer._id },
+    {
+      $set: {
+        publicAccesLevel: 'tokenBased',
+        readOnly_refs: [leser._id],
+        tokenAccessReadAndWrite_refs: [link._id],
+      },
+    }
+  )
+
+  const viele = await projekt(a, 'E2E Viele', { 'main.tex': LEER })
+  await projektAufraeumen(viele._id)
+  await vieleQuellen(viele._id, a._id)
+
+  for (const alt of await db.projects.find({ owner_ref: a._id, name: 'Demo' }).toArray()) {
+    await ProjectDeleter.promises.deleteProject(alt._id)
+    await ProjectDeleter.promises.expireDeletedProject(alt._id)
   }
-)
+  const bericht = await neuAnlegen(a, 'E2E Bericht', {
+    'main.tex': BERICHT_MAIN,
+    'kapitel.tex': BERICHT_KAPITEL,
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(bericht._id, a._id, 'smith2024.pdf')
+  await quelleAusFixture(bericht._id, a._id, 'retracted.pdf')
 
-const viele = await projekt(a, 'E2E Viele', { 'main.tex': LEER })
-await projektAufraeumen(viele._id)
-await vieleQuellen(viele._id, a._id)
+  const schreiben = await neuAnlegen(a, 'E2E Schreiben', {
+    'main.tex': SCHREIBEN_MAIN,
+    'references.bib': BERICHT_BIB,
+    'weg.tex': 'Wird gelöscht.',
+    'voll.tex': Array.from({ length: 1991 }, () => 'a').join(' '),
+  })
+  await quelleAusFixture(schreiben._id, a._id, 'smith2024.pdf')
+  await volleAenderungen(schreiben._id, await botFuer(a))
 
-for (const alt of await db.projects.find({ owner_ref: a._id, name: 'Demo' }).toArray()) {
-  await ProjectDeleter.promises.deleteProject(alt._id)
-  await ProjectDeleter.promises.expireDeletedProject(alt._id)
-}
-const bericht = await neuAnlegen(a, 'E2E Bericht', {
-  'main.tex': BERICHT_MAIN,
-  'kapitel.tex': BERICHT_KAPITEL,
-  'references.bib': BERICHT_BIB,
-})
-await quelleAusFixture(bericht._id, a._id, 'smith2024.pdf')
-await quelleAusFixture(bericht._id, a._id, 'retracted.pdf')
-
-const schreiben = await neuAnlegen(a, 'E2E Schreiben', {
-  'main.tex': SCHREIBEN_MAIN,
-  'references.bib': BERICHT_BIB,
-  'weg.tex': 'Wird gelöscht.',
-  'voll.tex': Array.from({ length: 1991 }, () => 'a').join(' '),
-})
-await quelleAusFixture(schreiben._id, a._id, 'smith2024.pdf')
-await volleAenderungen(schreiben._id, await botFuer(a))
-
-const pruefer = await konto('e2e-review@example.org')
-const laufProjekt = await neuAnlegen(a, 'E2E Lauf', {
-  'main.tex': String.raw`\documentclass{article}
+  const pruefer = await konto('e2e-review@example.org')
+  const laufProjekt = await neuAnlegen(a, 'E2E Lauf', {
+    'main.tex': String.raw`\documentclass{article}
 \begin{document}
 Alpha Satz.
 
@@ -248,159 +250,165 @@ Gamma Satz.
 
 Delta Satz.
 \end{document}`,
-  'extra.tex': 'Extra Satz.',
-})
-await db.projects.updateOne(
-  { _id: laufProjekt._id },
-  { $set: { readOnly_refs: [leser._id], reviewer_refs: [pruefer._id] } }
-)
-await (await einstellungen()).deleteMany({})
-
-const neuesDemo = await demoAnlegen(a)
-await db.projects.updateOne({ _id: neuesDemo._id }, { $set: { readOnly_refs: [leser._id] } })
-
-for (const klon of await db.projects.find({ owner_ref: a._id, name: 'E2E Klon' }).toArray()) {
-  await ProjectDeleter.promises.deleteProject(klon._id)
-  await ProjectDeleter.promises.expireDeletedProject(klon._id)
-}
-
-await neuAnlegen(link, 'E2E Fremd', { 'main.tex': LEER })
-
-async function testToken(mensch, token, ablauf) {
-  const bot = await botFuer(mensch)
-  await db.oauthAccessTokens.deleteMany({ user_id: mensch._id, scope: SCOPE })
-  await db.oauthAccessTokens.insertOne({
-    accessToken: createHash('sha256').update(token).digest('hex'),
-    accessTokenExpiresAt: ablauf,
-    scope: SCOPE,
-    user_id: mensch._id,
-    spurBotId: bot._id,
-    createdAt: new Date(ablauf.getTime() - 90 * 24 * 3600 * 1000),
+    'extra.tex': 'Extra Satz.',
   })
-}
+  await db.projects.updateOne(
+    { _id: laufProjekt._id },
+    { $set: { readOnly_refs: [leser._id], reviewer_refs: [pruefer._id] } }
+  )
+  await (await einstellungen()).deleteMany({})
 
-await testToken(leser, 'spur_e2e_abgelaufen', new Date(Date.now() - 3600 * 1000))
-const altWeg = await db.users.findOne({ email: 'e2e-weg@example.org' })
-if (altWeg) {
-  await kontoAufraeumen(altWeg._id)
-  await UserDeleter.promises.deleteUser(altWeg._id, {
-    force: true,
-    skipEmail: true,
-    ipAddress: '127.0.0.1',
-  })
-}
-await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': 'e2e-weg@example.org' })
-const weg = await konto('e2e-weg@example.org')
-await testToken(weg, 'spur_e2e_weg', new Date(Date.now() + 24 * 3600 * 1000))
+  const neuesDemo = await demoAnlegen(a)
+  await db.projects.updateOne({ _id: neuesDemo._id }, { $set: { readOnly_refs: [leser._id] } })
 
-// Ein Konto ohne Bot und ohne Token: f8 prüft das allererste Token eines neuen Nutzers.
-for (const email of ['e2e-neu@example.org']) {
-  const alt = await db.users.findOne({ email })
-  if (alt) {
-    await kontoAufraeumen(alt._id)
-    await UserDeleter.promises.deleteUser(alt._id, { force: true, skipEmail: true, ipAddress: '127.0.0.1' })
+  for (const klon of await db.projects.find({ owner_ref: a._id, name: 'E2E Klon' }).toArray()) {
+    await ProjectDeleter.promises.deleteProject(klon._id)
+    await ProjectDeleter.promises.expireDeletedProject(klon._id)
   }
-  await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': email })
-}
-const neu = await konto('e2e-neu@example.org')
-// Site-Admin: Claude bekommt über ein Admin-Token trotzdem nur Rollen aus Mitgliedschaften.
-const admin = await konto('e2e-admin@example.org')
-await db.users.updateOne({ _id: admin._id }, { $set: { isAdmin: true } })
-await testToken(admin, 'spur_e2e_admin', new Date(Date.now() + 24 * 3600 * 1000))
-await neuAnlegen(neu, 'E2E Neu', { 'main.tex': 'Erster Absatz.\n' })
 
-// P2: frisches Rechercheprojekt, Paper-Antworten nicht aus dem Cache des letzten Laufs.
-await neuAnlegen(a, 'E2E Recherche', { 'main.tex': LEER })
-await neuAnlegen(a, 'E2E Recherche Ziel', { 'main.tex': LEER })
-await neuAnlegen(a, 'E2E Beschaffung', { 'main.tex': LEER })
-await neuAnlegen(a, 'E2E Import', { 'main.tex': LEER })
-await neuAnlegen(a, 'E2E Literatur', { 'main.tex': LEER })
-await neuAnlegen(a, 'E2E Compile', {
-  'main.tex': String.raw`\documentclass{article}
+  await neuAnlegen(link, 'E2E Fremd', { 'main.tex': LEER })
+
+  async function testToken(mensch, token, ablauf) {
+    const bot = await botFuer(mensch)
+    await db.oauthAccessTokens.deleteMany({ user_id: mensch._id, scope: SCOPE })
+    await db.oauthAccessTokens.insertOne({
+      accessToken: createHash('sha256').update(token).digest('hex'),
+      accessTokenExpiresAt: ablauf,
+      scope: SCOPE,
+      user_id: mensch._id,
+      spurBotId: bot._id,
+      createdAt: new Date(ablauf.getTime() - 90 * 24 * 3600 * 1000),
+    })
+  }
+
+  await testToken(leser, 'spur_e2e_abgelaufen', new Date(Date.now() - 3600 * 1000))
+  const altWeg = await db.users.findOne({ email: 'e2e-weg@example.org' })
+  if (altWeg) {
+    await kontoAufraeumen(altWeg._id)
+    await UserDeleter.promises.deleteUser(altWeg._id, {
+      force: true,
+      skipEmail: true,
+      ipAddress: '127.0.0.1',
+    })
+  }
+  await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': 'e2e-weg@example.org' })
+  const weg = await konto('e2e-weg@example.org')
+  await testToken(weg, 'spur_e2e_weg', new Date(Date.now() + 24 * 3600 * 1000))
+
+  // Ein Konto ohne Bot und ohne Token: f8 prüft das allererste Token eines neuen Nutzers.
+  for (const email of ['e2e-neu@example.org']) {
+    const alt = await db.users.findOne({ email })
+    if (alt) {
+      await kontoAufraeumen(alt._id)
+      await UserDeleter.promises.deleteUser(alt._id, { force: true, skipEmail: true, ipAddress: '127.0.0.1' })
+    }
+    await db.deletedUsers.deleteMany({ 'deleterData.deletedUserLastPrimaryEmail': email })
+  }
+  const neu = await konto('e2e-neu@example.org')
+  // Site-Admin: Claude bekommt über ein Admin-Token trotzdem nur Rollen aus Mitgliedschaften.
+  const admin = await konto('e2e-admin@example.org')
+  await db.users.updateOne({ _id: admin._id }, { $set: { isAdmin: true } })
+  await testToken(admin, 'spur_e2e_admin', new Date(Date.now() + 24 * 3600 * 1000))
+  await neuAnlegen(neu, 'E2E Neu', { 'main.tex': 'Erster Absatz.\n' })
+
+  // P2: frisches Rechercheprojekt, Paper-Antworten nicht aus dem Cache des letzten Laufs.
+  await neuAnlegen(a, 'E2E Recherche', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Recherche Ziel', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Beschaffung', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Import', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Literatur', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Compile', {
+    'main.tex': String.raw`\documentclass{article}
 \begin{document}
 Erste Seite.
 \newpage
 Zweite Seite.
 \end{document}`,
-})
-await neuAnlegen(a, 'E2E Kaputt', {
-  'main.tex': String.raw`\documentclass{article}
+  })
+  await neuAnlegen(a, 'E2E Kaputt', {
+    'main.tex': String.raw`\documentclass{article}
 \begin{document}
 Text davor.
 \kaputtesmakro{}
 \end{document}`,
-})
-await neuAnlegen(a, 'E2E Folien', { 'main.tex': 'Folien folgen.\n' })
-await neuAnlegen(a, 'E2E Semantik', {
-  'main.tex': String.raw`\documentclass{article}
+  })
+  await neuAnlegen(a, 'E2E Folien', { 'main.tex': 'Folien folgen.\n' })
+  await neuAnlegen(a, 'E2E Semantik', {
+    'main.tex': String.raw`\documentclass{article}
 \usepackage{csquotes}
 \begin{document}
 \enquote{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
 \end{document}`,
-})
-await neuAnlegen(a, 'E2E Offenlegung', { 'main.tex': 'Alpha.\nOmega.\n' })
-await neuAnlegen(a, 'E2E Zahlen', {
-  'main.tex': String.raw`\documentclass{article}
+  })
+  await neuAnlegen(a, 'E2E Offenlegung', { 'main.tex': 'Alpha.\nOmega.\n' })
+  await neuAnlegen(a, 'E2E Zahlen', {
+    'main.tex': String.raw`\documentclass{article}
 \begin{document}
 Platzhalter.
 \end{document}`,
-})
-for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll]) {
-  await (await sammlung()).deleteMany({})
-}
-await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))
+  })
+  for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll]) {
+    await (await sammlung()).deleteMany({})
+  }
+  await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))
 
-// P4: zwei Menschen mit Namen im selben Projekt, dazu eine Leserin.
-async function mitNamen(email, first_name, last_name) {
-  const nutzer = await konto(email)
-  await db.users.updateOne({ _id: nutzer._id }, { $set: { first_name, last_name } })
-  return await db.users.findOne({ _id: nutzer._id })
-}
-const teamA = await mitNamen('e2e-team-a@example.org', 'Anna', 'Autor')
-const teamB = await mitNamen('e2e-team-b@example.org', 'Ben', 'Berater')
-const team = await neuAnlegen(teamA, 'E2E Team', { 'main.tex': LEER })
-await db.projects.updateOne(
-  { _id: team._id },
-  { $set: { collaberator_refs: [teamB._id], readOnly_refs: [leser._id] } }
-)
-await quelleAusFixture(team._id, teamA._id, 'smith2024.pdf')
+  // P4: zwei Menschen mit Namen im selben Projekt, dazu eine Leserin.
+  async function mitNamen(email, first_name, last_name) {
+    const nutzer = await konto(email)
+    await db.users.updateOne({ _id: nutzer._id }, { $set: { first_name, last_name } })
+    return await db.users.findOne({ _id: nutzer._id })
+  }
+  const teamA = await mitNamen('e2e-team-a@example.org', 'Anna', 'Autor')
+  const teamB = await mitNamen('e2e-team-b@example.org', 'Ben', 'Berater')
+  const team = await neuAnlegen(teamA, 'E2E Team', { 'main.tex': LEER })
+  await db.projects.updateOne(
+    { _id: team._id },
+    { $set: { collaberator_refs: [teamB._id], readOnly_refs: [leser._id] } }
+  )
+  await quelleAusFixture(team._id, teamA._id, 'smith2024.pdf')
 
-const scanProjekt = await neuAnlegen(a, 'E2E Scan', { 'main.tex': APA, 'references.bib': BIB })
-await quelleAusFixture(scanProjekt._id, a._id, 'scan.pdf')
-await neuAnlegen(a, 'E2E Web', { 'main.tex': APA, 'references.bib': BIB })
-await neuAnlegen(a, 'E2E Transkript', { 'main.tex': LEER })
+  const scanProjekt = await neuAnlegen(a, 'E2E Scan', { 'main.tex': APA, 'references.bib': BIB })
+  await quelleAusFixture(scanProjekt._id, a._id, 'scan.pdf')
+  await neuAnlegen(a, 'E2E Web', { 'main.tex': APA, 'references.bib': BIB })
+  await neuAnlegen(a, 'E2E Transkript', { 'main.tex': LEER })
 
-// P3: zwei Menschen mit eigenem Claude in denselben Projekten.
-const p3a = await mitNamen('e2e-p3a@example.org', 'Ada', 'Autorin')
-const p3b = await mitNamen('e2e-p3b@example.org', 'Bo', 'Berater')
-const ABSCHNITTE = String.raw`\documentclass{article}
+  // P3: zwei Menschen mit eigenem Claude in denselben Projekten.
+  const p3a = await mitNamen('e2e-p3a@example.org', 'Ada', 'Autorin')
+  const p3b = await mitNamen('e2e-p3b@example.org', 'Bo', 'Berater')
+  const ABSCHNITTE = String.raw`\documentclass{article}
 \begin{document}
 \section{Eins}
 Erster Abschnitt.
 \section{Zwei}
 Zweiter Abschnitt über Schlaf und Gedächtnis.
 \end{document}`
-await neuAnlegen(p3a, 'E2E Chat', { 'main.tex': ABSCHNITTE })
-for (const name of ['E2E Kommentar', 'E2E Vorschläge']) {
-  const p = await neuAnlegen(p3a, name, {
-    'main.tex': String.raw`\documentclass{article}
+  await neuAnlegen(p3a, 'E2E Chat', { 'main.tex': ABSCHNITTE })
+  for (const name of ['E2E Kommentar', 'E2E Vorschläge']) {
+    const p = await neuAnlegen(p3a, name, {
+      'main.tex': String.raw`\documentclass{article}
 \begin{document}
 Schlaf verdoppelt die Gedächtnisleistung.
 \kaputtesmakro{}
 \end{document}`,
-  })
-  await db.projects.updateOne({ _id: p._id }, { $set: { collaberator_refs: [p3b._id] } })
-}
-await neuAnlegen(p3a, 'E2E Workflows', { 'main.tex': ABSCHNITTE })
-for (const [mensch, token] of [[p3a, 'spur_e2e_p3a'], [p3b, 'spur_e2e_p3b']]) {
-  await testToken(mensch, token, new Date(Date.now() + 24 * 3600 * 1000))
-  // Ein Bot aus einem früheren Lauf trägt sonst noch den Namen von vor mitNamen.
-  await db.users.updateOne({ 'spur.botFuer': mensch._id }, { $set: { last_name: `(${mensch.first_name})` } })
-}
-for (const sammlung of [vorschlaege, workflows]) {
-  await (await sammlung()).deleteMany({})
+    })
+    await db.projects.updateOne({ _id: p._id }, { $set: { collaberator_refs: [p3b._id] } })
+  }
+  await neuAnlegen(p3a, 'E2E Workflows', { 'main.tex': ABSCHNITTE })
+  for (const [mensch, token] of [[p3a, 'spur_e2e_p3a'], [p3b, 'spur_e2e_p3b']]) {
+    await testToken(mensch, token, new Date(Date.now() + 24 * 3600 * 1000))
+    // Ein Bot aus einem früheren Lauf trägt sonst noch den Namen von vor mitNamen.
+    await db.users.updateOne({ 'spur.botFuer': mensch._id }, { $set: { last_name: `(${mensch.first_name})` } })
+  }
+  for (const sammlung of [vorschlaege, workflows]) {
+    await (await sammlung()).deleteMany({})
+  }
 }
 
-await ablageFreigeben()
-console.log('E2E-Daten bereit')
-process.exit(0)
+// Als Skript läuft es als root; die Ablage muss danach dem Web-Prozess gehören.
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
+  logger.logger.level('error')
+  await e2eDatenVorbereiten()
+  await ablageFreigeben()
+  console.log('E2E-Daten bereit')
+  process.exit(0)
+}

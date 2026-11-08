@@ -10,7 +10,7 @@ import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
 import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
-import { testseite, zeitSetzen } from './dev/DevSchalter.mjs'
+import { e2eVorbereiten, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
@@ -164,6 +164,7 @@ export default {
       publicApiRouter.use('/spur/dev/crossref', paperFake)
       publicApiRouter.get('/spur/dev/web/testseite', testseite)
       publicApiRouter.post('/spur/dev/zeit', zeitSetzen)
+      publicApiRouter.post('/spur/dev/e2e/vorbereiten', e2eVorbereiten)
     }
   },
 }

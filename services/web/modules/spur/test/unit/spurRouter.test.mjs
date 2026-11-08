@@ -53,6 +53,7 @@ async function laden({ dev = false } = {}) {
   vi.doMock('../../app/src/dev/DevSchalter.mjs', () => ({
     testseite: Object.assign(() => {}, { handler: 'testseite' }),
     zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
+    e2eVorbereiten: Object.assign(() => {}, { handler: 'e2eVorbereiten' }),
   }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
@@ -151,11 +152,12 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit) nur in der Dev-Umgebung', async () => {
+  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit, E2E-Daten) nur in der Dev-Umgebung', async () => {
     const dev = [
       ['use', '/spur/dev/crossref', 'paperFake'],
       ['get', '/spur/dev/web/testseite', 'testseite'],
       ['post', '/spur/dev/zeit', 'zeitSetzen'],
+      ['post', '/spur/dev/e2e/vorbereiten', 'e2eVorbereiten'],
     ]
     for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()
     await laden({ dev: true })

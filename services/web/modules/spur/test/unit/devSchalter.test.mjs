@@ -3,11 +3,14 @@ import { Antwort, anfrage } from './hilfen/express.mjs'
 
 let Dev
 let gesetzt
+let vorbereitet
 
 beforeEach(async () => {
   gesetzt = []
+  vorbereitet = vi.fn(async () => {})
   vi.resetModules()
   vi.doMock('../../app/src/schalter.mjs', () => ({ zeitFestlegen: iso => gesetzt.push(iso) }))
+  vi.doMock('../../test/e2e/vorbereiten.mjs', () => ({ e2eDatenVorbereiten: vorbereitet }))
   Dev = await import('../../app/src/dev/DevSchalter.mjs')
 })
 
@@ -39,5 +42,38 @@ describe('testseite', () => {
     Dev.testseite(anfrage(), res)
     expect(res.kopfzeilen['Content-Type']).toBe('html')
     expect(gesendet).toContain('<title>Schlafhygiene im Schichtdienst</title>')
+  })
+})
+
+describe('e2eVorbereiten', () => {
+  it('setzt die E2E-Daten im laufenden Prozess zurück und meldet 204', async () => {
+    const res = new Antwort()
+    await Dev.e2eVorbereiten(anfrage(), res)
+    expect(vorbereitet).toHaveBeenCalledTimes(1)
+    expect(res.statusCode).toBe(204)
+  })
+
+  it('teilt gleichzeitige Aufrufe auf einen Lauf und startet danach einen neuen', async () => {
+    let fertig
+    vorbereitet.mockImplementationOnce(() => new Promise(r => (fertig = r)))
+    const [a, b] = [new Antwort(), new Antwort()]
+    const laeufe = [Dev.e2eVorbereiten(anfrage(), a), Dev.e2eVorbereiten(anfrage(), b)]
+    await vi.waitFor(() => expect(fertig).toBeTypeOf('function'))
+    fertig()
+    await Promise.all(laeufe)
+    expect(vorbereitet).toHaveBeenCalledTimes(1)
+    expect([a.statusCode, b.statusCode]).toEqual([204, 204])
+    await Dev.e2eVorbereiten(anfrage(), new Antwort())
+    expect(vorbereitet).toHaveBeenCalledTimes(2)
+  })
+
+  it('meldet einen Fehler beim Zurücksetzen mit 500 und Text', async () => {
+    vorbereitet.mockRejectedValueOnce(new Error('Mongo weg'))
+    const res = new Antwort()
+    let gesendet
+    res.send = inhalt => ((gesendet = inhalt), res)
+    await Dev.e2eVorbereiten(anfrage(), res)
+    expect(res.statusCode).toBe(500)
+    expect(gesendet).toContain('Mongo weg')
   })
 })

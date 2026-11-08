@@ -1,5 +1,6 @@
 // Alle E2E-Schritte. Läuft mit dem run-code-Werkzeug von Playwright oder per `make e2e`.
-// Vorher: spur-dev run modules/spur/test/e2e/vorbereiten.mjs
+// Die Suite setzt ihre Daten vor dem ersten Feature selbst zurück (POST /spur/dev/e2e/vorbereiten, nur mit
+// SPUR_DEV); spur-dev run modules/spur/test/e2e/vorbereiten.mjs macht dasselbe von außen.
 // Einzelne Features: Seite vorher auf about:blank#f3,f4 stellen.
 async page => {
   const BASE = globalThis.SPUR_URL || 'http://localhost:8080'
@@ -1443,8 +1444,11 @@ async page => {
     await page.getByLabel('Link zur Bibliothek').fill('https://bibliothek.example/?doi={doi}')
     await page.getByRole('button', { name: 'Speichern' }).click()
     await sichtbar('Link zur Bibliothek gespeichert')
+    // Die Liste lädt nach der Meldung neu; bis dahin zeigt der Link noch auf doi.org.
     const link = eintrag('Sleep and Memory').getByRole('link', { name: 'In der Bibliothek holen' })
-    ok((await link.getAttribute('href')) === 'https://bibliothek.example/?doi=10.5555/spur.2024.001', `Link: ${await link.getAttribute('href')}`)
+    const BIB_LINK = 'https://bibliothek.example/?doi=10.5555/spur.2024.001'
+    await link.and(page.locator(`[href="${BIB_LINK}"]`)).waitFor({ timeout: 10000 }).catch(() => {})
+    ok((await link.getAttribute('href')) === BIB_LINK, `Link: ${await link.getAttribute('href')}`)
 
     const dois = text => [...text.matchAll(/10\.\d{4,9}\/[^\s},"]+/g)].map(t => t[0]).sort().join()
     const erwartet = '10.1038/nrn2762,10.5555/spur.2024.001'
@@ -2215,6 +2219,20 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     fail(`${typ}: ${liste.length} statt ${anzahl} Ereignisse`)
   }
 
+  // Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her, auf langsamen Rechnern erst nach Sekunden;
+  // ein früher Klick auf „Review panel“ wird dann überschrieben. Darum öffnen, bis der Eintrag sichtbar ist.
+  async function reviewEintrag(text) {
+    const eintrag = page.locator('.review-panel-entry', { hasText: text })
+    const ende = Date.now() + 30000
+    while (!(await eintrag.isVisible())) {
+      ok(Date.now() < ende, `Review-Eintrag „${text}“ nicht sichtbar`)
+      const tab = railTab('Review panel')
+      if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click()
+      await page.waitForTimeout(1000)
+    }
+    return eintrag
+  }
+
   features.p3f2 = async () => {
     await anmelden('e2e-p3b@example.org')
     await projektOeffnen('E2E Kommentar')
@@ -2230,14 +2248,11 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click(),
     ])
     ok(gesendet.status() === 204, `Kommentar von Bo: ${gesendet.status()}`)
-    const thread = page.locator('.review-panel-entry', { hasText: 'Bo meint: Das ist zu stark.' })
-    await thread.waitFor()
+    const thread = await reviewEintrag('Bo meint: Das ist zu stark.')
 
     await anmelden('e2e-p3a@example.org')
     await projektOeffnen('E2E Kommentar')
-    // Overleaf stellt das zuletzt offene Panel kurz nach dem Laden wieder her; ein Klick zu früh schlösse es.
-    await thread.waitFor({ timeout: 5000 }).catch(() => railTab('Review panel').click())
-    await thread.waitFor()
+    await reviewEintrag('Bo meint: Das ist zu stark.')
     await thread.locator('.review-panel-comment-input .cm-content').click()
     await page.keyboard.type('@claude prüfe diese Aussage')
     await page.keyboard.press('Escape')
@@ -2515,6 +2530,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok((await promptText('methodenteil')) === texte.methodenteil, 'Standardtext nicht wiederhergestellt')
   }
 
+  // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
+  const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
+  if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue
