@@ -9,6 +9,10 @@ const indexes = {
   spurAcquisitions: [{ key: { projectId: 1, doi: 1 }, name: 'projectId_1_doi_1', unique: true }],
   spurSearchLog: [{ key: { projectId: 1, datum: -1 }, name: 'projectId_1_datum_-1' }],
   spurNotes: [{ key: { projectId: 1, quelleId: 1, zitatId: 1 }, name: 'projectId_1_quelleId_1_zitatId_1', unique: true }],
+  spurJobs: [
+    { key: { projectId: 1, art: 1, status: 1 }, name: 'projectId_1_art_1_status_1' },
+    { key: { projectId: 1, botId: 1, art: 1, status: 1, fertigAm: -1 }, name: 'projectId_1_botId_1_art_1_status_1_fertigAm_-1' },
+  ],
   spurMatrixCells: [
     { key: { projectId: 1, quelleId: 1, spalteId: 1 }, name: 'projectId_1_quelleId_1_spalteId_1', unique: true },
   ],

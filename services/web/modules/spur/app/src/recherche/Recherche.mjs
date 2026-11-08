@@ -1,5 +1,6 @@
 import logger from '@overleaf/logger'
 import { csv } from '../csv.mjs'
+import { doiNormal } from '../pruefung/bib.mjs'
 import { Problem } from '../probleme.mjs'
 import { suchprotokoll } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
@@ -100,7 +101,7 @@ export async function protokoll(projectId, { seite = 0 } = {}) {
 }
 
 export function doiPruefen(doi) {
-  const wert = doi?.trim().toLowerCase()
+  const wert = doiNormal(doi ?? '')?.toLowerCase()
   if (!DOI_MUSTER.test(wert ?? '')) {
     throw new Problem(400, 'doi_ungueltig', 'Das ist keine DOI. Bitte eine DOI wie 10.1038/nrn2762 angeben.')
   }

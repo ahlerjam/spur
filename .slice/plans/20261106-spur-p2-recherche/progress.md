@@ -29,3 +29,21 @@
 - f8: Die Heuristik (`schreiben/zahlen.mjs`) prüft nur den neuen Text eines `doc_edit` und nie `ergebnisse.tex`. Sie blendet Mathe, Kommentare, `\newcommand`, Argumente von Zitier-, Verweis- und Gliederungsbefehlen, Seitenangaben (S., Seite, p., pp., Kapitel, Abb., Tab.), Jahre 1500–2099 und Ziffern in Wörtern (COVID-19, 3D) aus. Treffer stehen im Ergebnis als `zahlen_ohne_beleg` und am Lauf, und die Karte zeigt sie als „Zahl ohne Beleg“. Die Automatik nimmt solche Läufe nicht an, wie bei roten Zitaten.
 - f9: Die Offenlegung zählt Läufe mit mindestens einer Änderung. Zweck sind die Zusammenfassungen aus `run_finish`. Die Annahmequote gilt für entschiedene Läufe (angenommen oder abgelehnt); noch offene Läufe nennt der Text extra. Das Modell steht nur im Text, wenn die Person es ins Freitextfeld schreibt, weil spur das Modell nicht gemeldet bekommt. „Als .tex-Abschnitt einfügen“ schreibt `ki-offenlegung.tex` als Person, ohne Track Change; eingebunden wird es mit `\input{ki-offenlegung}`.
 - f10: Die Schalter `SPUR_SEMANTIC_SEARCH` und `SPUR_FAKE_EMBEDDINGS` kommen aus der Umgebung. Nur mit `SPUR_DEV=1` darf die E2E-Suite sie zur Laufzeit über `POST …/_steuerung` überschreiben, weil `compose.yml` keine Variablen durchreicht. Vektoren liegen als `Binary` (Float32, 384 Werte) an der Seite in `spurSourcePages`, gesucht wird mit Brute-Force-Kosinus. Das Indexieren läuft als Job in `spurJobs`; das Panel stößt es an und fragt alle 500 ms nach. Die Fake-Einbettung (Zeichen-Trigramme) wartet 1 s je Seite, damit der Fortschritt sichtbar wird, und legt nie ein Modell ab. Treffer erzeugen keine Zitate oder Markierungen und sind als „kein Prüfbeleg“ beschriftet.
+
+## /simplify (Diff 0c431525a7..HEAD, nur dieser Lauf)
+- Basis: Die Skill-Formel ergibt `7ff09078c1^`. Dieser Diff enthält auch P11-Commits (etwa `zitatManager.test.mjs`). Wie in P1 laufen `/simplify` und `/code-review` deshalb auf `0c431525a7..HEAD`, dem Stand vor f1.
+- Umgesetzt:
+  - `antwortVon` reicht fertige MCP-Inhalte durch; das Flag `eigenerInhalt` ist entfallen.
+  - Die Fake-Pause liegt im Fake-Einbetter, nicht mehr in der Indexschleife.
+  - Notizen fragen über den Index `projectId` ab.
+  - Neue Indizes für `spurJobs`.
+  - Eine DOI-Normalisierung für Aufnahme, Beschaffung und Zitationen, die auch `https://doi.org/…` versteht.
+  - `ApiFehler` statt Cast im Panel.
+- Nicht umgesetzt:
+  - Gemeinsame Hooks für Seitenlisten in den Panels (wie in P1 zurückgestellt; Umbau ohne Verhaltensgewinn).
+  - `@overleaf/fetch-utils` statt `fetch`: `Crossref.mjs` arbeitet ebenso mit `fetch`, der Umstieg gehört in einen eigenen Schritt.
+  - Paper-Fake unter `/spur/dev/paper`: Die Wurzel steht in der installierten Kopie von `spur-dev`, die nur ein Mensch ändert.
+  - Dev-Schalter über `dev-schalter.json`: Das Modulverzeichnis ist im Container schreibgeschützt.
+  - Zellen der Matrix ohne Effekt und memoisiert: 50 Zeilen je Seite bleiben bedienbar (E2E unter 5 s).
+  - Streaming und Top-10-Heap in der semantischen Suche: Bei Brute Force (Decision) ist das Optimierung; das Backlog nennt pgvector für später.
+- Prettier lief nicht: Das Dev-Image hat keinen `prettier`-Befehl (`yarn exec prettier` findet nichts).

@@ -14,7 +14,7 @@ const quelleFehlt = () => new Problem(404, 'quelle_fehlt', 'Diese Quelle gibt es
 const spalteFehlt = () => new Problem(404, 'spalte_fehlt', 'Diese Spalte gibt es nicht. Bitte zuerst in der Matrix anlegen.')
 
 export async function notizen(quelle) {
-  const liste = await (await notizSammlung()).find({ quelleId: quelle._id }).sort({ zitatId: 1 }).toArray()
+  const liste = await (await notizSammlung()).find({ projectId: quelle.projectId, quelleId: quelle._id }).sort({ zitatId: 1 }).toArray()
   return liste.map(n => ({ zitatId: n.zitatId ? String(n.zitatId) : null, text: n.text }))
 }
 

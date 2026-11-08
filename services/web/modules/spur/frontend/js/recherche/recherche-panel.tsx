@@ -6,7 +6,7 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
-import { anfrage, jsonAnfrage, projektPfad } from '../api'
+import { anfrage, ApiFehler, jsonAnfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
 import PaperEintrag from './paper-treffer'
 import Beschaffung from './beschaffung'
@@ -45,8 +45,8 @@ export default function RecherchePanel() {
         setMeldungen(alt => ({ ...alt, [doi]: { typ: 'success', text: t('spur_auf_liste_gesetzt') } }))
       }
     } catch (error) {
-      const status = (error as { status?: number }).status
-      setMeldungen(alt => ({ ...alt, [doi]: { typ: status === 409 ? 'info' : 'error', text: (error as Error).message } }))
+      const vorhanden = error instanceof ApiFehler && error.status === 409
+      setMeldungen(alt => ({ ...alt, [doi]: { typ: vorhanden ? 'info' : 'error', text: (error as Error).message } }))
     } finally {
       setArbeitet(null)
     }

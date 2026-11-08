@@ -8,14 +8,14 @@ import { Problem } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
-import { bibLesen } from '../pruefung/bib.mjs'
+import { bibLesen, doiNormal as bibDoi } from '../pruefung/bib.mjs'
 import { paperApiBasis } from '../schalter.mjs'
 import { arxivMetadaten, unpaywall } from './dienste.mjs'
 import { freierKey, keyVorschlag } from './keys.mjs'
 
 const ARXIV_DOI = /^10\.48550\/arxiv\.(.+)$/
 
-export const doiNormal = doi => doi.trim().toLowerCase()
+export const doiNormal = doi => bibDoi(doi)?.toLowerCase() ?? ''
 
 function erlaubteAdresse(url) {
   let adresse
@@ -36,6 +36,8 @@ const pdfFehlt = () =>
     'pdf_fehlt',
     'Der freie Volltext ließ sich nicht laden. Bitte später erneut versuchen oder das PDF selbst hochladen.'
   )
+
+const zuGross = () => new Problem(413, 'zu_gross', 'Der Volltext ist größer als 50 MB. Bitte selbst beschaffen.')
 
 async function pdfLaden(url, ziel) {
   if (!erlaubteAdresse(url)) throw pdfFehlt()
@@ -60,8 +62,6 @@ async function pdfLaden(url, ziel) {
   await fs.writeFile(ziel, inhalt)
   return groesse
 }
-
-const zuGross = () => new Problem(413, 'zu_gross', 'Der Volltext ist größer als 50 MB. Bitte selbst beschaffen.')
 
 // Metadaten aus dem DOI-Register: Crossref, für arXiv-DOIs (DataCite) die arXiv-API.
 export async function metadaten(doi) {

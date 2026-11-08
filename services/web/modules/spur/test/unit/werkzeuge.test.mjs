@@ -435,6 +435,5 @@ describe('Recherche', () => {
     expect(await aufruf('page_image', { project_id: projekt, seite: 2 })).toEqual({
       content: [{ type: 'image', data: Buffer.from('PNG').toString('base64'), mimeType: 'image/png' }],
     })
-    expect(WERKZEUGE.page_image.eigenerInhalt).toBe(true)
   })
 })

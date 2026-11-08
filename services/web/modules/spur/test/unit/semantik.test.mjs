@@ -3,6 +3,7 @@ import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mj
 import { fehlerVon } from './hilfen/fehler.mjs'
 
 let Semantik
+let Einbetten
 let datenbank
 let schalter
 
@@ -30,7 +31,8 @@ beforeEach(async () => {
   vi.doMock('../../app/src/schalter.mjs', () => schalter.modul)
   vi.doMock('../../app/src/QuellenManager.mjs', () => ({ ablageWurzel: () => '/tmp/spur-test/data/spur' }))
   Semantik = await import('../../app/src/semantik/Semantik.mjs')
-  Semantik.fakePause.ms = 0
+  Einbetten = await import('../../app/src/semantik/einbetten.mjs')
+  Einbetten.fakePause.ms = 0
   await datenbank.db.collection('spurSources').insertOne({ _id: quelleId, projectId, dateiname: 'smith2024.pdf' })
   await datenbank.db.collection('spurSourcePages').insertMany(
     SEITEN.map((text, i) => ({ quelleId, projectId, seite: i + 1, label: String(345 + i), text }))
@@ -62,7 +64,7 @@ describe('Semantische Suche', () => {
   })
 
   it('startet keinen zweiten Indexlauf, solange einer läuft', async () => {
-    Semantik.fakePause.ms = 50
+    Einbetten.fakePause.ms = 50
     const erster = await Semantik.indexieren(projectId)
     const zweiter = await Semantik.indexieren(projectId)
     expect(zweiter.job_id).toEqual(erster.job_id)

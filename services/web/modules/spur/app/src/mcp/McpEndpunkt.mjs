@@ -16,7 +16,9 @@ const ANWEISUNGEN =
 
 const begrenzer = new RateLimiter('spur-mcp', { points: 600, duration: 60 })
 
+// Werkzeuge mit eigenem MCP-Inhalt (etwa Bilder) liefern content selbst.
 function antwortVon(ergebnis) {
+  if (Array.isArray(ergebnis?.content)) return ergebnis
   return { content: [{ type: 'text', text: JSON.stringify(ergebnis) }] }
 }
 
@@ -39,9 +41,7 @@ function serverBauen({ authInfo }) {
       { description: werkzeug.description, inputSchema: werkzeug.inputSchema },
       async (args, ctx) => {
         try {
-          const ergebnis = await werkzeug.ausfuehren(args, kontext, ctx)
-          // Werkzeuge mit eigenem MCP-Inhalt (etwa Bilder) liefern content selbst.
-          return werkzeug.eigenerInhalt ? ergebnis : antwortVon(ergebnis)
+          return antwortVon(await werkzeug.ausfuehren(args, kontext, ctx))
         } catch (error) {
           if (error instanceof WerkzeugFehler) return fehlerVon(error.code, error.message)
           if (error instanceof Problem) return fehlerVon(error.typ, error.message)

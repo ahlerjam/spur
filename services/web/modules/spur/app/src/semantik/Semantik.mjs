@@ -1,17 +1,14 @@
-import { setTimeout as warten } from 'node:timers/promises'
 import logger from '@overleaf/logger'
 import mongodb from 'mongodb-legacy'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from '../probleme.mjs'
 import { jobs, quellen, quellenSeiten } from '../sammlungen.mjs'
-import { fakeEmbeddings, jetzt, semantikAn } from '../schalter.mjs'
+import { jetzt, semantikAn } from '../schalter.mjs'
 import { aehnlichkeit, einbetten } from './einbetten.mjs'
 
 const { Binary } = mongodb
 const TREFFER = 10
 const AUSZUG = 240
-// Der Fake ist sofort fertig; die Pause macht den Fortschritt im Test sichtbar.
-export const fakePause = { ms: 1000 }
 
 // Mongo liefert den Puffer an beliebigem Versatz; Float32Array braucht ihn auf 4 Byte ausgerichtet.
 const ausBinaer = binaer => new Float32Array(Uint8Array.from(binaer.buffer).buffer)
@@ -41,7 +38,6 @@ async function abarbeiten(job) {
     .toArray()
   for (const seite of offen) {
     const vektor = await einbetten(seite.text, 'passage')
-    if (fakeEmbeddings() && fakePause.ms) await warten(fakePause.ms)
     await seiten.updateOne({ _id: seite._id }, { $set: { vektor: alsBinaer(vektor) } })
   }
 }

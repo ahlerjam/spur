@@ -1,4 +1,5 @@
 import Path from 'node:path'
+import { setTimeout as warten } from 'node:timers/promises'
 import { ablageWurzel } from '../QuellenManager.mjs'
 import { fakeEmbeddings } from '../schalter.mjs'
 
@@ -40,9 +41,15 @@ async function echteEinbettung(text) {
   return Float32Array.from(ausgabe.data)
 }
 
+// Der Fake ist sofort fertig; die Pause je Passage macht den Fortschritt im Test sichtbar.
+export const fakePause = { ms: 1000 }
+
 // e5 erwartet die Präfixe „query:“ und „passage:“.
 export async function einbetten(text, art) {
-  if (fakeEmbeddings()) return fakeVektor(text)
+  if (fakeEmbeddings()) {
+    if (art === 'passage' && fakePause.ms) await warten(fakePause.ms)
+    return fakeVektor(text)
+  }
   return await echteEinbettung(`${art}: ${text}`)
 }
 

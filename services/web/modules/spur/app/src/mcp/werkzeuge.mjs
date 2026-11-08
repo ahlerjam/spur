@@ -434,7 +434,6 @@ Object.assign(WERKZEUGE, {
   page_image: {
     description: 'Eine Seite des zuletzt kompilierten PDFs als PNG, etwa um Layout und Folien zu prüfen.',
     inputSchema: z.object({ project_id: id, seite: z.number().int().min(1).max(2000) }),
-    eigenerInhalt: true,
     async ausfuehren({ project_id: pid, seite }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
       const bild = await Kompilieren.seitenBild({ projectId, botId, seite })
