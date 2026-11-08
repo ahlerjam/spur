@@ -32,6 +32,7 @@ beforeEach(async () => {
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   vi.doMock('../../app/src/schalter.mjs', () => schalterAttrappe().modul)
+  vi.doMock('../../app/src/live.mjs', () => ({ quelleGeaendert: () => {}, zitateGeaendert: () => {} }))
   vi.doMock('../../app/src/Crossref.mjs', () => crossref.modul)
   Quellen = await import('../../app/src/QuellenManager.mjs')
 })
@@ -284,5 +285,22 @@ describe('Klone und Übernehmen', () => {
     expect(existsSync(Quellen.dateiPfad(kopie))).toBe(true)
     expect(await datenbank.db.collection('spurClones').countDocuments()).toBe(0)
     expect(await Quellen.uebernehmen(ziel, projekt, anna)).toBe(0)
+  })
+
+  it('uebernehmen lässt Kommentare, Zuweisungen und eine laufende Texterkennung des alten Projekts zurück', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf')
+    const scan = await aufnehmen('scan.pdf', 'scan.pdf')
+    await datenbank.db.collection('spurSources').updateOne({ _id: scan._id }, { $set: { ocr: { status: 'laeuft', fertig: 0, gesamt: 2 } } })
+    const bestaetigt = { von: anna, am: new Date(0) }
+    await datenbank.db.collection('spurQuotes').insertOne({
+      projectId: projekt, quelleId: quelle._id, text: 'Zitat', seite: 3, angelegtVon: anna,
+      kommentare: [{ von: anna, text: 'intern' }], zugewiesen: { an: anna, von: anna }, bestaetigt,
+    })
+    const ziel = new ObjectId()
+    expect(await Quellen.uebernehmen(ziel, projekt, anna)).toBe(2)
+    const [kopie] = await datenbank.db.collection('spurQuotes').find({ projectId: ziel }).toArray()
+    expect(kopie).toMatchObject({ text: 'Zitat', kommentare: [], zugewiesen: null, bestaetigt })
+    const scanKopie = (await Quellen.alle(ziel)).find(q => q.key === 'scan')
+    expect(scanKopie.ocr).toBeNull()
   })
 })

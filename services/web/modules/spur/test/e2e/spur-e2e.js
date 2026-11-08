@@ -35,6 +35,12 @@ async page => {
     // Eine noch laufende Antwort der verlassenen Seite kann trotzdem eine Session setzen (403 CSRF).
     // Dann genau einmal neu; ein echter Login-Fehler scheitert auch beim zweiten Mal.
     if (antwort.status() === 403 && versuch === 1) return await anmelden(email, 2)
+    // Overleaf erlaubt je IP 20 Anmeldungen in 60 s (router.mjs, overleafLoginRateLimiter); auf einem
+    // schnellen Rechner meldet die Suite sich öfter an. Dann das Fenster abwarten, ohne Retry-After.
+    if (antwort.status() === 429 && versuch <= 2) {
+      await page.waitForTimeout(61000)
+      return await anmelden(email, versuch + 1)
+    }
     await page.waitForURL(/\/project/, { waitUntil: 'commit' })
   }
 
@@ -1251,6 +1257,267 @@ async page => {
       })).status
     }, pid)
     ok(reviewPut === 403, `review setzt Automatik: ${reviewPut}`)
+  }
+
+  // P4: Mehr Quellen und Team. Schlüssel p4f1 … p4f4, damit sie neben P1 stehen können.
+
+  // Führt Schritte auf einer zweiten Seite aus (eigene Sitzung); die Helfer arbeiten dann dort.
+  async function alsSeite(andere, schritte) {
+    const vorher = page
+    page = andere
+    try {
+      return await schritte()
+    } finally {
+      page = vorher
+    }
+  }
+
+  async function zweiteSeite() {
+    const kontext = await page.context().browser().newContext()
+    const neu = await kontext.newPage()
+    neu.on('pageerror', beiFehler)
+    await neu.addInitScript(() => {
+      window.addEventListener('beforeunload', e => e.stopImmediatePropagation(), true)
+    })
+    return { seite: neu, schliessen: () => kontext.close() }
+  }
+
+  async function quelleSeite3(datei) {
+    await page.getByRole('button', { name: datei }).click()
+    for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Nächste Seite' }).click()
+    await sichtbar('Seite 347 (PDF-Seite 3 von 8)')
+    await page.locator('.spur-seitentext', { hasText: 'Sleep supports' }).waitFor()
+  }
+
+  features.p4f1 = async () => {
+    const SATZ_A = 'Sleep supports the consolidation of declarative memory.'
+    const SATZ_B = 'Memory traces are strengthened during slow-wave sleep'
+    // B wartet mit offener Quelle; A markiert in einer zweiten Sitzung.
+    await anmelden('e2e-team-b@example.org')
+    await projektOeffnen('E2E Team')
+    await panelOeffnen('Quellen')
+    await quelleSeite3('smith2024.pdf')
+    await sichtbar('Markieren Sie oben Text und speichern Sie ihn als Zitat.')
+
+    const a = await zweiteSeite()
+    try {
+      await alsSeite(a.seite, async () => {
+        await anmelden('e2e-team-a@example.org')
+        await projektOeffnen('E2E Team')
+        await panelOeffnen('Quellen')
+        await quelleSeite3('smith2024.pdf')
+        await textMarkieren(SATZ_A)
+        await page.getByRole('button', { name: 'Zitat speichern' }).click()
+        await sichtbar(`„${SATZ_A}“`)
+        await sichtbar(/S\. 347 · von Ihnen/)
+        // Zurück zur Liste: Dort erscheint gleich der Hinweis auf die Zuweisung.
+        await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+        await page.getByRole('button', { name: 'smith2024.pdf' }).waitFor()
+      })
+
+      // Live bei B, ohne Neuladen.
+      await sichtbar(/S\. 347 · von Anna Autor/)
+      const zeile = page.locator('.spur-zitate li', { hasText: SATZ_A })
+      await zeile.getByRole('button', { name: 'Kommentieren' }).click()
+      await zeile.getByLabel('Kommentar').fill('Bitte die Seitenzahl prüfen.')
+      await zeile.getByLabel('Zuweisen an').selectOption({ label: 'Anna Autor' })
+      await zeile.getByRole('button', { name: 'Kommentar senden' }).click()
+      await zeile.getByText('Zugewiesen an Anna Autor').waitFor()
+      await zeile.getByText('Bitte die Seitenzahl prüfen.').waitFor()
+
+      await alsSeite(a.seite, async () => {
+        await sichtbar(`Ben Berater hat Ihnen ein Zitat zugewiesen: „${SATZ_A}“ (smith2024.pdf, S. 347)`)
+        await page.getByRole('button', { name: 'Öffnen', exact: true }).click()
+        await sichtbar('Seite 347 (PDF-Seite 3 von 8)')
+        await sichtbar('Zugewiesen an Anna Autor')
+        await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+        await page.getByRole('button', { name: 'Erledigt' }).click()
+        await page.getByRole('button', { name: 'Erledigt' }).waitFor({ state: 'detached' })
+      })
+    } finally {
+      await a.schliessen()
+    }
+
+    // Filter „Von mir“: B markiert selbst, sieht dann nur das eigene Zitat.
+    await textMarkieren(SATZ_B)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    await sichtbar(`„${SATZ_B}“`)
+    await page.getByText('Von mir', { exact: true }).click()
+    await page.getByText(`„${SATZ_A}“`).waitFor({ state: 'detached' })
+    ok(await page.getByText(`„${SATZ_B}“`).isVisible(), 'Eigenes Zitat fehlt im Filter')
+    await page.getByText('Alle', { exact: true }).click()
+    await sichtbar(`„${SATZ_A}“`)
+
+    // Leserin: sieht die Markierungen, legt keine an.
+    await anmelden('e2e-leser@example.org')
+    await projektOeffnen('E2E Team')
+    await panelOeffnen('Quellen')
+    await quelleSeite3('smith2024.pdf')
+    await sichtbar(/S\. 347 · von Anna Autor/)
+    await sichtbar(/S\. 347 · von Ben Berater/)
+    ok(
+      (await page.getByRole('button', { name: 'Zitat speichern' }).count()) === 0,
+      'Leserin sieht „Zitat speichern“'
+    )
+    const pid = page.url().split('/project/')[1]
+    const quelleId = await page.evaluate(async p => {
+      const r = await fetch(`/spur/project/${p}/quellen`)
+      return (await r.json()).quellen[0].id
+    }, pid)
+    const versuch = await seitenPost(`/spur/project/${pid}/quellen/${quelleId}/zitate`, {
+      seite: 3,
+      text: SATZ_A,
+    })
+    ok(versuch.status === 403, `Leserin markiert: ${versuch.status}`)
+  }
+
+  // Fügt ein gespeichertes Zitat vor \printbibliography ein und wartet auf den Text im Editor.
+  async function vorBibliographieEinfuegen(zitat, erwartet) {
+    await page.evaluate(() => {
+      const view = window.overleaf.unstable.store.get('editor.view')
+      view.dispatch({ selection: { anchor: view.state.doc.toString().indexOf('\\printbibliography') } })
+    })
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith('/einfuegen') && r.ok()),
+      zitat.getByRole('button', { name: 'Einfügen' }).click(),
+    ])
+    await page.waitForFunction(
+      text => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(text),
+      erwartet
+    )
+  }
+
+  features.p4f2 = async () => {
+    const SATZ = 'Short naps restore attention in night shift workers.'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Scan')
+    await panelOeffnen('Quellen')
+    const zeile = page.locator('.spur-liste li', { hasText: 'scan.pdf' })
+    await zeile.getByText('2 Seiten · Kein Text, nicht prüfbar').waitFor()
+    await zeile.getByRole('button', { name: 'Text erkennen' }).click()
+    await zeile.getByText(/Text wird erkannt: Seite \d von 2/).waitFor()
+    await zeile.getByText('2 Seiten · OCR, Sichtprüfung nötig').waitFor({ timeout: 120000 })
+    ok((await zeile.getByRole('button', { name: 'Text erkennen' }).count()) === 0, 'Knopf nach OCR')
+
+    await suchen('restore attention')
+    await page.locator('.spur-panel').getByText(/Short naps restore attention/).first().waitFor()
+    await page.getByRole('button', { name: /scan\.pdf/ }).first().click()
+    await sichtbar('Text dieser Seite per OCR erkannt. Bitte mit dem Bild vergleichen.')
+    await page.locator('.spur-seitentext', { hasText: SATZ }).waitFor()
+    await textMarkieren(SATZ)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    const zitat = page
+      .getByRole('tabpanel', { name: 'Quellen' })
+      .locator('.spur-zitate li', { hasText: SATZ })
+    await zitat.getByText('Wortlaut: OCR, nicht bestätigt').waitFor()
+
+    await vorBibliographieEinfuegen(zitat, `\\enquote{${SATZ}} \\autocite[1]{scan}`)
+    await panelOeffnen('Prüfbericht')
+    const bericht = page
+      .getByRole('tabpanel', { name: 'Prüfbericht' })
+      .locator('.spur-zeile', { hasText: 'Short naps' })
+    await bericht.getByText('Wortlaut: OCR, nicht bestätigt').waitFor()
+    ok((await bericht.getByText('Wortlaut: exakt').count()) === 0, 'OCR-Zitat als exakt')
+
+    // Das Quellen-Panel steht noch auf der Vorschau von scan.pdf.
+    await railTab('Quellen').click()
+    await zitat.getByRole('button', { name: 'Stelle bestätigt' }).click()
+    await zitat.getByText('Wortlaut: von Mensch bestätigt').waitFor()
+    ok((await zitat.getByRole('button', { name: 'Stelle bestätigt' }).count()) === 0, 'Knopf nach Bestätigung')
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await bericht.getByText('Wortlaut: von Mensch bestätigt').waitFor()
+  }
+
+  // SPUR_NOW gilt nur für diesen Schritt; sonst hingen Herzschläge und Token an einer festen Zeit.
+  async function zeitSetzen(jetzt) {
+    const r = await page.request.post(`${BASE}/spur/dev/zeit`, { data: { jetzt } })
+    ok(r.status() === 204, `SPUR_NOW setzen: ${r.status()}`)
+  }
+
+  features.p4f3 = async () => {
+    const SATZ = 'Regular sleep times help shift workers recover.'
+    const TESTSEITE = 'http://127.0.0.1/spur/dev/web/testseite'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Web')
+    await panelOeffnen('Quellen')
+    await sichtbar('Noch keine Quellen')
+    await zeitSetzen('2026-11-01T09:00:00.000Z')
+    try {
+      await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+      await page.getByLabel('Adresse der Webseite').fill(TESTSEITE)
+      // Erst nach der Antwort freigeben: Der Server liest die Zeit beim Speichern.
+      await Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/quellen/web')),
+        page.getByRole('button', { name: 'Aufnehmen', exact: true }).click(),
+      ])
+    } finally {
+      await zeitSetzen(null)
+    }
+    const zeile = page.locator('.spur-liste li', { hasText: 'Schlafhygiene im Schichtdienst' })
+    await zeile.getByText('Webseite · abgerufen am 1. November 2026').waitFor()
+    await zeile.getByText(TESTSEITE, { exact: true }).waitFor()
+
+    await zeile.getByRole('button', { name: 'Schlafhygiene im Schichtdienst' }).click()
+    await sichtbar(`Schnappschuss von ${TESTSEITE}.`)
+    await sichtbar('abgerufen am 1. November 2026')
+    await page.locator('.spur-seitentext', { hasText: SATZ }).waitFor()
+    ok(!(await page.locator('.spur-seitentext').textContent()).includes('console.log'), 'Skript im Schnappschuss')
+    await textMarkieren(SATZ)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    const zitat = page.getByRole('tabpanel', { name: 'Quellen' }).locator('.spur-zitate li', { hasText: SATZ })
+    await zitat.waitFor()
+    await vorBibliographieEinfuegen(zitat, `\\enquote{${SATZ}} \\autocite{schlafhygiene-im-schichtdienst}`)
+    await panelOeffnen('Prüfbericht')
+    const bericht = page.getByRole('tabpanel', { name: 'Prüfbericht' })
+    await bericht.locator('.spur-zeile', { hasText: 'Regular sleep' }).getByText('Wortlaut: exakt').waitFor()
+    await editorErsetzen('{Regular sleep times', '{Irregular sleep times')
+    await bericht.locator('.spur-zeile', { hasText: 'Irregular sleep' }).getByText('Wortlaut: abweichend').waitFor()
+
+    // Nicht erreichbar: Meldung, keine neue Quelle.
+    await railTab('Quellen').click()
+    await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+    await page.getByLabel('Adresse der Webseite').fill('http://nicht-erreichbar.invalid/')
+    await page.getByRole('button', { name: 'Aufnehmen', exact: true }).click()
+    await sichtbar('Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.')
+    ok(
+      (await page.getByLabel('Adresse der Webseite').inputValue()) === 'http://nicht-erreichbar.invalid/',
+      'Adresse nach Fehler verloren'
+    )
+    const quellenListe = page.getByRole('tabpanel', { name: 'Quellen' }).locator('.spur-liste li')
+    ok((await quellenListe.count()) === 1, `Nicht erreichbare Seite gespeichert: ${await quellenListe.count()}`)
+  }
+
+  // Liest eine Datei des Repos über ein Dateifeld (das run-code-Werkzeug hat kein fs).
+  async function repoDatei(pfad) {
+    await page.setContent('<input type="file">')
+    await page.locator('input').setInputFiles(pfad)
+    return await page.locator('input').evaluate(el => el.files[0].text())
+  }
+
+  features.p4f4 = async () => {
+    const HINWEIS =
+      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Transkript')
+    await panelOeffnen('Quellen')
+    await hochladen('interview.vtt')
+    const hinweis = page.getByRole('tabpanel', { name: 'Quellen' }).getByText(HINWEIS)
+    await hinweis.waitFor()
+    // Der Hinweis steht unter dem Upload-Knopf.
+    const [knopf, text] = await Promise.all([
+      page.getByRole('button', { name: 'Hochladen', exact: true }).boundingBox(),
+      hinweis.boundingBox(),
+    ])
+    ok(text.y > knopf.y, 'Hinweis steht nicht unter dem Upload')
+
+    await hochladen('smith2024.pdf')
+    await hinweis.waitFor({ state: 'detached' })
+
+    const readme = await repoDatei(`${FIXTURES}/../../../../../../README.md`)
+    const abschnitt = readme.split('\n## ').find(teil => teil.startsWith('Claude und Ihre Daten'))
+    ok(abschnitt?.includes(HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude und Ihre Daten“')
   }
 
   const ergebnis = []

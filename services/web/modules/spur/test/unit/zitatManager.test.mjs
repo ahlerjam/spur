@@ -39,11 +39,13 @@ beforeEach(async () => {
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   vi.doMock('../../app/src/schalter.mjs', () => schalterAttrappe().modul)
+  vi.doMock('../../app/src/live.mjs', () => ({ quelleGeaendert: () => {}, zitateGeaendert: () => {} }))
   vi.doMock('../../app/src/Crossref.mjs', () => crossrefAttrappe().modul)
   vi.doMock('../../../../app/src/Features/Editor/EditorController.mjs', () => ({
     default: { promises: { appendToDoc, upsertDocWithPath } },
   }))
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ dokumente: async () => docs }))
+  vi.doMock('../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs', () => ({ default: { promises: { getInvitedMemberIds: async () => [] } } }))
   Quellen = await import('../../app/src/QuellenManager.mjs')
   Zitate = await import('../../app/src/ZitatManager.mjs')
   quelle = await Quellen.aufnehmen({ projectId: projekt, userId: anna, dateiname: 'smith2024.pdf', tempPfad: fixture('smith2024.pdf'), groesse: 1 })

@@ -78,3 +78,20 @@ describe('Testschalter in der Dev-Umgebung', () => {
     expect(schalter.jetzt().getFullYear()).toBeGreaterThan(2025)
   })
 })
+
+describe('SPUR_NOW zur Laufzeit (E2E)', () => {
+  it('legt die Zeit im Prozess fest, vor der Datei, und gibt sie mit null wieder frei', async () => {
+    dateiVorgeben({ SPUR_NOW: '2020-01-01T00:00:00Z' })
+    await laden(true)
+    schalter.zeitFestlegen('2026-11-01T09:00:00Z')
+    expect(schalter.jetzt()).toEqual(new Date('2026-11-01T09:00:00Z'))
+    schalter.zeitFestlegen(null)
+    expect(schalter.jetzt()).toEqual(new Date('2020-01-01T00:00:00Z'))
+  })
+
+  it('wirkt außerhalb der Dev-Umgebung nicht', async () => {
+    await laden(false)
+    schalter.zeitFestlegen('2020-01-01T00:00:00Z')
+    expect(schalter.jetzt().getFullYear()).toBeGreaterThan(2025)
+  })
+})

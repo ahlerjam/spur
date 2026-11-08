@@ -23,7 +23,15 @@ export function paperApiBasis() {
   return schalter().SPUR_PAPER_API_BASE
 }
 
+// Der E2E-Test legt SPUR_NOW für einen Schritt im laufenden Prozess fest (Route nur bei SPUR_DEV);
+// die Schalterdatei ist im Container schreibgeschützt eingehängt.
+let festeZeit = null
+
+export function zeitFestlegen(iso) {
+  if (IST_DEV) festeZeit = iso
+}
+
 export function jetzt() {
-  const fest = schalter().SPUR_NOW
+  const fest = festeZeit ?? schalter().SPUR_NOW
   return fest ? new Date(fest) : new Date()
 }

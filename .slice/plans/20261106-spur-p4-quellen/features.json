@@ -9,7 +9,7 @@
     "`read`-Nutzer sehen Markierungen, dürfen aber keine anlegen",
     "Der Filter „Von mir“ zeigt nur eigene Zitate"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -21,7 +21,7 @@
     "Ein Zitat daraus zeigt „Wortlaut: OCR, nicht bestätigt“",
     "Nach „Stelle bestätigt“ zeigt es „Wortlaut: von Mensch bestätigt“"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -32,7 +32,7 @@
     "Ein Zitat daraus wird gegen den Schnappschuss geprüft",
     "Eine nicht erreichbare Adresse zeigt „Seite nicht erreichbar“ und speichert nichts"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -43,7 +43,7 @@
     "Bei einem PDF steht dieser Hinweis nicht",
     "Die README nennt denselben Hinweis im Abschnitt „Claude und Ihre Daten“"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   }
  ]

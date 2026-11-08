@@ -1,7 +1,20 @@
 import { latexZuText, seiteAusBeleg } from './latex.mjs'
-import { wortlautPruefen } from './wortlaut.mjs'
+import { normalisieren, wortlautPruefen } from './wortlaut.mjs'
+
+// OCR-Text kann falsch gelesen sein: Ein Treffer gilt erst als belegt, wenn ein Mensch ein Zitat
+// dieser Quelle mit dem Text bestätigt hat.
+function ocrWortlaut(wortlaut, quelle, zitiert, bestaetigt) {
+  if (quelle.status !== 'ocr' || !['exakt', 'trennung'].includes(wortlaut)) return wortlaut
+  const text = normalisieren(zitiert)
+  const belegt = (bestaetigt?.get(String(quelle._id)) ?? []).some(z =>
+    normalisieren(z).includes(text)
+  )
+  return belegt ? 'bestaetigt' : 'ocr_unbestaetigt'
+}
 
 function seitenStatus(beleg, quelle, gefunden, texte) {
+  // Ein Schnappschuss hat keine Seiten, es gibt nichts zu prüfen.
+  if (quelle.art === 'web') return { seite: null }
   if (quelle.versatz == null) return { seite: 'nicht_pruefbar' }
   const zitiert = seiteAusBeleg(beleg.seite)
   if (gefunden.length === 0 || !zitiert) return { seite: 'nicht_pruefbar' }
@@ -60,17 +73,18 @@ export function zeileBewerten(fund, kontext) {
   if (!fund.roh) return { ...ergebnis, wortlaut: null, seite: null }
   const seiten = seitenJeQuelle.get(String(quelle._id)) ?? []
   const texte = seiten.map(s => s.text)
-  const { wortlaut, seiten: gefunden } = wortlautPruefen(latexZuText(fund.roh), texte)
+  const zitiert = latexZuText(fund.roh)
+  const { wortlaut, seiten: gefunden } = wortlautPruefen(zitiert, texte)
   return {
     ...ergebnis,
-    wortlaut,
+    wortlaut: ocrWortlaut(wortlaut, quelle, zitiert, kontext.bestaetigt),
     ...seitenStatus(beleg, quelle, gefunden, seiten),
   }
 }
 
 export function istProblem(zeile) {
   return (
-    ['abweichend', 'nicht_pruefbar', 'quelle_fehlt'].includes(zeile.wortlaut) ||
+    ['abweichend', 'nicht_pruefbar', 'quelle_fehlt', 'ocr_unbestaetigt'].includes(zeile.wortlaut) ||
     ['nicht_pruefbar', 'gefunden'].includes(zeile.seite) ||
     zeile.referenz === 'nicht_gefunden' ||
     zeile.retraction === 'zurueckgezogen' ||

@@ -76,8 +76,9 @@ claude plugin marketplace add ahlerjam/spur
 claude plugin install spur@spur --config server_url=https://ihre-spur-adresse/spur/mcp --config token=<Token>
 ```
 
-
 Inhalte, die Claude liest, gehen an Anthropic. Dazu gehören Dokumente und Quellen, auch Interviews. Die Verantwortung dafür liegt bei Ihnen.
+
+Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen. spur zeigt diesen Hinweis beim Hochladen jeder VTT-Datei; weitere Regeln für Interviews gibt es nicht.
 
 ## Herkunft
 

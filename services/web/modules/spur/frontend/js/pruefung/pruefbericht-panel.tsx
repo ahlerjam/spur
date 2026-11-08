@@ -21,6 +21,8 @@ function useBadges(zeile: Zeile) {
   if (zeile.wortlaut === 'abweichend') add(t('spur_wortlaut_abweichend'), 'danger')
   if (zeile.wortlaut === 'nicht_pruefbar') add(t('spur_nicht_pruefbar'), 'warning')
   if (zeile.wortlaut === 'quelle_fehlt') add(t('spur_quelle_fehlt'), 'danger')
+  if (zeile.wortlaut === 'ocr_unbestaetigt') add(t('spur_wortlaut_ocr'), 'warning')
+  if (zeile.wortlaut === 'bestaetigt') add(t('spur_wortlaut_bestaetigt'), 'success')
 
   if (zeile.seite === 'stimmt') add(t('spur_seite_stimmt'), 'success')
   if (zeile.seite === 'bestaetigt') add(t('spur_seite_bestaetigt'), 'success')
