@@ -1,8 +1,10 @@
 // Fake aller Paper-Dienste für Tests (nur mit SPUR_DEV=1). Antwortet im Format der echten APIs
 // aus dem Katalog test/fixtures/papers.json, protokolliert jeden Abruf und kann Dienste ausfallen lassen.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
+import { devSchalterSetzen } from '../schalter.mjs'
+import { modellOrdner } from '../semantik/einbetten.mjs'
 
 const FIXTURES = new URL('../../../test/fixtures/', import.meta.url)
 const KATALOG = JSON.parse(readFileSync(new URL('papers.json', FIXTURES), 'utf8'))
@@ -107,6 +109,7 @@ export const paperFake = express.Router()
 paperFake.post('/_steuerung', express.json(), (req, res) => {
   zustand.ausfall = new Set(req.body?.ausfall ?? [])
   if (req.body?.protokollLeeren) zustand.protokoll = []
+  if (req.body?.schalter) devSchalterSetzen(req.body.schalter)
   res.sendStatus(204)
 })
 
@@ -117,6 +120,8 @@ paperFake.get('/zotero/collections/:key/bibtex', (req, res) => {
   if (!bibtex) return res.sendStatus(404)
   res.type('text/plain').send(bibtex)
 })
+
+paperFake.get('/_semantik', (req, res) => res.json({ modellVorhanden: existsSync(modellOrdner()) }))
 
 paperFake.get('/_protokoll', (req, res) => res.json({ abrufe: zustand.protokoll }))
 

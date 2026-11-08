@@ -65,6 +65,8 @@ export function schalterAttrappe() {
     IST_DEV: false,
     jetzt: () => new Date(schalter.zeit),
     paperApiBasis: () => schalter.paperApiBasis,
+    semantikAn: () => schalter.semantik ?? false,
+    fakeEmbeddings: () => true,
   }
   return schalter
 }

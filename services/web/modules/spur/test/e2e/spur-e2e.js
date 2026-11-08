@@ -737,8 +737,14 @@ async page => {
         'project_list', 'doc_list', 'doc_read', 'sources_list', 'source_search', 'source_read',
         'quote_mark', 'check_report', 'bib_list', 'doc_edit', 'doc_create', 'run_status',
         'run_finish', 'wait_for_event', 'events_since', 'reply',
-      ].sort()
-      ok(JSON.stringify(namen) === JSON.stringify(P1), `Tools: ${namen}`)
+      ]
+      // P2 ergänzt laut docs/mcp-vertrag.md Recherche, Aufnahme, Matrix und Compile.
+      const P2 = [
+        'paper_search', 'paper_citations', 'source_add', 'acquisition_add', 'matrix_suggest',
+        'compile', 'job_status', 'compile_log', 'page_image',
+      ]
+      const erwartet = [...P1, ...P2].sort()
+      ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
 
@@ -1745,6 +1751,59 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const tex = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'ki-offenlegung.tex' })).inhalt.text
     ok(tex.startsWith('\\section*{Nutzung von KI-Werkzeugen}\n') && tex.includes('Modell: Claude Opus 5.5.'), `.tex:\n${tex}`)
     await dialog.getByRole('button', { name: 'Schließen' }).click()
+  }
+
+  features.p2f10 = async () => {
+    const AUS = { ausfall: [], schalter: {} }
+    const modellVorhanden = async () => (await (await page.request.get(`${FAKE}/_semantik`)).json()).modellVorhanden
+    const stichworte = async () => {
+      await suchen('consolidation')
+      const liste = page.locator('.spur-panel-inhalt > .spur-liste .spur-zeile')
+      await liste.first().waitFor()
+      return await liste.allTextContents()
+    }
+    const panelNeu = async () => {
+      await page.reload()
+      await page.locator('.cm-content').first().waitFor()
+      await panelOeffnen('Quellen')
+    }
+    await fakeSteuern(AUS)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Semantik')
+    await panelOeffnen('Quellen')
+    await hochladen('smith2024.pdf')
+    ok((await page.getByText('Sinngemäß suchen').count()) === 0, 'Hinweis auf semantische Suche ohne Schalter')
+    ok(!(await modellVorhanden()), 'Modell im Volume ohne Schalter')
+    const vorher = await stichworte()
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Semantik')
+    const bericht = async () => JSON.stringify((await werkzeug(token, 'check_report', { project_id: pid })).inhalt.eintraege)
+    const berichtVorher = await bericht()
+    ok(berichtVorher.includes('exakt'), `Prüfbericht ohne Status: ${berichtVorher}`)
+
+    try {
+      await fakeSteuern({ ausfall: [], schalter: { SPUR_SEMANTIC_SEARCH: 'true', SPUR_FAKE_EMBEDDINGS: '1' } })
+      await panelNeu()
+      await sichtbar('Indexiert 3 von 8 Seiten', 30000)
+      await sichtbar('Bereit: 8 Seiten indexiert', 30000)
+      ok(!(await modellVorhanden()), 'Fake-Einbettung legt ein Modell ab')
+      await page.getByRole('searchbox', { name: 'Sinngemäß suchen' }).fill('memories get stronger in deep slow wave sleep')
+      await page.locator('.spur-semantik').getByRole('button', { name: 'Suchen' }).click()
+      const erster = page.locator('.spur-semantik .spur-zeile').first()
+      await erster.waitFor()
+      const text = await erster.textContent()
+      ok(text.includes('smith2024.pdf') && text.includes('S. 347') && text.includes('Sleep supports the consolidation'), `Erster Treffer: ${text}`)
+      await page.locator('.spur-semantik').getByText('Sie belegen kein Zitat.', { exact: false }).waitFor()
+      ok((await bericht()) === berichtVorher, 'Semantische Treffer ändern den Prüfbericht')
+    } finally {
+      await fakeSteuern(AUS)
+    }
+
+    await panelNeu()
+    await page.getByRole('searchbox', { name: 'Quellen durchsuchen' }).waitFor()
+    ok((await page.getByText('Sinngemäß suchen').count()) === 0, 'Semantik nach dem Ausschalten sichtbar')
+    const nachher = await stichworte()
+    ok(JSON.stringify(nachher) === JSON.stringify(vorher), `Stichwortsuche verändert:\n${vorher}\n${nachher}`)
   }
 
   const ergebnis = []

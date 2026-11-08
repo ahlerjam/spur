@@ -20,6 +20,7 @@ beforeEach(async () => {
     Import: { zoteroSammlungen: vi.fn(), zoteroImportieren: vi.fn() },
     Literatur: {},
     Offenlegung: {},
+    Semantik: {},
     Quellen: {
       liste: vi.fn(),
       aufnehmen: vi.fn(),
@@ -77,6 +78,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/recherche/Import.mjs', () => m.Import)
   vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
   vi.doMock('../../app/src/offenlegung/Offenlegung.mjs', () => m.Offenlegung)
+  vi.doMock('../../app/src/semantik/Semantik.mjs', () => m.Semantik)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.Zitate)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.Pruef)
   vi.doMock('../../app/src/ClaudeZugang.mjs', () => m.Zugang)

@@ -78,3 +78,25 @@ describe('Testschalter in der Dev-Umgebung', () => {
     expect(schalter.jetzt().getFullYear()).toBeGreaterThan(2025)
   })
 })
+
+describe('Semantische Suche', () => {
+  it('ist ohne Schalter aus und folgt den Umgebungsvariablen', async () => {
+    await laden(false)
+    expect(schalter.semantikAn()).toBe(false)
+    vi.stubEnv('SPUR_SEMANTIC_SEARCH', 'true')
+    vi.stubEnv('SPUR_FAKE_EMBEDDINGS', '1')
+    expect(schalter.semantikAn()).toBe(true)
+    expect(schalter.fakeEmbeddings()).toBe(true)
+  })
+
+  it('lässt sich nur in der Dev-Umgebung zur Laufzeit umschalten', async () => {
+    await laden(false)
+    schalter.devSchalterSetzen({ SPUR_SEMANTIC_SEARCH: 'true' })
+    expect(schalter.semantikAn()).toBe(false)
+    await laden(true)
+    schalter.devSchalterSetzen({ SPUR_SEMANTIC_SEARCH: 'true', SPUR_FAKE_EMBEDDINGS: '1' })
+    expect([schalter.semantikAn(), schalter.fakeEmbeddings()]).toEqual([true, true])
+    schalter.devSchalterSetzen({})
+    expect(schalter.semantikAn()).toBe(false)
+  })
+})

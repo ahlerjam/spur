@@ -13,6 +13,7 @@ import ImportModal from './import-modal'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
+import Semantik from './semantik'
 import type { Quelle, Treffer } from './typen'
 
 const MAX_BYTES = 50 * 1024 * 1024
@@ -248,6 +249,7 @@ export default function QuellenPanel() {
             <OLSpinner size="sm" /> {t('spur_quellen_laden')}
           </p>
         )}
+        <Semantik quellenAnzahl={gesamt} oeffnen={trefferOeffnen} />
         {treffer && <QuellenSuche treffer={treffer} oeffnen={trefferOeffnen} />}
         {!treffer && quellen?.length === 0 && (
           <p className="spur-leer">{t('spur_keine_quellen')}</p>

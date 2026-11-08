@@ -20,6 +20,7 @@ import * as Beschaffung from './recherche/Beschaffung.mjs'
 import * as Import from './recherche/Import.mjs'
 import * as Literatur from './literatur/Literatur.mjs'
 import * as Offenlegung from './offenlegung/Offenlegung.mjs'
+import * as Semantik from './semantik/Semantik.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -479,4 +480,17 @@ export const offenlegung = mitProblemen(async (req, res) => {
 
 export const offenlegungTex = mitProblemen(async (req, res) => {
   res.json(await Offenlegung.alsTex(projektId(req), new ObjectId(nutzerId(req)), { modell: modellAus(req.body?.modell) }))
+})
+
+export const semantikStand = mitProblemen(async (req, res) => {
+  res.json(await Semantik.stand(projektId(req)))
+})
+
+export const semantikIndexieren = mitProblemen(async (req, res) => {
+  const { job_id: jobId } = await Semantik.indexieren(projektId(req))
+  res.status(202).json({ job_id: jobId })
+})
+
+export const semantikSuchen = mitProblemen(async (req, res) => {
+  res.json({ treffer: await Semantik.suchen(projektId(req), req.query.q) })
 })

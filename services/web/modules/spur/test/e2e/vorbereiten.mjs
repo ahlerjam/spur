@@ -329,6 +329,13 @@ Text davor.
 \end{document}`,
 })
 await neuAnlegen(a, 'E2E Folien', { 'main.tex': 'Folien folgen.\n' })
+await neuAnlegen(a, 'E2E Semantik', {
+  'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\begin{document}
+\enquote{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
+\end{document}`,
+})
 await neuAnlegen(a, 'E2E Offenlegung', { 'main.tex': 'Alpha.\nOmega.\n' })
 await neuAnlegen(a, 'E2E Zahlen', {
   'main.tex': String.raw`\documentclass{article}
