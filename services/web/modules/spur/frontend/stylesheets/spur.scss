@@ -418,3 +418,14 @@
   padding-bottom: var(--spacing-04);
   border-bottom: 1px solid var(--border-divider);
 }
+
+// Im schmalen Panel umbrechen statt abschneiden.
+.spur-reiter {
+  flex-wrap: wrap;
+}
+
+.spur-paper-aktionen .btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}

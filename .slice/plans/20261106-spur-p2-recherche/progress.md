@@ -74,3 +74,9 @@
   - Weitere Sonderbereiche (198.18/15, NAT64).
   - Rohe Zotero-Blöcke in der `.bib`: Sie kommen aus dem eigenen Konto.
   - `job_status` ohne erneute Rollenprüfung: Er liefert nur Status und Dateinamen.
+
+## Abschluss
+- Upstream (`spur-dev upstream alle`): web 5598 bestanden, 173 bekannt, 0 neu; du 784 bestanden; frontend 1685 bestanden, 14 bekannt, 1 neu. Der neue Fehler ist der P1-Test „Prüfbericht-Panel blendet mit ‚Nur Probleme‘ grüne Zeilen aus“. Einzeln läuft er grün (`spur-dev upstream frontend modules/spur/test/frontend/pruefbericht-panel.test.tsx`); im Gesamtlauf schwankt er offenbar zeitlich. Vorschlag: Test auf `findBy…` umstellen.
+- Ansichten bei 1280 und 360 px: Treffer, Suchprotokoll, Beschaffung, Import-Dialog, Literaturmatrix, Quellenvorschau mit Notizen, KI-Offenlegung, Lauf-Karte, semantische Suche (Fortschritt und fertig). Kein horizontaler Scroll.
+  - Behoben nach Sichtprüfung: Die Reiter des Recherche-Panels wurden bei 1280 px (Panel 185 px) abgeschnitten, „Auf die Beschaffungsliste“ ragte aus dem Panel, und das Rail-Icon `travel_explore` fehlt im Icon-Subset von Overleaf und erschien als Text „TRAV…“. Jetzt brechen Reiter und Knöpfe um, und das Icon ist `find_in_page`.
+- Letzter E2E-Lauf nach der letzten Code-Änderung: f1–f15 und p2f1–p2f10 ok.

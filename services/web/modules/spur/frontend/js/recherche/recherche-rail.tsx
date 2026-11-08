@@ -4,7 +4,7 @@ import RecherchePanel from './recherche-panel'
 
 const eintrag = {
   key: 'spur-recherche',
-  icon: 'travel_explore',
+  icon: 'find_in_page',
   get title() {
     return i18n.t('spur_recherche')
   },
