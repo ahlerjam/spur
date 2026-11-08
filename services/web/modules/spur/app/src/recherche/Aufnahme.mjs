@@ -1,10 +1,11 @@
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import Path from 'node:path'
-import { lookup } from 'node:dns/promises'
-import { BlockList, isIP } from 'node:net'
+import dns from 'node:dns'
+import { isIP } from 'node:net'
 import logger from '@overleaf/logger'
 import * as Crossref from '../Crossref.mjs'
+import { adresseGesperrt, geschuetztHolen } from '../netz.mjs'
 import { Problem } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
@@ -19,18 +20,11 @@ const ARXIV_DOI = /^10\.48550\/arxiv\.(.+)$/
 export const doiNormal = doi => bibDoi(doi)?.toLowerCase() ?? ''
 
 // Austauschbar für Tests ohne Netz.
-export const namen = { lookup }
+export const netz = { holen: geschuetztHolen, lookup: dns.lookup }
 
-const INTERN = new BlockList()
-for (const [netz, laenge] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]]) {
-  INTERN.addSubnet(netz, laenge, 'ipv4')
-}
-// IPv4-gemappte IPv6-Adressen prüft BlockList mit den IPv4-Regeln.
-for (const [netz, laenge] of [['::', 127], ['fc00::', 7], ['fe80::', 10]]) INTERN.addSubnet(netz, laenge, 'ipv6')
-
-// Der Paper-Fake liegt im eigenen Stack; echte Volltexte kommen nur von öffentlichen https-Adressen,
-// auch nach der Namensauflösung.
-async function erlaubteAdresse(url) {
+// Der Paper-Fake liegt im eigenen Stack; echte Volltexte kommen nur von öffentlichen https-Adressen.
+// Die Auflösung des Namens prüft erst die Anfrage selbst, an der Stelle, an der sie verbindet.
+function erlaubteAdresse(url) {
   let adresse
   try {
     adresse = new URL(url)
@@ -39,19 +33,25 @@ async function erlaubteAdresse(url) {
   }
   if (paperApiBasis()) return true
   const host = adresse.hostname.replace(/^\[|\]$/g, '')
-  if (adresse.protocol !== 'https:' || isIP(host) || host === 'localhost' || host.endsWith('.localhost')) return false
-  const ziele = await namen.lookup(host, { all: true }).catch(() => [])
-  return ziele.length > 0 && ziele.every(z => !INTERN.check(z.address, z.family === 6 ? 'ipv6' : 'ipv4'))
+  return adresse.protocol === 'https:' && !isIP(host) && host !== 'localhost' && !host.endsWith('.localhost')
 }
 
 // Redirects selbst folgen, damit jede Station dieselbe Prüfung durchläuft.
 async function holenMitPruefung(url) {
+  const gesperrt = paperApiBasis() ? () => false : adresseGesperrt
+  const signal = AbortSignal.timeout(60000)
   let ziel = url
   for (let i = 0; i < 5; i++) {
-    if (!(await erlaubteAdresse(ziel))) throw pdfFehlt()
-    const antwort = await fetch(ziel, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
-    const weiter = antwort.headers.get('location')
-    if (antwort.status < 300 || antwort.status >= 400 || !weiter) return antwort
+    if (!erlaubteAdresse(ziel)) throw pdfFehlt()
+    const antwort = await netz.holen(new URL(ziel), {
+      gesperrt,
+      signal,
+      lookup: netz.lookup,
+      headers: { 'User-Agent': 'spur (Volltext)', Accept: 'application/pdf' },
+    })
+    const weiter = antwort.headers.location
+    if (antwort.statusCode < 300 || antwort.statusCode >= 400 || !weiter) return antwort
+    antwort.resume()
     ziel = new URL(weiter, ziel).toString()
   }
   throw pdfFehlt()
@@ -71,18 +71,34 @@ async function pdfLaden(url, ziel) {
   try {
     antwort = await holenMitPruefung(url)
   } catch (error) {
-    if (error instanceof Problem) throw error
+    if (error instanceof Problem && error.typ === 'pdf_fehlt') throw error
+    // Auch ein gesperrtes Ziel meldet der Nutzer nur als nicht ladbar.
     logger.warn({ err: error, url }, 'Volltext nicht erreichbar')
     throw pdfFehlt()
   }
-  if (!antwort.ok) throw pdfFehlt()
-  if (Number(antwort.headers.get('content-length') ?? 0) > QuellenManager.MAX_BYTES) throw zuGross()
+  if (antwort.statusCode < 200 || antwort.statusCode >= 300) {
+    antwort.resume()
+    throw pdfFehlt()
+  }
+  if (Number(antwort.headers['content-length'] ?? 0) > QuellenManager.MAX_BYTES) {
+    antwort.destroy()
+    throw zuGross()
+  }
   const teile = []
   let groesse = 0
-  for await (const teil of antwort.body) {
-    groesse += teil.length
-    if (groesse > QuellenManager.MAX_BYTES) throw zuGross()
-    teile.push(teil)
+  try {
+    for await (const teil of antwort) {
+      groesse += teil.length
+      if (groesse > QuellenManager.MAX_BYTES) {
+        antwort.destroy()
+        throw zuGross()
+      }
+      teile.push(teil)
+    }
+  } catch (error) {
+    if (error instanceof Problem) throw error
+    logger.warn({ err: error, url }, 'Volltext abgebrochen')
+    throw pdfFehlt()
   }
   const inhalt = Buffer.concat(teile)
   if (!inhalt.subarray(0, 5).equals(Buffer.from('%PDF-'))) throw pdfFehlt()
