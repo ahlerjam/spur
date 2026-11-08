@@ -20,3 +20,7 @@
   - P2's PDF fetch (`recherche/Aufnahme.mjs`) checks DNS before `fetch` resolves again (rebinding window).
   - It also lacks the NAT64, 6to4 and Teredo ranges that P4's `WebSchnappschuss` blocks.
   Follow-up fix: use one shared guarded request for both.
+
+- D3 (plan 20261106-spur-p3-app) f5: Über das Plugin heißen die Workflows in Claude Code `/plugin:spur:spur:<name> (MCP)`, nicht `/spur:<name> (MCP)` wie in Schritt 2 verlangt. Was gilt?
+  Interim: Prompts und Plugin unverändert; `passes` von f5 bleibt false, die übrigen vier Schritte bestehen.
+  Options: A (empfohlen) Schritt 2 auf den Namen anpassen, den Claude Code für Plugin-Server vergibt (`/plugin:spur:spur:…`), und den Befehl in README und Panel-Hilfe so nennen | B Einrichtung zusätzlich ohne Plugin anbieten (`claude mcp add --transport http spur <Adresse> --header …`), dann gilt `/spur:…`, aber Token und Erlaubnisse liegen nicht mehr im Plugin | C Workflows zusätzlich als Plugin-Befehle `/spur:<name>` ausliefern (widerspricht „Keine Workflow-Skills im Plugin“ und doppelt die Textquelle)
