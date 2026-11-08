@@ -124,6 +124,7 @@
   "spur_token_einmalig": "Dieses Token erscheint nur einmal. Führen Sie diese Befehle im Terminal aus:",
   "spur_token_erzeugen": "Token erzeugen",
   "spur_token_gueltig_bis": "Token gültig bis __datum__",
+  "spur_transkript_hinweis": "Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.",
   "spur_treffer_dateiname": "Treffer im Dateinamen",
   "spur_von": "von __name__",
   "spur_von_ihnen": "von Ihnen",

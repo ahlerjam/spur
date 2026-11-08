@@ -125,6 +125,7 @@
   "spur_token_einmalig": "This token is shown only once. Run these commands in your terminal:",
   "spur_token_erzeugen": "Create token",
   "spur_token_gueltig_bis": "Token valid until __datum__",
+  "spur_transkript_hinweis": "Transcripts are sent to the AI provider when Claude reads them. Ideally, pseudonymise interviews before uploading them.",
   "spur_treffer_dateiname": "Match in file name",
   "spur_von": "by __name__",
   "spur_von_ihnen": "by you",

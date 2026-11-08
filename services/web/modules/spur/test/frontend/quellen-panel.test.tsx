@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import QuellenPanel from '@modules/spur/frontend/js/quellen/quellen-panel'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
 import { deutschAktivieren } from './helpers/deutsch'
@@ -84,6 +84,20 @@ describe('Quellen-Panel', function () {
     await screen.findByText('Anna Autor hat Ihnen ein Zitat zugewiesen: „Sleep supports“ (smith2024.pdf, S. 347)')
     screen.getByRole('button', { name: 'Öffnen' }).click()
     await screen.findByText('Seite 347 (PDF-Seite 3 von 8)')
+  })
+
+  it('weist beim Hochladen eines Transkripts auf den KI-Anbieter hin, bei einem PDF nicht', async function () {
+    const HINWEIS =
+      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.'
+    fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
+    fetchMock.post(QUELLEN, { status: 201, body: {} })
+    zeigen()
+    await screen.findByText('Noch keine Quellen')
+    const feld = screen.getByLabelText('Datei wählen')
+    fireEvent.change(feld, { target: { files: [new File(['WEBVTT'], 'interview.vtt')] } })
+    await screen.findByText(HINWEIS)
+    fireEvent.change(feld, { target: { files: [new File(['%PDF'], 'smith2024.pdf')] } })
+    await waitFor(() => expect(screen.queryByText(HINWEIS)).to.not.exist)
   })
 
   it('zeigt nach einem API-Fehler die Fehlermeldung als Text', async function () {

@@ -1490,6 +1490,37 @@ async page => {
     ok((await quellenListe.count()) === 1, `Nicht erreichbare Seite gespeichert: ${await quellenListe.count()}`)
   }
 
+  // Liest eine Datei des Repos über ein Dateifeld (das run-code-Werkzeug hat kein fs).
+  async function repoDatei(pfad) {
+    await page.setContent('<input type="file">')
+    await page.locator('input').setInputFiles(pfad)
+    return await page.locator('input').evaluate(el => el.files[0].text())
+  }
+
+  features.p4f4 = async () => {
+    const HINWEIS =
+      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Transkript')
+    await panelOeffnen('Quellen')
+    await hochladen('interview.vtt')
+    const hinweis = page.getByRole('tabpanel', { name: 'Quellen' }).getByText(HINWEIS)
+    await hinweis.waitFor()
+    // Der Hinweis steht unter dem Upload-Knopf.
+    const [knopf, text] = await Promise.all([
+      page.getByRole('button', { name: 'Hochladen', exact: true }).boundingBox(),
+      hinweis.boundingBox(),
+    ])
+    ok(text.y > knopf.y, 'Hinweis steht nicht unter dem Upload')
+
+    await hochladen('smith2024.pdf')
+    await hinweis.waitFor({ state: 'detached' })
+
+    const readme = await repoDatei(`${FIXTURES}/../../../../../../README.md`)
+    const abschnitt = readme.split('\n## ').find(teil => teil.startsWith('Claude und Ihre Daten'))
+    ok(abschnitt?.includes(HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude und Ihre Daten“')
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

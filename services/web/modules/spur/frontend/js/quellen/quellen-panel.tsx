@@ -99,6 +99,7 @@ export default function QuellenPanel() {
   const [gesamt, setGesamt] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
   const [laedtHoch, setLaedtHoch] = useState(false)
+  const [transkript, setTranskript] = useState(false)
   const [offen, setOffen] = useState<{ quelle: Quelle; seite: number } | null>(null)
   const [treffer, setTreffer] = useState<Treffer[] | null>(null)
   const [begriff, setBegriff] = useState('')
@@ -172,6 +173,8 @@ export default function QuellenPanel() {
       setFehler(t('spur_datei_zu_gross'))
       return
     }
+    // Interviews sind Sache der Nutzer; spur weist nur darauf hin (keine Sonderregeln).
+    setTranskript(datei.name.toLowerCase().endsWith('.vtt'))
     const formular = new FormData()
     formular.append('datei', datei)
     setLaedtHoch(true)
@@ -266,6 +269,11 @@ export default function QuellenPanel() {
           {t('spur_quellen_exportieren')}
         </OLButton>
       </div>
+      {transkript && (
+        <div className="spur-panel-hinweis">
+          <Notification type="info" content={t('spur_transkript_hinweis')} />
+        </div>
+      )}
       {webForm && (
         <div className="spur-panel-hinweis">
           <WebAufnehmen
