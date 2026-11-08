@@ -71,14 +71,16 @@ async page => {
 
   // Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her, auf langsamen Rechnern erst nach Sekunden,
   // und überschreibt damit einen frühen Klick; manchmal bleibt die Leiste eingeklappt. Darum den Tab wählen, bis
-  // `bereit` sichtbar ist. Ein schon gewählter Tab wird erst nach 3 s erneut geklickt, sonst schlösse der Klick ihn.
+  // `bereit` sichtbar ist. Ein schon gewählter Tab wird nur bei eingeklappter Leiste und erst nach 3 s erneut
+  // geklickt; bei offener Leiste schlösse der Klick das Panel.
   async function panelSichern(tab, bereit, timeout = 30000) {
     const ende = Date.now() + timeout
     let geklickt = Date.now()
     while (!(await bereit.isVisible())) {
       ok(Date.now() < ende, `Panel ${tab}: nicht sichtbar nach ${timeout / 1000} s`)
       const gewaehlt = (await railTab(tab).getAttribute('aria-selected')) === 'true'
-      if (!gewaehlt || Date.now() - geklickt > 3000) {
+      const eingeklappt = !(await page.locator('.rail-panel-title').first().isVisible())
+      if (!gewaehlt || (eingeklappt && Date.now() - geklickt > 3000)) {
         await railTab(tab).click()
         geklickt = Date.now()
       }
