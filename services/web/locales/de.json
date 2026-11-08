@@ -240,7 +240,7 @@
   "spur_vorschlag_uebernommen": "Claude hat den Auftrag. Den Lauf sehen Sie im Claude-Panel.",
   "spur_vorschlag_verwerfen": "Verwerfen",
   "spur_vorschlag_vorschlag": "Vorschlag",
-  "spur_vorschlag_wie_projekt": "Projekt-Standard: __wert__",
+  "spur_vorschlag_wie_projekt": "Projekt: __wert__",
   "spur_weitere_eintraege": "Weitere Einträge",
   "spur_weitere_quellen": "__anzahl__ von __gesamt__ angezeigt. Die übrigen finden Sie über die Suche.",
   "spur_widerrufen": "Widerrufen",

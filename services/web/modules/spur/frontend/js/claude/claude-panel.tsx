@@ -87,7 +87,7 @@ function Verbindung({ verbunden }: { verbunden: boolean }) {
 }
 
 function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise<void> }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const nachrichten = status.nachrichten
   const wartet = status.verbunden && nachrichten.at(-1)?.von === 'mensch'
   // Die Lauf-Karte steht dort im Verlauf, wo der Lauf begann; spätere Antworten folgen darunter.
@@ -119,7 +119,9 @@ function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise
             <li className={`spur-chat-nachricht spur-nachricht-${n.von}`} key={n.id}>
               <p className="spur-zeile-meta">
                 {n.von === 'claude' ? 'Claude' : t('spur_du')} ·{' '}
-                <time dateTime={n.am}>{new Date(n.am).toLocaleTimeString()}</time>
+                <time dateTime={n.am}>
+                  {new Date(n.am).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
+                </time>
               </p>
               <p className="spur-nachricht-text">{n.text}</p>
             </li>,

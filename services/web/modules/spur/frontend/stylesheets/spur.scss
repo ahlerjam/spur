@@ -256,7 +256,7 @@
 
 .spur-nachricht-claude {
   align-self: flex-start;
-  border-left: 3px solid var(--border-active, var(--green-50));
+  border-left: 3px solid var(--green-50);
   border-radius: 0;
   padding-left: var(--spacing-04);
 }
@@ -559,7 +559,7 @@
 
 .spur-abschnitt {
   margin: var(--spacing-05) 0 var(--spacing-03);
-  font-size: var(--font-size-03);
+  font-size: var(--font-size-02);
   font-weight: 600;
 }
 
@@ -569,31 +569,36 @@
 }
 
 .spur-vorschlag-schalter {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  align-items: center;
-  gap: var(--spacing-03);
   margin-bottom: var(--spacing-03);
 
   .form-label {
-    margin: 0;
+    margin-bottom: var(--spacing-01);
   }
 }
 
 .spur-vorschlag-projekt {
   margin-top: var(--spacing-04);
-  padding: var(--spacing-03) var(--spacing-04) 0;
-  border-left: 3px solid var(--border-divider);
+  padding-top: var(--spacing-01);
+  border-top: 1px dashed var(--border-divider);
 
   legend {
     float: none;
     width: auto;
-    margin-top: 0;
   }
 }
 
 .spur-vorschlag-limit {
   margin: var(--spacing-04) 0 var(--spacing-03);
+
+  .spur-limit-zeile {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-03);
+  }
+
+  .form-control {
+    width: 6rem;
+  }
 }
 
 .spur-vorschlaege > li + li {
@@ -608,7 +613,8 @@
 
   h4 {
     margin: 0;
-    font-size: var(--font-size-03);
+    font-size: var(--font-size-02);
+    font-weight: 600;
   }
 }
 
@@ -642,7 +648,8 @@
 .spur-workflows-admin {
   max-width: 900px;
   margin: 0 auto;
-  padding: var(--spacing-08) var(--spacing-05);
+  padding-left: var(--spacing-05);
+  padding-right: var(--spacing-05);
 
   textarea {
     font-family: var(--font-monospace, monospace);

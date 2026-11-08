@@ -241,7 +241,7 @@
   "spur_vorschlag_uebernommen": "Claude has the task. You can follow the run in the Claude panel.",
   "spur_vorschlag_verwerfen": "Dismiss",
   "spur_vorschlag_vorschlag": "Suggest",
-  "spur_vorschlag_wie_projekt": "Project default: __wert__",
+  "spur_vorschlag_wie_projekt": "Project: __wert__",
   "spur_weitere_eintraege": "More entries",
   "spur_weitere_quellen": "Showing __anzahl__ of __gesamt__. Use search to find the rest.",
   "spur_widerrufen": "Revoke",

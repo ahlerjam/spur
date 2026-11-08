@@ -56,3 +56,8 @@ Der Plan-Commit liegt vor 90 Commits aus P2 und P4, die danach in diesen Zweig k
 - Umgesetzt: Index `users.spur.botFuer` (jede Panel-Abfrage sucht den Bot); `@claude` höchstens 20 je Person und Minute, vor der Suche in den Ranges (eine Erwähnung mit erfundener Thread-ID kostet sonst 10 s Docstore-Abfragen); Rate-Limit für `tipp-pause` (10 je Minute).
 - Nicht umgesetzt: Tageslimit atomar (Überschreitung nur um gleichzeitige Auslöser, nur beim eigenen Bot); `doc_id` der Tipp-Pause gegen das Projekt prüfen (`doc_read` prüft); übernommene Vorschläge stärker kennzeichnen (Auftrag trägt `vorschlag_id` und „Bitte diesen Vorschlag umsetzen“); `null`-Filter in `spurSettings` (keine andere Dokumentart betroffen).
 - Gefunden, nicht aus P3: `recherche.test.mjs` „vergibt arXiv-Fenster im Abstand von 3 Sekunden, auch parallel“ schlug in einem vollen Lauf unter Last einmal fehl, danach viermal grün (Zeitmessung).
+
+## Ansichten (360 und 1280 px)
+Chat nicht verbunden, lange Unterhaltung mit Lauf-Karte, Workflows, Vorschläge mit Karten, Kommentar-Thread mit Antwort „Claude (Ada)“, Workflow-Admin: kein horizontaler Überlauf, keine Konsolenfehler.
+- Behoben nach den Bildern: Uhrzeit in der Sprache der Oberfläche ohne Sekunden; Claude-Akzent grün statt blau (blau liest sich wie Fokus); Vorschläge-Panel einspaltig (Auswahlen waren bei 1280 px abgeschnitten, das Limit-Feld wenige Pixel breit), „Projekt: Aus“ statt „Projekt-Standard: Aus“; Admin-Seite mit Overleafs Navigationsleiste (`header-footer-react`) und Abstand darunter, „Standard“ als Text statt Badge mit zu wenig Kontrast.
+- Gesehen, so gelassen: Die Reihenfolge „Antwort 098, 097, 099“ im Testbild kommt aus 100 parallel gesendeten `reply` in derselben Millisekunde (nur Testdaten).

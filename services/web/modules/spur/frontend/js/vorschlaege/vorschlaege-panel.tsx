@@ -121,7 +121,7 @@ function Einstellungen({
         }}
       >
         <OLFormLabel htmlFor="spur-vorschlag-limit">{t('spur_vorschlag_limit')}</OLFormLabel>
-        <div className="spur-recherche-suche">
+        <div className="spur-limit-zeile">
           <OLFormControl
             id="spur-vorschlag-limit"
             type="number"

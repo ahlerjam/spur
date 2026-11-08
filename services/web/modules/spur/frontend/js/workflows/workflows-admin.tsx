@@ -33,13 +33,13 @@ export default function WorkflowsAdmin() {
   if (!isReady) return null
 
   return (
-    <div className="spur-workflows-admin">
+    <main id="main-content" className="content spur-workflows-admin">
       <h1>{t('spur_workflows')}</h1>
       <p>{t('spur_workflows_admin_hinweis')}</p>
       {fehler && <Notification type="error" content={fehler} />}
       {!liste && !fehler && <p aria-busy="true">{t('loading')}</p>}
       {liste?.map(w => <WorkflowBearbeiten key={w.name} workflow={w} neuLaden={laden} />)}
-    </div>
+    </main>
   )
 }
 
@@ -69,9 +69,11 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
     <section className="spur-workflow-admin" aria-labelledby={`${id}-titel`}>
       <div className="spur-lauf-kopf">
         <h2 id={`${id}-titel`}>{workflow.titel}</h2>
-        <OLBadge bg={workflow.angepasst ? 'info' : 'light'}>
-          {workflow.angepasst ? t('spur_workflow_angepasst') : t('spur_workflow_standard')}
-        </OLBadge>
+        {workflow.angepasst ? (
+          <OLBadge bg="info">{t('spur_workflow_angepasst')}</OLBadge>
+        ) : (
+          <span className="spur-zeile-meta">{t('spur_workflow_standard')}</span>
+        )}
       </div>
       <p className="spur-zeile-meta">
         <code>/spur:{workflow.name}</code> · {workflow.beschreibung}

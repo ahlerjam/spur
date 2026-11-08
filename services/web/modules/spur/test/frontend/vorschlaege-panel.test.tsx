@@ -52,8 +52,8 @@ describe('Vorschläge-Panel', function () {
     zeigen()
     const compile = (await screen.findByLabelText('Compile-Fehler')) as HTMLSelectElement
     const argument = screen.getByLabelText('Belegloses Argument') as HTMLSelectElement
-    expect(compile.selectedOptions[0].textContent).to.equal('Projekt-Standard: Aus')
-    expect(argument.selectedOptions[0].textContent).to.equal('Projekt-Standard: Aus')
+    expect(compile.selectedOptions[0].textContent).to.equal('Projekt: Aus')
+    expect(argument.selectedOptions[0].textContent).to.equal('Projekt: Aus')
     screen.getByText('Vorschläge sind aus. Stellen Sie oben einen Auslöser auf „Vorschlag“.')
   })
 
