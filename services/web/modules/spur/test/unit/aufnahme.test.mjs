@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
@@ -10,6 +11,12 @@ let geladen
 const projectId = new ObjectId()
 const userId = new ObjectId()
 const PDF = Buffer.from('%PDF-1.5\nInhalt')
+
+// Eine Antwort wie die IncomingMessage der geschützten Anfrage.
+const antwort = (inhalt, { status = 200, kopf = {} } = {}) =>
+  Object.assign(Readable.from(inhalt === null ? [] : [Buffer.from(inhalt)]), { statusCode: status, headers: kopf })
+let holen
+let echt
 
 const KELLER = {
   gefunden: true,
@@ -53,25 +60,25 @@ beforeEach(async () => {
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.ZitatManager)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.PruefManager)
   vi.doMock('../../app/src/schalter.mjs', () => m.schalter)
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => new Response(PDF, { status: 200, headers: { 'Content-Type': 'application/pdf' } }))
-  )
   Aufnahme = await import('../../app/src/recherche/Aufnahme.mjs')
-  Aufnahme.namen.lookup = async host => [{ address: host === 'intern.example' ? '10.0.0.7' : '93.184.216.34', family: 4 }]
+  echt = (await import('../../app/src/netz.mjs')).geschuetztHolen
+  // Nur Namen, die intern auflösen sollen, laufen durch die echte Anfrage (und scheitern dort vor dem Verbindungsaufbau).
+  holen = vi.fn(async (url, optionen) => (url.hostname === 'intern.example' ? echt(url, optionen) : antwort(PDF)))
+  Aufnahme.netz.holen = holen
+  Aufnahme.netz.lookup = (host, optionen, fertig) =>
+    fertig(null, [{ address: host === 'intern.example' ? '10.0.0.7' : '93.184.216.34', family: 4 }])
 })
 
 const aufnehmen = doi => Aufnahme.perDoi({ projectId, userId, doi })
 
 afterEach(() => {
-  vi.unstubAllGlobals()
   vi.unstubAllEnvs()
 })
 
 describe('perDoi', () => {
   it('lädt das freie PDF und legt Quelle und .bib-Eintrag mit den DOI-Metadaten an', async () => {
     const ergebnis = await aufnehmen('10.1371/JOURNAL.pone.0099999')
-    expect(fetch).toHaveBeenCalledWith('https://journals.example/keller.pdf', expect.anything())
+    expect(holen.mock.calls[0][0].href).toBe('https://journals.example/keller.pdf')
     expect(geladen[0]).toMatchObject({
       projectId,
       userId,
@@ -95,7 +102,7 @@ describe('perDoi', () => {
     vorhandene = [{ doi: '10.1371/journal.pone.0099999', key: 'keller2014' }]
     const fehler = await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))
     expect(fehler).toMatchObject({ status: 409, typ: 'quelle_vorhanden', message: 'Bereits vorhanden' })
-    expect(fetch).not.toHaveBeenCalled()
+    expect(holen).not.toHaveBeenCalled()
   })
 
   it('meldet „DOI nicht gefunden“ für eine unbekannte DOI', async () => {
@@ -129,7 +136,7 @@ describe('perDoi', () => {
     await aufnehmen('10.48550/arXiv.2401.01234')
     expect(m.dienste.arxivMetadaten).toHaveBeenCalledWith('2401.01234')
     expect(m.dienste.unpaywall.status).not.toHaveBeenCalled()
-    expect(fetch).toHaveBeenCalledWith('https://arxiv.org/pdf/2401.01234v1', expect.anything())
+    expect(holen.mock.calls[0][0].href).toBe('https://arxiv.org/pdf/2401.01234v1')
     expect(geladen[0]).toMatchObject({ key: 'smith2024', nurProjekt: true, doi: '10.48550/arxiv.2401.01234' })
   })
 
@@ -141,14 +148,14 @@ describe('perDoi', () => {
   })
 
   it('lehnt eine Antwort ab, die kein PDF ist', async () => {
-    fetch.mockResolvedValue(new Response('<html>', { status: 200 }))
+    holen.mockResolvedValue(antwort('<html>'))
     const fehler = await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))
     expect(fehler).toMatchObject({ status: 502, typ: 'pdf_fehlt' })
     expect(geladen).toEqual([])
   })
 
   it('lehnt zu große PDFs ab', async () => {
-    fetch.mockResolvedValue(new Response(Buffer.concat([PDF, Buffer.alloc(2000)]), { status: 200 }))
+    holen.mockResolvedValue(antwort(Buffer.concat([PDF, Buffer.alloc(2000)])))
     const fehler = await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))
     expect(fehler).toMatchObject({ status: 413 })
   })
@@ -158,14 +165,67 @@ describe('perDoi', () => {
       m.dienste.unpaywall.status.mockResolvedValue({ frei: true, pdf, lizenz: null })
       expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
     }
-    expect(fetch).not.toHaveBeenCalled()
+    expect(holen).not.toHaveBeenCalled()
   })
 
   it('folgt keinem Redirect auf eine interne Adresse und keinem Namen, der intern auflöst', async () => {
-    fetch.mockResolvedValue(new Response(null, { status: 302, headers: { Location: 'https://intern.example/geheim.pdf' } }))
+    // Erste Station öffentlich, Ziel der Umleitung löst intern auf und geht durch die echte Anfrage.
+    holen
+      .mockResolvedValueOnce(antwort(null, { status: 302, kopf: { location: 'https://intern.example/geheim.pdf' } }))
+      .mockImplementationOnce((url, optionen) => echt(url, optionen))
     expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect(fetch.mock.calls[0][1]).toMatchObject({ redirect: 'manual' })
+    expect(holen).toHaveBeenCalledTimes(2)
+  })
+
+  it('lehnt einen Namen ab, der beim Verbindungsaufbau intern auflöst (DNS-Rebinding)', async () => {
+    let aufrufe = 0
+    // Eine frühere Auflösung wäre öffentlich gewesen; entscheidend ist die Antwort beim Verbinden.
+    Aufnahme.netz.lookup = (host, optionen, fertig) => {
+      aufrufe++
+      fertig(null, [{ address: '10.0.0.7', family: 4 }])
+    }
+    holen.mockImplementation((url, optionen) => echt(url, optionen))
+    m.dienste.unpaywall.status.mockResolvedValue({ frei: true, pdf: 'https://wechsel.example/a.pdf', lizenz: null })
+    expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ status: 502, typ: 'pdf_fehlt' })
+    expect(aufrufe).toBeGreaterThan(0)
+    expect(geladen).toEqual([])
+  })
+
+  it.each(['64:ff9b::7f00:1', '2002:7f00:1::1', '2001:0:4136:e378:8000:63bf:3fff:fdd2', '2001:db8::1', 'ff02::1', '::ffff:7f00:1'])(
+    'lehnt einen Namen ab, der auf %s auflöst',
+    async adresse => {
+      Aufnahme.netz.lookup = (host, optionen, fertig) => fertig(null, [{ address: adresse, family: 6 }])
+      holen.mockImplementation((url, optionen) => echt(url, optionen))
+      expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
+    }
+  )
+
+  it('lehnt IP-Literale in übersetzten IPv6-Formen ab', async () => {
+    for (const pdf of ['https://[64:ff9b::7f00:1]/a.pdf', 'https://[2002:7f00:1::1]/a.pdf']) {
+      m.dienste.unpaywall.status.mockResolvedValue({ frei: true, pdf, lizenz: null })
+      expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
+    }
+    expect(holen).not.toHaveBeenCalled()
+  })
+
+  it('lässt im Dev-Stack mit Paper-Fake auch das lokale Netz zu', async () => {
+    m.schalter.paperApiBasis = () => 'http://paper-fake:3000'
+    m.dienste.unpaywall.status.mockResolvedValue({ frei: true, pdf: 'http://paper-fake:3000/a.pdf', lizenz: null })
+    await aufnehmen('10.1371/journal.pone.0099999')
+    expect(holen.mock.calls[0][0].href).toBe('http://paper-fake:3000/a.pdf')
+    expect(holen.mock.calls[0][1].gesperrt('10.0.0.5')).toBe(false)
+  })
+
+  it('folgt einem Redirect auf eine öffentliche Adresse und meldet Fehlerstatus als nicht ladbar', async () => {
+    holen
+      .mockResolvedValueOnce(antwort(null, { status: 301, kopf: { location: '/neu.pdf' } }))
+      .mockResolvedValueOnce(antwort(PDF))
+    await aufnehmen('10.1371/journal.pone.0099999')
+    expect(holen.mock.calls[1][0].href).toBe('https://journals.example/neu.pdf')
+    holen.mockResolvedValue(antwort('weg', { status: 404 }))
+    m.QuellenManager.alle.mockResolvedValue([])
+    vorhandene = []
+    expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
   })
 
   it('räumt die Quelle weg, wenn die .bib nicht ergänzt werden kann', async () => {

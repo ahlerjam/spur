@@ -42,6 +42,7 @@ describe('adresseGesperrt', () => {
     '100.64.0.1', '0.0.0.0', '224.0.0.1', '::1', '::', 'fe80::1', 'fd00::1', '::ffff:127.0.0.1', 'ff02::1',
     // Gemappte und übersetzte IPv4-Adressen, auch in Hex-Schreibweise (so normalisiert sie new URL).
     '::ffff:7f00:1', '::ffff:a9fe:a9fe', '64:ff9b::7f00:1', '2002:7f00:1::', '::7f00:1',
+    '64:ff9b:1::1', '100::1', '2001:0:4136:e378:8000:63bf:3fff:fdd2', '2001:db8::1', 'ff00::1', '192.0.0.1', '198.18.0.1', '198.19.255.255',
   ])('sperrt %s', ip => {
     expect(adresseGesperrt(ip)).toBe(true)
   })
