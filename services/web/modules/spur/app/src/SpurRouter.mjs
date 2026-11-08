@@ -31,6 +31,7 @@ const schreiben = [
 ]
 
 const angemeldet = AuthenticationController.requireLogin()
+const admin = AuthorizationMiddleware.ensureUserIsSiteAdmin
 
 // Begrenzt teure Aufrufe (Paper-Dienste mit installationsweiter Drossel, Einbetten mit dem Modell) je Anmeldung.
 const fremdDienste = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-recherche', { points: 30, duration: 60 }))
@@ -112,14 +113,10 @@ export default {
     webRouter.get('/spur/project/:project_id/workflows', ...lesen, SpurController.workflows)
     webRouter.post('/spur/project/:project_id/workflows/:name/starten', ...lesen, SpurController.workflowStarten)
     const ADMIN_WORKFLOWS = '/spur/admin/workflows'
-    webRouter.get(ADMIN_WORKFLOWS, AuthorizationMiddleware.ensureUserIsSiteAdmin, WorkflowsAdminController.seite)
-    webRouter.get(`${ADMIN_WORKFLOWS}.json`, AuthorizationMiddleware.ensureUserIsSiteAdmin, WorkflowsAdminController.liste)
-    webRouter.put(`${ADMIN_WORKFLOWS}/:name`, AuthorizationMiddleware.ensureUserIsSiteAdmin, WorkflowsAdminController.setzen)
-    webRouter.delete(
-      `${ADMIN_WORKFLOWS}/:name`,
-      AuthorizationMiddleware.ensureUserIsSiteAdmin,
-      WorkflowsAdminController.zuruecksetzen
-    )
+    webRouter.get(ADMIN_WORKFLOWS, admin, WorkflowsAdminController.seite)
+    webRouter.get(`${ADMIN_WORKFLOWS}.json`, admin, WorkflowsAdminController.liste)
+    webRouter.put(`${ADMIN_WORKFLOWS}/:name`, admin, WorkflowsAdminController.setzen)
+    webRouter.delete(`${ADMIN_WORKFLOWS}/:name`, admin, WorkflowsAdminController.zuruecksetzen)
     const LAUF = '/spur/project/:project_id/laeufe/:lauf_id'
     webRouter.post(`${LAUF}/annehmen`, ...schreiben, SpurController.laufAnnehmen)
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)

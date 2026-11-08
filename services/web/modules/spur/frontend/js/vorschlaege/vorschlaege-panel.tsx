@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
@@ -8,7 +8,8 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
 import Notification from '@/shared/components/notification'
-import { anfrage, jsonAnfrage, projektPfad } from '../api'
+import { useAbfrage } from '../abfrage'
+import { jsonAnfrage, projektPfad } from '../api'
 
 const ARTEN = ['compile_fehler', 'belegloses_argument'] as const
 type Art = (typeof ARTEN)[number]
@@ -24,33 +25,14 @@ type Stand = {
 type Vorschlag = { id: string; art: Art; titel: string; text: string; pfad: string | null; am: string }
 type Antwort = { stand: Stand; vorschlaege: Vorschlag[] }
 
-const ABFRAGE_MS = 5000
-
 export default function VorschlaegePanel() {
   const { t } = useTranslation()
-  const [daten, setDaten] = useState<Antwort | null>(null)
-  const [fehler, setFehler] = useState<string | null>(null)
+  const { daten, fehler, setFehler, laden } = useAbfrage<Antwort>(projektPfad('/vorschlaege'))
 
-  const laden = useCallback(async () => {
-    try {
-      setDaten(await anfrage<Antwort>(projektPfad('/vorschlaege')))
-    } catch (error) {
-      setFehler((error as Error).message)
-    }
-  }, [])
-
-  useEffect(() => {
-    laden()
-    const takt = setInterval(() => {
-      if (!document.hidden) laden()
-    }, ABFRAGE_MS)
-    return () => clearInterval(takt)
-  }, [laden])
-
-  const speichern = async (methode: string, pfad: string, body: unknown) => {
+  const speichern = async (pfad: string, body: unknown) => {
     setFehler(null)
     try {
-      await jsonAnfrage(methode, pfad, body)
+      await jsonAnfrage('PUT', pfad, body)
       await laden()
     } catch (error) {
       setFehler((error as Error).message)
@@ -78,7 +60,7 @@ function Einstellungen({
   speichern,
 }: {
   stand: Stand
-  speichern: (methode: string, pfad: string, body: unknown) => Promise<void>
+  speichern: (pfad: string, body: unknown) => Promise<void>
 }) {
   const { t } = useTranslation()
   const { write } = usePermissionsContext()
@@ -99,7 +81,7 @@ function Einstellungen({
             size="sm"
             value={stand.eigene[art] ?? ''}
             onChange={e =>
-              speichern('PUT', projektPfad('/vorschlaege/eigene'), { art, wert: e.target.value || null })
+              speichern(projektPfad('/vorschlaege/eigene'), { art, wert: e.target.value || null })
             }
           >
             <option value="">
@@ -122,7 +104,7 @@ function Einstellungen({
                 id={`spur-projekt-${art}`}
                 size="sm"
                 value={stand.projekt[art] ?? 'aus'}
-                onChange={e => speichern('PUT', projektPfad('/vorschlaege/projekt'), { art, wert: e.target.value })}
+                onChange={e => speichern(projektPfad('/vorschlaege/projekt'), { art, wert: e.target.value })}
               >
                 <option value="aus">{wertName('aus')}</option>
                 <option value="vorschlag">{wertName('vorschlag')}</option>
@@ -135,7 +117,7 @@ function Einstellungen({
         className="spur-vorschlag-limit"
         onSubmit={e => {
           e.preventDefault()
-          speichern('PUT', '/spur/vorschlaege/limit', { limit: Number(limit) })
+          speichern('/spur/vorschlaege/limit', { limit: Number(limit) })
         }}
       >
         <OLFormLabel htmlFor="spur-vorschlag-limit">{t('spur_vorschlag_limit')}</OLFormLabel>

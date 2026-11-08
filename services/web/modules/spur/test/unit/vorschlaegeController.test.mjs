@@ -10,8 +10,10 @@ const ada = new ObjectId()
 beforeEach(async () => {
   m = {
     Vorschlaege: {
-      stand: vi.fn(async () => ({ wirksam: { compile_fehler: 'aus' }, limit: 50, heute: 0, limitErreicht: false })),
-      liste: vi.fn(async () => [{ id: 'v1', titel: 'Beleg fehlt' }]),
+      panel: vi.fn(async () => ({
+        stand: { wirksam: { compile_fehler: 'aus' }, limit: 50, heute: 0, limitErreicht: false },
+        vorschlaege: [{ id: 'v1', titel: 'Beleg fehlt' }],
+      })),
       eigeneSetzen: vi.fn(async () => {}),
       projektSetzen: vi.fn(async () => {}),
       limitSetzen: vi.fn(async () => {}),
@@ -21,7 +23,7 @@ beforeEach(async () => {
         const { Problem } = await import('../../app/src/probleme.mjs')
         throw new Problem(404, 'vorschlag_fehlt', 'weg')
       }),
-      ausloesen: vi.fn(async () => ({ ausgeloest: true })),
+      ausloesen: vi.fn(async ({ daten }) => ({ ausgeloest: true, daten: daten() })),
     },
   }
   vi.resetModules()
@@ -48,8 +50,7 @@ describe('Vorschläge-Panel', () => {
       stand: { wirksam: { compile_fehler: 'aus' }, limit: 50, heute: 0, limitErreicht: false },
       vorschlaege: [{ id: 'v1', titel: 'Beleg fehlt' }],
     })
-    expect(m.Vorschlaege.stand).toHaveBeenCalledWith(projekt, ada)
-    expect(m.Vorschlaege.liste).toHaveBeenCalledWith(projekt, ada)
+    expect(m.Vorschlaege.panel).toHaveBeenCalledWith(projekt, ada)
   })
 
   it('setzt eigene Schalter, Projekt-Standard und Limit', async () => {
@@ -72,13 +73,10 @@ describe('Vorschläge-Panel', () => {
   it('löst nach einer Tipp-Pause „belegloses Argument“ für das Dokument aus', async () => {
     const docId = String(new ObjectId())
     const res = await ausfuehren(C.tippPause, req({ body: { doc_id: docId } }))
-    expect(res.body).toEqual({ ausgeloest: true })
-    expect(m.Vorschlaege.ausloesen).toHaveBeenCalledWith({
-      projectId: projekt,
-      menschId: ada,
-      art: 'belegloses_argument',
-      daten: { doc_id: docId },
-    })
+    expect(res.body).toEqual({ ausgeloest: true, daten: { doc_id: docId } })
+    expect(m.Vorschlaege.ausloesen).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: projekt, menschId: ada, art: 'belegloses_argument' })
+    )
     expect((await ausfuehren(C.tippPause, req({ body: { doc_id: '../x' } }))).statusCode).toBe(422)
   })
 })

@@ -11,9 +11,9 @@ const WORKFLOWS = /\/spur\/project\/[^/]+\/workflows$/
 const STARTEN = /\/workflows\/methodenteil\/starten$/
 const LISTE = {
   workflows: [
-    { name: 'literaturueberblick', titel: 'Literaturüberblick', beschreibung: 'L', text: 'TL' },
-    { name: 'methodenteil', titel: 'Methodenteil', beschreibung: 'M', text: 'TM' },
-    { name: 'folien', titel: 'Folien aus Paper', beschreibung: 'F', text: 'TF' },
+    { name: 'literaturueberblick', titel: 'Literaturüberblick', beschreibung: 'L' },
+    { name: 'methodenteil', titel: 'Methodenteil', beschreibung: 'M' },
+    { name: 'folien', titel: 'Folien aus Paper', beschreibung: 'F' },
   ],
 }
 

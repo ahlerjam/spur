@@ -4,7 +4,7 @@ import DocstoreManager from '../../../../../app/src/Features/Docstore/DocstoreMa
 import EditorRealTimeController from '../../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import UserInfoController from '../../../../../app/src/Features/User/UserInfoController.mjs'
 import UserInfoManager from '../../../../../app/src/Features/User/UserInfoManager.mjs'
-import { db } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { botVon } from '../anfrage.mjs'
 import * as Inbox from '../Inbox.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
@@ -13,32 +13,39 @@ import * as PruefManager from '../pruefung/PruefManager.mjs'
 const ERWAEHNT = /(^|[^\w@.])@claude(?![\w-])/i
 
 // Overleaf schickt die Nachricht vor der Kommentar-Op; die Stelle steht erst kurz danach im Dokument.
-async function stelleSuchen(projectId, threadId, { versuche, pauseMs }) {
+async function kommentarSuchen(projectId, threadId, { versuche, pauseMs }) {
   for (let versuch = 0; versuch < versuche; versuch++) {
     if (versuch) await warten(pauseMs)
-    const docs = await PruefManager.dokumente(projectId)
     for (const eintrag of await DocstoreManager.promises.getAllRanges(String(projectId))) {
       const kommentar = eintrag.ranges?.comments?.find(c => c.op.t === threadId)
-      const doc = kommentar && docs.find(d => d.docId === String(eintrag._id))
-      if (!doc) continue
-      const { p, c } = kommentar.op
-      return {
-        doc_id: doc.docId,
-        pfad: doc.pfad,
-        stelle: { position: p, laenge: c.length, zeile: doc.text.slice(0, p).split('\n').length, markiert: c },
-      }
+      if (kommentar) return { docId: String(eintrag._id), op: kommentar.op }
     }
   }
-  return { doc_id: null, pfad: null, stelle: null }
+  return null
+}
+
+async function stelleSuchen(projectId, threadId, optionen) {
+  const gefunden = await kommentarSuchen(projectId, threadId, optionen)
+  const doc = gefunden && (await PruefManager.dokumente(projectId)).find(d => d.docId === gefunden.docId)
+  if (!doc) return { doc_id: null, pfad: null, stelle: null }
+  const { p, c } = gefunden.op
+  return {
+    doc_id: doc.docId,
+    pfad: doc.pfad,
+    stelle: { position: p, laenge: c.length, zeile: doc.text.slice(0, p).split('\n').length, markiert: c },
+  }
 }
 
 // Nur der Claude der schreibenden Person erfährt davon; Nachrichten anderer gehen nur als ID mit.
 export async function kommentarGesendet({ projectId, threadId, menschId, text }, { versuche = 20, pauseMs = 500 } = {}) {
   if (!ERWAEHNT.test(text)) return
-  const bot = await db.users.findOne({ 'spur.botFuer': menschId }, { projection: { _id: 1 } })
+  const bot = await botVon(menschId)
   if (!bot) return
-  const ort = await stelleSuchen(projectId, threadId, { versuche, pauseMs })
-  const nachrichten = (await ChatApiHandler.promises.getThreads(String(projectId)))[threadId]?.messages ?? []
+  const [ort, threads] = await Promise.all([
+    stelleSuchen(projectId, threadId, { versuche, pauseMs }),
+    ChatApiHandler.promises.getThreads(String(projectId)),
+  ])
+  const nachrichten = threads[threadId]?.messages ?? []
   const eigene = nachrichten.findLast(n => n.user_id === String(menschId) && n.content === text)
   await Inbox.ereignisAnlegen({
     projectId,

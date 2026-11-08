@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLBadge from '@/shared/components/ol/ol-badge'
@@ -7,6 +7,7 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormText from '@/shared/components/ol/ol-form-text'
 import Notification from '@/shared/components/notification'
+import { useAbfrage } from '../abfrage'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { startBefehl } from './claude-verbinden'
 import LaufKarte, { type Aenderung, type Lauf } from './lauf-karte'
@@ -22,29 +23,10 @@ type Status = {
   aenderungen: Aenderung[]
 }
 
-const ABFRAGE_MS = 5000
-
 export default function ClaudePanel() {
   const { t } = useTranslation()
-  const [status, setStatus] = useState<Status | null>(null)
-  const [fehler, setFehler] = useState<string | null>(null)
+  const { daten: status, fehler, setFehler, laden } = useAbfrage<Status>(projektPfad('/claude'))
   const [offenlegung, setOffenlegung] = useState(false)
-
-  const laden = useCallback(async () => {
-    try {
-      setStatus(await anfrage<Status>(projektPfad('/claude')))
-    } catch (error) {
-      setFehler((error as Error).message)
-    }
-  }, [])
-
-  useEffect(() => {
-    laden()
-    const takt = setInterval(() => {
-      if (!document.hidden) laden()
-    }, ABFRAGE_MS)
-    return () => clearInterval(takt)
-  }, [laden])
 
   return (
     <div className="spur-panel">

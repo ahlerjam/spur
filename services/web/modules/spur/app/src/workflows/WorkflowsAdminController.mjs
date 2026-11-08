@@ -1,7 +1,6 @@
 import Path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import SessionManager from '../../../../../app/src/Features/Authentication/SessionManager.mjs'
-import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { menschId } from '../anfrage.mjs'
 import { mitProblemen } from '../probleme.mjs'
 import * as Workflows from './Workflows.mjs'
 
@@ -16,8 +15,7 @@ export const liste = mitProblemen(async (req, res) => {
 })
 
 export const setzen = mitProblemen(async (req, res) => {
-  const admin = new ObjectId(String(SessionManager.getLoggedInUserId(req.session)))
-  await Workflows.setzen(req.params.name, req.body.text, admin)
+  await Workflows.setzen(req.params.name, req.body.text, menschId(req))
   res.sendStatus(204)
 })
 

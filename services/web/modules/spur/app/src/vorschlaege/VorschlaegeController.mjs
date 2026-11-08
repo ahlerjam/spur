@@ -1,17 +1,9 @@
-import SessionManager from '../../../../../app/src/Features/Authentication/SessionManager.mjs'
-import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { menschId, projektId } from '../anfrage.mjs'
 import { Problem, mitProblemen } from '../probleme.mjs'
 import * as Vorschlaege from './Vorschlaege.mjs'
 
-const projektId = req => new ObjectId(req.params.project_id)
-const menschId = req => new ObjectId(String(SessionManager.getLoggedInUserId(req.session)))
-
 export const status = mitProblemen(async (req, res) => {
-  const [stand, vorschlaege] = await Promise.all([
-    Vorschlaege.stand(projektId(req), menschId(req)),
-    Vorschlaege.liste(projektId(req), menschId(req)),
-  ])
-  res.json({ stand, vorschlaege })
+  res.json(await Vorschlaege.panel(projektId(req), menschId(req)))
 })
 
 export const eigeneSetzen = mitProblemen(async (req, res) => {
@@ -49,7 +41,7 @@ export const tippPause = mitProblemen(async (req, res) => {
       projectId: projektId(req),
       menschId: menschId(req),
       art: 'belegloses_argument',
-      daten: { doc_id: docId },
+      daten: () => ({ doc_id: docId }),
     })
   )
 })

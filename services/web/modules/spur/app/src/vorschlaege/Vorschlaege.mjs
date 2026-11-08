@@ -1,4 +1,5 @@
-import { db, ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { botVon } from '../anfrage.mjs'
 import * as Inbox from '../Inbox.mjs'
 import { Problem } from '../probleme.mjs'
 import { einstellungen, ereignisse, vorschlaege } from '../sammlungen.mjs'
@@ -15,9 +16,8 @@ function artPruefen(art) {
   }
 }
 
-function wertPruefen(wert, { leerErlaubt }) {
-  if (WERTE.includes(wert) || (leerErlaubt && wert === null)) return
-  throw new Problem(422, 'schalter_wert', `Der Wert muss ${WERTE.join(' oder ')}${leerErlaubt ? ' oder null' : ''} sein.`)
+function wertPruefen(wert) {
+  if (!WERTE.includes(wert)) throw new Problem(422, 'schalter_wert', `Der Wert muss ${WERTE.join(' oder ')} sein.`)
 }
 
 const nachArt = quelle => Object.fromEntries(ARTEN.map(art => [art, quelle?.[art] ?? null]))
@@ -33,51 +33,68 @@ function tagesbeginn() {
   return tag
 }
 
-async function botVon(menschId) {
-  return await db.users.findOne({ 'spur.botFuer': menschId }, { projection: { _id: 1 } })
+async function heuteAusgeloest(bot) {
+  if (!bot) return 0
+  return await (await ereignisse()).countDocuments({ botId: bot._id, typ: 'suggest_trigger', am: { $gte: tagesbeginn() } })
 }
 
-async function heuteAusgeloest(botId) {
-  if (!botId) return 0
-  return await (await ereignisse()).countDocuments({
-    botId,
-    typ: 'suggest_trigger',
-    am: { $gte: tagesbeginn() },
-  })
-}
-
-export async function stand(projectId, menschId) {
+async function schalterLesen(projectId, menschId) {
   const sammlung = await einstellungen()
-  const [projekt, eigene, limitEintrag, bot] = await Promise.all([
+  const [projekt, eigene, limitEintrag] = await Promise.all([
     sammlung.findOne(projektFilter(projectId)),
     sammlung.findOne(eigenerFilter(projectId, menschId)),
     sammlung.findOne(limitFilter(menschId)),
-    botVon(menschId),
   ])
   const p = nachArt(projekt?.vorschlaege)
   const e = nachArt(eigene?.vorschlaege)
-  const limit = limitEintrag?.vorschlagLimit ?? STANDARD_LIMIT
-  const heute = await heuteAusgeloest(bot?._id)
   return {
     eigene: e,
     projekt: p,
     wirksam: Object.fromEntries(ARTEN.map(art => [art, e[art] ?? p[art] ?? 'aus'])),
-    limit,
-    heute,
-    limitErreicht: heute >= limit,
+    limit: limitEintrag?.vorschlagLimit ?? STANDARD_LIMIT,
   }
+}
+
+async function standMitBot(projectId, menschId, bot) {
+  const [schalter, heute] = await Promise.all([schalterLesen(projectId, menschId), heuteAusgeloest(bot)])
+  return { ...schalter, heute, limitErreicht: heute >= schalter.limit }
+}
+
+async function offeneVorschlaege(projectId, bot) {
+  if (!bot) return []
+  const offen = await (await vorschlaege())
+    .find({ projectId, botId: bot._id, status: 'offen' })
+    .sort({ am: -1 })
+    .limit(100)
+    .toArray()
+  return offen.map(v => ({ id: v._id, art: v.art, titel: v.titel, text: v.text, pfad: v.pfad, am: v.am }))
+}
+
+export async function stand(projectId, menschId) {
+  return await standMitBot(projectId, menschId, await botVon(menschId))
+}
+
+export async function liste(projectId, menschId) {
+  return await offeneVorschlaege(projectId, await botVon(menschId))
+}
+
+// Für das Panel, das alle 5 s fragt: den Bot nur einmal suchen.
+export async function panel(projectId, menschId) {
+  const bot = await botVon(menschId)
+  const [s, offen] = await Promise.all([standMitBot(projectId, menschId, bot), offeneVorschlaege(projectId, bot)])
+  return { stand: s, vorschlaege: offen }
 }
 
 export async function eigeneSetzen(projectId, menschId, art, wert) {
   artPruefen(art)
-  wertPruefen(wert, { leerErlaubt: true })
+  if (wert !== null) wertPruefen(wert)
   const aenderung = wert === null ? { $unset: { [`vorschlaege.${art}`]: '' } } : { $set: { [`vorschlaege.${art}`]: wert } }
   await (await einstellungen()).updateOne(eigenerFilter(projectId, menschId), aenderung, { upsert: true })
 }
 
 export async function projektSetzen(projectId, art, wert) {
   artPruefen(art)
-  wertPruefen(wert, { leerErlaubt: false })
+  wertPruefen(wert)
   await (await einstellungen()).updateOne(
     projektFilter(projectId),
     { $set: { [`vorschlaege.${art}`]: wert } },
@@ -93,14 +110,14 @@ export async function limitSetzen(menschId, limit) {
 }
 
 // Prüft Schalter und Tageslimit; nur dann bekommt der eigene Claude ein suggest_trigger.
-// `daten` darf eine Funktion sein, die erst nach den Prüfungen läuft und mit null „kein Anlass“ meldet.
+// `daten` läuft erst nach den Prüfungen (etwa das Log eines Compiles lesen) und meldet mit null „kein Anlass“.
 export async function ausloesen({ projectId, menschId, art, daten }) {
-  const s = await stand(projectId, menschId)
-  if (s.wirksam[art] !== 'vorschlag') return { ausgeloest: false, grund: 'aus' }
+  const schalter = await schalterLesen(projectId, menschId)
+  if (schalter.wirksam[art] !== 'vorschlag') return { ausgeloest: false, grund: 'aus' }
   const bot = await botVon(menschId)
   if (!bot) return { ausgeloest: false, grund: 'kein_claude' }
-  if (s.limitErreicht) return { ausgeloest: false, grund: 'limit' }
-  const inhalt = typeof daten === 'function' ? await daten() : daten
+  if ((await heuteAusgeloest(bot)) >= schalter.limit) return { ausgeloest: false, grund: 'limit' }
+  const inhalt = await daten()
   if (!inhalt) return { ausgeloest: false, grund: 'kein_anlass' }
   await Inbox.ereignisAnlegen({ projectId, botId: bot._id, typ: 'suggest_trigger', daten: { art, ...inhalt } })
   return { ausgeloest: true }
@@ -120,19 +137,6 @@ export async function vorschlagen({ projectId, botId, art, titel, text, pfad }) 
   return { vorschlag_id: insertedId }
 }
 
-const fuerClient = v => ({ id: v._id, art: v.art, titel: v.titel, text: v.text, pfad: v.pfad, am: v.am })
-
-export async function liste(projectId, menschId) {
-  const bot = await botVon(menschId)
-  if (!bot) return []
-  const offen = await (await vorschlaege())
-    .find({ projectId, botId: bot._id, status: 'offen' })
-    .sort({ am: -1 })
-    .limit(100)
-    .toArray()
-  return offen.map(fuerClient)
-}
-
 async function erledigen(projectId, menschId, id, status) {
   const bot = await botVon(menschId)
   const vorschlag =
@@ -143,7 +147,7 @@ async function erledigen(projectId, menschId, id, status) {
         )
       : null
   if (!vorschlag) throw new Problem(404, 'vorschlag_fehlt', 'Diesen Vorschlag gibt es nicht mehr. Bitte das Panel neu laden.')
-  return { vorschlag, botId: bot._id }
+  return vorschlag
 }
 
 export async function verwerfen(projectId, menschId, id) {
@@ -151,11 +155,11 @@ export async function verwerfen(projectId, menschId, id) {
 }
 
 export async function uebernehmen(projectId, menschId, id) {
-  const { vorschlag, botId } = await erledigen(projectId, menschId, id, 'uebernommen')
+  const vorschlag = await erledigen(projectId, menschId, id, 'uebernommen')
   const ort = vorschlag.pfad ? ` (${vorschlag.pfad})` : ''
   await Inbox.auftragAnlegen({
     projectId,
-    botId,
+    botId: vorschlag.botId,
     text: `Bitte diesen Vorschlag umsetzen${ort}: ${vorschlag.titel}\n\n${vorschlag.text}`,
     daten: { vorschlag_id: vorschlag._id },
   })

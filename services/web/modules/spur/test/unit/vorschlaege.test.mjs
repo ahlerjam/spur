@@ -27,7 +27,7 @@ beforeEach(async () => {
 
 const ereignisse = () => datenbank.db.collection('spurEvents').find({ typ: 'suggest_trigger' }).toArray()
 const compile = (menschId = ada) =>
-  V.ausloesen({ projectId: projekt, menschId, art: 'compile_fehler', daten: { fehler: [{ zeile: 4, meldung: 'Undefined control sequence.' }] } })
+  V.ausloesen({ projectId: projekt, menschId, art: 'compile_fehler', daten: () => ({ fehler: [{ zeile: 4, meldung: 'Undefined control sequence.' }] }) })
 
 describe('Schalter', () => {
   it('stehen ohne Einstellung beide auf Aus, das Tageslimit auf 50', async () => {
@@ -114,6 +114,13 @@ describe('Auslöser', () => {
 })
 
 describe('Vorschläge im Panel', () => {
+  it('panel liefert Stand und offene Vorschläge zusammen', async () => {
+    await vorschlag()
+    const { stand, vorschlaege } = await V.panel(projekt, ada)
+    expect(stand.wirksam.compile_fehler).toBe('aus')
+    expect(vorschlaege.map(v => v.titel)).toEqual(['Beleg fehlt'])
+  })
+
   async function vorschlag() {
     return await V.vorschlagen({
       projectId: projekt,

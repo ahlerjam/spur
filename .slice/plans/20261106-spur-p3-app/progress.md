@@ -40,3 +40,9 @@ Alle fünf Features bestehen ihre E2E-Schritte (`p3f1` bis `p3f5` in `services/w
 ## Vorschläge
 - `events_since` sortiert nach `_id`. Solange alle Ereignisse im web-Prozess entstehen, ist das sicher; entstünden Ereignisse auch in web-api (MCP), könnte ein Cursor ein Ereignis aus derselben Sekunde überspringen. Dann einen monotonen Zähler je Bot einführen.
 - Bot-Namen folgen nicht, wenn eine Person ihren Vornamen ändert (Bot heißt weiter „Claude (alter Name)“).
+
+## /simplify (c823be1f51..HEAD)
+Der Plan-Commit liegt vor 90 Commits aus P2 und P4, die danach in diesen Zweig kamen; geprüft wurde deshalb nur der Diff dieses Laufs ab `c823be1f51`.
+- Umgesetzt: `anfrage.mjs` mit `projektId`, `menschId` und einer lesenden Bot-Suche `botVon` (vorher dreifach); das Vorschläge-Panel sucht den Bot je Abfrage einmal (`Vorschlaege.panel`); `ausloesen` bricht bei Schalter Aus ab, bevor es zählt, und nimmt `daten` immer als Funktion; `erledigen` liefert nur den Vorschlag; `@claude` sucht in der Schleife nur die Ranges und liest die Dokumente einmal, Threads parallel; die Workflow-Liste im Panel ohne Text; ein `useAbfrage`-Hook für beide Panels; `admin`-Middleware einmal.
+- Nicht umgesetzt: Hook statt `res.json`-Hülle im Compile-Beobachter (ADR 0001: keine neuen Kern-Patches); gemeinsamer Cursor für `seit` (siehe Vorschläge); Löschlisten aus einem Sammlungsregister ableiten (berührt P1/P2-Code); `ARTEN` vom Server ans Panel liefern; `useAktion`-Helfer für die vielen try/catch in allen Panels (weit über den Diff hinaus).
+- `tsc --noEmit` meldet in spur nur Fehler, die vor diesem Lauf schon bestanden (`ref` am Auftragsfeld in `claude-panel.tsx`, Testdaten in `ocr.test.tsx` und `zitate.test.tsx`).

@@ -368,7 +368,8 @@ export const claudeAuftrag = mitProblemen(async (req, res) => {
 
 export const workflows = mitProblemen(async (req, res) => {
   const liste = await Workflows.liste()
-  res.json({ workflows: liste.map(({ name, titel, beschreibung, text }) => ({ name, titel, beschreibung, text })) })
+  // Den Text holt workflowStarten selbst; das Panel braucht nur Name, Titel und Beschreibung.
+  res.json({ workflows: liste.map(({ name, titel, beschreibung }) => ({ name, titel, beschreibung })) })
 })
 
 export const workflowStarten = mitProblemen(async (req, res) => {

@@ -496,9 +496,9 @@ describe('Claude-Zugang und Läufe', () => {
     })
   })
 
-  it('workflows liefert Name, Titel, Beschreibung und aktuellen Text', async () => {
+  it('workflows liefert Name, Titel und Beschreibung', async () => {
     const { res } = await ausfuehren(C.workflows, req())
-    expect(res.body).toEqual({ workflows: [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B', text: 'T' }] })
+    expect(res.body).toEqual({ workflows: [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B' }] })
   })
 
   it('workflowStarten legt den Workflow als Auftrag für den eigenen Bot an', async () => {
