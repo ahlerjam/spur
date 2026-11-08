@@ -164,7 +164,22 @@ export async function webAufnehmen({ projectId, userId, url }) {
   // Im Dev-Stack liegt die Testseite im lokalen Netz.
   const seite = await abrufen(url, IST_DEV ? { gesperrt: () => false } : {})
   const adresse = new URL(seite.url)
-  const key = slug(seite.titel ?? '') || slug(`${adresse.hostname}${adresse.pathname}`) || 'webseite'
+  const sammlung = await quellen()
+  const gleich = await sammlung.findOne({ projectId, 'web.url': seite.url })
+  if (gleich) {
+    throw new Problem(
+      409,
+      'quelle_vorhanden',
+      `Diese Webseite ist schon als Quelle vorhanden („${gleich.meta?.titel ?? gleich.dateiname}“).`
+    )
+  }
+  // Viele Seiten heißen gleich („Startseite“): dann mit Zähler, statt zum Umbenennen aufzufordern.
+  const basis = slug(seite.titel ?? '') || slug(`${adresse.hostname}${adresse.pathname}`) || 'webseite'
+  const belegt = new Set(
+    await sammlung.distinct('key', { projectId, key: new RegExp(`^${_.escapeRegExp(basis)}(-\\d+)?$`) })
+  )
+  let key = basis
+  for (let n = 2; belegt.has(key); n++) key = `${basis}-${n}`
   const html = Buffer.from(seite.html)
   const quelle = {
     _id: new ObjectId(),
@@ -203,12 +218,25 @@ export function ocrZustand(quelle) {
   return { status: verwaist ? 'abgebrochen' : status, fertig, gesamt, konfidenz }
 }
 
+// Rastern und Tesseract brauchen viel Rechenzeit im Web-Prozess: höchstens zwei Läufe zugleich.
+const OCR_PARALLEL = 2
+let ocrLaeufe = 0
+
 export async function ocrStarten(quelle) {
-  if (quelle.art !== 'pdf' || quelle.status === 'text') {
+  // Auch eine fertige OCR-Quelle nicht neu erkennen: Bestätigte Stellen bezögen sich sonst auf
+  // einen Text, den es nicht mehr gibt.
+  if (quelle.art !== 'pdf' || quelle.status !== 'kein_text') {
     throw new Problem(
       409,
       'ocr_unnoetig',
-      'Diese Quelle hat schon Text. Texterkennung gibt es nur für gescannte PDFs.'
+      'Diese Quelle hat schon Text. Texterkennung gibt es nur für gescannte PDFs ohne Text.'
+    )
+  }
+  if (ocrLaeufe >= OCR_PARALLEL) {
+    throw new Problem(
+      429,
+      'ocr_ausgelastet',
+      'Gerade laufen schon zwei Texterkennungen. Bitte in einigen Minuten erneut starten.'
     )
   }
   const nun = jetzt()
@@ -231,7 +259,11 @@ export async function ocrStarten(quelle) {
     throw new Problem(409, 'ocr_laeuft', 'Die Texterkennung läuft schon. Bitte kurz warten.')
   }
   quelleGeaendert(neu)
-  return { quelle: neu, lauf: ocrAusfuehren(neu) }
+  ocrLaeufe++
+  const lauf = ocrAusfuehren(neu)
+    .catch(error => logger.error({ err: error, quelleId: neu._id }, 'spur: Texterkennung ohne Abschluss'))
+    .finally(() => ocrLaeufe--)
+  return { quelle: neu, lauf }
 }
 
 async function ocrAusfuehren(quelle) {
@@ -246,10 +278,12 @@ async function ocrAusfuehren(quelle) {
         { quelleId: quelle._id, seite: nr },
         { $set: { text: ergebnis.text, ocrKonfidenz: ergebnis.konfidenz } }
       )
-      await sammlung.updateOne(
+      const { matchedCount } = await sammlung.updateOne(
         { _id: quelle._id },
         { $set: { 'ocr.fertig': nr, 'ocr.aktualisiert': jetzt() } }
       )
+      // Quelle inzwischen gelöscht: nicht weiter rechnen.
+      if (!matchedCount) return
       quelleGeaendert(quelle)
     }
     const werte = ergebnisse.map(e => e.konfidenz).filter(k => k !== null)
@@ -483,6 +517,8 @@ async function quelleKopieren(quelle, zielProjekt, userId) {
     projectId: zielProjekt,
     angelegtVon: userId,
     angelegtAm: jetzt(),
+    // Eine laufende Texterkennung gehört zum alten Projekt; dort läuft sie weiter.
+    ocr: quelle.ocr?.status === 'laeuft' ? null : (quelle.ocr ?? null),
   }
   try {
     await kopieAnlegen(quelle, neu, zielProjekt)
@@ -516,10 +552,14 @@ async function kopieAnlegen(quelle, neu, zielProjekt) {
   const marken = await (await quotes()).find({ quelleId: quelle._id }).toArray()
   if (marken.length) {
     await (await quotes()).insertMany(
+      // Kommentare und Zuweisungen gehören zum Team des alten Projekts. Die Bestätigung einer Stelle
+      // betrifft den Quelltext und gilt weiter.
       marken.map(({ _id, ...q }) => ({
         ...q,
         quelleId: neu._id,
         projectId: zielProjekt,
+        kommentare: [],
+        zugewiesen: null,
       }))
     )
   }

@@ -6,7 +6,7 @@ import { useConnectionContext } from '@/features/ide-react/context/connection-co
 import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
 import getMeta from '@/utils/meta'
 import { anfrage, projektPfad } from '../api'
-import type { Quelle, Zitat } from './typen'
+import { anzeigename, type Quelle, type Zitat } from './typen'
 
 type Zuweisung = Zitat & { quelle: Quelle }
 
@@ -69,7 +69,7 @@ export default function Zugewiesen({
             name: zitat.zugewiesen?.von.name,
             text: zitat.text,
             stelle: [
-              zitat.quelle.dateiname,
+              anzeigename(zitat.quelle),
               zitat.quelle.art === 'pdf'
                 ? t('spur_seite_kurz', { seite: zitat.label ?? zitat.seite })
                 : zitat.label,

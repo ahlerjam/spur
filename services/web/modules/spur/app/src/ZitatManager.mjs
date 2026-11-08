@@ -73,16 +73,16 @@ export async function kommentieren(quelle, zitatId, { text, zuweisen }, userId) 
   }
   const am = jetzt()
   const kommentar = { _id: new ObjectId(), von: userId, text: inhalt, am }
-  const felder = {}
-  if (zuweisen !== undefined) {
-    felder.zugewiesen = { an: await zuweisungPruefen(quelle.projectId, zuweisen), von: userId, am }
-  }
+  const zugewiesen =
+    zuweisen === undefined
+      ? undefined
+      : { an: await zuweisungPruefen(quelle.projectId, zuweisen), von: userId, am }
   const neu = await (await quotes()).findOneAndUpdate(
     { _id: zitat._id },
-    { $push: { kommentare: kommentar }, $set: felder },
+    { $push: { kommentare: kommentar }, ...(zugewiesen ? { $set: { zugewiesen } } : {}) },
     { returnDocument: 'after' }
   )
-  melden(quelle, felder.zugewiesen?.an)
+  melden(quelle, zugewiesen?.an)
   return neu
 }
 

@@ -119,12 +119,41 @@ describe('ocrStarten', () => {
     await erster.lauf
   })
 
-  it('lehnt Quellen ab, die schon Text haben, und Transkripte', async () => {
+  it('lehnt Quellen ab, die schon Text haben, schon erkannt sind oder Transkripte sind', async () => {
     const pdf = await aufnehmen('smith2024.pdf', 'smith2024.pdf')
     const vtt = await aufnehmen('interview.vtt', 'interview.vtt')
-    for (const q of [pdf, vtt]) {
+    const scan = await aufnehmen('scan.pdf', 'scan.pdf')
+    for (const q of [pdf, vtt, { ...scan, status: 'ocr' }]) {
       expect(await fehlerVon(Quellen.ocrStarten(q))).toMatchObject({ status: 409, typ: 'ocr_unnoetig' })
     }
+  })
+})
+
+describe('Grenzen', () => {
+  it('lässt höchstens zwei Texterkennungen zugleich laufen', async () => {
+    const offen = []
+    ocrSeite = () => new Promise(r => offen.push(() => r({ text: 'x', konfidenz: 90 })))
+    const a = await aufnehmen('a.pdf', 'scan.pdf')
+    const b = await aufnehmen('b.pdf', 'scan.pdf')
+    const c = await aufnehmen('c.pdf', 'scan.pdf')
+    const laeufe = [(await Quellen.ocrStarten(a)).lauf, (await Quellen.ocrStarten(b)).lauf]
+    expect(await fehlerVon(Quellen.ocrStarten(c))).toMatchObject({ status: 429, typ: 'ocr_ausgelastet' })
+    ocrSeite = async () => ({ text: 'y', konfidenz: 90 })
+    for (const weiter of offen) weiter()
+    await Promise.all(laeufe)
+    await (await Quellen.ocrStarten(c)).lauf
+  })
+
+  it('hört auf, wenn die Quelle während der Erkennung gelöscht wird', async () => {
+    let aufrufe = 0
+    const scan = await aufnehmen('scan.pdf', 'scan.pdf')
+    ocrSeite = async () => {
+      aufrufe++
+      await Quellen.loeschen(scan)
+      return { text: 'x', konfidenz: 90 }
+    }
+    await (await Quellen.ocrStarten(scan)).lauf
+    expect(aufrufe).toBe(1)
   })
 })
 

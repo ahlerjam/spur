@@ -27,7 +27,7 @@ const SATZ = 'Regular sleep times help shift workers recover.'
 beforeAll(async () => {
   datenbank = await testDatenbank()
   server = createServer((req, res) => {
-    if (req.url !== '/testseite') {
+    if (!['/testseite', '/gleicher-titel'].includes(req.url)) {
       res.writeHead(404)
       return res.end()
     }
@@ -100,7 +100,15 @@ describe('webAufnehmen', () => {
 
   it('meldet einen zweiten Schnappschuss derselben Seite als vorhanden', async () => {
     await aufnehmen(`${basis}/testseite`)
-    expect(await fehlerVon(aufnehmen(`${basis}/testseite`))).toMatchObject({ status: 409, typ: 'quelle_vorhanden' })
+    const fehler = await fehlerVon(aufnehmen(`${basis}/testseite`))
+    expect(fehler).toMatchObject({ status: 409, typ: 'quelle_vorhanden' })
+    expect(fehler.message).toBe('Diese Webseite ist schon als Quelle vorhanden („Schlafhygiene im Schichtdienst“).')
+  })
+
+  it('zählt den Schlüssel hoch, wenn eine andere Seite gleich heißt', async () => {
+    await aufnehmen(`${basis}/testseite`)
+    const zweite = await aufnehmen(`${basis}/gleicher-titel`)
+    expect(zweite).toMatchObject({ key: 'schlafhygiene-im-schichtdienst-2', dateiname: 'schlafhygiene-im-schichtdienst-2.html' })
   })
 
   it('sperrt das lokale Netz außerhalb der Dev-Umgebung', async () => {

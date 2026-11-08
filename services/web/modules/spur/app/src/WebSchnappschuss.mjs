@@ -26,7 +26,10 @@ const gesperrtFehler = () =>
     'Adressen im lokalen Netz lassen sich nicht aufnehmen. Bitte eine öffentliche Webseite angeben.'
   )
 
-const V4_GESPERRT = [
+// Nicht öffentlich erreichbare Netze. BlockList prüft IPv4-gemappte IPv6-Adressen (::ffff:…) in
+// jeder Schreibweise gegen die IPv4-Regeln.
+const GESPERRT = new net.BlockList()
+for (const [netz, bits] of [
   ['0.0.0.0', 8],
   ['10.0.0.0', 8],
   ['100.64.0.0', 10],
@@ -37,30 +40,26 @@ const V4_GESPERRT = [
   ['192.168.0.0', 16],
   ['198.18.0.0', 15],
   ['224.0.0.0', 3],
-]
-
-const v4Zahl = ip => ip.split('.').reduce((summe, teil) => summe * 256 + Number(teil), 0)
-
-function v4Gesperrt(ip) {
-  const zahl = v4Zahl(ip)
-  return V4_GESPERRT.some(([netz, bits]) => {
-    const groesse = 2 ** (32 - bits)
-    return Math.floor(zahl / groesse) === Math.floor(v4Zahl(netz) / groesse)
-  })
+]) {
+  GESPERRT.addSubnet(netz, bits, 'ipv4')
+}
+for (const [netz, bits] of [
+  ['::', 96], // unbestimmt, Loopback und alte IPv4-kompatible Adressen
+  ['64:ff9b::', 96], // NAT64
+  ['64:ff9b:1::', 48],
+  ['100::', 64],
+  ['2001::', 32], // Teredo
+  ['2001:db8::', 32],
+  ['2002::', 16], // 6to4
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['ff00::', 8],
+]) {
+  GESPERRT.addSubnet(netz, bits, 'ipv6')
 }
 
 export function adresseGesperrt(ip) {
-  if (net.isIPv4(ip)) return v4Gesperrt(ip)
-  const klein = ip.toLowerCase()
-  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(klein)
-  if (v4) return v4Gesperrt(v4[1])
-  return (
-    klein === '::' ||
-    klein === '::1' ||
-    /^f[cd]/.test(klein) ||
-    /^fe[89ab]/.test(klein) ||
-    klein.startsWith('ff')
-  )
+  return GESPERRT.check(ip, net.isIPv6(ip) ? 'ipv6' : 'ipv4')
 }
 
 function adressePruefen(eingabe) {

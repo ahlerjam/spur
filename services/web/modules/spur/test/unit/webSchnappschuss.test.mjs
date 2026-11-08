@@ -40,6 +40,8 @@ describe('adresseGesperrt', () => {
   it.each([
     '127.0.0.1', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.1.1', '169.254.169.254',
     '100.64.0.1', '0.0.0.0', '224.0.0.1', '::1', '::', 'fe80::1', 'fd00::1', '::ffff:127.0.0.1', 'ff02::1',
+    // Gemappte und übersetzte IPv4-Adressen, auch in Hex-Schreibweise (so normalisiert sie new URL).
+    '::ffff:7f00:1', '::ffff:a9fe:a9fe', '64:ff9b::7f00:1', '2002:7f00:1::', '::7f00:1',
   ])('sperrt %s', ip => {
     expect(adresseGesperrt(ip)).toBe(true)
   })
@@ -81,6 +83,9 @@ describe('abrufen', () => {
   it('sperrt Adressen im lokalen Netz, auch als Ziel einer Umleitung', async () => {
     expect(await fehlerVon(abrufen(`${basis}/seite`))).toMatchObject({ status: 422, typ: 'adresse_gesperrt' })
     expect(await fehlerVon(abrufen('http://localhost:1/'))).toMatchObject({ typ: 'adresse_gesperrt' })
+    for (const url of ['http://[::ffff:127.0.0.1]:1/', 'http://[::ffff:169.254.169.254]/', 'http://[::1]:1/']) {
+      expect(await fehlerVon(abrufen(url))).toMatchObject({ typ: 'adresse_gesperrt' })
+    }
     antworten = { '/weiter': { status: 302, kopf: { Location: 'http://169.254.169.254/latest' } } }
     // Der erste Schritt geht an den Testserver, das Ziel der Umleitung prüft die Sperre erneut.
     const nurErster = { gesperrt: ip => ip === '169.254.169.254' }
