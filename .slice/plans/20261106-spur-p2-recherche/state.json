@@ -1,9 +1,10 @@
 {
-  "state": "parked",
+  "state": "queued",
   "builderModel": "opus",
   "builderAdvisor": "opus",
   "dependsOn": [
     "20261106-spur-p1-kern",
     "20261107-spur-p11-tests"
-  ]
+  ],
+  "where": "cloud"
 }
