@@ -6,7 +6,7 @@ import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
-import { bearbeitungen, beschaffungen, einstellungen, ereignisse, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll } from './sammlungen.mjs'
+import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
@@ -294,8 +294,14 @@ export async function aendern(quelle, { fassung, versatz }) {
 export async function loeschen(quelle) {
   await (await quotes()).deleteMany({ quelleId: quelle._id })
   await (await quellenSeiten()).deleteMany({ quelleId: quelle._id })
-  await (await notizen()).deleteMany({ quelleId: quelle._id })
-  await (await matrixZellen()).deleteMany({ quelleId: quelle._id })
+  const zuQuelle = { projectId: quelle.projectId, quelleId: quelle._id }
+  await (await notizen()).deleteMany(zuQuelle)
+  await (await matrixZellen()).deleteMany(zuQuelle)
+  // Ohne PDF ist der Eintrag wieder offen und lässt sich neu beschaffen.
+  await (await beschaffungen()).updateMany(
+    zuQuelle,
+    { $set: { status: 'offen' }, $unset: { quelleId: '', beschafftAm: '' } }
+  )
   await (await quellen()).deleteOne({ _id: quelle._id })
   const ordner = Path.dirname(dateiPfad(quelle))
   for (const name of await fs.readdir(ordner).catch(() => [])) {
@@ -324,6 +330,7 @@ export async function projektAufraeumen(projectId) {
     (await notizen()).deleteMany({ projectId: id }),
     (await matrixSpalten()).deleteOne({ _id: id }),
     (await matrixZellen()).deleteMany({ projectId: id }),
+    (await jobs()).deleteMany({ projectId: id }),
   ])
   await fs.rm(Path.join(ablageWurzel(), String(id)), { recursive: true, force: true })
 }

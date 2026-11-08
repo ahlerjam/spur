@@ -292,6 +292,15 @@ describe('Klone und Übernehmen', () => {
     expect(await Quellen.uebernehmen(ziel, projekt, anna)).toBe(0)
   })
 
+  it('loeschen öffnet einen damit beschafften Eintrag der Beschaffungsliste wieder', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf')
+    await datenbank.db.collection('spurAcquisitions').insertOne({ projectId: projekt, doi: '10.5555/x', status: 'beschafft', quelleId: quelle._id })
+    await Quellen.loeschen(quelle)
+    const eintrag = await datenbank.db.collection('spurAcquisitions').findOne({ doi: '10.5555/x' })
+    expect(eintrag.status).toBe('offen')
+    expect(eintrag.quelleId).toBeUndefined()
+  })
+
   it('uebernehmen lässt Volltexte ohne Lizenz zur Weitergabe im Projekt', async () => {
     await aufnehmen('smith2024.pdf', 'smith2024.pdf', { nurProjekt: true })
     const ziel = new ObjectId()

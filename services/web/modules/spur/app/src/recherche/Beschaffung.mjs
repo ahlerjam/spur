@@ -4,14 +4,15 @@ import { Problem } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
-import { bibEintrag } from '../pruefung/bib.mjs'
+import { autorName, bibEintrag } from '../pruefung/bib.mjs'
 import { beschaffungen, einstellungen, quellen } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import * as Aufnahme from './Aufnahme.mjs'
+import { doiPfad } from './dienste.mjs'
 import { freierKey, keyVorschlag } from './keys.mjs'
 
 const SEITE = 50
-export const STANDARD_VORLAGE = 'https://doi.org/{doi}'
+const STANDARD_VORLAGE = 'https://doi.org/{doi}'
 
 const fehlt = () =>
   new Problem(404, 'beschaffung_fehlt', 'Diesen Eintrag gibt es nicht mehr. Bitte die Liste neu laden.')
@@ -67,14 +68,13 @@ export async function vorlageSetzen(userId, wert) {
   return text
 }
 
-// Der Schrägstrich der DOI bleibt lesbar; Resolver und doi.org verstehen ihn so.
-export const link = (vorlage, doi) => vorlage.replaceAll('{doi}', encodeURIComponent(doi).replace(/%2F/gi, '/'))
+export const link = (vorlage, doi) => vorlage.replaceAll('{doi}', doiPfad(doi))
 
 function risEintrag({ doi, meta }) {
   const zeilen = [
     ['TY', 'JOUR'],
     ['TI', meta.titel],
-    ...(meta.autoren ?? []).map(a => ['AU', [a.family, a.given].filter(Boolean).join(', ')]),
+    ...(meta.autoren ?? []).map(a => ['AU', autorName(a)]),
     ['PY', meta.jahr],
     ['JO', meta.journal],
     ['SP', meta.seiten],
@@ -103,7 +103,7 @@ export async function exportieren(projectId, format) {
     const zeilen = eintraege.map(e => [
       e.doi,
       e.meta.titel,
-      (e.meta.autoren ?? []).map(a => [a.family, a.given].filter(Boolean).join(', ')).join('; '),
+      (e.meta.autoren ?? []).map(autorName).join('; '),
       e.meta.jahr,
       e.status === 'offen' ? 'Offen' : 'Beschafft',
     ])

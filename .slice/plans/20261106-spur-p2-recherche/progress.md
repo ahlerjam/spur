@@ -86,3 +86,36 @@
 - Letzter E2E-Lauf auf `600788ddc3` (nach der letzten Änderung): f1–f15 und p2f1–p2f10 ok, 293 s.
 - Alle 20 Screenshots (10 Ansichten × 360/1280 px) durchgesehen: Treffer, Suchprotokoll, Beschaffung, Import, Matrix, Vorschau mit Notiz, KI-Offenlegung, Lauf-Karte, semantische Suche (bereit und mit Treffern). Keine weiteren Mängel.
 - Diff-Basis für `/simplify` und `/code-review`: `0c431525a7..HEAD`. `7ff09078c1^..HEAD` enthielte zusätzlich die P11-Commits zwischen Plan-Commit und Laufstart (wie in P1 begründet). `/security-review` lief als Skill auf `origin/HEAD...HEAD` (`origin/HEAD` lokal auf `origin/agent` gesetzt), das umfasst denselben Lauf.
+
+## /code-review medium 7ff09078c1^..HEAD (Plan-Diff laut Skill-Formel)
+- Behoben, mit Unit-Tests:
+  - Löschen einer Quelle öffnet den damit beschafften Eintrag wieder.
+  - `projektAufraeumen` löscht auch `spurJobs`.
+  - Ein gescheiterter Modell-Download wird beim nächsten Mal neu versucht.
+  - `perDoi` räumt die Quelle weg, wenn die `.bib` nicht ergänzt werden kann.
+  - Ohne `UNPAYWALL_EMAIL` kommt 503 `unpaywall_aus` statt „kein freier Volltext“.
+  - Leere Titel verschmelzen keine Treffer.
+- Fehlalarm: `doc_create` prüft Zahlen schon, weil es über `bearbeiten` schreibt.
+- Nicht geändert:
+  - DNS-Rebinding (siehe Sicherheitsreview).
+  - Rest-Wettlauf beim Vorprüfen der Drossel und beim Start paralleler Indexjobs (Doppelarbeit, kein falsches Ergebnis).
+  - http-PDFs von Unpaywall bleiben bewusst gesperrt (nur https).
+
+## /simplify auf 7ff09078c1^..HEAD
+- Umgesetzt:
+  - Löschpfade nutzen die Indizes über `projectId`.
+  - Eine Funktion `autorName` (`bib.mjs`), eine Kodierregel `doiPfad` auch für den Bibliothekslink.
+  - Zitationen liefern dieselbe Form wie Suchen; die Weiche in `auswerten` ist entfallen.
+  - Unnötige Exporte entfernt.
+  - Das Nutzerlimit sitzt nicht mehr auf der rein lokalen sinngemäßen Suche, und sein Kommentar ist korrigiert.
+- Nicht umgesetzt:
+  - `node:timers/promises` in `platzHolen`: Der Unit-Test misst die Wartezeiten über `globalThis.setTimeout`.
+  - Negativ-Cache für 404.
+  - `QuellenManager.alle` durch eine DOI-Abfrage ersetzen (bräuchte einen neuen Index auf `spurSources`).
+  - Parallele Awaits in `perDoi`.
+  - Explizite Markierung für rohe MCP-Inhalte.
+  - Aufräum-Registry für Sammlungen rund um Quellen.
+  - Kleinschreibung der DOI in `bib.doiNormal`: Sie würde Ausgaben des Prüfberichts ändern.
+  - URL-Helfer für die Dienste.
+  - `formatDate` im Suchprotokoll.
+  - Diese Punkte sind Vorschläge für später.

@@ -109,6 +109,13 @@ export async function perDoi({ projectId, userId, doi }) {
   }
   const { meta, arxiv } = await metadaten(wert)
   if (!meta.gefunden) throw new Problem(404, 'doi_nicht_gefunden', 'DOI nicht gefunden')
+  if (!arxiv && !process.env.UNPAYWALL_EMAIL && !paperApiBasis()) {
+    throw new Problem(
+      503,
+      'unpaywall_aus',
+      'Unpaywall ist auf dieser Installation nicht eingerichtet (UNPAYWALL_EMAIL fehlt). Bitte den Betreiber fragen oder das PDF selbst hochladen.'
+    )
+  }
   const zugang = arxiv ? { frei: true, pdf: meta.pdf, lizenz: null } : await unpaywall.status(wert)
   if (!zugang?.frei || !zugang.pdf) {
     throw new Problem(409, 'nicht_frei', 'Kein freier Volltext gefunden. Bitte auf die Beschaffungsliste setzen.')
@@ -135,7 +142,13 @@ export async function perDoi({ projectId, userId, doi }) {
       // Open Access heißt nicht weiterverwendbar: ohne Lizenzangabe bleibt der Volltext in diesem Projekt.
       nurProjekt: !zugang.lizenz,
     })
-    await ZitatManager.bibSicherstellen(projectId, docs, quelle, userId)
+    try {
+      await ZitatManager.bibSicherstellen(projectId, docs, quelle, userId)
+    } catch (error) {
+      // Ohne .bib-Eintrag keine Quelle: Sonst schlüge jede Wiederholung mit „Bereits vorhanden“ fehl.
+      await QuellenManager.loeschen(quelle)
+      throw error
+    }
     return quelle
   } finally {
     await fs.rm(ordner, { recursive: true, force: true })

@@ -35,6 +35,10 @@ async function echteEinbettung(text) {
     env.cacheDir = modellOrdner()
     env.allowRemoteModels = true
     return pipeline('feature-extraction', MODELL, { dtype: 'q8' })
+  }).catch(error => {
+    // Ein gescheiterter Download soll beim nächsten Aufruf erneut versucht werden.
+    pipelineVersprechen = null
+    throw error
   })
   const extraktor = await pipelineVersprechen
   const ausgabe = await extraktor(text, { pooling: 'mean', normalize: true })

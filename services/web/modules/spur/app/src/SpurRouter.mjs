@@ -29,7 +29,7 @@ const schreiben = [
 
 const angemeldet = AuthenticationController.requireLogin()
 
-// Die Drossel der Paper-Dienste gilt für die ganze Installation; ein Nutzer darf sie nicht allein belegen.
+// Je Nutzer: Die Drossel der Paper-Dienste gilt für die ganze Installation, ein Nutzer soll sie nicht allein belegen.
 const fremdDienste = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-recherche', { points: 30, duration: 60 }))
 
 const upload = multerUploadHandler({
@@ -65,7 +65,7 @@ export default {
     webRouter.get(`${QUELLEN}/suche`, ...lesen, SpurController.quellenSuche)
     webRouter.get(`${QUELLEN}/semantik`, ...lesen, SpurController.semantikStand)
     webRouter.post(`${QUELLEN}/semantik/indexieren`, ...schreiben, SpurController.semantikIndexieren)
-    webRouter.get(`${QUELLEN}/semantik/suche`, ...lesen, fremdDienste, SpurController.semantikSuchen)
+    webRouter.get(`${QUELLEN}/semantik/suche`, ...lesen, SpurController.semantikSuchen)
     webRouter.get(`${QUELLEN}/export`, ...lesen, SpurController.quellenExport)
     webRouter.get(`${QUELLEN}/andere`, ...lesen, SpurController.andereProjekte)
     webRouter.post(`${QUELLEN}/holen`, ...schreiben, SpurController.quellenHolen)

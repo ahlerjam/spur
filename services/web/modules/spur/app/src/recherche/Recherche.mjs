@@ -9,14 +9,14 @@ import { aktiv, PRO_SEITE, SUCHDIENSTE, ZITATIONSDIENSTE } from './dienste.mjs'
 
 const PROTOKOLL_SEITE = 50
 const CSV_MAX = 10000
-export const DOI_MUSTER = /^10\.\d{4,9}\/\S+$/
+const DOI_MUSTER = /^10\.\d{4,9}\/\S+$/
 const RICHTUNGEN = ['zitiert_von', 'zitiert']
 const ANZEIGE = Object.fromEntries(SUCHDIENSTE.map(d => [d.name, d.anzeige]))
 
 const titelSchluessel = titel => titel?.trim() && `titel:${titel.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()}`
 
 function zusammenfuehren(sammlung, treffer) {
-  const schluessel = treffer.doi ?? titelSchluessel(treffer.titel) ?? `ohne:${sammlung.size}`
+  const schluessel = treffer.doi || titelSchluessel(treffer.titel) || `ohne:${sammlung.size}`
   const neu = { ...treffer, dienste: treffer.dienste.map(d => ANZEIGE[d]) }
   const alt = sammlung.get(schluessel)
   if (!alt) return sammlung.set(schluessel, neu)
@@ -45,9 +45,7 @@ export function auswerten(dienste, ergebnisse) {
       })
       return
     }
-    const { treffer, gesamt: anzahl } = Array.isArray(ergebnis.value)
-      ? { treffer: ergebnis.value, gesamt: ergebnis.value.length }
-      : ergebnis.value
+    const { treffer, gesamt: anzahl } = ergebnis.value
     gesamt.push({ dienst, anzahl })
     for (const t of treffer) zusammenfuehren(sammlung, t)
   })

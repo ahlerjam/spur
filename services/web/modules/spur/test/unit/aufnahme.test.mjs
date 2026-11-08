@@ -35,6 +35,7 @@ beforeEach(async () => {
     QuellenManager: {
       MAX_BYTES: 1000,
       alle: vi.fn(async () => vorhandene),
+      loeschen: vi.fn(async () => {}),
       aufnehmen: vi.fn(async eingabe => {
         geladen.push(eingabe)
         return { _id: new ObjectId(), ...eingabe, dateiname: eingabe.dateiname }
@@ -44,6 +45,7 @@ beforeEach(async () => {
     PruefManager: { dokumente: vi.fn(async () => [{ pfad: 'references.bib', text: '@article{keller2014b,\n}' }]) },
     schalter: { paperApiBasis: () => undefined, jetzt: () => new Date() },
   }
+  vi.stubEnv('UNPAYWALL_EMAIL', 'test@example.org')
   vi.resetModules()
   vi.doMock('../../app/src/Crossref.mjs', () => m.Crossref)
   vi.doMock('../../app/src/recherche/dienste.mjs', () => m.dienste)
@@ -63,6 +65,7 @@ const aufnehmen = doi => Aufnahme.perDoi({ projectId, userId, doi })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('perDoi', () => {
@@ -163,5 +166,16 @@ describe('perDoi', () => {
     expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(fetch.mock.calls[0][1]).toMatchObject({ redirect: 'manual' })
+  })
+
+  it('räumt die Quelle weg, wenn die .bib nicht ergänzt werden kann', async () => {
+    m.ZitatManager.bibSicherstellen.mockRejectedValueOnce(new Error('Editor weg'))
+    await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))
+    expect(m.QuellenManager.loeschen).toHaveBeenCalled()
+  })
+
+  it('meldet ein nicht eingerichtetes Unpaywall statt „kein freier Volltext“', async () => {
+    vi.stubEnv('UNPAYWALL_EMAIL', '')
+    expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ status: 503, typ: 'unpaywall_aus' })
   })
 })

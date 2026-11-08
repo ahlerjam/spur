@@ -21,7 +21,7 @@ export function basis(name) {
 }
 
 // Der Schrägstrich bleibt, alles andere (?, #, ..) wird kodiert.
-const doiPfad = doi => encodeURIComponent(doi).replace(/%2F/gi, '/')
+export const doiPfad = doi => encodeURIComponent(doi).replace(/%2F/gi, '/')
 const doiKlein = doi => doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').toLowerCase() || null
 const arxivDoi = id => `10.48550/arxiv.${id.replace(/v\d+$/, '')}`
 const leerzeichen = text => text?.replace(/\s+/g, ' ').trim() ?? null
@@ -104,10 +104,10 @@ const openalex = {
   },
   async zitationen(doi, richtung) {
     const werk = await abrufen(this, `${basis('openalex')}/works/doi:${doiPfad(doi)}`, { headers: this.kopf() })
-    if (!werk?.id) return []
+    if (!werk?.id) return { treffer: [], gesamt: 0 }
     const id = werk.id.split('/').pop()
     const filter = richtung === 'zitiert_von' ? `cites:${id}` : `cited_by:${id}`
-    return (await this.werke({ filter, 'per-page': ZITATIONEN_MAX })).treffer
+    return await this.werke({ filter, 'per-page': ZITATIONEN_MAX })
   },
 }
 
@@ -150,7 +150,8 @@ const s2 = {
     url.searchParams.set('limit', String(ZITATIONEN_MAX))
     const daten = await abrufen(this, url.toString(), { headers: this.kopf() })
     const feld = richtung === 'zitiert_von' ? 'citingPaper' : 'citedPaper'
-    return (daten?.data ?? []).map(d => d[feld]).filter(Boolean).map(s2Paper)
+    const treffer = (daten?.data ?? []).map(d => d[feld]).filter(Boolean).map(s2Paper)
+    return { treffer, gesamt: treffer.length }
   },
 }
 
