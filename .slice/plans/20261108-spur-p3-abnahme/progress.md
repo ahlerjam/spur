@@ -79,6 +79,12 @@ Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in
 - Umgesetzt: Index `{projectId, botId, am: -1, _id: -1}` für den Verlauf (neue Migration `20261109090000_spur_verlauf_index.mjs`, ersetzt den Index nur nach `am`; `explain` zeigt IXSCAN → LIMIT ohne SORT; Rollback geprüft); `Inbox.verlauf` parallel zu Lauf, Verbindung und Automatik; grüner Rand als eine Regel für Claude-Nachricht und Erfolgsmeldung; Test der Befehlsnamen ohne Quelltext-Regex des Präfixes, doppelte Prüfungen auf `/spur:` in den Frontend-Tests entfernt (bleiben im Node-Test und in der E2E); Leerzeichen vor „·“ auf der Admin-Seite wiederhergestellt (beim Umstellen verloren).
 - Nicht umgesetzt: Panel-Abfrage nur mit neuen Nachrichten (`seit`) und „Ältere laden“ (größerer Umbau, siehe Vorschläge); eine allgemeine CSS-Regel für Overleafs Notification im schmalen Panel statt Zeilen ohne Kasten (stellt die Entscheidung aus P3 um, die Ursache in Overleafs Komponente ist nicht geklärt); Befehl vom Server mitliefern statt Präfix im Frontend (Präfix bliebe auch dann fest im Code); Seitengröße 100 und Cursor-Wiederverwendung im E2E-Helfer (nur Test); Befehl je Workflow unter dem Knopf statt eigener Hilfe-Liste (Schritt 3 verlangt die Hilfe mit genau den drei Befehlen).
 
+## /simplify, zweiter Durchgang (37b2d9db3b..HEAD, nach den Review-Befunden)
+- Wiederverwendung und Effizienz: keine Befunde (Migration nutzt `tools/migrations/lib`, Verlauf läuft über den neuen Index, `claudeStatus` fragt parallel ab).
+- Vereinfachung: `{' · '}` auf eigener Zeile ist Prettiers JSX-Format; die gemeinsame Randregel war der Wiederverwendungs-Fix des ersten Durchgangs. Beides bleibt.
+- Höhe: Der ältere Index `projectId_1_botId_1__id_-1` (Migration `20261107120000`) ist jetzt überflüssig (nur `deleteMany` nach `projectId` nutzt den Präfix, den der neue Index auch hat). Nicht in diesem Lauf entfernt: Es wäre eine weitere Migration nach dem letzten Gesamtlauf, für geringe Schreibkosten; steht unter Vorschläge. `<wbr>` statt `overflow-wrap: anywhere` bleibt (ohne brach der Befehl im schmalen Panel mitten im Wort, siehe Bild vom ersten Entwurf).
+- Keine Codeänderung in diesem Durchgang; der Gesamtlauf von 19:25 bleibt der nach der letzten Codeänderung.
+
 ## /code-review medium 37b2d9db3b..HEAD
 - Umgesetzt: Hinweis auf ältere Nachrichten nennt die angezeigte Anzahl als Parameter statt fest „500“; Erfolgsmeldung im Vorschläge-Panel mit `--content-positive-themed` (dunkles Theme) statt `--green-70`; `ereignisseVon` bricht ab, wenn der Cursor fehlt oder sich nicht bewegt.
 - Nicht umgesetzt: Größe der Panel-Abfrage (siehe /simplify und Vorschläge); fest verdrahteter Präfix (siehe /simplify); `ok(daten?.result)` in `werkzeug` (vorher derselbe Abbruch als TypeError, jetzt mit Meldung); `anzahl === 102` in der E2E ist gewollt, die Suite läuft nach `vorbereiten.mjs`; Regex-Umfang des Namenstests (deckt die drei Workflows ab, die es gibt); älterer Index `projectId_1_botId_1__id_-1` bleibt (andere Abfragen sortieren nach `_id`); zweite Liste unter „Workflows“ ist die verlangte Hilfe, `<wbr>` fügt beim Kopieren kein Zeichen ein.
@@ -114,5 +120,6 @@ Nach der letzten Codeänderung (Review-Befunde), Stack mit `spur-dev reload` neu
 Keine.
 
 ## Vorschläge
+- Index `projectId_1_botId_1__id_-1` auf `spurMessages` in einer eigenen Migration entfernen; der Index `{projectId, botId, am, _id}` deckt alle Abfragen ab.
 - Der Verlauf zeigt höchstens 500 Nachrichten und wird bei jeder Abfrage (alle 5 s) ganz geladen, im schlimmsten Fall 500 × 20 000 Zeichen. Besser: erst den Verlauf, danach nur neue Nachrichten (`seit`), und „Ältere laden“ mit Cursor.
 - `events_since` ohne Cursor liefert die ältesten 100 Ereignisse eines Bots. Ein Client, der ohne Cursor fragt, sieht neue Ereignisse erst nach Blättern; die Tool-Beschreibung könnte das sagen.
