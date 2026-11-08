@@ -27,18 +27,18 @@ Stand: Entwurf vor Lauf 0. Änderungen an Namen und Fehlercodes gelten als Bruch
 | `doc_create` | P1 | Leeres Dokument anlegen, Inhalt folgt über `doc_edit` |
 | `run_status`, `run_finish` | P1 | Lauf abfragen und mit Zusammenfassung beenden |
 | `wait_for_event` | P1 | Long-Poll: wartet auf den nächsten Auftrag, sendet alle 30 s Fortschritt |
-| `events_since`, `reply` | P1 | Verpasste Ereignisse per Cursor holen und antworten |
+| `events_since`, `reply` | P1 | Verpasste Ereignisse per Cursor holen und antworten; `reply` mit `kommentar_id` (P3) antwortet im Kommentar-Thread |
 | `paper_search`, `paper_lookup`, `paper_citations` | P2 | Recherche |
 | `source_add`, `acquisition_add` | P2 | Quelle aufnehmen oder auf die Beschaffungsliste setzen |
 | `job_status`, `compile`, `compile_log`, `page_image` | P2 | Kompilieren und Ergebnis sehen |
 | `matrix_suggest` | P2 | Zelle der Literaturmatrix vorschlagen; die Person bestätigt (Übergang, bis `suggest` in P3 kommt) |
-| `suggest` | P3 | Vorschlag ins Panel legen |
+| `suggest` | P3 | Vorschlag (`art`, `titel`, `text`, optional `pfad`) ins Vorschläge-Panel legen; der Text bleibt unverändert |
 
 ## MCP-Prompts
 
 | Prompt | Plan | Zweck |
 |---|---|---|
-| `literaturueberblick`, `methodenteil`, `folien` | P3 | Fertige Workflows; derselbe Text liegt beim Klick auf „Workflows“ im Panel im Auftrag |
+| `literaturueberblick`, `methodenteil`, `folien` | P3 | Fertige Workflows; derselbe Text liegt beim Klick auf „Workflows“ im Panel im Auftrag. Optionales Argument `fokus`, ein einzelnes Wort |
 
 ## Fehlercodes von `doc_edit`
 
@@ -66,8 +66,17 @@ Unerkannte Zitatformen und nicht auflösbare DOIs werden angenommen, aber rot ma
 | `pdf_fehlt` | Der freie Volltext ließ sich nicht laden |
 | `dienst_fehlt` | Crossref antwortet nicht |
 | `spalte_fehlt` | `matrix_suggest`: Die Spalte gibt es in der Matrix nicht |
+| `kommentar_fehlt` | `reply` mit `kommentar_id`: Den Kommentar-Thread gibt es im Projekt nicht |
 
 `paper_search` und `paper_citations` scheitern nicht an einem einzelnen Dienst: `fehler` nennt ausgefallene Dienste mit Namen, die übrigen Treffer kommen trotzdem.
 
 ## Ereignisse für `events_since`
 `task_created`, `chat_message`, `comment_mention`, `suggest_trigger`. Jedes Ereignis gilt für genau einen Bot.
+
+| Ereignis | `daten` |
+|---|---|
+| `task_created` | `text`, `nachricht_id`; aus einem Workflow zusätzlich `workflow`, aus einem übernommenen Vorschlag `vorschlag_id` |
+| `comment_mention` | `kommentar_id`, `nachricht_id`, `text` (nur die eigene Nachricht), `doc_id`, `pfad`, `stelle` (`position`, `laenge`, `zeile`, `markiert`), `andere_nachrichten` (nur IDs) |
+| `suggest_trigger` | `art` (`compile_fehler` mit `fehler`, `belegloses_argument` mit `doc_id`) |
+
+Ein Chat-Text aus dem Panel kommt als `task_created`. `suggest_trigger` entsteht nur bei Schalter „Vorschlag“ und unter dem Tageslimit (Standard 50 je Person).
