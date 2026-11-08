@@ -1,7 +1,7 @@
 // node --test tools/tests
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { auswerten, dateiNormal, dateienOhneTests, dateienPruefen, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
+import { auswerten, dateiNormal, dateienOhneTests, dateienPruefen, unterOrdner, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
 
 const t = (datei, name, status, fehler = '') => ({ suite: 'web', datei, test: name, status, fehler })
 const b = (datei, name, herkunft = 'overleaf', grund = 'Grund.') => ({ suite: 'web', datei, test: name, herkunft, grund })
@@ -82,4 +82,10 @@ test('Dateiargumente ohne gelaufene Tests werden gemeldet, auch Ordner', () => {
   const tests = [t('test/unit/src/a.test.mjs', 'x', 'passed'), t('test/unit/src/sub/c.test.mjs', 'y', 'passed')]
   assert.deepEqual(dateienOhneTests(['test/unit/src/a.test.mjs', 'test/unit/src/sub', 'app/src/z.mjs'], tests), ['app/src/z.mjs'])
   assert.deepEqual(dateienOhneTests([], []), [])
+})
+
+test('unterOrdner: der Ordner selbst und alles darunter, kein Namenspräfix', () => {
+  assert.equal(unterOrdner('test/unit', 'test/unit'), true)
+  assert.equal(unterOrdner('test/unit/js/a.js', 'test/unit'), true)
+  assert.equal(unterOrdner('test/unitx/a.js', 'test/unit'), false)
 })

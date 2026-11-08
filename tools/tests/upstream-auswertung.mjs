@@ -12,6 +12,9 @@ export function grundAusFehler(fehler) {
 
 export const dateiNormal = datei => datei.replace(/^\.\//, '').replace(/\/$/, '')
 
+// Pfad ist der Ordner selbst oder liegt darunter (Pfade ohne Schrägstrich am Ende, siehe dateiNormal).
+export const unterOrdner = (pfad, ordner) => pfad === ordner || pfad.startsWith(`${ordner}/`)
+
 // Dateiargumente vor dem Lauf: ein Tippfehler darf nicht als „0 bestanden, neu: 0“ grün durchgehen.
 // `ausgeschlossen` enthält nur die Einträge dieser Suite.
 export function dateienPruefen(suite, dateien, existiert, ausgeschlossen) {
@@ -19,7 +22,7 @@ export function dateienPruefen(suite, dateien, existiert, ausgeschlossen) {
   for (const d of dateien) {
     if (!existiert(d)) fehler.push(`${d}: nicht gefunden (Pfad relativ zum Dienst)`)
     else if (ausgeschlossen.some(a => a.datei === d)) fehler.push(`${d}: ist ausgeschlossen (tools/tests/upstream-ausschluss.json)`)
-    else if (suite === 'du' && !/^test\/(unit|acceptance)(\/|$)/.test(d)) {
+    else if (suite === 'du' && !['test/unit', 'test/acceptance'].some(o => unterOrdner(d, o))) {
       fehler.push(`${d}: liegt nicht unter test/unit/ oder test/acceptance/`)
     }
   }
@@ -28,7 +31,7 @@ export function dateienPruefen(suite, dateien, existiert, ausgeschlossen) {
 
 // Dateiargumente (auch Ordner), zu denen nach dem Lauf kein einziger Test gehört.
 export function dateienOhneTests(dateien, tests) {
-  return dateien.filter(d => !tests.some(t => t.datei === d || t.datei.startsWith(`${d}/`)))
+  return dateien.filter(d => !tests.some(t => unterOrdner(t.datei, d)))
 }
 
 export function auswerten(tests, bekannt) {
