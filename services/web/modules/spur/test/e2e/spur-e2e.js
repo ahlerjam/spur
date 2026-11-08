@@ -1759,7 +1759,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const stichworte = async () => {
       await suchen('consolidation')
       const liste = page.locator('.spur-panel-inhalt > .spur-liste .spur-zeile')
-      await liste.first().waitFor()
+      // Die Quellenliste hat dieselbe Klasse: erst lesen, wenn ein Suchtreffer mit Seite da ist.
+      await liste.filter({ hasText: 'S. 347' }).first().waitFor()
       return await liste.allTextContents()
     }
     const panelNeu = async () => {
