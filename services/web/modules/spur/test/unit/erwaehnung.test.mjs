@@ -62,6 +62,12 @@ beforeEach(async () => {
   vi.doMock('../../../../app/src/Features/User/UserInfoManager.mjs', () => ({ default: m.UserInfoManager }))
   vi.doMock('../../../../app/src/Features/User/UserInfoController.mjs', () => ({ default: m.UserInfoController }))
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.PruefManager)
+  m.verbrauchen = vi.fn(async () => {})
+  vi.doMock('../../../../app/src/infrastructure/RateLimiter.mjs', () => ({
+    RateLimiter: class {
+      consume = (...args) => m.verbrauchen(...args)
+    },
+  }))
   E = await import('../../app/src/erwaehnung/Erwaehnung.mjs')
 })
 
@@ -122,6 +128,14 @@ describe('@claude im Kommentar', () => {
     m.ranges = []
     await gesendet(ada, '@claude prüfe diese Aussage', { versuche: 2, pauseMs: 1 })
     expect((await ereignisse())[0].daten).toMatchObject({ kommentar_id: thread, doc_id: null, stelle: null })
+  })
+
+  it('begrenzt @claude je Person, bevor es Dokumente durchsucht', async () => {
+    m.verbrauchen.mockRejectedValue({ msBeforeNext: 30000 })
+    await gesendet(ada, '@claude prüfe diese Aussage')
+    expect(m.verbrauchen).toHaveBeenCalledWith(String(ada), 1, { method: 'userId' })
+    expect(m.DocstoreManager.promises.getAllRanges).not.toHaveBeenCalled()
+    expect(await ereignisse()).toHaveLength(0)
   })
 
   it('ohne eigenes Claude passiert nichts', async () => {

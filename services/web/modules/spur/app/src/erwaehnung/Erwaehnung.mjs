@@ -1,9 +1,11 @@
 import { setTimeout as warten } from 'node:timers/promises'
+import logger from '@overleaf/logger'
 import ChatApiHandler from '../../../../../app/src/Features/Chat/ChatApiHandler.mjs'
 import DocstoreManager from '../../../../../app/src/Features/Docstore/DocstoreManager.mjs'
 import EditorRealTimeController from '../../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import UserInfoController from '../../../../../app/src/Features/User/UserInfoController.mjs'
 import UserInfoManager from '../../../../../app/src/Features/User/UserInfoManager.mjs'
+import { RateLimiter } from '../../../../../app/src/infrastructure/RateLimiter.mjs'
 import { botVon } from '../anfrage.mjs'
 import * as Inbox from '../Inbox.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
@@ -36,11 +38,22 @@ async function stelleSuchen(projectId, threadId, optionen) {
   }
 }
 
+// Jede Erwähnung durchsucht bis zu 10 s die Ranges des Projekts; mehr als ein paar je Minute schreibt kein Mensch.
+const begrenzer = new RateLimiter('spur-erwaehnung', { points: 20, duration: 60 })
+
 // Nur der Claude der schreibenden Person erfährt davon; Nachrichten anderer gehen nur als ID mit.
 export async function kommentarGesendet({ projectId, threadId, menschId, text }, { versuche = 20, pauseMs = 500 } = {}) {
   if (!ERWAEHNT.test(text)) return
   const bot = await botVon(menschId)
   if (!bot) return
+  try {
+    await begrenzer.consume(String(menschId), 1, { method: 'userId' })
+  } catch (error) {
+    // Abgewiesen wird mit einem RateLimiterRes; ein echter Error ist ein Ausfall, kein Limit.
+    if (error instanceof Error) throw error
+    logger.warn({ menschId, threadId }, 'spur: zu viele @claude-Erwähnungen, übergangen')
+    return
+  }
   const [ort, threads] = await Promise.all([
     stelleSuchen(projectId, threadId, { versuche, pauseMs }),
     ChatApiHandler.promises.getThreads(String(projectId)),

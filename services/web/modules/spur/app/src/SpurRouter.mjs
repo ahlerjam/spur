@@ -35,6 +35,8 @@ const admin = AuthorizationMiddleware.ensureUserIsSiteAdmin
 
 // Begrenzt teure Aufrufe (Paper-Dienste mit installationsweiter Drossel, Einbetten mit dem Modell) je Anmeldung.
 const fremdDienste = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-recherche', { points: 30, duration: 60 }))
+// Der Editor meldet höchstens eine Tipp-Pause je Minute und Tab.
+const tippPausen = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-tipp-pause', { points: 10, duration: 60 }))
 
 const upload = multerUploadHandler({
   dest: Settings.path.uploadFolder,
@@ -126,7 +128,7 @@ export default {
     webRouter.get(VORSCHLAEGE, ...lesen, VorschlaegeController.status)
     webRouter.put(`${VORSCHLAEGE}/eigene`, ...lesen, VorschlaegeController.eigeneSetzen)
     webRouter.put(`${VORSCHLAEGE}/projekt`, ...schreiben, VorschlaegeController.projektSetzen)
-    webRouter.post(`${VORSCHLAEGE}/tipp-pause`, ...lesen, VorschlaegeController.tippPause)
+    webRouter.post(`${VORSCHLAEGE}/tipp-pause`, ...lesen, tippPausen, VorschlaegeController.tippPause)
     webRouter.post(`${VORSCHLAEGE}/:vorschlag_id/uebernehmen`, ...lesen, VorschlaegeController.uebernehmen)
     webRouter.post(`${VORSCHLAEGE}/:vorschlag_id/verwerfen`, ...lesen, VorschlaegeController.verwerfen)
     webRouter.put('/spur/vorschlaege/limit', angemeldet, VorschlaegeController.limitSetzen)
