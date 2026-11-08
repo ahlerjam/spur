@@ -158,7 +158,7 @@ export default { ...basis, test: { ...basis.test, projects: basis.test.projects.
     const env = { NODE_ENV: 'test', OVERLEAF_CONFIG: '', MONGO_CONNECTION_STRING: TEST_DB, REDIS_HOST: 'redis-test' }
     const ignorieren = ausgeschlossen.flatMap(a => ['--ignore', a.datei])
     const teil = (name, opts) => {
-      const ziel = dateien.length ? dateien.filter(d => d.startsWith(`test/${name}/`)) : [`test/${name}/js`]
+      const ziel = dateien.length ? dateien.filter(d => d === `test/${name}` || d.startsWith(`test/${name}/`)) : [`test/${name}/js`]
       return ziel.length ? mochaLauf('du', name, DU, ['--recursive', ...opts, '--exit', ...ignorieren, ...ziel], env) : []
     }
     return [...teil('unit', []), ...teil('acceptance', ['--timeout', '15000'])]

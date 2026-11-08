@@ -19,7 +19,7 @@ export function dateienPruefen(suite, dateien, existiert, ausgeschlossen) {
   for (const d of dateien) {
     if (!existiert(d)) fehler.push(`${d}: nicht gefunden (Pfad relativ zum Dienst)`)
     else if (ausgeschlossen.some(a => a.datei === d)) fehler.push(`${d}: ist ausgeschlossen (tools/tests/upstream-ausschluss.json)`)
-    else if (suite === 'du' && !/^test\/(unit|acceptance)\//.test(d)) {
+    else if (suite === 'du' && !/^test\/(unit|acceptance)(\/|$)/.test(d)) {
       fehler.push(`${d}: liegt nicht unter test/unit/ oder test/acceptance/`)
     }
   }

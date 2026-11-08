@@ -73,6 +73,8 @@ test('Dateiargumente: fehlende, ausgeschlossene und bei du falsch abgelegte Date
   assert.match(dateienPruefen('web', ['test/unit/src/fehlt.test.mjs'], existiert, aus)[0], /fehlt\.test\.mjs.*nicht gefunden/)
   assert.match(dateienPruefen('web', ['test/unit/src/b.test.mjs'], existiert, aus)[0], /ausgeschlossen/)
   assert.deepEqual(dateienPruefen('du', ['test/unit/js/x.js'], existiert, []), [])
+  assert.deepEqual(dateienPruefen('du', ['test/unit', 'test/acceptance'], () => true, []), [])
+  assert.match(dateienPruefen('du', ['test/unitx/a.js'], () => true, [])[0], /test\/unit\/ oder test\/acceptance\//)
   assert.match(dateienPruefen('du', ['app/js/y.js'], existiert, [])[0], /test\/unit\/ oder test\/acceptance\//)
 })
 
