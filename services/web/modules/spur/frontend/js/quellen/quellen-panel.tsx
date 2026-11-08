@@ -11,6 +11,7 @@ import { pruefenVerzoegert } from '../pruefung/pruef-store'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
+import Zugewiesen from './zugewiesen'
 import type { Quelle, Treffer } from './typen'
 
 const MAX_BYTES = 50 * 1024 * 1024
@@ -205,6 +206,7 @@ export default function QuellenPanel() {
           />
         </div>
       )}
+      <Zugewiesen oeffnen={(quelle, seite) => setOffen({ quelle, seite })} />
       <form
         className="spur-suche"
         role="search"

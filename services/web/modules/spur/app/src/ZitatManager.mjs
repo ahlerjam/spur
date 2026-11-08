@@ -1,5 +1,6 @@
 // EditorController meldet neue Dateien sofort an offene Editoren (Dateibaum).
 import EditorController from '../../../../app/src/Features/Editor/EditorController.mjs'
+import EditorRealTimeController from '../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { bibLesen } from './pruefung/bib.mjs'
 import { zitierpaket } from './pruefung/latex.mjs'
@@ -8,8 +9,17 @@ import { Problem } from './probleme.mjs'
 import { quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
+import { mitglieder } from './Team.mjs'
 
 const MAX_ZITAT = 2000
+const MAX_KOMMENTAR = 2000
+
+// Offene Panels laden die Zitate der Quelle neu; der Inhalt geht nicht über den Socket.
+function melden(quelle) {
+  EditorRealTimeController.emitToRoom(String(quelle.projectId), 'spur:zitate', {
+    quelleId: String(quelle._id),
+  })
+}
 
 export async function liste(quelle) {
   return await (await quotes())
@@ -46,7 +56,55 @@ export async function markieren(quelle, { seite, text }, userId) {
     angelegtAm: jetzt(),
   }
   await (await quotes()).insertOne(zitat)
+  melden(quelle)
   return zitat
+}
+
+async function zuweisungPruefen(projectId, zuweisen) {
+  const ids = await mitglieder(projectId)
+  if (typeof zuweisen !== 'string' || !ids.some(m => m.id === zuweisen)) {
+    throw new Problem(422, 'zuweisung', 'Zuweisen geht nur an Mitglieder dieses Projekts.')
+  }
+  return new ObjectId(zuweisen)
+}
+
+export async function kommentieren(quelle, zitatId, { text, zuweisen }, userId) {
+  const zitat = await holen(quelle, zitatId)
+  const inhalt = typeof text === 'string' ? text.trim() : ''
+  if (!inhalt || inhalt.length > MAX_KOMMENTAR) {
+    throw new Problem(
+      422,
+      'kommentar_text',
+      `Bitte einen Kommentar mit 1 bis ${MAX_KOMMENTAR} Zeichen schreiben.`
+    )
+  }
+  const am = jetzt()
+  const kommentar = { _id: new ObjectId(), von: userId, text: inhalt, am }
+  const felder = {}
+  if (zuweisen !== undefined) {
+    felder.zugewiesen = { an: await zuweisungPruefen(quelle.projectId, zuweisen), von: userId, am }
+  }
+  const neu = await (await quotes()).findOneAndUpdate(
+    { _id: zitat._id },
+    { $push: { kommentare: kommentar }, $set: felder },
+    { returnDocument: 'after' }
+  )
+  melden(quelle)
+  return neu
+}
+
+export async function zuweisungLoesen(quelle, zitatId) {
+  const zitat = await holen(quelle, zitatId)
+  await (await quotes()).updateOne({ _id: zitat._id }, { $set: { zugewiesen: null } })
+  melden(quelle)
+}
+
+export async function zugewiesenAn(projectId, userId) {
+  return await (await quotes())
+    .find({ projectId, 'zugewiesen.an': userId })
+    .sort({ 'zugewiesen.am': -1 })
+    .limit(20)
+    .toArray()
 }
 
 export async function holen(quelle, zitatId) {

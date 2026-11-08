@@ -4,12 +4,16 @@ import { EditorSelection } from '@codemirror/state'
 import { useEditorViewContext } from '@/features/ide-react/context/editor-view-context'
 import OLButton from '@/shared/components/ol/ol-button'
 import Notification from '@/shared/components/notification'
+import OLToggleButton from '@/shared/components/ol/ol-toggle-button'
+import OLToggleButtonGroup from '@/shared/components/ol/ol-toggle-button-group'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
+import { useConnectionContext } from '@/features/ide-react/context/connection-context'
+import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
+import getMeta from '@/utils/meta'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
-import type { Quelle } from './typen'
-
-type Zitat = { id: string; seite: number; label: string | null; text: string }
+import ZitatKommentare from './zitat-kommentare'
+import type { Quelle, Zitat } from './typen'
 
 function useAuswahlIn(container: HTMLElement | null) {
   const [auswahl, setAuswahl] = useState('')
@@ -36,9 +40,11 @@ export default function Zitate({
   textElement: HTMLElement | null
 }) {
   const { t } = useTranslation()
-  const { write: darfSchreiben } = usePermissionsContext()
+  const { write: darfSchreiben, comment: darfKommentieren } = usePermissionsContext()
   const { view } = useEditorViewContext()
+  const { socket } = useConnectionContext()
   const [zitate, setZitate] = useState<Zitat[]>([])
+  const [nurEigene, setNurEigene] = useState(false)
   const [fehler, setFehler] = useState<string | null>(null)
   const auswahl = useAuswahlIn(textElement)
   const basis = `/quellen/${quelle.id}/zitate`
@@ -52,6 +58,17 @@ export default function Zitate({
   useEffect(() => {
     laden().catch(error => setFehler(error.message))
   }, [laden])
+
+  const live = useCallback(
+    ({ quelleId }: { quelleId: string }) => {
+      if (quelleId === quelle.id) laden().catch(error => setFehler(error.message))
+    },
+    [laden, quelle.id]
+  )
+  useSocketListener(socket, 'spur:zitate', live)
+
+  const ich = getMeta('ol-user_id')
+  const sichtbar = nurEigene ? zitate.filter(z => z.von.id === ich) : zitate
 
   const speichern = async () => {
     setFehler(null)
@@ -104,19 +121,47 @@ export default function Zitate({
         {t('spur_gespeicherte_zitate')}
       </h5>
       {fehler && <Notification type="error" content={fehler} />}
+      {zitate.length > 0 && (
+        <OLToggleButtonGroup
+          type="radio"
+          name="spur-zitate-filter"
+          size="sm"
+          value={nurEigene ? 'mir' : 'alle'}
+          onChange={(wert: string) => setNurEigene(wert === 'mir')}
+          aria-label={t('spur_zitate_filtern')}
+        >
+          <OLToggleButton id="spur-filter-alle" variant="secondary" value="alle">
+            {t('spur_alle')}
+          </OLToggleButton>
+          <OLToggleButton id="spur-filter-mir" variant="secondary" value="mir">
+            {t('spur_von_mir')}
+          </OLToggleButton>
+        </OLToggleButtonGroup>
+      )}
       {zitate.length === 0 && <p className="spur-leer">{t('spur_keine_zitate_markiert')}</p>}
+      {zitate.length > 0 && sichtbar.length === 0 && (
+        <p className="spur-leer">{t('spur_keine_eigenen_zitate')}</p>
+      )}
       {!kannEinfuegen && zitate.length > 0 && (
         <p className="spur-zeile-meta" id="spur-einfuegen-hinweis">
           {t('spur_keine_schreibrechte')}
         </p>
       )}
       <ul className="spur-liste">
-        {zitate.map(zitat => (
+        {sichtbar.map(zitat => (
           <li className="spur-zeile" key={zitat.id}>
             <p className="spur-zeile-auszug">„{zitat.text}“</p>
             <p className="spur-zeile-meta">
               {t('spur_seite_kurz', { seite: zitat.label ?? zitat.seite })}
+              {' · '}
+              {zitat.von.id === ich ? t('spur_von_ihnen') : t('spur_von', { name: zitat.von.name })}
             </p>
+            <ZitatKommentare
+              zitat={zitat}
+              basis={basis}
+              darfKommentieren={darfKommentieren}
+              geaendert={() => laden().catch(error => setFehler(error.message))}
+            />
             <OLButton
               variant="secondary"
               size="sm"

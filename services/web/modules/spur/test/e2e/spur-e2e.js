@@ -1253,6 +1253,118 @@ async page => {
     ok(reviewPut === 403, `review setzt Automatik: ${reviewPut}`)
   }
 
+  // P4: Mehr Quellen und Team. Schlüssel p4f1 … p4f4, damit sie neben P1 stehen können.
+
+  // Führt Schritte auf einer zweiten Seite aus (eigene Sitzung); die Helfer arbeiten dann dort.
+  async function alsSeite(andere, schritte) {
+    const vorher = page
+    page = andere
+    try {
+      return await schritte()
+    } finally {
+      page = vorher
+    }
+  }
+
+  async function zweiteSeite() {
+    const kontext = await page.context().browser().newContext()
+    const neu = await kontext.newPage()
+    neu.on('pageerror', beiFehler)
+    await neu.addInitScript(() => {
+      window.addEventListener('beforeunload', e => e.stopImmediatePropagation(), true)
+    })
+    return { seite: neu, schliessen: () => kontext.close() }
+  }
+
+  async function quelleSeite3(datei) {
+    await page.getByRole('button', { name: datei }).click()
+    for (let i = 0; i < 2; i++) await page.getByRole('button', { name: 'Nächste Seite' }).click()
+    await sichtbar('Seite 347 (PDF-Seite 3 von 8)')
+    await page.locator('.spur-seitentext', { hasText: 'Sleep supports' }).waitFor()
+  }
+
+  features.p4f1 = async () => {
+    const SATZ_A = 'Sleep supports the consolidation of declarative memory.'
+    const SATZ_B = 'Memory traces are strengthened during slow-wave sleep'
+    // B wartet mit offener Quelle; A markiert in einer zweiten Sitzung.
+    await anmelden('e2e-team-b@example.org')
+    await projektOeffnen('E2E Team')
+    await panelOeffnen('Quellen')
+    await quelleSeite3('smith2024.pdf')
+    await sichtbar('Markieren Sie oben Text und speichern Sie ihn als Zitat.')
+
+    const a = await zweiteSeite()
+    try {
+      await alsSeite(a.seite, async () => {
+        await anmelden('e2e-team-a@example.org')
+        await projektOeffnen('E2E Team')
+        await panelOeffnen('Quellen')
+        await quelleSeite3('smith2024.pdf')
+        await textMarkieren(SATZ_A)
+        await page.getByRole('button', { name: 'Zitat speichern' }).click()
+        await sichtbar(`„${SATZ_A}“`)
+        await sichtbar(/S\. 347 · von Ihnen/)
+        // Zurück zur Liste: Dort erscheint gleich der Hinweis auf die Zuweisung.
+        await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+        await page.getByRole('button', { name: 'smith2024.pdf' }).waitFor()
+      })
+
+      // Live bei B, ohne Neuladen.
+      await sichtbar(/S\. 347 · von Anna Autor/)
+      const zeile = page.locator('.spur-zitate li', { hasText: SATZ_A })
+      await zeile.getByRole('button', { name: 'Kommentieren' }).click()
+      await zeile.getByLabel('Kommentar').fill('Bitte die Seitenzahl prüfen.')
+      await zeile.getByLabel('Zuweisen an').selectOption({ label: 'Anna Autor' })
+      await zeile.getByRole('button', { name: 'Kommentar senden' }).click()
+      await zeile.getByText('Zugewiesen an Anna Autor').waitFor()
+      await zeile.getByText('Bitte die Seitenzahl prüfen.').waitFor()
+
+      await alsSeite(a.seite, async () => {
+        await sichtbar(`Ben Berater hat Ihnen ein Zitat zugewiesen: „${SATZ_A}“ (smith2024.pdf, S. 347)`)
+        await page.getByRole('button', { name: 'Öffnen', exact: true }).click()
+        await sichtbar('Seite 347 (PDF-Seite 3 von 8)')
+        await sichtbar('Zugewiesen an Anna Autor')
+        await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+        await page.getByRole('button', { name: 'Erledigt' }).click()
+        await page.getByRole('button', { name: 'Erledigt' }).waitFor({ state: 'detached' })
+      })
+    } finally {
+      await a.schliessen()
+    }
+
+    // Filter „Von mir“: B markiert selbst, sieht dann nur das eigene Zitat.
+    await textMarkieren(SATZ_B)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    await sichtbar(`„${SATZ_B}“`)
+    await page.getByText('Von mir', { exact: true }).click()
+    await page.getByText(`„${SATZ_A}“`).waitFor({ state: 'detached' })
+    ok(await page.getByText(`„${SATZ_B}“`).isVisible(), 'Eigenes Zitat fehlt im Filter')
+    await page.getByText('Alle', { exact: true }).click()
+    await sichtbar(`„${SATZ_A}“`)
+
+    // Leserin: sieht die Markierungen, legt keine an.
+    await anmelden('e2e-leser@example.org')
+    await projektOeffnen('E2E Team')
+    await panelOeffnen('Quellen')
+    await quelleSeite3('smith2024.pdf')
+    await sichtbar(/S\. 347 · von Anna Autor/)
+    await sichtbar(/S\. 347 · von Ben Berater/)
+    ok(
+      (await page.getByRole('button', { name: 'Zitat speichern' }).count()) === 0,
+      'Leserin sieht „Zitat speichern“'
+    )
+    const pid = page.url().split('/project/')[1]
+    const quelleId = await page.evaluate(async p => {
+      const r = await fetch(`/spur/project/${p}/quellen`)
+      return (await r.json()).quellen[0].id
+    }, pid)
+    const versuch = await seitenPost(`/spur/project/${pid}/quellen/${quelleId}/zitate`, {
+      seite: 3,
+      text: SATZ_A,
+    })
+    ok(versuch.status === 403, `Leserin markiert: ${versuch.status}`)
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

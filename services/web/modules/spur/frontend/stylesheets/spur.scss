@@ -133,6 +133,44 @@
   font-size: var(--font-size-03);
 }
 
+.spur-zitate .btn-group {
+  margin-bottom: var(--spacing-02);
+}
+
+.spur-kommentare {
+  margin: var(--spacing-02) 0;
+  padding-left: var(--spacing-04);
+  border-left: 2px solid var(--border-divider);
+  list-style: none;
+  font-size: var(--font-size-02);
+}
+
+.spur-kommentar-von {
+  font-weight: 600;
+}
+
+.spur-zugewiesen {
+  font-weight: 600;
+  color: var(--content-primary);
+}
+
+.spur-kommentar-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-02);
+  margin: var(--spacing-02) 0;
+}
+
+.spur-kommentar-form label {
+  margin-bottom: 0;
+}
+
+.spur-kommentar-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-02);
+}
+
 .spur-panel-werkzeuge .btn {
   max-width: 100%;
   white-space: normal;

@@ -8,6 +8,7 @@ import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import * as PruefManager from './pruefung/PruefManager.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
 import * as ZitatManager from './ZitatManager.mjs'
+import * as Team from './Team.mjs'
 import * as ClaudeZugang from './ClaudeZugang.mjs'
 import * as Inbox from './Inbox.mjs'
 import * as LaufAktionen from './schreiben/LaufAktionen.mjs'
@@ -191,16 +192,30 @@ export const quellenHolen = mitProblemen(async (req, res) => {
   res.json({ anzahl })
 })
 
-const zitatFuerClient = z => ({
-  id: z._id,
-  seite: z.seite,
-  label: z.label,
-  text: z.text,
-})
+async function zitateFuerClient(liste) {
+  const ids = liste.flatMap(z => [
+    z.angelegtVon,
+    ...(z.kommentare ?? []).map(k => k.von),
+    ...(z.zugewiesen ? [z.zugewiesen.an, z.zugewiesen.von] : []),
+  ])
+  const namen = await Team.namen(ids.filter(Boolean))
+  const person = id => ({ id, name: Team.nameAus(namen, id) })
+  return liste.map(z => ({
+    id: z._id,
+    seite: z.seite,
+    label: z.label,
+    text: z.text,
+    von: person(z.angelegtVon),
+    kommentare: (z.kommentare ?? []).map(k => ({ id: k._id, von: person(k.von), text: k.text, am: k.am })),
+    zugewiesen: z.zugewiesen
+      ? { an: person(z.zugewiesen.an), von: person(z.zugewiesen.von), am: z.zugewiesen.am }
+      : null,
+  }))
+}
 
 export const zitate = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
-  res.json({ zitate: (await ZitatManager.liste(quelle)).map(zitatFuerClient) })
+  res.json({ zitate: await zitateFuerClient(await ZitatManager.liste(quelle)) })
 })
 
 export const zitatMarkieren = mitProblemen(async (req, res) => {
@@ -211,7 +226,38 @@ export const zitatMarkieren = mitProblemen(async (req, res) => {
     { seite, text: req.body.text },
     new ObjectId(nutzerId(req))
   )
-  res.status(201).json(zitatFuerClient(zitat))
+  res.status(201).json((await zitateFuerClient([zitat]))[0])
+})
+
+export const zitatKommentieren = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const { text, zuweisen } = req.body
+  const zitat = await ZitatManager.kommentieren(
+    quelle,
+    req.params.zitat_id,
+    { text, zuweisen },
+    new ObjectId(nutzerId(req))
+  )
+  res.status(201).json((await zitateFuerClient([zitat]))[0])
+})
+
+export const zuweisungLoesen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  await ZitatManager.zuweisungLoesen(quelle, req.params.zitat_id)
+  res.sendStatus(204)
+})
+
+export const team = mitProblemen(async (req, res) => {
+  res.json({ ich: nutzerId(req), mitglieder: await Team.mitglieder(projektId(req)) })
+})
+
+export const zugewiesen = mitProblemen(async (req, res) => {
+  const liste = await ZitatManager.zugewiesenAn(projektId(req), new ObjectId(nutzerId(req)))
+  const fuerClient = await zitateFuerClient(liste)
+  const quellen = await Promise.all(liste.map(z => QuellenManager.holen(projektId(req), z.quelleId)))
+  res.json({
+    zitate: fuerClient.map((z, i) => ({ ...z, quelle: quelleFuerClient(quellen[i]) })),
+  })
 })
 
 export const zitatEinfuegen = mitProblemen(async (req, res) => {

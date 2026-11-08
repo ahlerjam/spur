@@ -22,3 +22,15 @@ export type Treffer = {
   imDateinamen?: boolean
   quelle?: Quelle
 }
+
+export type Person = { id: string; name: string }
+
+export type Zitat = {
+  id: string
+  seite: number
+  label: string | null
+  text: string
+  von: Person
+  kommentare: { id: string; von: Person; text: string; am: string }[]
+  zugewiesen: { an: Person; von: Person; am: string } | null
+}

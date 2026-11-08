@@ -9,7 +9,7 @@
     "`read`-Nutzer sehen Markierungen, dürfen aber keine anlegen",
     "Der Filter „Von mir“ zeigt nur eigene Zitate"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

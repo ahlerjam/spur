@@ -7,6 +7,7 @@ import { deutschAktivieren } from './helpers/deutsch'
 
 const QUELLEN = /\/spur\/project\/[^/]+\/quellen$/
 const ANDERE = /\/spur\/project\/[^/]+\/quellen\/andere$/
+const ZUGEWIESEN = /\/spur\/project\/[^/]+\/zitate\/zugewiesen$/
 
 function zeigen() {
   render(<QuellenPanel />, { wrapper: EditorProviders })
@@ -18,6 +19,7 @@ describe('Quellen-Panel', function () {
   beforeEach(function () {
     fetchMock.removeRoutes().clearHistory()
     fetchMock.get(ANDERE, { projekte: [], klonVon: null })
+    fetchMock.get(ZUGEWIESEN, { zitate: [] })
   })
 
   afterEach(function () {
@@ -52,6 +54,35 @@ describe('Quellen-Panel', function () {
     zeigen()
     await screen.findByText('mueller2020.pdf')
     expect(screen.queryByText('Noch keine Quellen')).to.not.exist
+  })
+
+  it('zeigt Zitate, die mir zugewiesen sind, und öffnet sie', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(ANDERE, { projekte: [], klonVon: null })
+    fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
+    fetchMock.get(
+      ZUGEWIESEN,
+      {
+        zitate: [
+          {
+            id: 'z1',
+            seite: 3,
+            label: '347',
+            text: 'Sleep supports',
+            von: { id: 'a', name: 'Anna Autor' },
+            kommentare: [],
+            zugewiesen: { an: { id: 'b', name: 'Ben' }, von: { id: 'a', name: 'Anna Autor' }, am: '2026-11-07T10:00:00Z' },
+            quelle: { id: 'q1', dateiname: 'smith2024.pdf', art: 'pdf', seitenzahl: 8 },
+          },
+        ],
+      }
+    )
+    fetchMock.get(/\/quellen\/q1\/seiten\/3$/, { text: 'Sleep supports', label: '347', seite: 3, seitenzahl: 8 })
+    fetchMock.get(/\/quellen\/q1\/zitate$/, { zitate: [] })
+    zeigen()
+    await screen.findByText('Anna Autor hat Ihnen ein Zitat zugewiesen: „Sleep supports“ (smith2024.pdf, S. 347)')
+    screen.getByRole('button', { name: 'Öffnen' }).click()
+    await screen.findByText('Seite 347 (PDF-Seite 3 von 8)')
   })
 
   it('zeigt nach einem API-Fehler die Fehlermeldung als Text', async function () {

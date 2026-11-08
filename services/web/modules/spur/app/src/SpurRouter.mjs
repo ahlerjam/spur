@@ -64,6 +64,19 @@ export default {
     webRouter.delete(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleLoeschen)
     webRouter.get(`${QUELLEN}/:quelle_id/zitate`, ...lesen, SpurController.zitate)
     webRouter.post(`${QUELLEN}/:quelle_id/zitate`, ...schreiben, SpurController.zitatMarkieren)
+    // Kommentieren dürfen wie in Overleaf alle Mitglieder, auch mit Leserecht.
+    webRouter.post(
+      `${QUELLEN}/:quelle_id/zitate/:zitat_id/kommentare`,
+      ...lesen,
+      SpurController.zitatKommentieren
+    )
+    webRouter.delete(
+      `${QUELLEN}/:quelle_id/zitate/:zitat_id/zuweisung`,
+      ...lesen,
+      SpurController.zuweisungLoesen
+    )
+    webRouter.get('/spur/project/:project_id/team', ...lesen, SpurController.team)
+    webRouter.get('/spur/project/:project_id/zitate/zugewiesen', ...lesen, SpurController.zugewiesen)
     webRouter.post(
       `${QUELLEN}/:quelle_id/zitate/:zitat_id/einfuegen`,
       ...schreiben,
