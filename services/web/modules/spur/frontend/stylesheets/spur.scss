@@ -221,3 +221,43 @@
     flex: 0 0 calc(100vw - 40px) !important;
   }
 }
+
+.spur-recherche-suche {
+  display: flex;
+  gap: var(--spacing-03);
+
+  .form-control {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.spur-paper-titel {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.spur-paper-badge {
+  margin-left: var(--spacing-03);
+}
+
+.spur-paper-doi {
+  overflow-wrap: anywhere;
+}
+
+.spur-paper-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-02);
+  margin-top: var(--spacing-02);
+}
+
+.spur-blaettern {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-03);
+  margin-top: var(--spacing-04);
+}

@@ -11,6 +11,7 @@ import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
+import * as Recherche from '../recherche/Recherche.mjs'
 
 const SEITE = 50
 const MAX_TEXT = 40000
@@ -341,6 +342,17 @@ Object.assign(WERKZEUGE, {
       await LaufManager.beenden(lauf, zusammenfassung)
       await LaufAktionen.nachLaufende(projectId, lauf, menschId)
       return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
+    },
+  },
+
+  paper_search: {
+    description:
+      'Sucht Paper über arXiv, OpenAlex, Crossref und Semantic Scholar. Treffer mit DOI, Titel, Autoren, Jahr, ' +
+      'Diensten und Open-Access-Status; fehler nennt ausgefallene Dienste. Die Suche landet im Suchprotokoll des Projekts.',
+    inputSchema: z.object({ project_id: id, anfrage: z.string().min(1).max(300), seite: z.number().int().min(0).max(50).optional() }),
+    async ausfuehren({ project_id: pid, anfrage, seite = 0 }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await Recherche.suchen({ projectId, userId: menschId, anfrage, seite })
     },
   },
 })

@@ -1,0 +1,96 @@
+import logger from '@overleaf/logger'
+import { Problem } from '../probleme.mjs'
+import { suchprotokoll } from '../sammlungen.mjs'
+import { jetzt } from '../schalter.mjs'
+import { DienstFehler } from './abruf.mjs'
+import { aktiv, PRO_SEITE, SUCHDIENSTE } from './dienste.mjs'
+
+const PROTOKOLL_SEITE = 50
+const ANZEIGE = Object.fromEntries(SUCHDIENSTE.map(d => [d.name, d.anzeige]))
+
+const titelSchluessel = titel => `titel:${titel?.toLowerCase().replace(/\W+/g, ' ').trim()}`
+
+function zusammenfuehren(sammlung, treffer) {
+  const schluessel = treffer.doi ?? titelSchluessel(treffer.titel)
+  const neu = { ...treffer, dienste: treffer.dienste.map(d => ANZEIGE[d]) }
+  const alt = sammlung.get(schluessel)
+  if (!alt) return sammlung.set(schluessel, neu)
+  for (const [feld, wert] of Object.entries(neu)) {
+    if (feld === 'dienste') alt.dienste.push(...wert.filter(d => !alt.dienste.includes(d)))
+    else if (feld === 'frei') alt.frei = alt.frei === true || wert === true ? true : (alt.frei ?? wert)
+    else if (alt[feld] == null || (Array.isArray(alt[feld]) && !alt[feld].length)) alt[feld] = wert
+  }
+}
+
+// Fasst die Antworten paralleler Dienstaufrufe zusammen. Ein Ausfall nimmt nur diesen Dienst heraus.
+export function auswerten(dienste, ergebnisse) {
+  const sammlung = new Map()
+  const fehler = []
+  const gesamt = []
+  ergebnisse.forEach((ergebnis, i) => {
+    const dienst = dienste[i]
+    if (ergebnis.status === 'rejected') {
+      if (!(ergebnis.reason instanceof DienstFehler)) {
+        logger.error({ err: ergebnis.reason, dienst: dienst.name }, 'Paper-Dienst unerwartet fehlgeschlagen')
+      }
+      fehler.push({
+        dienst: dienst.name,
+        art: ergebnis.reason?.art ?? 'nicht_erreichbar',
+        text: ergebnis.reason instanceof DienstFehler ? ergebnis.reason.message : `${dienst.anzeige} nicht erreichbar`,
+      })
+      return
+    }
+    const { treffer, gesamt: anzahl } = Array.isArray(ergebnis.value)
+      ? { treffer: ergebnis.value, gesamt: ergebnis.value.length }
+      : ergebnis.value
+    gesamt.push({ dienst, anzahl })
+    for (const t of treffer) zusammenfuehren(sammlung, t)
+  })
+  return { treffer: [...sammlung.values()], fehler, gesamt }
+}
+
+export async function suchen({ projectId, userId, anfrage, seite = 0 }) {
+  const begriff = anfrage?.trim()
+  if (!begriff) throw new Problem(400, 'anfrage_fehlt', 'Bitte einen Suchbegriff eingeben.')
+  const dienste = SUCHDIENSTE.filter(aktiv)
+  const hinweise = SUCHDIENSTE.filter(d => !aktiv(d)).map(
+    d => `${d.anzeige} ist aus: Der Betreiber hat keinen API-Key hinterlegt (${d.keyVariable}).`
+  )
+  const ergebnisse = await Promise.allSettled(dienste.map(d => d.suchen(begriff, seite)))
+  const { treffer, fehler, gesamt } = auswerten(dienste, ergebnisse)
+  if (seite === 0 && gesamt.length) {
+    const datum = jetzt()
+    await (await suchprotokoll()).insertMany(
+      gesamt.map(({ dienst, anzahl }) => ({
+        projectId,
+        userId,
+        datum,
+        dienst: dienst.anzeige,
+        anfrage: begriff,
+        treffer: anzahl,
+      }))
+    )
+  }
+  return {
+    anfrage: begriff,
+    seite,
+    treffer,
+    weiter: gesamt.some(({ anzahl }) => (seite + 1) * PRO_SEITE < anzahl),
+    fehler,
+    hinweise,
+  }
+}
+
+export async function protokoll(projectId, { seite = 0 } = {}) {
+  const sammlung = await suchprotokoll()
+  const [eintraege, anzahl] = await Promise.all([
+    sammlung
+      .find({ projectId }, { projection: { _id: 0, datum: 1, dienst: 1, anfrage: 1, treffer: 1 } })
+      .sort({ datum: -1, _id: -1 })
+      .skip(seite * PROTOKOLL_SEITE)
+      .limit(PROTOKOLL_SEITE)
+      .toArray(),
+    sammlung.countDocuments({ projectId }),
+  ])
+  return { eintraege, gesamt: anzahl, weiter: (seite + 1) * PROTOKOLL_SEITE < anzahl }
+}

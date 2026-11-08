@@ -6,7 +6,7 @@ import { Problem, problemSenden } from './probleme.mjs'
 import { MAX_BYTES } from './QuellenManager.mjs'
 import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
-import { crossrefFake } from './dev/CrossrefFake.mjs'
+import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
 const lesen = [
@@ -81,10 +81,11 @@ export default {
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)
     webRouter.post(`${LAUF}/zuruecknehmen`, ...schreiben, SpurController.laufZuruecknehmen)
     webRouter.put('/spur/project/:project_id/claude/automatik', ...schreiben, SpurController.automatikSetzen)
+    webRouter.get('/spur/project/:project_id/recherche', ...lesen, SpurController.rechercheSuchen)
     webRouter.get('/spur/claude/tokens', angemeldet, SpurController.claudeTokens)
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
     webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)
     publicApiRouter.all('/spur/mcp', mcpAnfrage)
-    if (IST_DEV) publicApiRouter.get('/spur/dev/crossref/works/:doi', crossrefFake)
+    if (IST_DEV) publicApiRouter.use('/spur/dev/crossref', paperFake)
   },
 }

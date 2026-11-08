@@ -19,6 +19,9 @@ import {
   nachrichten,
   quellen,
   quellenSeiten,
+  drossel,
+  paperCache,
+  suchprotokoll,
 } from '../../app/src/sammlungen.mjs'
 import { createHash } from 'node:crypto'
 import { botFuer, kontoAufraeumen, SCOPE } from '../../app/src/ClaudeZugang.mjs'
@@ -304,7 +307,9 @@ await db.users.updateOne({ _id: admin._id }, { $set: { isAdmin: true } })
 await testToken(admin, 'spur_e2e_admin', new Date(Date.now() + 24 * 3600 * 1000))
 await neuAnlegen(neu, 'E2E Neu', { 'main.tex': 'Erster Absatz.\n' })
 
-for (const sammlung of [ereignisse, herzschlaege, nachrichten]) {
+// P2: frisches Rechercheprojekt, Paper-Antworten nicht aus dem Cache des letzten Laufs.
+await neuAnlegen(a, 'E2E Recherche', { 'main.tex': LEER })
+for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll]) {
   await (await sammlung()).deleteMany({})
 }
 await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))

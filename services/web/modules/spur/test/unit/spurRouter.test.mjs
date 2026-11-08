@@ -45,12 +45,12 @@ async function laden({ dev = false } = {}) {
   vi.doMock('../../app/src/SpurController.mjs', () =>
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
   )
-  vi.doMock('../../app/src/dev/CrossrefFake.mjs', () => ({ crossrefFake: Object.assign(() => {}, { handler: 'crossrefFake' }) }))
+  vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
   routen = []
   const router = Object.fromEntries(
-    ['get', 'post', 'put', 'patch', 'delete', 'all'].map(methode => [methode, (pfad, ...kette) => routen.push({ methode, pfad, kette })])
+    ['get', 'post', 'put', 'patch', 'delete', 'all', 'use'].map(methode => [methode, (pfad, ...kette) => routen.push({ methode, pfad, kette })])
   )
   const oeffentlich = { ...router, all: (pfad, ...kette) => routen.push({ methode: 'all', pfad, kette, oeffentlich: true }) }
   Router.apply(router, {}, oeffentlich)
@@ -86,6 +86,7 @@ describe('Rechte der Routen', () => {
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/ablehnen', 'pruefen', 'laufAblehnen'],
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/zuruecknehmen', 'schreiben', 'laufZuruecknehmen'],
     ['put', '/spur/project/:project_id/claude/automatik', 'schreiben', 'automatikSetzen'],
+    ['get', '/spur/project/:project_id/recherche', 'lesen', 'rechercheSuchen'],
   ])('%s %s verlangt Anmeldung, Ausschluss von Leselink-Nutzern und %s', (methode, pfad, recht, handler) => {
     const r = route(methode, pfad)
     expect(r, `${methode} ${pfad}`).toBeTruthy()
@@ -110,10 +111,10 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('registriert die Dev-Route für den Crossref-Fake nur in der Dev-Umgebung', async () => {
-    expect(route('get', '/spur/dev/crossref/works/:doi')).toBeUndefined()
+  it('hängt den Paper-Fake nur in der Dev-Umgebung ein', async () => {
+    expect(route('use', '/spur/dev/crossref')).toBeUndefined()
     await laden({ dev: true })
-    expect(handlerVon(route('get', '/spur/dev/crossref/works/:doi'))).toBe('crossrefFake')
+    expect(handlerVon(route('use', '/spur/dev/crossref'))).toBe('paperFake')
   })
 })
 

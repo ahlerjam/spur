@@ -254,6 +254,25 @@ async page => {
     )
   }
 
+  const FAKE = `${BASE}/spur/dev/crossref`
+
+  async function fakeSteuern(einstellung) {
+    const r = await page.request.post(`${FAKE}/_steuerung`, { data: einstellung })
+    ok(r.status() === 204, `Fake-Steuerung: ${r.status()}`)
+  }
+
+  async function paperSuchen(anfrage) {
+    await page.getByRole('searchbox', { name: 'Paper suchen' }).fill(anfrage)
+    await page.getByRole('button', { name: 'Suchen', exact: true }).click()
+    await page.waitForFunction(() => !document.querySelector('.spur-panel-inhalt[aria-busy="true"]'), null, { timeout: 30000 })
+  }
+
+  const paperTreffer = titel => page.locator('.spur-paper', { has: page.getByText(titel, { exact: true }) }).first()
+
+  async function trefferDois() {
+    return await page.locator('.spur-paper-doi').allTextContents()
+  }
+
   const features = {
     async f1() {
       await page.context().clearCookies()
@@ -1251,6 +1270,54 @@ async page => {
       })).status
     }, pid)
     ok(reviewPut === 403, `review setzt Automatik: ${reviewPut}`)
+  }
+
+  // P2: Recherche und Design
+  features.p2f1 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Recherche')
+    await panelOeffnen('Recherche')
+    await paperSuchen('sleep memory consolidation')
+    const treffer = paperTreffer('The memory function of sleep')
+    await treffer.waitFor({ timeout: 30000 })
+    await treffer.getByText('Susanne Diekelmann, Jan Born · 2010').waitFor()
+    await treffer.getByText('Gefunden über OpenAlex, Crossref, Semantic Scholar').waitFor()
+    const imPanel = await trefferDois()
+    ok(imPanel.length >= 10, `Treffer auf Seite 1: ${imPanel.length}`)
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Recherche')
+    const { inhalt } = await werkzeug(token, 'paper_search', { project_id: pid, anfrage: 'sleep memory consolidation' })
+    const perTool = inhalt.treffer.map(t => t.doi)
+    ok(JSON.stringify(perTool) === JSON.stringify(imPanel), `paper_search: ${perTool} statt ${imPanel}`)
+
+    await page.getByRole('button', { name: 'Nächste Seite' }).click()
+    await sichtbar('Seite 2')
+    await page.waitForFunction(() => !document.querySelector('.spur-panel-inhalt[aria-busy="true"]'))
+    ok(!(await trefferDois()).includes(imPanel[0]), 'Seite 2 zeigt Seite 1')
+
+    await fakeSteuern({ ausfall: ['s2'] })
+    try {
+      await paperSuchen('memory consolidation during sleep')
+      await sichtbar('Semantic Scholar nicht erreichbar', 30000)
+      await paperTreffer('The memory function of sleep').waitFor()
+    } finally {
+      await fakeSteuern({ ausfall: [] })
+    }
+
+    await fakeSteuern({ ausfall: [], protokollLeeren: true })
+    await Promise.all(
+      ['sleep replay', 'sleep spindles'].map(anfrage =>
+        werkzeug(token, 'paper_search', { project_id: pid, anfrage })
+      )
+    )
+    const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe
+    const arxiv = abrufe.filter(a => a.dienst === 'arxiv').map(a => a.zeit)
+    ok(arxiv.length === 2, `arXiv-Abrufe: ${arxiv.length}`)
+    ok(Math.abs(arxiv[1] - arxiv[0]) >= 3000, `arXiv-Abstand ${Math.abs(arxiv[1] - arxiv[0])} ms`)
+
+    await paperSuchen('xyzzy')
+    await page.locator('.spur-panel-inhalt').getByText('Keine Treffer', { exact: true }).waitFor()
   }
 
   const ergebnis = []

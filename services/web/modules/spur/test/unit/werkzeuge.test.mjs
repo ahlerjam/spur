@@ -35,6 +35,7 @@ beforeEach(async () => {
     LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
     Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
     Crossref: { werk: vi.fn() },
+    Recherche: { suchen: vi.fn(async () => ({ treffer: [], fehler: [] })) },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -47,6 +48,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => m.LaufAktionen)
   vi.doMock('../../app/src/Inbox.mjs', () => m.Inbox)
   vi.doMock('../../app/src/Crossref.mjs', () => m.Crossref)
+  vi.doMock('../../app/src/recherche/Recherche.mjs', () => m.Recherche)
   ;({ WERKZEUGE } = await import('../../app/src/mcp/werkzeuge.mjs'))
   recht.vergeben(anna, projekt, { stufe: 'owner' })
 })
@@ -65,6 +67,7 @@ describe('Rechte der Werkzeuge', () => {
     ['bib_list', {}],
     ['reply', { text: 'Hallo' }],
     ['run_status', {}],
+    ['paper_search', { anfrage: 'sleep' }],
   ]
 
   it.each(alleLesen)('%s verweigert Nutzern ohne Zugriff mit keine_rechte', async (name, args) => {
@@ -352,5 +355,19 @@ describe('Eingabeprüfung', () => {
     expect(WERKZEUGE.doc_list.inputSchema.safeParse({ project_id: projekt }).success).toBe(true)
     expect(WERKZEUGE.doc_edit.inputSchema.safeParse({ project_id: projekt, neu: 'x', idempotenz_schluessel: 'kurz' }).success).toBe(false)
     expect(WERKZEUGE.doc_create.inputSchema.safeParse({ project_id: projekt, pfad: 'a.exe', inhalt: '', idempotenz_schluessel: 'schluessel-0001' }).success).toBe(false)
+  })
+})
+
+describe('Recherche', () => {
+  it('paper_search sucht für Projekt und Person und reicht das Ergebnis durch', async () => {
+    m.Recherche.suchen.mockResolvedValue({ treffer: [{ doi: '10.1038/nrn2762' }], fehler: [] })
+    const ergebnis = await aufruf('paper_search', { project_id: projekt, anfrage: 'sleep' })
+    expect(ergebnis.treffer[0].doi).toBe('10.1038/nrn2762')
+    expect(m.Recherche.suchen).toHaveBeenCalledWith({
+      projectId: new ObjectId(projekt),
+      userId: anna,
+      anfrage: 'sleep',
+      seite: 0,
+    })
   })
 })

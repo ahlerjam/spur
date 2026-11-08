@@ -14,6 +14,7 @@ import * as LaufAktionen from './schreiben/LaufAktionen.mjs'
 import * as LaufManager from './schreiben/LaufManager.mjs'
 import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
+import * as Recherche from './recherche/Recherche.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -316,4 +317,17 @@ export const automatikSetzen = mitProblemen(async (req, res) => {
   }
   await LaufAktionen.automatikSetzen(projektId(req), new ObjectId(nutzerId(req)), req.body.an)
   res.sendStatus(204)
+})
+
+const seiteAus = wert => Math.max(0, Number.parseInt(wert ?? '0', 10) || 0)
+
+export const rechercheSuchen = mitProblemen(async (req, res) => {
+  res.json(
+    await Recherche.suchen({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      anfrage: String(req.query.anfrage ?? ''),
+      seite: seiteAus(req.query.seite),
+    })
+  )
 })

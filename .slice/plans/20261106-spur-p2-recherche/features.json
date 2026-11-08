@@ -5,7 +5,7 @@
 "Fällt der Fake für Semantic Scholar aus, zeigt das Panel „Semantic Scholar nicht erreichbar“ und die übrigen Treffer",
 "Zwei schnelle arXiv-Suchen liegen im Fake-Protokoll mindestens 3 Sekunden auseinander",
 "Ohne Treffer steht „Keine Treffer“"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f2", "title": "Zitationen folgen und Suche dokumentieren", "steps": [
 "Nutzer klickt bei einem Treffer „Zitiert von“ und „Zitiert“: Beide Listen erscheinen",
 "„Suchprotokoll“ listet Datum, Datenbank, Anfrage und Trefferzahl",
