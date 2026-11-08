@@ -62,7 +62,10 @@ Behoben nach der Sichtprüfung:
 Offen (Kern-Layout, wie in P1): Bei der Standardbreite des Panels (185 px) werden Hinweise mit Symbol sehr schmal und hoch; das Panel lässt sich verbreitern.
 
 ## Abschluss
-- Letzter voller E2E-Lauf nach der letzten Code-Änderung (5744e75817), nach `vorbereiten.mjs`: f1–f15 ok, p4f1–p4f4 ok.
+- Overleafs Suiten (`spur-dev upstream alle` nach 5744e75817): web zuerst `neu: 2`, nämlich die beiden echten OCR-Unit-Tests, die unter der Last der ganzen Suite länger als 60 s brauchten. Behoben in 631dde70ac: Tesseract mit `OMP_THREAD_LIMIT=1` (OpenMP belegte sonst alle Kerne und überbuchte parallele Läufe), nur noch zwei echte Erkennungen in den Tests, 180 s Zeit. Danach `spur-dev upstream web`: bestanden 5581, fehlgeschlagen 173, bekannt 173, neu 0. frontend: 1674/14/14/0, du: 784/0/0/0.
+- Tesseract mit `deu` und `eng` steht im Produktions-Basisimage (`server-ce/Dockerfile-base`), nicht nur im Dev-Image.
+- P1-Code prüft nirgends `status === 'text'` als „hat Text“; `quelle_fehlt` entsteht nur ohne Quelle, OCR-Quellen sind also für `doc_edit` normale Quellen (Wortlaut „OCR, nicht bestätigt“ blockiert nicht).
+- Letzter voller E2E-Lauf nach der letzten Code-Änderung (631dde70ac), nach `vorbereiten.mjs`: f1–f15 ok, p4f1–p4f4 ok.
 - Unit-Tests: 516 grün, Zeilen 98,58 %. spur-Frontend-Tests: 25 grün.
 
 ## Vorschläge
