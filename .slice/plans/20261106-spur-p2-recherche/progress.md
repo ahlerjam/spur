@@ -122,3 +122,14 @@
 - p2f10 schwankte: Die erste Erfassung der Stichwortsuche las die Quellenliste, die dieselbe Klasse hat, bevor die Treffer da waren. Der Test wartet jetzt auf einen Treffer mit Seitenangabe.
 - Letzter E2E-Lauf auf `ed98d2afbe` (letzte Änderung): f1–f15 und p2f1–p2f10 ok, 287 s.
 - Seit den Screenshots haben sich nur Server- und Testcode geändert, keine Oberfläche. Die 20 Aufnahmen bei 360 und 1280 px gelten weiter.
+
+## /code-review medium ae0268d96e^..HEAD (Nachreview der letzten Änderungen)
+- Behoben:
+  - Das Limit je Anmeldung gilt wieder für die sinngemäße Suche, weil das Einbetten mit dem echten Modell teuer ist.
+  - Ein Fehler beim Aufräumen nach einer gescheiterten Aufnahme verdeckt nicht mehr die Ursache.
+  - Ein Neuversuch nach gescheitertem Modell-Download verwirft keinen neueren Download.
+- Fehlalarme, geprüft:
+  - Die entfernten Exporte `DOI_MUSTER` und `STANDARD_VORLAGE` haben keine Nutzer (grep).
+  - Alle Aufrufer der neuen Rückgabeform von Zitationen sind angepasst; Unit-Tests und E2E sind grün.
+  - `projektAufraeumen` löscht Beschaffung und Suchprotokoll schon seit f6.
+- Letzter E2E-Lauf auf `3bc8530d02` (letzte Code-Änderung): f1–f15 und p2f1–p2f10 ok, 293 s. Die Oberfläche ist seit den Screenshots unverändert.
