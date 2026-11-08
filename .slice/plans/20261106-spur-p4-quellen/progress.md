@@ -60,3 +60,13 @@ Behoben nach der Sichtprüfung:
 - OCR-Hinweis in der Vorschau hatte die Schriftgröße des Fließtexts: jetzt Meta-Größe, fett.
 - Formular-IDs aus `useId()` statt aus dem API-Pfad; Zuweisungshinweis kürzt lange Zitate auf etwa 60 Zeichen.
 Offen (Kern-Layout, wie in P1): Bei der Standardbreite des Panels (185 px) werden Hinweise mit Symbol sehr schmal und hoch; das Panel lässt sich verbreitern.
+
+## Abschluss
+- Letzter voller E2E-Lauf nach der letzten Code-Änderung (5744e75817), nach `vorbereiten.mjs`: f1–f15 ok, p4f1–p4f4 ok.
+- Unit-Tests: 516 grün, Zeilen 98,58 %. spur-Frontend-Tests: 25 grün.
+
+## Vorschläge
+- Gemeinsame SSRF-Prüfung für web und linked-url-proxy in `libraries/` (mit `Settings.blockedNetworks`).
+- Rate-Limit für `/quellen/web` und Kommentare; OCR-Grenze je Projekt und Seitenobergrenze.
+- `dev-schalter.json` im Dev-Stack beschreibbar einhängen; dann kann `zeitFestlegen` entfallen.
+- Markierungen auch im Seitentext der Vorschau hervorheben (heute nur in der Liste).
