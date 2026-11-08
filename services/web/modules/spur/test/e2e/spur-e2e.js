@@ -35,6 +35,12 @@ async page => {
     // Eine noch laufende Antwort der verlassenen Seite kann trotzdem eine Session setzen (403 CSRF).
     // Dann genau einmal neu; ein echter Login-Fehler scheitert auch beim zweiten Mal.
     if (antwort.status() === 403 && versuch === 1) return await anmelden(email, 2)
+    // Overleaf erlaubt je IP 20 Anmeldungen in 60 s (router.mjs, overleafLoginRateLimiter); auf einem
+    // schnellen Rechner meldet die Suite sich öfter an. Dann das Fenster abwarten, ohne Retry-After.
+    if (antwort.status() === 429 && versuch <= 2) {
+      await page.waitForTimeout(61000)
+      return await anmelden(email, versuch + 1)
+    }
     await page.waitForURL(/\/project/, { waitUntil: 'commit' })
   }
 
