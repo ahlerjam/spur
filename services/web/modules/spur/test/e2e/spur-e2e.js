@@ -70,8 +70,8 @@ async page => {
   const railTab = name => page.getByRole('tab', { name, exact: true })
 
   // Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her, auf langsamen Rechnern erst nach Sekunden,
-  // und überschreibt damit einen frühen Klick. Darum den Tab wählen, bis `bereit` sichtbar ist. Ein schon gewählter
-  // Tab wird erst nach 3 s erneut geklickt (eingeklappte Leiste), sonst schlösse der Klick das Panel wieder.
+  // und überschreibt damit einen frühen Klick; manchmal bleibt die Leiste eingeklappt. Darum den Tab wählen, bis
+  // `bereit` sichtbar ist. Ein schon gewählter Tab wird erst nach 3 s erneut geklickt, sonst schlösse der Klick ihn.
   async function panelSichern(tab, bereit, timeout = 30000) {
     const ende = Date.now() + timeout
     let geklickt = Date.now()
@@ -2235,9 +2235,11 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     fail(`${typ}: ${liste.length} statt ${anzahl} Ereignisse`)
   }
 
+  // Bei eingeklappter Leiste zeigt Overleaf den Eintrag nur als Marke am Rand (.review-panel-entry, ohne Text);
+  // bereit ist das Panel erst, wenn der Kommentartext selbst sichtbar ist.
   async function reviewEintrag(text) {
     const eintrag = page.locator('.review-panel-entry', { hasText: text })
-    await panelSichern('Review panel', eintrag)
+    await panelSichern('Review panel', eintrag.getByText(text).first())
     return eintrag
   }
 
