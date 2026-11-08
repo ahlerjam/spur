@@ -36,7 +36,7 @@
     "Mit `SPUR_NOW` und Limit 2 erzeugt der dritte Auslöser kein Ereignis, das Panel zeigt „Tageslimit erreicht“; 60 Sekunden Tipp-Pause lösen genau ein Ereignis aus",
     "Alle vier Zustände des Vorschläge-Panels (aus, keine, mehrere, Tageslimit erreicht) bei 360 und 1280 px als Screenshot, ohne Überlauf und ohne Konsolenfehler"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
