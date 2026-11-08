@@ -37,6 +37,10 @@ Befund: `spur-e2e.js` nach `vorbereiten.mjs` nicht vollständig grün, `p3f2` sc
 - Umgesetzt: `panelSichern` klickt einen schon gewählten Tab nur noch, wenn die Leiste eingeklappt ist (kein `.rail-panel-title` sichtbar). Vorher hätte es nach 3 s auch ein offenes, langsam ladendes Panel geschlossen. Danach bei 20× zweimal `p3f2 ok` (132 s, 129 s).
 - Nicht umgesetzt (wie oben begründet): Dev-Route ohne Anmeldung nur mit `SPUR_DEV`; Verlauf bis 500 je Abfrage; Index-Kette (Rollback läuft rückwärts, `spur_verlauf_index` stellt den `am`-Index vor `spur_app` wieder her); Seitengröße 100 in `ereignisseVon` (bricht ohne fortschreitenden Cursor ab); Hinweis außerhalb von `role="log"` (Statuszeile, kein Gesprächsinhalt); Notification-Ersatz.
 
+### /simplify und /code-review auf dem Endstand (37b2d9db3b..HEAD, Schwerpunkt 1611ebbaf5..HEAD)
+- /simplify: Altitude und Effizienz ohne neue Befunde. Wiederverwendung und Vereinfachung nennen nur Kosmetik: doppelte Lösch-Schleifen und eine Schleife über ein Element in `vorbereiten.mjs` (stammt aus P1/P2, im Diff nur eingerückt), den Namen `geklickt`, `.and()` statt eines verschachtelten Locators in p2f4. Nicht umgesetzt, weil nichts am Verhalten ändert und jede Änderung einen neuen Gesamtlauf bräuchte; siehe Vorschläge.
+- /code-review: Umgesetzt ist, dass CI jetzt auch `tools/tests/befehlsnamen.test.mjs` ausführt (vorher nur von Hand); der Schritt meldet 11/11 grün. Nicht umgesetzt: der Main-Guard in `vorbereiten.mjs` (belegt, `spur-dev run` meldet „E2E-Daten bereit“); `ablageFreigeben` nur im Skript (der Web-Prozess legt seine Dateien selbst an); Zählung 102 in p3f1 (die Suite setzt vorher zurück, also deterministisch); die übrigen Punkte wie oben.
+
 ## Abnahme
 Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in der Scratchpad-Ablage `bilder/`, je 360 und 1280 px. In keinem Bild horizontaler Überlauf von Seite oder Panel, keine Konsolenfehler.
 
@@ -142,6 +146,7 @@ Stand nach der letzten Codeänderung (84bfe96e45, 21:45; danach nur Belege):
 Keine.
 
 ## Vorschläge
+- `vorbereiten.mjs`: Lösch-Schleifen für Projekte und Konten in Helfer `projekteLoeschen(owner, name)` und `kontoEntfernen(email)` zusammenziehen.
 - Index `projectId_1_botId_1__id_-1` auf `spurMessages` in einer eigenen Migration entfernen; der Index `{projectId, botId, am, _id}` deckt alle Abfragen ab.
 - Der Verlauf zeigt höchstens 500 Nachrichten und wird bei jeder Abfrage (alle 5 s) ganz geladen, im schlimmsten Fall 500 × 20 000 Zeichen. Besser: erst den Verlauf, danach nur neue Nachrichten (`seit`), und „Ältere laden“ mit Cursor.
 - `events_since` ohne Cursor liefert die ältesten 100 Ereignisse eines Bots. Ein Client, der ohne Cursor fragt, sieht neue Ereignisse erst nach Blättern; die Tool-Beschreibung könnte das sagen.
