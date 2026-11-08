@@ -1,6 +1,6 @@
 # Fortschritt 20261106-spur-p3-app
 
-Alle fünf Features bestehen ihre E2E-Schritte (`p3f1` bis `p3f5` in `services/web/modules/spur/test/e2e/spur-e2e.js`).
+f1 bis f4 bestehen. f5 bleibt offen: Schritte 1, 3, 4 und 5 bestehen in `p3f5`, Schritt 2 scheitert bei Installation über das Plugin (siehe „Needs decision“).
 
 ## Recipe changes
 - Wie in P2 und P4: Das Setup-Skript der Cloud-Umgebung war nicht gelaufen (kein `spur-dev`, Docker ohne Images). Der Builder hat den unveränderten Stand mit `bash tools/spur-dev/spur-dev install --cloud` installiert und `dockerd` gestartet; `spur-dev up` zog die Images.
@@ -29,13 +29,15 @@ Alle fünf Features bestehen ihre E2E-Schritte (`p3f1` bis `p3f5` in `services/w
 - Chat-Verlauf sortierte nach `_id`. Panel (web) und MCP (web-api) erzeugen ObjectIds mit eigenem Zufallsteil; in derselben Sekunde stand eine Antwort vor der Frage. Jetzt nach `am`.
 
 ## Menschlich zu prüfen
-- f5, Schritt 2 mit installiertem Plugin: In Claude Code 2.1.319 meldet `claude -p --mcp-config` mit einem Server namens `spur` die Befehle `mcp__spur__literaturueberblick`, `mcp__spur__methodenteil` und `mcp__spur__folien`; laut Doku (code.claude.com/docs/en/mcp.md, „Use MCP prompts as commands“) zeigt das Menü sie als `/spur:literaturueberblick (MCP)` usw. Über das Plugin (`--plugin-dir plugins/spur`) startete der Server headless nicht, weil `userConfig` (Adresse, Token) fehlt; ob das Menü bei Plugin-Servern `spur` oder `plugin:spur:spur` zeigt, sagt die Doku nicht. Bitte einmal im Terminal mit installiertem Plugin `/` tippen und die Namen ansehen.
+- f5, Schritt 2 (nachgeprüft mit Claude Code 2.1.319, headless, Init-Meldung `slash_commands`):
+  - Server direkt als `spur` eingerichtet (`--mcp-config`): `mcp__spur__literaturueberblick`, `mcp__spur__methodenteil`, `mcp__spur__folien`. Laut Doku (code.claude.com/docs/en/mcp.md, „Use MCP prompts as commands“) zeigt das Menü sie als `/spur:literaturueberblick (MCP)` usw.
+  - Über das Plugin (Kopie von `plugins/spur` mit eingetragener Adresse und Token, `--plugin-dir`): Server `plugin:spur:spur`, Befehle `mcp__plugin_spur_spur__literaturueberblick`, `mcp__plugin_spur_spur__methodenteil`, `mcp__plugin_spur_spur__folien`. Das Menü zeigt sie dann nach demselben Muster als `/plugin:spur:spur:literaturueberblick (MCP)`, nicht als `/spur:…`. Das Präfix setzt Claude Code für Plugin-Server; spur kann es nicht ändern. Den genauen Menütext bitte einmal interaktiv ansehen.
 - Weckweg je Meilenstein (laut Spec): `@claude` im Kommentar und ein Fehler-Compile mit Schalter „Vorschlag“ wecken eine wartende echte Claude-Session; Claude antwortet im Thread beziehungsweise legt einen Vorschlag mit `suggest` ab.
 
 ## Needs decision
-- f5: Soll das Menü in Claude Code `/spur:…` zeigen, auch wenn Claude Code Plugin-Server anders benennt?
-  Interim: Server im Plugin heißt `spur`, Prompts heißen wie in der Spec; nicht weiter angepasst.
-  Options: A (empfohlen) so lassen und nach dem Handtest entscheiden | B Prompts zusätzlich als Plugin-Befehle ausliefern (widerspricht „keine Workflow-Skills im Plugin“)
+- f5: Über das Plugin heißen die Workflows in Claude Code `/plugin:spur:spur:<name> (MCP)`, nicht `/spur:<name> (MCP)` wie in Schritt 2 verlangt. Was gilt?
+  Interim: Prompts und Plugin unverändert; `passes` von f5 bleibt false, die übrigen vier Schritte bestehen.
+  Options: A (empfohlen) Schritt 2 auf den Namen anpassen, den Claude Code für Plugin-Server vergibt (`/plugin:spur:spur:…`), und den Befehl in README und Panel-Hilfe so nennen | B Einrichtung zusätzlich ohne Plugin anbieten (`claude mcp add --transport http spur <Adresse> --header …`), dann gilt `/spur:…`, aber Token und Erlaubnisse liegen nicht mehr im Plugin | C Workflows zusätzlich als Plugin-Befehle `/spur:<name>` ausliefern (widerspricht „Keine Workflow-Skills im Plugin“ und doppelt die Textquelle)
 
 ## Vorschläge
 - `events_since` sortiert nach `_id`. Solange alle Ereignisse im web-Prozess entstehen, ist das sicher; entstünden Ereignisse auch in web-api (MCP), könnte ein Cursor ein Ereignis aus derselben Sekunde überspringen. Dann einen monotonen Zähler je Bot einführen.
