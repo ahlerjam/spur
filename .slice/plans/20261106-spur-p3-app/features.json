@@ -22,7 +22,7 @@
     "`reply` erscheint im selben Thread als „Claude (A)“",
     "Der Text eines Kommentars von B erscheint nicht im Ereignis"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

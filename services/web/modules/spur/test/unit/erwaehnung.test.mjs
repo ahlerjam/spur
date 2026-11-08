@@ -14,6 +14,11 @@ const thread = 'aaaaaaaaaaaaaaaaaaaaaaaa'
 const DOC = '0123456789abcdef01234567'
 const TEXT = 'Einleitung.\nSchlaf verdoppelt die Gedächtnisleistung.\nEnde.'
 
+// Wie der echte DocstoreManager, der die ID in einen URL-Pfad setzt (path.posix.join verlangt Text).
+const nurText = id => {
+  if (typeof id !== 'string') throw new TypeError('projectId muss Text sein')
+}
+
 beforeAll(async () => {
   datenbank = await testDatenbank()
 })
@@ -43,7 +48,7 @@ beforeEach(async () => {
       sendComment: vi.fn(async (p, t, u, content) => ({ id: 'm-claude', content, user_id: u })),
     },
   }
-  m.DocstoreManager = { promises: { getAllRanges: vi.fn(async () => m.ranges) } }
+  m.DocstoreManager = { promises: { getAllRanges: vi.fn(async id => (nurText(id), m.ranges)) } }
   m.PruefManager = { dokumente: vi.fn(async () => [{ docId: DOC, pfad: 'main.tex', text: TEXT }]) }
   m.EditorRealTimeController = { emitToRoom: vi.fn() }
   m.UserInfoManager = { promises: { getPersonalInfo: vi.fn(async id => ({ _id: id, first_name: 'Claude', last_name: '(Ada)' })) } }
@@ -107,7 +112,7 @@ describe('@claude im Kommentar', () => {
   it('wartet, bis die Kommentarstelle im Dokument angekommen ist', async () => {
     const spaeter = m.ranges
     m.ranges = [{ _id: DOC, ranges: {} }]
-    m.DocstoreManager.promises.getAllRanges.mockImplementationOnce(async () => m.ranges).mockImplementation(async () => spaeter)
+    m.DocstoreManager.promises.getAllRanges.mockImplementationOnce(async () => m.ranges).mockImplementation(async id => (nurText(id), spaeter))
     await gesendet(ada, '@claude prüfe diese Aussage')
     expect(m.DocstoreManager.promises.getAllRanges).toHaveBeenCalledTimes(2)
     expect((await ereignisse())[0].daten.pfad).toBe('main.tex')
@@ -133,7 +138,7 @@ describe('Antwort im Thread', () => {
     expect(ergebnis).toEqual({ nachricht_id: 'm-claude' })
     expect(m.ChatApiHandler.promises.sendComment).toHaveBeenCalledWith(projekt, thread, adasBot, 'Die Aussage ist nicht belegt.')
     expect(m.EditorRealTimeController.emitToRoom).toHaveBeenCalledWith(
-      projekt,
+      String(projekt),
       'new-comment',
       thread,
       expect.objectContaining({ content: 'Die Aussage ist nicht belegt.', user: expect.objectContaining({ first_name: 'Claude', last_name: '(Ada)' }) })

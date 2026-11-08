@@ -72,6 +72,19 @@ describe('Compile', () => {
     })
   })
 
+  it('nimmt den Build aus outputFiles, wie Overleaf CE ihn liefert', async () => {
+    anfrage(`/project/${PROJEKT}/compile`).json({
+      status: 'success',
+      outputFiles: [
+        { path: 'output.pdf', build: '1a1b-pdf' },
+        { path: 'output.log', build: '1a1b-log' },
+      ],
+    })
+    await ruhe()
+    expect(await m.Vorschlaege.ausloesen.mock.results[0].value).toMatchObject({ daten: { fehler: [{ zeile: 4 }] } })
+    expect(m.Kompilieren.fehlerDesCompiles).toHaveBeenCalledWith(expect.objectContaining({ buildId: '1a1b-log' }))
+  })
+
   it('ohne Fehler im Log gibt es keinen Anlass', async () => {
     m.Kompilieren.fehlerDesCompiles.mockResolvedValue([])
     anfrage(`/project/${PROJEKT}/compile`).json({ status: 'success', buildId: 'b1' })

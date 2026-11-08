@@ -354,7 +354,7 @@ await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))
 async function mitNamen(email, first_name, last_name) {
   const nutzer = await konto(email)
   await db.users.updateOne({ _id: nutzer._id }, { $set: { first_name, last_name } })
-  return nutzer
+  return await db.users.findOne({ _id: nutzer._id })
 }
 const teamA = await mitNamen('e2e-team-a@example.org', 'Anna', 'Autor')
 const teamB = await mitNamen('e2e-team-b@example.org', 'Ben', 'Berater')
@@ -392,8 +392,11 @@ Schlaf verdoppelt die Gedächtnisleistung.
   await db.projects.updateOne({ _id: p._id }, { $set: { collaberator_refs: [p3b._id] } })
 }
 await neuAnlegen(p3a, 'E2E Workflows', { 'main.tex': ABSCHNITTE })
-await testToken(p3a, 'spur_e2e_p3a', new Date(Date.now() + 24 * 3600 * 1000))
-await testToken(p3b, 'spur_e2e_p3b', new Date(Date.now() + 24 * 3600 * 1000))
+for (const [mensch, token] of [[p3a, 'spur_e2e_p3a'], [p3b, 'spur_e2e_p3b']]) {
+  await testToken(mensch, token, new Date(Date.now() + 24 * 3600 * 1000))
+  // Ein Bot aus einem früheren Lauf trägt sonst noch den Namen von vor mitNamen.
+  await db.users.updateOne({ 'spur.botFuer': mensch._id }, { $set: { last_name: `(${mensch.first_name})` } })
+}
 for (const sammlung of [vorschlaege, workflows]) {
   await (await sammlung()).deleteMany({})
 }

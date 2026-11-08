@@ -17,7 +17,7 @@ async function stelleSuchen(projectId, threadId, { versuche, pauseMs }) {
   for (let versuch = 0; versuch < versuche; versuch++) {
     if (versuch) await warten(pauseMs)
     const docs = await PruefManager.dokumente(projectId)
-    for (const eintrag of await DocstoreManager.promises.getAllRanges(projectId)) {
+    for (const eintrag of await DocstoreManager.promises.getAllRanges(String(projectId))) {
       const kommentar = eintrag.ranges?.comments?.find(c => c.op.t === threadId)
       const doc = kommentar && docs.find(d => d.docId === String(eintrag._id))
       if (!doc) continue
@@ -61,6 +61,6 @@ export async function imThreadAntworten({ projectId, threadId, botId, text }) {
   }
   const nachricht = await ChatApiHandler.promises.sendComment(projectId, threadId, botId, text)
   nachricht.user = UserInfoController.formatPersonalInfo(await UserInfoManager.promises.getPersonalInfo(botId))
-  EditorRealTimeController.emitToRoom(projectId, 'new-comment', threadId, nachricht)
+  EditorRealTimeController.emitToRoom(String(projectId), 'new-comment', threadId, nachricht)
   return { nachricht_id: nachricht.id }
 }

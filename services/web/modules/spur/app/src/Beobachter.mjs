@@ -14,7 +14,10 @@ function nebenbei(arbeit, was) {
   arbeit.catch(error => logger.warn({ err: error }, `spur: ${was} fehlgeschlagen`))
 }
 
-function nachCompile(projectId, menschId, { buildId, clsiServerId }) {
+// Overleaf CE nennt den Build nur je Ausgabedatei; andere Fassungen liefern buildId oben.
+const buildVon = antwort => antwort?.buildId ?? antwort?.outputFiles?.find(f => f.path === 'output.log')?.build
+
+function nachCompile(projectId, menschId, buildId, clsiServerId) {
   return Vorschlaege.ausloesen({
     projectId,
     menschId,
@@ -50,8 +53,12 @@ export function beobachten(req, res, next) {
     const senden = res.json.bind(res)
     res.json = body => {
       const menschId = SessionManager.getLoggedInUserId(req.session)
-      if (menschId && body?.buildId) {
-        nebenbei(nachCompile(new ObjectId(compile[1]), new ObjectId(String(menschId)), body), 'Vorschlag nach Compile')
+      const buildId = buildVon(body)
+      if (menschId && buildId) {
+        nebenbei(
+          nachCompile(new ObjectId(compile[1]), new ObjectId(String(menschId)), buildId, body.clsiServerId),
+          'Vorschlag nach Compile'
+        )
       }
       return senden(body)
     }

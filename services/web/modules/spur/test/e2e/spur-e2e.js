@@ -2167,13 +2167,19 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
 
   const AUSSAGE = 'Schlaf verdoppelt die Gedächtnisleistung.'
 
-  async function textAuswaehlen(text) {
-    await page.evaluate(t => {
-      const view = window.overleaf.unstable.store.get('editor.view')
-      const von = view.state.doc.toString().indexOf(t)
-      view.focus()
-      view.dispatch({ selection: { anchor: von, head: von + t.length } })
-    }, text)
+  // Mit der Maus wie ein Mensch: Overleafs Menü „Kommentar hinzufügen“ erscheint erst nach dem Loslassen.
+  async function zeileAuswaehlen(text) {
+    const zeile = page.locator('.cm-line', { hasText: text })
+    const box = await zeile.boundingBox()
+    const breite = await zeile.evaluate(el => {
+      const r = document.createRange()
+      r.selectNodeContents(el)
+      return r.getBoundingClientRect().width
+    })
+    await page.mouse.move(box.x + 1, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + breite + 10, box.y + box.height / 2, { steps: 5 })
+    await page.mouse.up()
   }
 
   async function ereignisseVon(token, typ) {
@@ -2196,17 +2202,24 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await anmelden('e2e-p3b@example.org')
     await projektOeffnen('E2E Kommentar')
     const pid = page.url().split('/').pop()
-    await textAuswaehlen(AUSSAGE)
+    await zeileAuswaehlen(AUSSAGE)
     await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
-    await page.locator('.review-panel-add-comment-editor .cm-content').first().click()
+    const eingabe = page.locator('.review-panel-add-comment-editor .cm-content').first()
+    await eingabe.waitFor()
+    await eingabe.click()
     await page.keyboard.type('Bo meint: Das ist zu stark.')
-    await page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click()
+    const [gesendet] = await Promise.all([
+      page.waitForResponse(r => /\/thread\/[0-9a-f]{24}\/messages$/.test(r.url()) && r.request().method() === 'POST'),
+      page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click(),
+    ])
+    ok(gesendet.status() === 204, `Kommentar von Bo: ${gesendet.status()}`)
     const thread = page.locator('.review-panel-entry', { hasText: 'Bo meint: Das ist zu stark.' })
     await thread.waitFor()
 
     await anmelden('e2e-p3a@example.org')
     await projektOeffnen('E2E Kommentar')
-    await railTab('Review panel').click()
+    // Overleaf stellt das zuletzt offene Panel kurz nach dem Laden wieder her; ein Klick zu früh schlösse es.
+    await thread.waitFor({ timeout: 5000 }).catch(() => railTab('Review panel').click())
     await thread.waitFor()
     await thread.locator('.review-panel-comment-input .cm-content').click()
     await page.keyboard.type('@claude prüfe diese Aussage')
@@ -2219,7 +2232,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok(erwaehnung.project_id === pid, `Projekt: ${erwaehnung.project_id}`)
     ok(
       d.text === '@claude prüfe diese Aussage' && d.pfad === 'main.tex' && /^[0-9a-f]{24}$/.test(d.doc_id) &&
-        /^[0-9a-f]{24}$/.test(d.kommentar_id) && d.stelle?.zeile === 3 && d.stelle.markiert === AUSSAGE,
+        /^[0-9a-f]{24}$/.test(d.kommentar_id) && d.stelle?.zeile === 3 && d.stelle.markiert.startsWith('Schlaf verdoppelt die Gedächtnisleistung'),
       `comment_mention: ${JSON.stringify(d)}`
     )
     ok(d.andere_nachrichten.length === 1, `Andere Nachrichten: ${JSON.stringify(d.andere_nachrichten)}`)
@@ -2243,6 +2256,19 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   const auswahlText = async label =>
     await vorschlaegePanel().getByLabel(label, { exact: true }).evaluate(el => el.selectedOptions[0].textContent)
 
+  // Das Panel lädt nach dem Speichern neu; bis dahin zeigt die Auswahl noch den alten Stand.
+  async function auswahlIst(label, erwartet) {
+    try {
+      await page.waitForFunction(
+        ([id, text]) => document.getElementById(id)?.selectedOptions[0]?.textContent === text,
+        [label === 'Compile-Fehler' ? 'spur-schalter-compile_fehler' : 'spur-schalter-belegloses_argument', erwartet],
+        { timeout: 10000 }
+      )
+    } catch {
+      fail(`${label}: „${await auswahlText(label)}“ statt „${erwartet}“`)
+    }
+  }
+
   async function aufAntwort(pfadEnde, handlung) {
     await Promise.all([
       page.waitForResponse(r => r.url().endsWith(pfadEnde) && r.request().method() !== 'GET'),
@@ -2261,11 +2287,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await anmelden('e2e-p3a@example.org')
     await projektOeffnen('E2E Vorschläge')
     await panelOeffnen('Vorschläge')
-    ok((await auswahlText('Compile-Fehler')) === 'Projekt-Standard: Aus', `Compile-Fehler: ${await auswahlText('Compile-Fehler')}`)
-    ok(
-      (await auswahlText('Belegloses Argument')) === 'Projekt-Standard: Aus',
-      `Belegloses Argument: ${await auswahlText('Belegloses Argument')}`
-    )
+    await auswahlIst('Compile-Fehler', 'Projekt-Standard: Aus')
+    await auswahlIst('Belegloses Argument', 'Projekt-Standard: Aus')
     await aufAntwort('/vorschlaege/projekt', () =>
       vorschlaegePanel().getByLabel('Compile-Fehler (Projekt)').selectOption('vorschlag')
     )
@@ -2273,14 +2296,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await anmelden('e2e-p3b@example.org')
     await projektOeffnen('E2E Vorschläge')
     await panelOeffnen('Vorschläge')
-    await page.waitForFunction(() => document.querySelector('#spur-schalter-compile_fehler'))
-    ok(
-      (await auswahlText('Compile-Fehler')) === 'Projekt-Standard: Vorschlag',
-      `Projekt-Standard gilt nicht: ${await auswahlText('Compile-Fehler')}`
-    )
+    await auswahlIst('Compile-Fehler', 'Projekt-Standard: Vorschlag')
     ok((await vorschlaegePanel().getByText('Projekt-Standard für alle Mitglieder').count()) === 1, 'Bo darf schreiben')
     await aufAntwort('/vorschlaege/eigene', () => vorschlaegePanel().getByLabel('Compile-Fehler', { exact: true }).selectOption('aus'))
-    ok((await auswahlText('Compile-Fehler')) === 'Aus', `Eigene Einstellung: ${await auswahlText('Compile-Fehler')}`)
+    await auswahlIst('Compile-Fehler', 'Aus')
 
     await fehlerKompilieren()
     await page.waitForTimeout(4000)
@@ -2290,7 +2309,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await aufAntwort('/vorschlaege/eigene', () =>
       vorschlaegePanel().getByLabel('Compile-Fehler', { exact: true }).selectOption('vorschlag')
     )
-    await page.waitForTimeout(1500)
+    await auswahlIst('Compile-Fehler', 'Vorschlag')
     await fehlerKompilieren()
     const [ausgeloest] = await bisEreignisse(BO, 'suggest_trigger', 1)
     await page.waitForTimeout(3000)
