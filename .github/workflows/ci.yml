@@ -74,6 +74,8 @@ jobs:
           tools/spur-dev/spur-dev install
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
+      - name: Auswertung testen
+        run: node --test tools/tests/upstream-auswertung.test.mjs
       - name: web-Unit
         run: spur-dev upstream web
       - name: Frontend
