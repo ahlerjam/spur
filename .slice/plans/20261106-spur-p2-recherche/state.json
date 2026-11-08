@@ -1,5 +1,5 @@
 {
-  "state": "halted",
+  "state": "done",
   "builderModel": "opus",
   "builderAdvisor": "opus",
   "dependsOn": [
@@ -11,6 +11,5 @@
   "started": "2026-11-08T11:17:08Z",
   "runBranch": "slice/run-20261106-spur-p2-recherche",
   "sessionId": "433b6958-1dba-4962-af86-8a6cd40251ac",
-  "finished": "2026-11-08T14:10:00Z",
-  "haltReason": "merge conflict with agent branch (p4-quellen landed on same files)"
+  "finished": "2026-11-08T14:26:37Z"
 }

@@ -5,3 +5,18 @@
 - D2 (plan 20261106-spur-p2-recherche) merge: Run branch slice/run-20261106-spur-p2-recherche has all 10 features passing (builder, independent acceptance f1-f10 PASS), but merging the current agent branch into it conflicts in 15 files (SpurRouter, SpurController, QuellenManager, ZitatManager, quellen-panel/zitate.tsx, spur.scss, locales, spur-e2e.js and four unit tests), because plan p4-quellen landed on the same files meanwhile. Not merged.
   Interim: plan halted; run branch is pushed to origin unchanged, agent branch untouched.
   Options: (a) resolve the conflicts by hand on slice/run-20261106-spur-p2-recherche, run spur-dev test, then fast-forward agent; (b) resume a builder on the run branch with the task to merge agent and resolve the conflicts, then run the gate again.
+  Resolved 2026-11-08 (owner session): option (a). The 15 conflicts were resolved by hand in merge commit 390138827b. Details:
+  - Dev routes keep P2's paper fake plus P4's test page and time switch.
+  - `aufnehmen` uses P4's `speichern()` and keeps P2's defaults (key, doi, meta, nurProjekt).
+  - P4's web entries for the .bib moved into P2's `pruefung/bib.mjs`.
+  - Notes, comments and OCR confirmation coexist in the panel.
+  - Locales were merged three-way with no conflicting keys.
+  After the merge the E2E suite needed one fix: e2e-a now has more than 20 projects, so `projektOeffnen` uses the project list search.
+  Results:
+  - `spur-dev test`: 638 tests passed, 94.2 % lines.
+  - Full E2E: f1–f15, p2f1–p2f10 and p4f1–p4f4 all ok.
+  The independent acceptance (f1–f10 PASS) ran before the merge; after it only unit tests and E2E were rerun.
+  Open:
+  - P2's PDF fetch (`recherche/Aufnahme.mjs`) checks DNS before `fetch` resolves again (rebinding window).
+  - It also lacks the NAT64, 6to4 and Teredo ranges that P4's `WebSchnappschuss` blocks.
+  Follow-up fix: use one shared guarded request for both.
