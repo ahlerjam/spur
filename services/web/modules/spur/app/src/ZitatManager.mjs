@@ -90,7 +90,7 @@ function bibEintrag(key, quelle) {
   return `@article{${key},\n${zeilen.join(',\n')}\n}`
 }
 
-async function bibSicherstellen(projectId, docs, quelle, userId) {
+export async function bibSicherstellen(projectId, docs, quelle, userId) {
   const bibDocs = docs.filter(d => d.pfad.endsWith('.bib'))
   for (const doc of bibDocs) {
     for (const eintrag of bibLesen(doc.text).values()) {

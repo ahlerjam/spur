@@ -5,11 +5,13 @@ import OLButton from '@/shared/components/ol/ol-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
-import { anfrage, projektPfad } from '../api'
+import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
+import { anfrage, jsonAnfrage, projektPfad } from '../api'
+import { pruefenVerzoegert } from '../pruefung/pruef-store'
 import PaperEintrag from './paper-treffer'
 import Suchprotokoll from './suchprotokoll'
 import Zitationen from './zitationen'
-import type { SuchErgebnis } from './typen'
+import type { PaperTreffer, SuchErgebnis } from './typen'
 
 type Ansicht = 'treffer' | 'protokoll'
 const ANSICHTEN: { id: Ansicht; titel: string }[] = [
@@ -24,6 +26,24 @@ export default function RecherchePanel() {
   const [laedt, setLaedt] = useState(false)
   const [fehler, setFehler] = useState<string | null>(null)
   const [ansicht, setAnsicht] = useState<Ansicht>('treffer')
+  const { write: darfSchreiben } = usePermissionsContext()
+  const [meldungen, setMeldungen] = useState<Record<string, { typ: 'success' | 'info' | 'error'; text: string }>>({})
+  const [arbeitet, setArbeitet] = useState<string | null>(null)
+
+  const aufnehmen = async (treffer: PaperTreffer) => {
+    const doi = treffer.doi!
+    setArbeitet(doi)
+    try {
+      const quelle = await jsonAnfrage<{ key: string }>('POST', projektPfad('/recherche/aufnehmen'), { doi })
+      setMeldungen(alt => ({ ...alt, [doi]: { typ: 'success', text: t('spur_aufgenommen', { key: quelle.key }) } }))
+      pruefenVerzoegert()
+    } catch (error) {
+      const status = (error as { status?: number }).status
+      setMeldungen(alt => ({ ...alt, [doi]: { typ: status === 409 ? 'info' : 'error', text: (error as Error).message } }))
+    } finally {
+      setArbeitet(null)
+    }
+  }
 
   const suchen = async (seite: number) => {
     setFehler(null)
@@ -102,7 +122,23 @@ export default function RecherchePanel() {
                   <PaperEintrag key={treffer.doi ?? treffer.titel} treffer={treffer}>
                     {treffer.doi && (
                       <div className="spur-paper-aktionen">
+                        {darfSchreiben && treffer.frei && (
+                          <OLButton
+                            variant="primary"
+                            size="sm"
+                            isLoading={arbeitet === treffer.doi}
+                            loadingLabel={t('spur_wird_aufgenommen')}
+                            onClick={() => aufnehmen(treffer)}
+                          >
+                            {t('spur_aufnehmen')}
+                          </OLButton>
+                        )}
                         <Zitationen doi={treffer.doi} />
+                      </div>
+                    )}
+                    {treffer.doi && meldungen[treffer.doi] && (
+                      <div role="status">
+                        <Notification type={meldungen[treffer.doi].typ} content={meldungen[treffer.doi].text} />
                       </div>
                     )}
                   </PaperEintrag>

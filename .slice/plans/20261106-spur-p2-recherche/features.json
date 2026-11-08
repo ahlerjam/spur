@@ -17,7 +17,7 @@
 "Ein zweites Aufnehmen meldet „Bereits vorhanden“",
 "Für einen arXiv-Treffer ohne Lizenz zur Weitergabe bleibt der Volltext auf das Projekt des Nutzers beschränkt",
 "`source_add` mit unbekannter DOI meldet „DOI nicht gefunden“"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f4", "title": "Beschaffungsliste für nicht freie Paper", "steps": [
 "Nutzer klickt „Auf die Beschaffungsliste“ bei einem nicht freien Treffer: Der Eintrag zeigt „Offen“",
 "Der Link folgt der eingestellten Vorlage, zum Beispiel `https://bibliothek.example/?doi={doi}`",

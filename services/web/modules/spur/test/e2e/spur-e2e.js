@@ -1359,6 +1359,47 @@ async page => {
     ok(zeilen.some(z => /^\d{4}-\d\d-\d\dT[^,]+,OpenAlex,sleep memory consolidation,\d+$/.test(z)), `CSV:\n${csv}`)
   }
 
+  features.p2f3 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Recherche')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Treffer' }).click()
+    await paperSuchen('sleep memory consolidation')
+    const keller = paperTreffer('Sleep spindles predict overnight memory consolidation')
+    await keller.getByRole('button', { name: 'Aufnehmen' }).click()
+    await keller.getByText('Aufgenommen als „keller2014“: Quelle mit PDF und Eintrag in der .bib').waitFor({ timeout: 30000 })
+    await keller.getByRole('button', { name: 'Aufnehmen' }).click()
+    await keller.getByText('Bereits vorhanden', { exact: true }).waitFor()
+
+    const arxiv = paperTreffer('Sleep-like replay improves memory consolidation in artificial neural networks')
+    await arxiv.getByRole('button', { name: 'Aufnehmen' }).click()
+    await arxiv.getByText('Aufgenommen als „smith2024“', { exact: false }).waitFor({ timeout: 30000 })
+
+    await panelOeffnen('Quellen')
+    const zeile = name => page.locator('.spur-panel .spur-zeile', { hasText: name })
+    await zeile('keller2014.pdf').getByText('2 Seiten · Text erkannt').waitFor()
+    await zeile('smith2024.pdf').getByText('Volltext nur in diesem Projekt').waitFor()
+    ok((await zeile('keller2014.pdf').getByText('Volltext nur in diesem Projekt').count()) === 0, 'keller nur im Projekt')
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Recherche')
+    const bib = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
+    ok(bib.includes('@article{keller2014,') && bib.includes('doi = {10.1371/journal.pone.0099999}'), `.bib:\n${bib}`)
+    ok(bib.includes('title = {Sleep spindles predict overnight memory consolidation}'), `.bib-Titel:\n${bib}`)
+    ok(bib.includes('@article{smith2024,') && bib.includes('author = {Smith, Alice and Lee, Ben}'), `.bib arXiv:\n${bib}`)
+
+    // Der arXiv-Volltext ohne Lizenz bleibt im Projekt: „Holen“ in ein anderes Projekt nimmt nur keller2014 mit.
+    await projektOeffnen('E2E Recherche Ziel')
+    await panelOeffnen('Quellen')
+    await quelleHolen('E2E Recherche')
+    await sichtbar('1 Quelle geholt')
+    await zeile('keller2014.pdf').waitFor()
+    ok((await zeile('smith2024.pdf').count()) === 0, 'arXiv-Volltext wurde mitkopiert')
+
+    const unbekannt = await werkzeug(token, 'source_add', { project_id: pid, doi: '10.9999/gibt.es.nicht' })
+    ok(unbekannt.fehler && unbekannt.inhalt.fehler === 'doi_nicht_gefunden' && unbekannt.inhalt.detail === 'DOI nicht gefunden', `source_add: ${JSON.stringify(unbekannt.inhalt)}`)
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

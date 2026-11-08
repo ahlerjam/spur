@@ -12,6 +12,7 @@ import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
+import * as Aufnahme from '../recherche/Aufnahme.mjs'
 
 const SEITE = 50
 const MAX_TEXT = 40000
@@ -363,6 +364,18 @@ Object.assign(WERKZEUGE, {
     inputSchema: z.object({ doi: z.string().min(4).max(300), richtung: z.enum(['zitiert_von', 'zitiert']) }),
     async ausfuehren({ doi, richtung }) {
       return await Recherche.zitationen(doi, richtung)
+    },
+  },
+
+  source_add: {
+    description:
+      'Nimmt ein Paper per DOI auf: lädt den freien Volltext, legt die Quelle an und ergänzt die .bib mit den ' +
+      'DOI-Metadaten. Ohne freien Volltext: acquisition_add.',
+    inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
+    async ausfuehren({ project_id: pid, doi }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      const quelle = await Aufnahme.perDoi({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi }
     },
   },
 })

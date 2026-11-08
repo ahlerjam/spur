@@ -44,6 +44,12 @@ const aufnehmen = (dateiname, fixtureName, extra = {}) =>
   Quellen.aufnehmen({ projectId: projekt, userId: anna, dateiname, tempPfad: fixture(fixtureName), groesse: 1234, ...extra })
 
 describe('aufnehmen', () => {
+  it('übernimmt Key, DOI und Metadaten der Aufnahme per DOI', async () => {
+    const meta = { gefunden: true, titel: 'Vorgabe', autoren: [], jahr: 2014 }
+    const quelle = await aufnehmen('keller2014.pdf', 'smith2024.pdf', { key: 'keller2014', doi: '10.1/vorgabe', meta, nurProjekt: true })
+    expect(quelle).toMatchObject({ key: 'keller2014', doi: '10.1/vorgabe', meta, nurProjekt: true })
+  })
+
   it('liest ein PDF mit Text, DOI, Crossref-Daten und gedruckten Seitenzahlen ein', async () => {
     const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf')
     expect(quelle).toMatchObject({
@@ -284,5 +290,13 @@ describe('Klone und Übernehmen', () => {
     expect(existsSync(Quellen.dateiPfad(kopie))).toBe(true)
     expect(await datenbank.db.collection('spurClones').countDocuments()).toBe(0)
     expect(await Quellen.uebernehmen(ziel, projekt, anna)).toBe(0)
+  })
+
+  it('uebernehmen lässt Volltexte ohne Lizenz zur Weitergabe im Projekt', async () => {
+    await aufnehmen('smith2024.pdf', 'smith2024.pdf', { nurProjekt: true })
+    const ziel = new ObjectId()
+    expect(await Quellen.uebernehmen(ziel, projekt, anna)).toBe(0)
+    expect(await Quellen.alle(ziel)).toEqual([])
+    expect(await Quellen.projekteMitQuellen(anna, ziel)).toEqual([])
   })
 })

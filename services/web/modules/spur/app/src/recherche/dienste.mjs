@@ -29,33 +29,44 @@ function treffer(dienst, felder) {
   return { frei: null, pdf: null, lizenz: null, ...felder, dienste: [dienst] }
 }
 
+function arxivEintrag(e) {
+  const id = xmlText(e.id[0]).split('/abs/').pop()
+  return {
+    id: id.replace(/v\d+$/, ''),
+    doi: doiKlein(xmlText(e['arxiv:doi']?.[0])) ?? arxivDoi(id),
+    titel: leerzeichen(xmlText(e.title?.[0])),
+    autoren: (e.author ?? []).map(a => xmlText(a.name[0])),
+    jahr: Number(xmlText(e.published?.[0])?.slice(0, 4)) || null,
+    pdf: (e.link ?? []).find(l => l.$?.title === 'pdf')?.$.href ?? null,
+  }
+}
+
+async function arxivFeed(dienst, parameter) {
+  const url = new URL(`${basis('arxiv')}/api/query`)
+  for (const [name, wert] of Object.entries(parameter)) url.searchParams.set(name, wert)
+  const xml = await abrufen(dienst, url.toString(), { text: true })
+  const { feed } = await parseStringPromise(xml || '<feed/>')
+  return {
+    eintraege: (feed?.entry ?? []).map(arxivEintrag),
+    gesamt: Number(xmlText(feed?.['opensearch:totalResults']?.[0]) ?? 0),
+  }
+}
+
 const arxiv = {
   name: 'arxiv',
   anzeige: 'arXiv',
   // arXiv erlaubt eine Anfrage alle 3 s; der Puffer fängt Schwankungen der Laufzeit ab.
   abstandMs: 3100,
   async suchen(anfrage, seite) {
-    const begriffe = anfrage.split(/\s+/).filter(Boolean).map(b => `all:${b}`).join(' AND ')
-    const url = new URL(`${basis('arxiv')}/api/query`)
-    url.searchParams.set('search_query', begriffe)
-    url.searchParams.set('start', String(seite * PRO_SEITE))
-    url.searchParams.set('max_results', String(PRO_SEITE))
-    const xml = await abrufen(this, url.toString(), { text: true })
-    const { feed } = await parseStringPromise(xml ?? '<feed/>')
-    const eintraege = (feed?.entry ?? []).map(e => {
-      const id = xmlText(e.id[0]).split('/abs/').pop()
-      return treffer('arxiv', {
-        doi: doiKlein(xmlText(e['arxiv:doi']?.[0])) ?? arxivDoi(id),
-        arxiv: id.replace(/v\d+$/, ''),
-        titel: leerzeichen(xmlText(e.title?.[0])),
-        autoren: (e.author ?? []).map(a => xmlText(a.name[0])),
-        jahr: Number(xmlText(e.published?.[0])?.slice(0, 4)) || null,
-        frei: true,
-        pdf: (e.link ?? []).find(l => l.$?.title === 'pdf')?.$.href ?? null,
-      })
+    const { eintraege, gesamt } = await arxivFeed(this, {
+      search_query: anfrage.split(/\s+/).filter(Boolean).map(b => `all:${b}`).join(' AND '),
+      start: seite * PRO_SEITE,
+      max_results: PRO_SEITE,
     })
-    const gesamt = Number(xmlText(feed?.['opensearch:totalResults']?.[0]) ?? eintraege.length)
-    return { treffer: eintraege, gesamt }
+    return {
+      treffer: eintraege.map(({ id, ...e }) => treffer('arxiv', { ...e, arxiv: id, frei: true })),
+      gesamt,
+    }
   },
 }
 
@@ -184,6 +195,26 @@ export const unpaywall = {
     const ort = daten.best_oa_location
     return { frei: daten.is_oa === true, pdf: ort?.url_for_pdf ?? null, lizenz: ort?.license ?? null }
   },
+}
+
+// Metadaten im Format von Crossref.werkAuswerten, damit .bib-Einträge gleich entstehen.
+export async function arxivMetadaten(id) {
+  const [e] = (await arxivFeed(arxiv, { id_list: id })).eintraege
+  if (!e) return { gefunden: false }
+  return {
+    gefunden: true,
+    titel: e.titel,
+    autoren: e.autoren.map(name => {
+      const teile = name.split(' ')
+      return { family: teile.pop(), given: teile.join(' ') }
+    }),
+    jahr: e.jahr,
+    journal: null,
+    seiten: null,
+    typ: 'preprint',
+    retraction: 'keine_meldung',
+    pdf: e.pdf,
+  }
 }
 
 export const SUCHDIENSTE = [arxiv, openalex, crossref, s2]

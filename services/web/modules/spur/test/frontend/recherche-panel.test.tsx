@@ -126,4 +126,29 @@ describe('Recherche-Panel', function () {
     fireEvent.click(screen.getByRole('tab', { name: 'Suchprotokoll' }))
     await screen.findByText('Noch keine Suchen protokolliert')
   })
+
+  it('nimmt einen freien Treffer auf und meldet eine Dublette als „Bereits vorhanden“', async function () {
+    fetchMock.get(SUCHE, ergebnis({ treffer: [{ ...NRN, frei: true }] }))
+    let aufrufe = 0
+    fetchMock.post(/\/recherche\/aufnehmen$/, () =>
+      ++aufrufe === 1
+        ? { status: 201, body: { key: 'diekelmann2010' } }
+        : { status: 409, body: { detail: 'Bereits vorhanden' } }
+    )
+    suchen('sleep')
+    fireEvent.click(await screen.findByRole('button', { name: 'Aufnehmen' }))
+    await screen.findByText('Aufgenommen als „diekelmann2010“: Quelle mit PDF und Eintrag in der .bib')
+    const body = fetchMock.callHistory.lastCall(/\/recherche\/aufnehmen$/)?.options.body
+    expect(JSON.parse(String(body))).to.deep.equal({ doi: '10.1038/nrn2762' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aufnehmen' }))
+    await screen.findByText('Bereits vorhanden')
+  })
+
+  it('bietet „Aufnehmen“ nur für freie Treffer an', async function () {
+    fetchMock.get(SUCHE, ergebnis({}))
+    suchen('sleep')
+    await screen.findByText('The memory function of sleep')
+    expect(screen.queryByRole('button', { name: 'Aufnehmen' })).to.not.exist
+  })
 })

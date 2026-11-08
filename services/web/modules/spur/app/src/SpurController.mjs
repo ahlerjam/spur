@@ -15,6 +15,7 @@ import * as LaufManager from './schreiben/LaufManager.mjs'
 import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
 import * as Recherche from './recherche/Recherche.mjs'
+import * as Aufnahme from './recherche/Aufnahme.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -42,6 +43,7 @@ function quelleFuerClient(q) {
     fassung: q.fassung,
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
+    nurProjekt: q.nurProjekt === true,
   }
 }
 
@@ -343,4 +345,10 @@ export const suchprotokoll = mitProblemen(async (req, res) => {
 export const suchprotokollExport = mitProblemen(async (req, res) => {
   res.attachment('suchprotokoll.csv').type('text/csv; charset=utf-8')
   res.send(await Recherche.protokollCsv(projektId(req)))
+})
+
+export const perDoiAufnehmen = mitProblemen(async (req, res) => {
+  const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
+  const quelle = await Aufnahme.perDoi({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
+  res.status(201).json(quelleFuerClient(quelle))
 })

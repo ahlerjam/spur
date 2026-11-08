@@ -35,7 +35,8 @@ beforeEach(async () => {
     LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
     Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
     Crossref: { werk: vi.fn() },
-    Recherche: { suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
+    Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
+    Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -49,6 +50,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/Inbox.mjs', () => m.Inbox)
   vi.doMock('../../app/src/Crossref.mjs', () => m.Crossref)
   vi.doMock('../../app/src/recherche/Recherche.mjs', () => m.Recherche)
+  vi.doMock('../../app/src/recherche/Aufnahme.mjs', () => m.Aufnahme)
   ;({ WERKZEUGE } = await import('../../app/src/mcp/werkzeuge.mjs'))
   recht.vergeben(anna, projekt, { stufe: 'owner' })
 })
@@ -374,5 +376,18 @@ describe('Recherche', () => {
   it('paper_citations reicht DOI und Richtung weiter', async () => {
     await aufruf('paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert' })
     expect(m.Recherche.zitationen).toHaveBeenCalledWith('10.1038/nrn2762', 'zitiert')
+  })
+
+  it('source_add verlangt Schreibrechte und nimmt per DOI auf', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('source_add', { project_id: projekt, doi: '10.1/X' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('owner')
+    expect(await aufruf('source_add', { project_id: projekt, doi: '10.1/X' })).toEqual({
+      quelle_id: 'q1',
+      key: 'keller2014',
+      dateiname: 'keller2014.pdf',
+      doi: '10.1/x',
+    })
+    expect(m.Aufnahme.perDoi).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
   })
 })

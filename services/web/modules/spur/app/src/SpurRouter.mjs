@@ -86,6 +86,7 @@ export default {
     webRouter.get(`${RECHERCHE}/zitationen`, ...lesen, SpurController.rechercheZitationen)
     webRouter.get(`${RECHERCHE}/protokoll`, ...lesen, SpurController.suchprotokoll)
     webRouter.get(`${RECHERCHE}/protokoll.csv`, ...lesen, SpurController.suchprotokollExport)
+    webRouter.post(`${RECHERCHE}/aufnehmen`, ...schreiben, SpurController.perDoiAufnehmen)
     webRouter.get('/spur/claude/tokens', angemeldet, SpurController.claudeTokens)
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
     webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)

@@ -35,6 +35,7 @@ function QuellenZeile({ quelle, oeffnen }: { quelle: Quelle; oeffnen: () => void
         {quelle.status === 'text' ? t('spur_text_erkannt') : t('spur_kein_text')}
         {quelle.fassung && ` · ${quelle.fassung}`}
       </p>
+      {quelle.nurProjekt && <p className="spur-zeile-meta">{t('spur_nur_projekt')}</p>}
     </li>
   )
 }

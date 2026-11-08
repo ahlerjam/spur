@@ -112,22 +112,24 @@ paperFake.post('/_steuerung', express.json(), (req, res) => {
 
 paperFake.get('/_protokoll', (req, res) => res.json({ abrufe: zustand.protokoll }))
 
-paperFake.get('/pdf/:datei', (req, res) => {
-  if (!WERKE.some(w => w.pdf === req.params.datei)) return res.sendStatus(404)
-  res.type('application/pdf').sendFile(fileURLToPath(new URL(req.params.datei, FIXTURES)))
-})
-
 paperFake.use((req, res, next) => {
-  const dienst = /^\/(arxiv|openalex|s2|unpaywall)\//.exec(req.path)?.[1] ?? 'crossref'
+  const dienst = /^\/(arxiv|openalex|s2|unpaywall|pdf)\//.exec(req.path)?.[1] ?? 'crossref'
   zustand.protokoll.push({ dienst, pfad: req.originalUrl, zeit: Date.now() })
   zustand.protokoll = zustand.protokoll.slice(-500)
   if (zustand.ausfall.has(dienst)) return res.status(503).send('Service unavailable')
   next()
 })
 
+paperFake.get('/pdf/:datei', (req, res) => {
+  if (!WERKE.some(w => w.pdf === req.params.datei)) return res.sendStatus(404)
+  res.type('application/pdf').sendFile(fileURLToPath(new URL(req.params.datei, FIXTURES)))
+})
+
 paperFake.get('/arxiv/api/query', (req, res) => {
   const start = Number(req.query.start ?? 0)
-  const treffer = suche('arxiv', req.query.search_query)
+  const treffer = req.query.id_list
+    ? WERKE.filter(w => w.arxiv && req.query.id_list.split(',').includes(w.arxiv))
+    : suche('arxiv', req.query.search_query)
   res.type('application/atom+xml').send(atom(req, seite(treffer, start, Number(req.query.max_results ?? 10)), treffer.length))
 })
 
@@ -193,7 +195,8 @@ paperFake.get('/works', (req, res) => {
 paperFake.get('/works/:doi', (req, res) => {
   const doi = req.params.doi.toLowerCase()
   const w = nachDoi(doi)
-  const message = CROSSREF[doi] ?? (w && crossrefWerk(w))
+  // arXiv-DOIs stehen wie in Wirklichkeit nicht bei Crossref, sondern bei DataCite.
+  const message = CROSSREF[doi] ?? (w?.dienste.includes('crossref') ? crossrefWerk(w) : null)
   if (!message) return res.status(404).send('Resource not found.')
   res.json({ status: 'ok', 'message-type': 'work', message })
 })
