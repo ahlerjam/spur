@@ -74,7 +74,7 @@ async page => {
   // Tab wird erst nach 3 s erneut geklickt (eingeklappte Leiste), sonst schlösse der Klick das Panel wieder.
   async function panelSichern(tab, bereit, timeout = 30000) {
     const ende = Date.now() + timeout
-    let geklickt = 0
+    let geklickt = Date.now()
     while (!(await bereit.isVisible())) {
       ok(Date.now() < ende, `Panel ${tab}: nicht sichtbar nach ${timeout / 1000} s`)
       const gewaehlt = (await railTab(tab).getAttribute('aria-selected')) === 'true'

@@ -29,6 +29,10 @@ Befund: `spur-e2e.js` nach `vorbereiten.mjs` nicht vollständig grün, `p3f2` sc
 - Umgesetzt: ein allgemeines `panelSichern(tab, bereit)` statt eines nur für das Review-Panel gebauten Helfers (Altitude). Es wählt den Tab, bis `bereit` sichtbar ist, und klickt einen schon gewählten Tab erst nach 3 s erneut. `panelOeffnen`, `reviewEintrag`, der Dateibaum in `bibText`/`texErsetzen` und das Review-Panel in f11 nutzen es. Abfrage alle 250 ms statt 1 s. `p2f4` hat eine einzige Wartebedingung mit Meldung statt `waitFor().catch()` plus zweitem Vergleich. Die Dev-Route hat kein Sperr-Promise mehr (einziger Aufrufer ist die serielle Suite), der Unit-Test dazu entfällt.
 - Nicht umgesetzt: Projekte in `e2eDatenVorbereiten` parallel anlegen (Effizienz; das Zurücksetzen dauert 4,4 s je Lauf, parallel wäre es fehleranfälliger); `panelOeffnen` direkt im Review-Fall (der Titel heißt „Überprüfen“, der Tab „Review panel“); die beiden Klicks auf „Quellen“ in p4f3 (Wechsel ohne Neuladen, keine Wiederherstellung).
 
+### /code-review medium 37b2d9db3b..HEAD (nach den Korrekturen)
+- Umgesetzt: `panelSichern` zählt die 3 s ab dem Aufruf; vorher klickte es einen schon gewählten Tab beim ersten Durchgang und konnte das Panel schließen.
+- Nicht umgesetzt: Dev-Route ohne Anmeldung (nur mit `SPUR_DEV`, wie Zeit-Schalter und Paper-Fake; setzt nur E2E-Konten und -Projekte zurück, dazu `spurVorschlaege`/`spurWorkflows` wie das Skript); Zurücksetzen auch beim Lauf einzelner Features (gewollt: jeder Lauf auf denselben Daten); `ablageFreigeben` nur im Skript (im Web-Prozess gehören neue Dateien schon dem Web-Nutzer); übrige Punkte wie im ersten Review (Verlauf je Abfrage, Notification, `<wbr>`, Index-Kette).
+
 ## Abnahme
 Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in der Scratchpad-Ablage `bilder/`, je 360 und 1280 px. In keinem Bild horizontaler Überlauf von Seite oder Panel, keine Konsolenfehler.
 
