@@ -20,6 +20,8 @@ export function basis(name) {
   return name === 'crossref' ? fake : `${fake}/${name}`
 }
 
+// Der Schrägstrich bleibt, alles andere (?, #, ..) wird kodiert.
+const doiPfad = doi => encodeURIComponent(doi).replace(/%2F/gi, '/')
 const doiKlein = doi => doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').toLowerCase() || null
 const arxivDoi = id => `10.48550/arxiv.${id.replace(/v\d+$/, '')}`
 const leerzeichen = text => text?.replace(/\s+/g, ' ').trim() ?? null
@@ -101,7 +103,7 @@ const openalex = {
     return this.werke({ search: anfrage, 'per-page': PRO_SEITE, page: seite + 1 })
   },
   async zitationen(doi, richtung) {
-    const werk = await abrufen(this, `${basis('openalex')}/works/doi:${doi}`, { headers: this.kopf() })
+    const werk = await abrufen(this, `${basis('openalex')}/works/doi:${doiPfad(doi)}`, { headers: this.kopf() })
     if (!werk?.id) return []
     const id = werk.id.split('/').pop()
     const filter = richtung === 'zitiert_von' ? `cites:${id}` : `cited_by:${id}`
@@ -143,7 +145,7 @@ const s2 = {
   },
   async zitationen(doi, richtung) {
     const teil = richtung === 'zitiert_von' ? 'citations' : 'references'
-    const url = new URL(`${basis('s2')}/graph/v1/paper/DOI:${doi}/${teil}`)
+    const url = new URL(`${basis('s2')}/graph/v1/paper/DOI:${doiPfad(doi)}/${teil}`)
     url.searchParams.set('fields', S2_FELDER)
     url.searchParams.set('limit', String(ZITATIONEN_MAX))
     const daten = await abrufen(this, url.toString(), { headers: this.kopf() })
@@ -188,7 +190,7 @@ export const unpaywall = {
     // Unpaywall verlangt eine Kontaktadresse; ohne sie bleibt der Status unbekannt.
     const email = process.env.UNPAYWALL_EMAIL ?? (paperApiBasis() && 'fake@example.org')
     if (!email) return null
-    const url = new URL(`${basis('unpaywall')}/v2/${doi}`)
+    const url = new URL(`${basis('unpaywall')}/v2/${doiPfad(doi)}`)
     url.searchParams.set('email', email)
     const daten = await abrufen(this, url.toString(), { cacheSchluessel: `unpaywall:${doi}` })
     if (!daten) return null

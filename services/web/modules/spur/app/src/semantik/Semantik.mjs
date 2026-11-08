@@ -9,6 +9,9 @@ import { aehnlichkeit, einbetten } from './einbetten.mjs'
 const { Binary } = mongodb
 const TREFFER = 10
 const AUSZUG = 240
+// Ein Job, der so lange „läuft“, ist mit seinem Prozess gestorben.
+const JOB_MAX_MS = 30 * 60 * 1000
+const laufend = projectId => ({ projectId, art: 'semantik', status: 'laeuft', angelegtAm: { $gt: new Date(jetzt() - JOB_MAX_MS) } })
 
 // Mongo liefert den Puffer an beliebigem Versatz; Float32Array braucht ihn auf 4 Byte ausgerichtet.
 const ausBinaer = binaer => new Float32Array(Uint8Array.from(binaer.buffer).buffer)
@@ -26,9 +29,10 @@ export async function stand(projectId) {
   const [gesamt, indexiert, job] = await Promise.all([
     seiten.countDocuments(mitText(projectId)),
     seiten.countDocuments({ ...mitText(projectId), vektor: { $exists: true } }),
-    (await jobs()).findOne({ projectId, art: 'semantik', status: 'laeuft' }),
+    (await jobs()).findOne({ projectId, art: 'semantik' }, { sort: { angelegtAm: -1 } }),
   ])
-  return { an: true, gesamt, indexiert, laeuft: Boolean(job) }
+  const laeuft = job?.status === 'laeuft' && jetzt() - job.angelegtAm < JOB_MAX_MS
+  return { an: true, gesamt, indexiert, laeuft, fehlgeschlagen: job?.status === 'fehlgeschlagen' }
 }
 
 async function abarbeiten(job) {
@@ -46,8 +50,8 @@ async function abarbeiten(job) {
 export async function indexieren(projectId) {
   pruefeAn()
   const sammlung = await jobs()
-  const laufend = await sammlung.findOne({ projectId, art: 'semantik', status: 'laeuft' })
-  if (laufend) return { job_id: laufend._id }
+  const offen = await sammlung.findOne(laufend(projectId))
+  if (offen) return { job_id: offen._id }
   const job = { _id: new ObjectId(), projectId, art: 'semantik', status: 'laeuft', angelegtAm: jetzt() }
   await sammlung.insertOne(job)
   const ende = abarbeiten(job)

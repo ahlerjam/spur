@@ -69,6 +69,7 @@
   "spur_import_ok": "aufgenommen",
   "spur_importieren": "Importieren",
   "spur_in_bibliothek": "In der Bibliothek holen",
+  "spur_indexieren_fehlgeschlagen": "Das Indexieren ist fehlgeschlagen. Bitte das Panel später erneut öffnen.",
   "spur_indexiert": "Indexiert __fertig__ von __gesamt__ Seiten",
   "spur_kein_pruefbeleg": "Sinngemäße Treffer zeigen nur, wo Sie nachlesen können. Sie belegen kein Zitat.",
   "spur_kein_text": "Kein Text, nicht prüfbar",

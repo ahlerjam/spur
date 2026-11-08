@@ -41,10 +41,10 @@ beforeEach(async () => {
 
 describe('Semantische Suche', () => {
   it('zählt Seiten mit Text und indexiert sie als Job', async () => {
-    expect(await Semantik.stand(projectId)).toEqual({ an: true, gesamt: 3, indexiert: 0, laeuft: false })
+    expect(await Semantik.stand(projectId)).toEqual({ an: true, gesamt: 3, indexiert: 0, laeuft: false, fehlgeschlagen: false })
     const { ende } = await Semantik.indexieren(projectId)
     await ende
-    expect(await Semantik.stand(projectId)).toEqual({ an: true, gesamt: 3, indexiert: 3, laeuft: false })
+    expect(await Semantik.stand(projectId)).toEqual({ an: true, gesamt: 3, indexiert: 3, laeuft: false, fehlgeschlagen: false })
     const seite = await datenbank.db.collection('spurSourcePages').findOne({ seite: 2 })
     expect(seite.vektor.buffer.byteLength).toBe(384 * 4)
   })

@@ -23,6 +23,9 @@ export class DienstFehler extends Error {
 export async function platzHolen(dienst) {
   const sammlung = await drossel()
   const nun = Date.now()
+  // Ein abgewiesener Aufruf darf kein Fenster belegen, sonst sperrt sich der Dienst bei Last selbst.
+  const stand = await sammlung.findOne({ _id: dienst.name })
+  if ((stand?.naechster ?? 0) - nun > MAX_WARTEN_MS) throw new DienstFehler(dienst, 'limit')
   const eintrag = await sammlung.findOneAndUpdate(
     { _id: dienst.name },
     [

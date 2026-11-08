@@ -56,6 +56,7 @@ beforeEach(async () => {
     vi.fn(async () => new Response(PDF, { status: 200, headers: { 'Content-Type': 'application/pdf' } }))
   )
   Aufnahme = await import('../../app/src/recherche/Aufnahme.mjs')
+  Aufnahme.namen.lookup = async host => [{ address: host === 'intern.example' ? '10.0.0.7' : '93.184.216.34', family: 4 }]
 })
 
 const aufnehmen = doi => Aufnahme.perDoi({ projectId, userId, doi })
@@ -155,5 +156,12 @@ describe('perDoi', () => {
       expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
     }
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('folgt keinem Redirect auf eine interne Adresse und keinem Namen, der intern auflöst', async () => {
+    fetch.mockResolvedValue(new Response(null, { status: 302, headers: { Location: 'https://intern.example/geheim.pdf' } }))
+    expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ typ: 'pdf_fehlt' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch.mock.calls[0][1]).toMatchObject({ redirect: 'manual' })
   })
 })

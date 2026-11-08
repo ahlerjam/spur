@@ -13,10 +13,10 @@ export const DOI_MUSTER = /^10\.\d{4,9}\/\S+$/
 const RICHTUNGEN = ['zitiert_von', 'zitiert']
 const ANZEIGE = Object.fromEntries(SUCHDIENSTE.map(d => [d.name, d.anzeige]))
 
-const titelSchluessel = titel => `titel:${titel?.toLowerCase().replace(/\W+/g, ' ').trim()}`
+const titelSchluessel = titel => titel?.trim() && `titel:${titel.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()}`
 
 function zusammenfuehren(sammlung, treffer) {
-  const schluessel = treffer.doi ?? titelSchluessel(treffer.titel)
+  const schluessel = treffer.doi ?? titelSchluessel(treffer.titel) ?? `ohne:${sammlung.size}`
   const neu = { ...treffer, dienste: treffer.dienste.map(d => ANZEIGE[d]) }
   const alt = sammlung.get(schluessel)
   if (!alt) return sammlung.set(schluessel, neu)

@@ -136,6 +136,21 @@ describe('Beschaffungsliste', () => {
     expect(fehler).toMatchObject({ status: 409, typ: 'schon_beschafft' })
   })
 
+  it('überschreibt keine Quelle, die schon eine andere DOI trägt, und lässt den Eintrag offen', async () => {
+    const eintrag = await hinzufuegen('10.5555/spur.2024.001')
+    const quelle = await quelleAnlegen({ doi: '10.1038/nrn2762' })
+    const fehler = await fehlerVon(Beschaffung.zuordnen(projectId, String(eintrag._id), String(quelle._id), userId))
+    expect(fehler).toMatchObject({ status: 409, typ: 'andere_doi' })
+    expect((await Beschaffung.liste(projectId)).offen).toBe(1)
+  })
+
+  it('lässt den Eintrag offen, wenn die .bib nicht ergänzt werden kann', async () => {
+    const eintrag = await hinzufuegen('10.5555/spur.2024.001')
+    m.ZitatManager.bibSicherstellen.mockRejectedValueOnce(new Error('Editor weg'))
+    await fehlerVon(Beschaffung.zuordnen(projectId, String(eintrag._id), String((await quelleAnlegen())._id), userId))
+    expect((await Beschaffung.liste(projectId)).offen).toBe(1)
+  })
+
   it('kennt nur Einträge des eigenen Projekts', async () => {
     const eintrag = await hinzufuegen('10.5555/spur.2024.001')
     const fremd = await fehlerVon(Beschaffung.zuordnen(new ObjectId(), String(eintrag._id), String(new ObjectId()), userId))

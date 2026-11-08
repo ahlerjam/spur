@@ -2,6 +2,8 @@ import Settings from '@overleaf/settings'
 import AuthorizationMiddleware from '../../../../app/src/Features/Authorization/AuthorizationMiddleware.mjs'
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
 import { multerUploadHandler } from '../../../../app/src/infrastructure/Multer.mjs'
+import RateLimiterMiddleware from '../../../../app/src/Features/Security/RateLimiterMiddleware.mjs'
+import { RateLimiter } from '../../../../app/src/infrastructure/RateLimiter.mjs'
 import { Problem, problemSenden } from './probleme.mjs'
 import { MAX_BYTES } from './QuellenManager.mjs'
 import { IST_DEV } from './schalter.mjs'
@@ -26,6 +28,9 @@ const schreiben = [
 ]
 
 const angemeldet = AuthenticationController.requireLogin()
+
+// Die Drossel der Paper-Dienste gilt für die ganze Installation; ein Nutzer darf sie nicht allein belegen.
+const fremdDienste = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-recherche', { points: 30, duration: 60 }))
 
 const upload = multerUploadHandler({
   dest: Settings.path.uploadFolder,
@@ -59,8 +64,8 @@ export default {
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
     webRouter.get(`${QUELLEN}/suche`, ...lesen, SpurController.quellenSuche)
     webRouter.get(`${QUELLEN}/semantik`, ...lesen, SpurController.semantikStand)
-    webRouter.post(`${QUELLEN}/semantik/indexieren`, ...lesen, SpurController.semantikIndexieren)
-    webRouter.get(`${QUELLEN}/semantik/suche`, ...lesen, SpurController.semantikSuchen)
+    webRouter.post(`${QUELLEN}/semantik/indexieren`, ...schreiben, SpurController.semantikIndexieren)
+    webRouter.get(`${QUELLEN}/semantik/suche`, ...lesen, fremdDienste, SpurController.semantikSuchen)
     webRouter.get(`${QUELLEN}/export`, ...lesen, SpurController.quellenExport)
     webRouter.get(`${QUELLEN}/andere`, ...lesen, SpurController.andereProjekte)
     webRouter.post(`${QUELLEN}/holen`, ...schreiben, SpurController.quellenHolen)
@@ -87,14 +92,14 @@ export default {
     webRouter.post(`${LAUF}/zuruecknehmen`, ...schreiben, SpurController.laufZuruecknehmen)
     webRouter.put('/spur/project/:project_id/claude/automatik', ...schreiben, SpurController.automatikSetzen)
     const RECHERCHE = '/spur/project/:project_id/recherche'
-    webRouter.get(RECHERCHE, ...lesen, SpurController.rechercheSuchen)
-    webRouter.get(`${RECHERCHE}/zitationen`, ...lesen, SpurController.rechercheZitationen)
+    webRouter.get(RECHERCHE, ...lesen, fremdDienste, SpurController.rechercheSuchen)
+    webRouter.get(`${RECHERCHE}/zitationen`, ...lesen, fremdDienste, SpurController.rechercheZitationen)
     webRouter.get(`${RECHERCHE}/protokoll`, ...lesen, SpurController.suchprotokoll)
     webRouter.get(`${RECHERCHE}/protokoll.csv`, ...lesen, SpurController.suchprotokollExport)
-    webRouter.post(`${RECHERCHE}/aufnehmen`, ...schreiben, SpurController.perDoiAufnehmen)
+    webRouter.post(`${RECHERCHE}/aufnehmen`, ...schreiben, fremdDienste, SpurController.perDoiAufnehmen)
     const BESCHAFFUNG = '/spur/project/:project_id/beschaffung'
     webRouter.get(BESCHAFFUNG, ...lesen, SpurController.beschaffungsliste)
-    webRouter.post(BESCHAFFUNG, ...schreiben, SpurController.beschaffungHinzufuegen)
+    webRouter.post(BESCHAFFUNG, ...schreiben, fremdDienste, SpurController.beschaffungHinzufuegen)
     webRouter.get(`${BESCHAFFUNG}/export/:format`, ...lesen, SpurController.beschaffungExport)
     webRouter.post(`${BESCHAFFUNG}/hochladen`, ...schreiben, hochladenMitGrenze, SpurController.beschaffungHochladen)
     webRouter.post(`${BESCHAFFUNG}/:eintrag_id/zuordnen`, ...schreiben, SpurController.beschaffungZuordnen)

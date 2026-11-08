@@ -112,16 +112,20 @@ export async function exportieren(projectId, format) {
   throw new Problem(400, 'format_ungueltig', 'Exportformate: bib, ris oder csv.')
 }
 
+// Erst Quelle und .bib, dann der Status: Scheitert ein Schritt, bleibt der Eintrag offen und wiederholbar.
 async function beschaffen(projectId, eintrag, quelle, userId) {
+  if (quelle.doi && quelle.doi.toLowerCase() !== eintrag.doi) {
+    throw new Problem(409, 'andere_doi', `„${quelle.dateiname}“ trägt schon die DOI ${quelle.doi}. Bitte das passende PDF wählen.`)
+  }
+  const mitDoi = { ...quelle, doi: eintrag.doi, meta: eintrag.meta }
+  await (await quellen()).updateOne({ _id: quelle._id }, { $set: { doi: eintrag.doi, meta: eintrag.meta } })
+  await ZitatManager.bibSicherstellen(projectId, await PruefManager.dokumente(projectId), mitDoi, userId)
   const ergebnis = await (await beschaffungen()).findOneAndUpdate(
     { _id: eintrag._id, status: 'offen' },
     { $set: { status: 'beschafft', quelleId: quelle._id, beschafftAm: jetzt() } },
     { returnDocument: 'after' }
   )
   if (!ergebnis) throw new Problem(409, 'schon_beschafft', 'Dieser Eintrag ist schon beschafft.')
-  const mitDoi = { ...quelle, doi: eintrag.doi, meta: eintrag.meta }
-  await (await quellen()).updateOne({ _id: quelle._id }, { $set: { doi: eintrag.doi, meta: eintrag.meta } })
-  await ZitatManager.bibSicherstellen(projectId, await PruefManager.dokumente(projectId), mitDoi, userId)
   return ergebnis
 }
 

@@ -337,7 +337,7 @@ export const rechercheSuchen = mitProblemen(async (req, res) => {
       projectId: projektId(req),
       userId: new ObjectId(nutzerId(req)),
       anfrage: String(req.query.anfrage ?? ''),
-      seite: seiteAus(req.query.seite),
+      seite: Math.min(50, seiteAus(req.query.seite)),
     })
   )
 })

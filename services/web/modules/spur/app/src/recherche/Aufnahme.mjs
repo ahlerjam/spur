@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import Path from 'node:path'
-import { isIP } from 'node:net'
+import { lookup } from 'node:dns/promises'
+import { BlockList, isIP } from 'node:net'
 import logger from '@overleaf/logger'
 import * as Crossref from '../Crossref.mjs'
 import { Problem } from '../probleme.mjs'
@@ -17,17 +18,43 @@ const ARXIV_DOI = /^10\.48550\/arxiv\.(.+)$/
 
 export const doiNormal = doi => bibDoi(doi)?.toLowerCase() ?? ''
 
-function erlaubteAdresse(url) {
+// Austauschbar für Tests ohne Netz.
+export const namen = { lookup }
+
+const INTERN = new BlockList()
+for (const [netz, laenge] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]]) {
+  INTERN.addSubnet(netz, laenge, 'ipv4')
+}
+// IPv4-gemappte IPv6-Adressen prüft BlockList mit den IPv4-Regeln.
+for (const [netz, laenge] of [['::', 127], ['fc00::', 7], ['fe80::', 10]]) INTERN.addSubnet(netz, laenge, 'ipv6')
+
+// Der Paper-Fake liegt im eigenen Stack; echte Volltexte kommen nur von öffentlichen https-Adressen,
+// auch nach der Namensauflösung.
+async function erlaubteAdresse(url) {
   let adresse
   try {
     adresse = new URL(url)
   } catch {
     return false
   }
-  // Der Paper-Fake liegt im eigenen Stack; echte Volltexte kommen nur von öffentlichen https-Adressen.
   if (paperApiBasis()) return true
   const host = adresse.hostname.replace(/^\[|\]$/g, '')
-  return adresse.protocol === 'https:' && !isIP(host) && host !== 'localhost' && !host.endsWith('.localhost')
+  if (adresse.protocol !== 'https:' || isIP(host) || host === 'localhost' || host.endsWith('.localhost')) return false
+  const ziele = await namen.lookup(host, { all: true }).catch(() => [])
+  return ziele.length > 0 && ziele.every(z => !INTERN.check(z.address, z.family === 6 ? 'ipv6' : 'ipv4'))
+}
+
+// Redirects selbst folgen, damit jede Station dieselbe Prüfung durchläuft.
+async function holenMitPruefung(url) {
+  let ziel = url
+  for (let i = 0; i < 5; i++) {
+    if (!(await erlaubteAdresse(ziel))) throw pdfFehlt()
+    const antwort = await fetch(ziel, { redirect: 'manual', signal: AbortSignal.timeout(60000) })
+    const weiter = antwort.headers.get('location')
+    if (antwort.status < 300 || antwort.status >= 400 || !weiter) return antwort
+    ziel = new URL(weiter, ziel).toString()
+  }
+  throw pdfFehlt()
 }
 
 const pdfFehlt = () =>
@@ -40,11 +67,11 @@ const pdfFehlt = () =>
 const zuGross = () => new Problem(413, 'zu_gross', 'Der Volltext ist größer als 50 MB. Bitte selbst beschaffen.')
 
 async function pdfLaden(url, ziel) {
-  if (!erlaubteAdresse(url)) throw pdfFehlt()
   let antwort
   try {
-    antwort = await fetch(url, { signal: AbortSignal.timeout(60000) })
+    antwort = await holenMitPruefung(url)
   } catch (error) {
+    if (error instanceof Problem) throw error
     logger.warn({ err: error, url }, 'Volltext nicht erreichbar')
     throw pdfFehlt()
   }

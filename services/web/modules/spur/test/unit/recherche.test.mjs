@@ -220,10 +220,21 @@ describe('platzHolen', () => {
   it('meldet „Limit erreicht“, wenn das nächste Fenster zu weit weg liegt', async () => {
     const dienst = { name: 's2', anzeige: 'Semantic Scholar', abstandMs: 30000 }
     await datenbank.db.collection('spurDrossel').insertOne({ _id: 's2', naechster: Date.now() + 25000 })
+    const vorher = (await datenbank.db.collection('spurDrossel').findOne({ _id: 's2' })).naechster
     expect(await fehlerVon(Abruf.platzHolen(dienst))).toMatchObject({
       art: 'limit',
       message: 'Semantic Scholar: Limit erreicht. Bitte in einigen Minuten erneut suchen.',
     })
+    expect((await datenbank.db.collection('spurDrossel').findOne({ _id: 's2' })).naechster).toBe(vorher)
+  })
+})
+
+describe('auswerten', () => {
+  it('verschmilzt Treffer ohne DOI und Titel nicht', () => {
+    const dienst = { name: 'crossref', anzeige: 'Crossref' }
+    const leer = { doi: null, titel: null, autoren: [], dienste: ['crossref'] }
+    const { treffer } = Recherche.auswerten([dienst], [{ status: 'fulfilled', value: { treffer: [leer, { ...leer }], gesamt: 2 } }])
+    expect(treffer).toHaveLength(2)
   })
 })
 

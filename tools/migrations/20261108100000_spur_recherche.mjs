@@ -7,6 +7,8 @@ const tags = ['server-ce', 'server-pro']
 // Notiz, je Quelle und Spalte eine Matrixzelle; das Protokoll liest neueste zuerst.
 const indexes = {
   spurAcquisitions: [{ key: { projectId: 1, doi: 1 }, name: 'projectId_1_doi_1', unique: true }],
+  // Antworten gelten 24 h; nach zwei Tagen räumt Mongo sie weg.
+  spurPaperCache: [{ key: { abgerufenAm: 1 }, name: 'abgerufenAm_1_ttl', expireAfterSeconds: 2 * 24 * 3600 }],
   spurSearchLog: [{ key: { projectId: 1, datum: -1 }, name: 'projectId_1_datum_-1' }],
   spurNotes: [{ key: { projectId: 1, quelleId: 1, zitatId: 1 }, name: 'projectId_1_quelleId_1_zitatId_1', unique: true }],
   spurJobs: [

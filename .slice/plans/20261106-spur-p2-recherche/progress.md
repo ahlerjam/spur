@@ -47,3 +47,30 @@
   - Zellen der Matrix ohne Effekt und memoisiert: 50 Zeilen je Seite bleiben bedienbar (E2E unter 5 s).
   - Streaming und Top-10-Heap in der semantischen Suche: Bei Brute Force (Decision) ist das Optimierung; das Backlog nennt pgvector für später.
 - Prettier lief nicht: Das Dev-Image hat keinen `prettier`-Befehl (`yarn exec prettier` findet nichts).
+- E2E nach /simplify: f1–f15 und p2f1–p2f10 ok (297 s).
+
+## /code-review medium 0c431525a7..HEAD
+- Behoben:
+  - SSRF: Redirects werden von Hand verfolgt, und jede Station prüft https, Namen und aufgelöste IP gegen private Bereiche (Unit-Test mit Redirect auf intern auflösenden Host).
+  - Die Drossel reserviert kein Fenster mehr für abgewiesene Aufrufe.
+  - Die Panel-Indexierung startet einmal je Öffnen und zeigt einen gescheiterten Lauf an, statt ihn in Schleife neu zu starten.
+  - Jobs, die länger als 30 Minuten „laufen“, gelten als abgebrochen.
+  - Beim Beschaffen erst Quelle und `.bib`, dann der Status. Eine Quelle mit anderer DOI wird nicht überschrieben (409 `andere_doi`).
+  - Treffer ohne DOI und Titel werden nicht verschmolzen.
+  - DOIs werden in Pfaden kodiert.
+  - TTL-Index für `spurPaperCache`.
+  - Indexieren nur mit Schreibrecht.
+- Abgleich mit Spec und Steps: Alle Zustände der Spec sind abgedeckt.
+  - Suche: leer, lädt, Dienst nicht erreichbar, Limit erreicht, Seiten.
+  - Beschaffung: leer, teilweise erledigt.
+  - Matrix: leer, 300 Zeilen.
+  - Semantik: aus, Fortschritt, fertig.
+  - „Limit erreicht“ zeigt das Panel als Dienstfehler; kein E2E-Schritt verlangt es, die Unit-Tests prüfen es.
+
+## /security-review (Subagent, weil `origin/HEAD` fehlt und der Skill daran scheitert)
+- Befund 8/10 behoben: Recherche, Zitationen, Aufnahme, Beschaffung und sinngemäße Suche haben ein Limit von 30 Aufrufen je Nutzer und Minute (`spur-recherche`). Die Seitenzahl der Websuche ist auf 50 begrenzt. Sonst könnte ein Nutzer die installationsweite Drossel allein belegen.
+- Nicht geändert (Konfidenz ≤ 4):
+  - DNS-Rebinding zwischen Prüfung und Abruf. Vorschlag: per eigenem Agent auf die geprüfte IP festlegen.
+  - Weitere Sonderbereiche (198.18/15, NAT64).
+  - Rohe Zotero-Blöcke in der `.bib`: Sie kommen aus dem eigenen Konto.
+  - `job_status` ohne erneute Rollenprüfung: Er liefert nur Status und Dateinamen.

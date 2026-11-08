@@ -70,6 +70,7 @@
   "spur_import_ok": "added",
   "spur_importieren": "Import",
   "spur_in_bibliothek": "Get it from the library",
+  "spur_indexieren_fehlgeschlagen": "Indexing failed. Please reopen the panel later.",
   "spur_indexiert": "Indexed __fertig__ of __gesamt__ pages",
   "spur_kein_pruefbeleg": "Results by meaning only show where to read. They do not verify a quote.",
   "spur_kein_text": "No text, cannot be checked",

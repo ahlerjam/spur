@@ -41,6 +41,10 @@ async function laden({ dev = false } = {}) {
     },
   }))
   vi.doMock('../../app/src/QuellenManager.mjs', () => ({ MAX_BYTES: MAX }))
+  vi.doMock('../../../../app/src/Features/Security/RateLimiterMiddleware.mjs', () => ({
+    default: { rateLimit: limiter => Object.assign(() => {}, { limiter: limiter.name }) },
+  }))
+  vi.doMock('../../../../app/src/infrastructure/RateLimiter.mjs', () => ({ RateLimiter: class { constructor(name) { this.name = name } } }))
   vi.doMock('../../app/src/schalter.mjs', () => ({ IST_DEV: dev }))
   vi.doMock('../../app/src/SpurController.mjs', () =>
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
@@ -71,7 +75,7 @@ describe('Rechte der Routen', () => {
     ['get', `${Q}/suche`, 'lesen', 'quellenSuche'],
     ['get', `${Q}/export`, 'lesen', 'quellenExport'],
     ['get', `${Q}/semantik`, 'lesen', 'semantikStand'],
-    ['post', `${Q}/semantik/indexieren`, 'lesen', 'semantikIndexieren'],
+    ['post', `${Q}/semantik/indexieren`, 'schreiben', 'semantikIndexieren'],
     ['get', `${Q}/semantik/suche`, 'lesen', 'semantikSuchen'],
     ['get', `${Q}/:quelle_id/datei`, 'lesen', 'quelleDatei'],
     ['get', `${Q}/:quelle_id/seiten/:seite`, 'lesen', 'quelleSeite'],
@@ -199,4 +203,16 @@ describe('Hochladen mit Fehlerbehandlung', () => {
     expect(next).toHaveBeenCalledWith(fehler)
     expect(res.body).toBeUndefined()
   })
+})
+
+it('begrenzt Aufrufe der Paper-Dienste je Nutzer', () => {
+  for (const [methode, pfad] of [
+    ['get', '/spur/project/:project_id/recherche'],
+    ['get', '/spur/project/:project_id/recherche/zitationen'],
+    ['post', '/spur/project/:project_id/recherche/aufnehmen'],
+    ['post', '/spur/project/:project_id/beschaffung'],
+    ['get', `${Q}/semantik/suche`],
+  ]) {
+    expect(route(methode, pfad).kette.some(f => f.limiter === 'spur-recherche'), pfad).toBe(true)
+  }
 })

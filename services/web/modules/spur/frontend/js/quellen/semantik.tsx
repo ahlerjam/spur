@@ -3,11 +3,14 @@ import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import Notification from '@/shared/components/notification'
+import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import QuellenSuche from './quellen-suche'
 import type { Treffer } from './typen'
 
-type Stand = { an: false } | { an: true; gesamt: number; indexiert: number; laeuft: boolean }
+type Stand =
+  | { an: false }
+  | { an: true; gesamt: number; indexiert: number; laeuft: boolean; fehlgeschlagen: boolean }
 type SemantikTreffer = { quelleId: string; dateiname: string; seite: number; label: string | null; auszug: string }
 
 const TAKT_MS = 500
@@ -15,6 +18,7 @@ const TAKT_MS = 500
 // Sinngemäße Suche über die Quellen. Ohne Schalter des Betreibers zeigt sie nichts.
 export default function Semantik({ quellenAnzahl, oeffnen }: { quellenAnzahl: number; oeffnen: (t: Treffer) => void }) {
   const { t } = useTranslation()
+  const { write: darfSchreiben } = usePermissionsContext()
   const [stand, setStand] = useState<Stand | null>(null)
   const [frage, setFrage] = useState('')
   const [treffer, setTreffer] = useState<Treffer[] | null>(null)
@@ -23,15 +27,22 @@ export default function Semantik({ quellenAnzahl, oeffnen }: { quellenAnzahl: nu
   useEffect(() => {
     let aktiv = true
     let takt: number | undefined
+    let angestossen = false
     const pruefen = async () => {
       try {
         const neu = await anfrage<Stand>(projektPfad('/quellen/semantik'))
         if (!aktiv) return
         setStand(neu)
-        if (neu.an && neu.indexiert < neu.gesamt) {
-          if (!neu.laeuft) await jsonAnfrage('POST', projektPfad('/quellen/semantik/indexieren'))
-          takt = window.setTimeout(pruefen, TAKT_MS)
+        if (!neu.an || neu.indexiert >= neu.gesamt) return
+        // Einmal je Öffnen anstoßen; ein gescheiterter Lauf wird nicht in Schleife neu gestartet.
+        if (!neu.laeuft && !angestossen && darfSchreiben) {
+          angestossen = true
+          await jsonAnfrage('POST', projektPfad('/quellen/semantik/indexieren'))
+        } else if (!neu.laeuft) {
+          if (neu.fehlgeschlagen) setFehler(t('spur_indexieren_fehlgeschlagen'))
+          return
         }
+        takt = window.setTimeout(pruefen, TAKT_MS)
       } catch (error) {
         if (aktiv) setFehler((error as Error).message)
       }
@@ -41,7 +52,7 @@ export default function Semantik({ quellenAnzahl, oeffnen }: { quellenAnzahl: nu
       aktiv = false
       window.clearTimeout(takt)
     }
-  }, [quellenAnzahl])
+  }, [quellenAnzahl, darfSchreiben, t])
 
   if (!stand?.an) return fehler ? <Notification type="error" content={fehler} /> : null
 
