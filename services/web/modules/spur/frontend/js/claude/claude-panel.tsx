@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLBadge from '@/shared/components/ol/ol-badge'
@@ -88,52 +88,46 @@ function Verbindung({ verbunden }: { verbunden: boolean }) {
 
 function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise<void> }) {
   const { t } = useTranslation()
-  const liste = useRef<HTMLDivElement>(null)
   const nachrichten = status.nachrichten
-  const letzte = nachrichten.at(-1)
-  const wartet = status.verbunden && letzte?.von === 'mensch'
+  const wartet = status.verbunden && nachrichten.at(-1)?.von === 'mensch'
+  // Die Lauf-Karte steht dort im Verlauf, wo der Lauf begann; spätere Antworten folgen darunter.
+  const { lauf } = status
+  const laufBei = lauf
+    ? nachrichten.filter(n => new Date(n.am) <= new Date(lauf.gestartet)).length
+    : -1
+  const laufKarte = lauf && (
+    <li className="spur-chat-lauf" key="lauf">
+      <LaufKarte
+        lauf={lauf}
+        aenderungen={status.aenderungen}
+        automatik={status.automatik}
+        neuLaden={neuLaden}
+      />
+    </li>
+  )
 
-  // Nur mitscrollen, wenn die Person schon unten war; sonst springt der Verlauf beim Zurücklesen.
-  const unten = useRef(true)
-  useLayoutEffect(() => {
-    const el = liste.current
-    if (el && unten.current) el.scrollTop = el.scrollHeight
-  }, [letzte?.id, wartet, status.lauf?.id, status.lauf?.status])
-
+  // column-reverse im CSS hält den Verlauf unten, ohne das Zurücklesen zu stören.
   return (
-    <div
-      className="spur-chat-verlauf"
-      ref={liste}
-      onScroll={e => {
-        const el = e.currentTarget
-        unten.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
-      }}
-    >
-      {nachrichten.length === 0 && !status.lauf && (
-        <p className="spur-leer">{t('spur_keine_nachrichten')}</p>
-      )}
-      <ol className="spur-chat" role="log" aria-label={t('spur_unterhaltung')}>
-        {nachrichten.map(n => (
-          <li className={`spur-chat-nachricht spur-nachricht-${n.von}`} key={n.id}>
-            <p className="spur-zeile-meta">
-              {n.von === 'claude' ? 'Claude' : t('spur_du')} ·{' '}
-              <time dateTime={n.am}>{new Date(n.am).toLocaleTimeString()}</time>
-            </p>
-            <p className="spur-nachricht-text">{n.text}</p>
-          </li>
-        ))}
-        {status.lauf && (
-          <li className="spur-chat-lauf">
-            <LaufKarte
-              lauf={status.lauf}
-              aenderungen={status.aenderungen}
-              automatik={status.automatik}
-              neuLaden={neuLaden}
-            />
-          </li>
+    <div className="spur-chat-verlauf">
+      <div>
+        {nachrichten.length === 0 && !status.lauf && (
+          <p className="spur-leer">{t('spur_keine_nachrichten')}</p>
         )}
-        {wartet && <li className="spur-chat-wartet">{t('spur_claude_arbeitet')}</li>}
-      </ol>
+        <ol className="spur-chat" role="log" aria-label={t('spur_unterhaltung')}>
+          {nachrichten.map((n, i) => [
+            i === laufBei && laufKarte,
+            <li className={`spur-chat-nachricht spur-nachricht-${n.von}`} key={n.id}>
+              <p className="spur-zeile-meta">
+                {n.von === 'claude' ? 'Claude' : t('spur_du')} ·{' '}
+                <time dateTime={n.am}>{new Date(n.am).toLocaleTimeString()}</time>
+              </p>
+              <p className="spur-nachricht-text">{n.text}</p>
+            </li>,
+          ])}
+          {laufBei === nachrichten.length && laufKarte}
+          {wartet && <li className="spur-chat-wartet">{t('spur_claude_arbeitet')}</li>}
+        </ol>
+      </div>
     </div>
   )
 }

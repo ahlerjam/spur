@@ -2090,6 +2090,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   const chatLog = () => claudePanel().getByRole('log', { name: 'Unterhaltung mit Claude' })
 
   async function verbinden(token) {
+    // Wie eine Session, die ihre Inbox abgearbeitet hat: Offene Ereignisse früherer Schritte zuerst abholen.
+    while ((await werkzeug(token, 'wait_for_event', { max_sekunden: 1 })).inhalt.ereignis);
     await warteStarten(token)
     await claudePanel().getByText('Claude verbunden').waitFor({ timeout: 20000 })
   }

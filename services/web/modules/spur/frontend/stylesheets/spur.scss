@@ -224,6 +224,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
   padding: 0 var(--spacing-05);
   border-top: 1px solid var(--border-divider);
 }

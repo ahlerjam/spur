@@ -9,6 +9,7 @@ import type { FC, PropsWithChildren } from 'react'
 const lauf: Lauf = {
   id: 'lauf-1',
   status: 'fertig',
+  gestartet: '2026-11-08T10:00:00Z',
   dateien: 1,
   aenderungen: 1,
   rot: [],

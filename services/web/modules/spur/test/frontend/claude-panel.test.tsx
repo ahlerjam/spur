@@ -112,4 +112,34 @@ describe('Claude-Panel', function () {
     await screen.findByText('Claude nicht verbunden')
     expect(screen.queryByText('Workflows')).to.equal(null)
   })
+
+  it('zeigt die Lauf-Karte dort im Verlauf, wo der Lauf begann', async function () {
+    fetchMock.get(
+      STATUS,
+      status({
+        nachrichten: [nachricht(1, 'mensch', 'Fasse Abschnitt 2 zusammen'), nachricht(5, 'claude', 'Fertig.')],
+        lauf: {
+          id: 'l1',
+          status: 'fertig',
+          gestartet: new Date(2026, 10, 8, 10, 3).toISOString(),
+          dateien: 1,
+          aenderungen: 1,
+          rot: [],
+          zahlen: [],
+          zusammenfassung: null,
+        },
+      })
+    )
+    zeigen()
+    const log = await screen.findByRole('log', { name: 'Unterhaltung mit Claude' })
+    const klassen = within(log)
+      .getAllByRole('listitem')
+      .filter(li => li.parentElement === log)
+      .map(li => li.className)
+    expect(klassen).to.deep.equal([
+      'spur-chat-nachricht spur-nachricht-mensch',
+      'spur-chat-lauf',
+      'spur-chat-nachricht spur-nachricht-claude',
+    ])
+  })
 })

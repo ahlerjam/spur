@@ -10,6 +10,7 @@ import { jsonAnfrage, projektPfad } from '../api'
 export type Lauf = {
   id: string
   status: 'offen' | 'fertig' | 'angenommen' | 'abgelehnt' | 'zurueckgenommen'
+  gestartet: string
   dateien: number
   aenderungen: number
   rot: { grund: string; auszug: string }[]
