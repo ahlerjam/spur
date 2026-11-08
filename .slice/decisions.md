@@ -24,3 +24,10 @@
 - D3 (plan 20261106-spur-p3-app) f5: Über das Plugin heißen die Workflows in Claude Code `/plugin:spur:spur:<name> (MCP)`, nicht `/spur:<name> (MCP)` wie in Schritt 2 verlangt. Was gilt?
   Interim: Prompts und Plugin unverändert; `passes` von f5 bleibt false, die übrigen vier Schritte bestehen.
   Options: A (empfohlen) Schritt 2 auf den Namen anpassen, den Claude Code für Plugin-Server vergibt (`/plugin:spur:spur:…`), und den Befehl in README und Panel-Hilfe so nennen | B Einrichtung zusätzlich ohne Plugin anbieten (`claude mcp add --transport http spur <Adresse> --header …`), dann gilt `/spur:…`, aber Token und Erlaubnisse liegen nicht mehr im Plugin | C Workflows zusätzlich als Plugin-Befehle `/spur:<name>` ausliefern (widerspricht „Keine Workflow-Skills im Plugin“ und doppelt die Textquelle)
+
+- D4 (plan 20261108-spur-p3-abnahme) f3: Die zweite unabhängige Abnahme fand: `tipp-pause` akzeptiert eine nicht vorhandene `doc_id` und legt dafür einen `suggest_trigger` an, der das Tageslimit verbraucht.
+  Interim: Nicht behoben; alle vier Features stehen auf passes true, die Abnahme blieb für f3 rot, der Plan steht auf partial.
+  Options: A (empfohlen) `doc_id` gegen das Projekt prüfen und bei unbekannter ID einen Fehler liefern, mit rotem Test zuerst | B so lassen, weil nur ein Claude-Client mit eigenem Token es aufrufen kann
+- D5 (plan 20261108-spur-p3-abnahme): Der Merge des Default-Branches in `agent` brach mit „refusing to merge unrelated histories“ ab; der Lauf baut auf dem Stand von `agent` ohne diesen Merge.
+  Interim: Kein Merge; Gate auf dem Run-Branch grün (531 Tests).
+  Options: A (empfohlen) Default-Branch von Hand klären, ob `agent` und `main` getrennte Geschichten haben sollen | B ignorieren
