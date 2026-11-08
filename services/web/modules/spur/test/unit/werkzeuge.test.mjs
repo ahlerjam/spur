@@ -35,6 +35,7 @@ beforeEach(async () => {
     LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
     Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
     Crossref: { werk: vi.fn() },
+    Beschaffung: { hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })) },
     Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
     Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
   }
@@ -51,6 +52,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/Crossref.mjs', () => m.Crossref)
   vi.doMock('../../app/src/recherche/Recherche.mjs', () => m.Recherche)
   vi.doMock('../../app/src/recherche/Aufnahme.mjs', () => m.Aufnahme)
+  vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
   ;({ WERKZEUGE } = await import('../../app/src/mcp/werkzeuge.mjs'))
   recht.vergeben(anna, projekt, { stufe: 'owner' })
 })
@@ -389,5 +391,17 @@ describe('Recherche', () => {
       doi: '10.1/x',
     })
     expect(m.Aufnahme.perDoi).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
+  })
+
+  it('acquisition_add verlangt Schreibrechte und setzt die DOI auf die Liste', async () => {
+    mitStufe('review')
+    expect(await fehlerVon(aufruf('acquisition_add', { project_id: projekt, doi: '10.1/X' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    expect(await aufruf('acquisition_add', { project_id: projekt, doi: '10.1/X' })).toEqual({
+      eintrag_id: 'b1',
+      doi: '10.1/x',
+      titel: 'T',
+      status: 'offen',
+    })
   })
 })

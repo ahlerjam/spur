@@ -32,3 +32,31 @@ export function bibLesen(text) {
   }
   return eintraege
 }
+
+const LATEX_ZEICHEN = /[\\{}&%$#_^~]/g
+const LATEX_ERSATZ = {
+  '\\': '\\textbackslash{}',
+  '~': '\\textasciitilde{}',
+  '^': '\\textasciicircum{}',
+}
+
+export function latexSicher(text) {
+  return text.replace(LATEX_ZEICHEN, c => LATEX_ERSATZ[c] ?? `\\${c}`)
+}
+
+export function bibEintrag(key, quelle) {
+  const meta = quelle.meta?.gefunden ? quelle.meta : {}
+  // Crossref-Daten und Dateinamen sind fremder Text: maskieren, damit die Klammern der .bib halten.
+  const text = wert => wert && latexSicher(String(wert))
+  const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
+  const felder = [
+    ['author', text(meta.autoren?.map(a => [a.family, a.given].filter(Boolean).join(', ')).join(' and '))],
+    ['title', text(meta.titel ?? quelle.dateiname)],
+    ['journal', text(meta.journal)],
+    ['year', ohneKlammern(meta.jahr)],
+    ['pages', ohneKlammern(meta.seiten?.replace('-', '--'))],
+    ['doi', ohneKlammern(quelle.doi)],
+  ].filter(([, wert]) => wert)
+  const zeilen = felder.map(([name, wert]) => `  ${name} = {${wert}}`)
+  return `@article{${key},\n${zeilen.join(',\n')}\n}`
+}

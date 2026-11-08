@@ -24,7 +24,7 @@
 "Export liefert `.bib`, `.ris` und CSV mit denselben DOIs",
 "Nutzer lädt das PDF hoch: Es wird per DOI zugeordnet und der Eintrag zeigt „Beschafft“",
 "Findet spur keine DOI im PDF, wählt der Nutzer den Eintrag per Hand"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f5", "title": "Bestand aus Zotero und Ordnern importieren", "steps": [
 "Nutzer importiert eine Zotero-Sammlung: Einträge erscheinen mit den vorhandenen Keys",
 "Nutzer wählt mehrere PDFs auf einmal: Alle erscheinen mit Status, Fehlschläge einzeln benannt",

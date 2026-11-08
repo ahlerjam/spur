@@ -9,14 +9,16 @@ import { usePermissionsContext } from '@/features/ide-react/context/permissions-
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
 import PaperEintrag from './paper-treffer'
+import Beschaffung from './beschaffung'
 import Suchprotokoll from './suchprotokoll'
 import Zitationen from './zitationen'
 import type { PaperTreffer, SuchErgebnis } from './typen'
 
-type Ansicht = 'treffer' | 'protokoll'
+type Ansicht = 'treffer' | 'protokoll' | 'beschaffung'
 const ANSICHTEN: { id: Ansicht; titel: string }[] = [
   { id: 'treffer', titel: 'spur_treffer_reiter' },
   { id: 'protokoll', titel: 'spur_suchprotokoll' },
+  { id: 'beschaffung', titel: 'spur_beschaffung' },
 ]
 
 export default function RecherchePanel() {
@@ -30,13 +32,18 @@ export default function RecherchePanel() {
   const [meldungen, setMeldungen] = useState<Record<string, { typ: 'success' | 'info' | 'error'; text: string }>>({})
   const [arbeitet, setArbeitet] = useState<string | null>(null)
 
-  const aufnehmen = async (treffer: PaperTreffer) => {
+  const aktion = async (treffer: PaperTreffer, ziel: 'aufnehmen' | 'beschaffen') => {
     const doi = treffer.doi!
     setArbeitet(doi)
     try {
-      const quelle = await jsonAnfrage<{ key: string }>('POST', projektPfad('/recherche/aufnehmen'), { doi })
-      setMeldungen(alt => ({ ...alt, [doi]: { typ: 'success', text: t('spur_aufgenommen', { key: quelle.key }) } }))
-      pruefenVerzoegert()
+      if (ziel === 'aufnehmen') {
+        const quelle = await jsonAnfrage<{ key: string }>('POST', projektPfad('/recherche/aufnehmen'), { doi })
+        setMeldungen(alt => ({ ...alt, [doi]: { typ: 'success', text: t('spur_aufgenommen', { key: quelle.key }) } }))
+        pruefenVerzoegert()
+      } else {
+        await jsonAnfrage('POST', projektPfad('/beschaffung'), { doi })
+        setMeldungen(alt => ({ ...alt, [doi]: { typ: 'success', text: t('spur_auf_liste_gesetzt') } }))
+      }
     } catch (error) {
       const status = (error as { status?: number }).status
       setMeldungen(alt => ({ ...alt, [doi]: { typ: status === 409 ? 'info' : 'error', text: (error as Error).message } }))
@@ -97,6 +104,7 @@ export default function RecherchePanel() {
         ))}
       </div>
       {ansicht === 'protokoll' && <Suchprotokoll />}
+      {ansicht === 'beschaffung' && <Beschaffung />}
       {ansicht === 'treffer' && (
       <div className="spur-panel-inhalt" aria-busy={laedt}>
         {fehler && <Notification type="error" content={fehler} />}
@@ -128,9 +136,20 @@ export default function RecherchePanel() {
                             size="sm"
                             isLoading={arbeitet === treffer.doi}
                             loadingLabel={t('spur_wird_aufgenommen')}
-                            onClick={() => aufnehmen(treffer)}
+                            onClick={() => aktion(treffer, 'aufnehmen')}
                           >
                             {t('spur_aufnehmen')}
+                          </OLButton>
+                        )}
+                        {darfSchreiben && treffer.frei !== true && (
+                          <OLButton
+                            variant="secondary"
+                            size="sm"
+                            isLoading={arbeitet === treffer.doi}
+                            loadingLabel={t('spur_wird_gesetzt')}
+                            onClick={() => aktion(treffer, 'beschaffen')}
+                          >
+                            {t('spur_auf_beschaffungsliste')}
                           </OLButton>
                         )}
                         <Zitationen doi={treffer.doi} />

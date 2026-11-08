@@ -16,6 +16,7 @@ import AuthorizationManager from '../../../../app/src/Features/Authorization/Aut
 import { Problem, mitProblemen } from './probleme.mjs'
 import * as Recherche from './recherche/Recherche.mjs'
 import * as Aufnahme from './recherche/Aufnahme.mjs'
+import * as Beschaffung from './recherche/Beschaffung.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -67,22 +68,25 @@ export const quellenListe = mitProblemen(async (req, res) => {
   res.json({ ...ergebnis, quellen: ergebnis.quellen.map(quelleFuerClient) })
 })
 
-export const quelleHochladen = mitProblemen(async (req, res) => {
+async function hochgeladeneQuelle(req) {
   if (!req.file) {
     throw new Problem(400, 'datei_fehlt', 'Es kam keine Datei an. Bitte erneut hochladen.')
   }
   try {
-    const quelle = await QuellenManager.aufnehmen({
+    return await QuellenManager.aufnehmen({
       projectId: projektId(req),
       userId: new ObjectId(nutzerId(req)),
       dateiname: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
       tempPfad: req.file.path,
       groesse: req.file.size,
     })
-    res.status(201).json(quelleFuerClient(quelle))
   } finally {
     await rm(req.file.path, { force: true })
   }
+}
+
+export const quelleHochladen = mitProblemen(async (req, res) => {
+  res.status(201).json(quelleFuerClient(await hochgeladeneQuelle(req)))
 })
 
 export const quellenSuche = mitProblemen(async (req, res) => {
@@ -351,4 +355,54 @@ export const perDoiAufnehmen = mitProblemen(async (req, res) => {
   const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
   const quelle = await Aufnahme.perDoi({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
   res.status(201).json(quelleFuerClient(quelle))
+})
+
+function beschaffungFuerClient(eintrag, vorlage) {
+  return {
+    id: eintrag._id,
+    doi: eintrag.doi,
+    titel: eintrag.meta.titel,
+    autoren: (eintrag.meta.autoren ?? []).map(a => [a.given, a.family].filter(Boolean).join(' ')),
+    jahr: eintrag.meta.jahr,
+    status: eintrag.status,
+    quelleId: eintrag.quelleId ?? null,
+    link: Beschaffung.link(vorlage, eintrag.doi),
+  }
+}
+
+export const beschaffungsliste = mitProblemen(async (req, res) => {
+  const [liste, vorlage] = await Promise.all([
+    Beschaffung.liste(projektId(req), { seite: seiteAus(req.query.seite) }),
+    Beschaffung.vorlage(new ObjectId(nutzerId(req))),
+  ])
+  res.json({ ...liste, vorlage, eintraege: liste.eintraege.map(e => beschaffungFuerClient(e, vorlage)) })
+})
+
+export const beschaffungHinzufuegen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
+  const eintrag = await Beschaffung.hinzufuegen({ projectId: projektId(req), userId, doi })
+  res.status(201).json(beschaffungFuerClient(eintrag, await Beschaffung.vorlage(userId)))
+})
+
+export const beschaffungExport = mitProblemen(async (req, res) => {
+  const { dateiname, typ, inhalt } = await Beschaffung.exportieren(projektId(req), req.params.format)
+  res.attachment(dateiname).type(`${typ}; charset=utf-8`).send(inhalt)
+})
+
+export const beschaffungHochladen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const quelle = await hochgeladeneQuelle(req)
+  const eintrag = await Beschaffung.perDoiZuordnen(projektId(req), quelle, userId)
+  res.status(201).json({ quelle: quelleFuerClient(quelle), zugeordnet: eintrag ? String(eintrag._id) : null })
+})
+
+export const beschaffungZuordnen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const eintrag = await Beschaffung.zuordnen(projektId(req), req.params.eintrag_id, String(req.body?.quelle_id ?? ''), userId)
+  res.json(beschaffungFuerClient(eintrag, await Beschaffung.vorlage(userId)))
+})
+
+export const bibliotheksvorlageSetzen = mitProblemen(async (req, res) => {
+  res.json({ vorlage: await Beschaffung.vorlageSetzen(new ObjectId(nutzerId(req)), req.body?.vorlage) })
 })

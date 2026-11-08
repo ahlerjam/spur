@@ -55,6 +55,7 @@ async function laden({ dev = false } = {}) {
   const oeffentlich = { ...router, all: (pfad, ...kette) => routen.push({ methode: 'all', pfad, kette, oeffentlich: true }) }
   Router.apply(router, {}, oeffentlich)
   hochladen = routen.find(r => r.methode === 'post' && r.pfad.endsWith('/quellen')).kette.at(-2)
+  marken.beschaffungHochladen = routen.find(r => r.pfad.endsWith('/beschaffung/hochladen'))
 }
 
 beforeEach(async () => await laden())
@@ -91,6 +92,10 @@ describe('Rechte der Routen', () => {
     ['get', '/spur/project/:project_id/recherche/protokoll', 'lesen', 'suchprotokoll'],
     ['get', '/spur/project/:project_id/recherche/protokoll.csv', 'lesen', 'suchprotokollExport'],
     ['post', '/spur/project/:project_id/recherche/aufnehmen', 'schreiben', 'perDoiAufnehmen'],
+    ['get', '/spur/project/:project_id/beschaffung', 'lesen', 'beschaffungsliste'],
+    ['post', '/spur/project/:project_id/beschaffung', 'schreiben', 'beschaffungHinzufuegen'],
+    ['get', '/spur/project/:project_id/beschaffung/export/:format', 'lesen', 'beschaffungExport'],
+    ['post', '/spur/project/:project_id/beschaffung/:eintrag_id/zuordnen', 'schreiben', 'beschaffungZuordnen'],
   ])('%s %s verlangt Anmeldung, Ausschluss von Leselink-Nutzern und %s', (methode, pfad, recht, handler) => {
     const r = route(methode, pfad)
     expect(r, `${methode} ${pfad}`).toBeTruthy()
@@ -102,6 +107,7 @@ describe('Rechte der Routen', () => {
     ['get', '/spur/claude/tokens', 'claudeTokens'],
     ['post', '/spur/claude/tokens', 'claudeTokenErzeugen'],
     ['delete', '/spur/claude/tokens/:token_id', 'claudeTokenWiderrufen'],
+    ['put', '/spur/beschaffung/vorlage', 'bibliotheksvorlageSetzen'],
   ])('%s %s verlangt nur die Anmeldung', (methode, pfad, handler) => {
     const r = route(methode, pfad)
     expect(prueferVon(r)).toEqual(['angemeldet'])
@@ -120,6 +126,13 @@ describe('Rechte der Routen', () => {
     await laden({ dev: true })
     expect(handlerVon(route('use', '/spur/dev/crossref'))).toBe('paperFake')
   })
+})
+
+it('lädt PDFs für die Beschaffungsliste mit Schreibrecht und derselben Größengrenze hoch', () => {
+  const r = marken.beschaffungHochladen
+  expect(prueferVon(r)).toEqual(['angemeldet', 'eingeschraenkt', 'schreiben'])
+  expect(r.kette.at(-2)).toBe(hochladen)
+  expect(handlerVon(r)).toBe('beschaffungHochladen')
 })
 
 describe('Hochladen mit Fehlerbehandlung', () => {

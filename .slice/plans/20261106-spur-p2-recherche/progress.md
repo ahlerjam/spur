@@ -18,3 +18,6 @@
 - Keys: Ohne `OPENALEX_API_KEY` oder `SEMANTIC_SCHOLAR_API_KEY` bleibt der Dienst aus, und das Panel nennt ihn mit Hinweis (OpenAlex verweigert ohne Key, Semantic Scholar antwortet ohne Key fast immer mit 429). Mit Paper-Fake braucht kein Dienst einen Key.
 - Drossel über die ganze Installation: Zeitfenster je Dienst als Mongo-Dokument (`spurDrossel`), atomar mit `findOneAndUpdate` vergeben. arXiv 3 s, Semantic Scholar 1 s, OpenAlex 0,1 s. Liegt das nächste freie Fenster mehr als 20 s in der Zukunft, meldet der Dienst „Limit erreicht“.
 - Cache: Antworten je URL (ohne Key) 24 h in `spurPaperCache`, nur Metadaten.
+- f3 Aufnehmen: Metadaten aus Crossref; arXiv-DOIs (bei DataCite registriert) aus der arXiv-API. Der freie Volltext kommt von Unpaywall oder arXiv und wird nur von öffentlichen https-Adressen geladen, höchstens 50 MB und nur mit `%PDF-` am Anfang. Ohne Lizenzangabe bekommt die Quelle `nurProjekt`: Sie erscheint im Panel mit „Volltext nur in diesem Projekt“, und „Aus anderem Projekt holen“ nimmt sie nicht mit.
+- f4 Bibliothekslink: Die Vorlage gilt je Person (Einstellung mit `projectId: null` in `spurSettings`), Standard `https://doi.org/{doi}`. spur verlinkt nur. Der Schrägstrich der DOI bleibt im Link unkodiert.
+- CSV-Exporte entschärfen Zellen, die mit `=`, `+`, `-` oder `@` beginnen (gemeinsamer Helfer `csv.mjs`).

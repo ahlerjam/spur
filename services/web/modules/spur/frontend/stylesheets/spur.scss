@@ -302,3 +302,19 @@
   font-size: var(--font-size-02);
   font-weight: 600;
 }
+
+.spur-vorlage,
+.spur-zuordnen {
+  margin-bottom: var(--spacing-04);
+
+  .form-label {
+    margin-bottom: var(--spacing-02);
+    font-size: var(--font-size-02);
+  }
+}
+
+.spur-bibliothek-link {
+  display: inline-block;
+  margin-top: var(--spacing-02);
+  font-size: var(--font-size-02);
+}

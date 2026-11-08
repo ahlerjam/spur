@@ -1400,6 +1400,52 @@ async page => {
     ok(unbekannt.fehler && unbekannt.inhalt.fehler === 'doi_nicht_gefunden' && unbekannt.inhalt.detail === 'DOI nicht gefunden', `source_add: ${JSON.stringify(unbekannt.inhalt)}`)
   }
 
+  features.p2f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Beschaffung')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Treffer' }).click()
+    await paperSuchen('sleep memory consolidation')
+    for (const titel of ['Sleep and Memory', 'The memory function of sleep']) {
+      const treffer = paperTreffer(titel)
+      ok((await treffer.getByRole('button', { name: 'Aufnehmen' }).count()) === 0, `${titel} wäre frei`)
+      await treffer.getByRole('button', { name: 'Auf die Beschaffungsliste' }).click()
+      await treffer.getByText('Steht jetzt auf der Beschaffungsliste').waitFor()
+    }
+
+    await page.getByRole('tab', { name: 'Beschaffung' }).click()
+    const eintrag = titel => page.locator('.spur-panel-inhalt .spur-paper', { has: page.getByText(titel, { exact: true }) })
+    await eintrag('Sleep and Memory').getByText('Offen', { exact: true }).waitFor()
+    await sichtbar('Offen: 2 · Beschafft: 0')
+
+    await page.getByLabel('Link zur Bibliothek').fill('https://bibliothek.example/?doi={doi}')
+    await page.getByRole('button', { name: 'Speichern' }).click()
+    await sichtbar('Link zur Bibliothek gespeichert')
+    const link = eintrag('Sleep and Memory').getByRole('link', { name: 'In der Bibliothek holen' })
+    ok((await link.getAttribute('href')) === 'https://bibliothek.example/?doi=10.5555/spur.2024.001', `Link: ${await link.getAttribute('href')}`)
+
+    const dois = text => [...text.matchAll(/10\.\d{4,9}\/[^\s},"]+/g)].map(t => t[0]).sort().join()
+    const erwartet = '10.1038/nrn2762,10.5555/spur.2024.001'
+    for (const format of ['.bib', '.ris', 'CSV']) {
+      const knopf = page.getByRole('link', { name: `Als ${format} exportieren` })
+      const [download] = await Promise.all([page.waitForEvent('download'), knopf.click()])
+      const text = await (await page.request.get(download.url())).text()
+      ok(dois(text) === erwartet, `${format}: ${dois(text)}`)
+    }
+
+    await page.getByLabel('Beschafftes PDF wählen').setInputFiles(`${FIXTURES}/smith2024.pdf`)
+    await sichtbar('„smith2024.pdf“ ist zugeordnet: beschafft', 30000)
+    await eintrag('Sleep and Memory').getByText('Beschafft', { exact: true }).waitFor()
+
+    await page.getByLabel('Beschafftes PDF wählen').setInputFiles(`${FIXTURES}/scan.pdf`)
+    await sichtbar('In „scan.pdf“ steht keine bekannte DOI. Zu welchem Eintrag gehört das PDF?', 30000)
+    await page.getByLabel('Eintrag', { exact: true }).selectOption({ label: 'The memory function of sleep' })
+    await page.getByRole('button', { name: 'Zuordnen' }).click()
+    await sichtbar('„scan.pdf“ ist zugeordnet: beschafft')
+    await eintrag('The memory function of sleep').getByText('Beschafft', { exact: true }).waitFor()
+    await sichtbar('Offen: 0 · Beschafft: 2')
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

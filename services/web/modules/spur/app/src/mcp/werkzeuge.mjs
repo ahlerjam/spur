@@ -13,6 +13,7 @@ import { bibLesen } from '../pruefung/bib.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
+import * as Beschaffung from '../recherche/Beschaffung.mjs'
 
 const SEITE = 50
 const MAX_TEXT = 40000
@@ -376,6 +377,18 @@ Object.assign(WERKZEUGE, {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
       const quelle = await Aufnahme.perDoi({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
       return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi }
+    },
+  },
+
+  acquisition_add: {
+    description:
+      'Setzt ein nicht freies Paper per DOI auf die Beschaffungsliste des Projekts. Die Person holt es in der Bibliothek ' +
+      'und lädt das PDF hoch; spur ordnet es per DOI zu.',
+    inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
+    async ausfuehren({ project_id: pid, doi }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      const eintrag = await Beschaffung.hinzufuegen({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+      return { eintrag_id: eintrag._id, doi: eintrag.doi, titel: eintrag.meta.titel, status: eintrag.status }
     },
   },
 })

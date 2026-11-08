@@ -310,6 +310,7 @@ await neuAnlegen(neu, 'E2E Neu', { 'main.tex': 'Erster Absatz.\n' })
 // P2: frisches Rechercheprojekt, Paper-Antworten nicht aus dem Cache des letzten Laufs.
 await neuAnlegen(a, 'E2E Recherche', { 'main.tex': LEER })
 await neuAnlegen(a, 'E2E Recherche Ziel', { 'main.tex': LEER })
+await neuAnlegen(a, 'E2E Beschaffung', { 'main.tex': LEER })
 for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll]) {
   await (await sammlung()).deleteMany({})
 }

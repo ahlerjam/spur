@@ -11,27 +11,11 @@ import * as PruefManager from '../pruefung/PruefManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
 import { paperApiBasis } from '../schalter.mjs'
 import { arxivMetadaten, unpaywall } from './dienste.mjs'
+import { freierKey, keyVorschlag } from './keys.mjs'
 
 const ARXIV_DOI = /^10\.48550\/arxiv\.(.+)$/
 
 export const doiNormal = doi => doi.trim().toLowerCase()
-
-// Erster Nachname ohne Akzente plus Jahr, wie viele Literaturverwaltungen: „keller2014“.
-function keyVorschlag(meta) {
-  const name = (meta.autoren?.[0]?.family ?? meta.titel ?? 'quelle')
-    .normalize('NFKD')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toLowerCase()
-  return `${name || 'quelle'}${meta.jahr ?? ''}`
-}
-
-function freierKey(basis, belegt) {
-  if (!belegt.has(basis)) return basis
-  for (const buchstabe of 'abcdefghijklmnopqrstuvwxyz') {
-    if (!belegt.has(`${basis}${buchstabe}`)) return `${basis}${buchstabe}`
-  }
-  return `${basis}-${Date.now()}`
-}
 
 function erlaubteAdresse(url) {
   let adresse

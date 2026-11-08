@@ -13,6 +13,7 @@ const INDIZES = {
   ],
   spurCheckSections: [{ key: { projectId: 1, hash: 1 }, unique: true }],
   spurEdits: [{ key: { botId: 1, schluessel: 1 }, unique: true }],
+  spurAcquisitions: [{ key: { projectId: 1, doi: 1 }, unique: true }],
   spurRuns: [
     {
       key: { projectId: 1, botId: 1 },
