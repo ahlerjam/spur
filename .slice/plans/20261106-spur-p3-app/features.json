@@ -33,7 +33,7 @@
     "Der Projekt-Standard gilt für neue Mitglieder, die eigene Einstellung überschreibt ihn",
     "Ein Fehler-Compile mit Schalter Aus erzeugt kein Ereignis, mit Vorschlag genau ein `suggest_trigger`"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
