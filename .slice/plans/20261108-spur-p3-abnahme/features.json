@@ -1,0 +1,56 @@
+{
+ "features": [
+  {
+   "id": "f1",
+   "title": "Befehlsnamen der Workflows auf den Plugin-Namen umstellen (f5 von P3 fertig)",
+   "steps": [
+    "Schritt 2 von f5 in `.slice/plans/20261106-spur-p3-app/features.json` lautet: In Claude Code erscheinen die Workflows bei `/` über das Plugin als `/plugin:spur:spur:literaturueberblick (MCP)`, `/plugin:spur:spur:methodenteil (MCP)` und `/plugin:spur:spur:folien (MCP)`; kein anderer Schritt und kein anderes Feld außer `passes` ändert sich",
+    "`grep -rn '/spur:' ` über README, Panel-Quellen und Hilfetexte findet keinen Befehl `/spur:<name>` mehr; README und die Hilfe im Workflows-Panel nennen `/plugin:spur:spur:literaturueberblick`, `/plugin:spur:spur:methodenteil` und `/plugin:spur:spur:folien`",
+    "Das Workflows-Panel im Browser (360 und 1280 px) zeigt in der Hilfe genau diese drei Befehle, ohne Überlauf und ohne Konsolenfehler",
+    "Claude Code headless mit `--plugin-dir` auf das Plugin (Adresse und Token der laufenden Instanz) meldet in der Init-Zeile `slash_commands` die drei Einträge `mcp__plugin_spur_spur__literaturueberblick`, `…methodenteil`, `…folien`; das Menümuster dazu ist `/plugin:spur:spur:<name> (MCP)`",
+    "Der Test für die Befehlsnamen ist grün; die E2E-Suite läuft vollständig grün, und f5 von P3 wird in `features.json` von P3 auf `passes: true` gesetzt, sobald alle seine fünf Schritte am laufenden System belegt sind"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f2",
+   "title": "Abnahme P3-f1 und P3-f2: Chat und @claude am laufenden System",
+   "steps": [
+    "System mit `spur-dev up` starten, mit `SPUR_FAKE_AGENT=1`. Ohne Verbindung zeigt das Panel „Claude nicht verbunden“ samt Startbefehl und kein Eingabefeld",
+    "Mit Fake-Client „Fasse Abschnitt 2 zusammen“ schreiben: Die Nachricht kommt per `events_since` beim Client an, die `reply`-Antwort erscheint im Panel, bei schreibendem Fake-Client erscheint die Lauf-Karte",
+    "100 Nachrichten senden: Panel bleibt bedienbar, nach dem Neuladen ist der Verlauf vollständig und in Reihenfolge Frage vor Antwort",
+    "Nutzer A kommentiert „@claude prüfe diese Aussage“: Bot von A erhält `comment_mention` mit Dokument, Stelle und Kommentar-ID; Bot von B erhält nichts; die `reply` steht im selben Thread als „Claude (A)“; der Kommentartext von B steht nicht im Ereignis",
+    "Für jeden Schritt liegen Befehlsausgabe oder Screenshot (360 und 1280 px) in `progress.md` unter „Abnahme“; ein Fehler wird zuerst mit rotem Test nachgestellt und behoben"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f3",
+   "title": "Abnahme P3-f3 und P3-f4: Schalter und Vorschläge am laufenden System",
+   "steps": [
+    "Einstellungen zeigen „Compile-Fehler“ und „Belegloses Argument“, beide auf Aus; der Projekt-Standard gilt für neue Mitglieder, die eigene Einstellung überschreibt ihn",
+    "Ein Fehler-Compile mit Schalter Aus erzeugt kein Ereignis, mit Vorschlag genau ein `suggest_trigger`",
+    "`suggest` des Fake-Clients erscheint als Karte im Panel, der Text im Dokument bleibt unverändert; „Übernehmen“ startet einen Lauf, „Verwerfen“ entfernt die Karte",
+    "Mit `SPUR_NOW` und Limit 2 erzeugt der dritte Auslöser kein Ereignis, das Panel zeigt „Tageslimit erreicht“; 60 Sekunden Tipp-Pause lösen genau ein Ereignis aus",
+    "Alle vier Zustände des Vorschläge-Panels (aus, keine, mehrere, Tageslimit erreicht) bei 360 und 1280 px als Screenshot, ohne Überlauf und ohne Konsolenfehler"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f4",
+   "title": "Abnahme P3-f5 und Gesamtlauf: Workflows, Admin-Text und komplette Suite",
+   "steps": [
+    "`prompts/list` des laufenden Servers liefert `literaturueberblick`, `methodenteil`, `folien`; `prompts/get` liefert jeweils den vollen Workflow-Text",
+    "Im Panel listet „Workflows“ dieselben drei Einträge; ein Klick auf „Literaturüberblick“ legt den Auftrag mit dem vollen Text in die Inbox, der Fake-Client erhält ihn mit Workflow-Name und Text",
+    "Ein Admin ändert den Text von `folien` in der Admin-Seite: Panel und `prompts/get` liefern sofort den neuen Text; danach ist der Standardtext wiederhergestellt",
+    "`spur-dev test` läuft vollständig grün (bis auf die bekannte Upstream-Liste) und `test/e2e/spur-e2e.js` nach `vorbereiten.mjs` grün, Ausgabe nach der letzten Codeänderung in `progress.md`",
+    "In `progress.md` steht unter „Abnahme“ je P3-Feature f1 bis f5 eine Zeile PASS oder FAIL mit Beleg, und unter „Menschlich zu prüfen“ der Weckweg mit echter Claude-Session sowie der interaktive Blick auf den Menütext `/plugin:spur:spur:…`"
+   ],
+   "passes": false,
+   "ui": true
+  }
+ ]
+}
