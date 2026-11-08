@@ -329,6 +329,7 @@ Text davor.
 \end{document}`,
 })
 await neuAnlegen(a, 'E2E Folien', { 'main.tex': 'Folien folgen.\n' })
+await neuAnlegen(a, 'E2E Offenlegung', { 'main.tex': 'Alpha.\nOmega.\n' })
 await neuAnlegen(a, 'E2E Zahlen', {
   'main.tex': String.raw`\documentclass{article}
 \begin{document}

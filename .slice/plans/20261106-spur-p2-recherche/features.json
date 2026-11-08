@@ -52,7 +52,7 @@
 "Nutzer klickt „KI-Offenlegung“: Der Text nennt Läufe, Zweck, Dateien und angenommene Anteile",
 "Der Text lässt sich kopieren und als `.tex`-Abschnitt einfügen",
 "Ohne Läufe steht „Keine KI-Nutzung protokolliert“"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f10", "title": "Semantische Suche einschalten", "steps": [
 "Ohne Schalter gibt es keinen Hinweis auf semantische Suche und kein Modell im Volume",
 "Mit `SPUR_SEMANTIC_SEARCH=true` und `SPUR_FAKE_EMBEDDINGS=1` zeigt das Panel den Fortschritt „Indexiert 3 von 8 Seiten“",

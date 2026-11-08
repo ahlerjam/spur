@@ -97,6 +97,8 @@ describe('Rechte der Routen', () => {
     ['get', `${Q}/:quelle_id/notizen`, 'lesen', 'notizen'],
     ['put', `${Q}/:quelle_id/notizen`, 'schreiben', 'notizSetzen'],
     ['get', '/spur/project/:project_id/matrix', 'lesen', 'matrix'],
+    ['get', '/spur/project/:project_id/offenlegung', 'lesen', 'offenlegung'],
+    ['post', '/spur/project/:project_id/offenlegung/tex', 'schreiben', 'offenlegungTex'],
     ['get', '/spur/project/:project_id/matrix.csv', 'lesen', 'matrixExport'],
     ['post', '/spur/project/:project_id/matrix/spalten', 'schreiben', 'matrixSpalte'],
     ['put', '/spur/project/:project_id/matrix/zellen', 'schreiben', 'matrixZelle'],

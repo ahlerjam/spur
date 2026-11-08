@@ -102,6 +102,8 @@ export default {
     webRouter.put(`${MATRIX}/zellen`, ...schreiben, SpurController.matrixZelle)
     webRouter.post(`${MATRIX}/zellen/bestaetigen`, ...schreiben, SpurController.matrixBestaetigen)
     webRouter.post(`${MATRIX}/zellen/verwerfen`, ...schreiben, SpurController.matrixVerwerfen)
+    webRouter.get('/spur/project/:project_id/offenlegung', ...lesen, SpurController.offenlegung)
+    webRouter.post('/spur/project/:project_id/offenlegung/tex', ...schreiben, SpurController.offenlegungTex)
     webRouter.get('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroSammlungen)
     webRouter.post('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroImportieren)
     webRouter.put('/spur/beschaffung/vorlage', angemeldet, SpurController.bibliotheksvorlageSetzen)

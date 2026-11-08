@@ -19,6 +19,7 @@ import * as Aufnahme from './recherche/Aufnahme.mjs'
 import * as Beschaffung from './recherche/Beschaffung.mjs'
 import * as Import from './recherche/Import.mjs'
 import * as Literatur from './literatur/Literatur.mjs'
+import * as Offenlegung from './offenlegung/Offenlegung.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -468,4 +469,14 @@ export const matrixBestaetigen = mitProblemen(async (req, res) => {
 export const matrixVerwerfen = mitProblemen(async (req, res) => {
   await Literatur.vorschlagVerwerfen(projektId(req), zellAdresse(req))
   res.sendStatus(204)
+})
+
+const modellAus = wert => String(wert ?? '').slice(0, 200)
+
+export const offenlegung = mitProblemen(async (req, res) => {
+  res.json(await Offenlegung.text(projektId(req), { modell: modellAus(req.query.modell) }))
+})
+
+export const offenlegungTex = mitProblemen(async (req, res) => {
+  res.json(await Offenlegung.alsTex(projektId(req), new ObjectId(nutzerId(req)), { modell: modellAus(req.body?.modell) }))
 })

@@ -1694,6 +1694,59 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok((await karte().getByText('Zahl ohne Beleg').count()) === 0, 'Warnung für Jahr, Seite oder Mathe')
   }
 
+  features.p2f9 = async () => {
+    await anmelden('e2e-a@example.org')
+    const dialog = page.locator('.modal')
+    const offenlegungOeffnen = async () => {
+      await panelOeffnen('Claude')
+      await page.getByRole('button', { name: 'KI-Offenlegung' }).click()
+      await dialog.locator('.spur-offenlegung-text').waitFor({ timeout: 20000 })
+    }
+    await projektOeffnen('E2E Recherche')
+    await offenlegungOeffnen()
+    await dialog.getByText('Keine KI-Nutzung protokolliert.').waitFor()
+    ok(await dialog.getByRole('button', { name: 'Als .tex-Abschnitt einfügen' }).isDisabled(), 'Einfügen ohne Läufe')
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+
+    await projektOeffnen('E2E Offenlegung')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const edit = (alt, neu) => werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: schluessel() })
+    ok(!(await edit('Alpha.', 'Alpha, klarer.')).fehler, 'Edit 1')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Einleitung überarbeitet' })
+    const erster = (await werkzeug(token, 'run_status', { project_id: pid })).inhalt.lauf
+    ok((await laufAktion(pid, erster.id, 'annehmen')).status < 300, 'Annehmen')
+    ok(!(await edit('Omega.', 'Omega mit Fazit.')).fehler, 'Edit 2')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Fazit ergänzt' })
+
+    await offenlegungOeffnen()
+    const text = await dialog.locator('.spur-offenlegung-text').textContent()
+    for (const teil of [
+      'Protokolliert sind 2 Läufe am',
+      'Zweck: Einleitung überarbeitet; Fazit ergänzt.',
+      'Betroffene Dateien: main.tex.',
+      'Angenommen wurden 1 von 1 abgeschlossenen Läufen (100 %).',
+      '1 Lauf wartet noch auf eine Entscheidung.',
+    ]) {
+      ok(text.includes(teil), `Offenlegung ohne „${teil}“:\n${text}`)
+    }
+    ok(!text.includes('Modell'), 'Modell ohne Angabe genannt')
+    await dialog.getByLabel('Modell (optional, wird nur genannt, wenn Sie es eintragen)').fill('Claude Opus 5.5')
+    await dialog.getByText('Modell: Claude Opus 5.5.', { exact: false }).waitFor()
+
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await dialog.getByRole('button', { name: 'Text kopieren' }).click()
+    await dialog.getByText('Kopiert', { exact: true }).waitFor()
+    const kopiert = await page.evaluate(() => navigator.clipboard.readText())
+    ok(kopiert.includes('Zweck: Einleitung überarbeitet; Fazit ergänzt.'), `Zwischenablage: ${kopiert}`)
+
+    await dialog.getByRole('button', { name: 'Als .tex-Abschnitt einfügen' }).click()
+    await dialog.getByText('In ki-offenlegung.tex eingefügt.', { exact: false }).waitFor()
+    const tex = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'ki-offenlegung.tex' })).inhalt.text
+    ok(tex.startsWith('\\section*{Nutzung von KI-Werkzeugen}\n') && tex.includes('Modell: Claude Opus 5.5.'), `.tex:\n${tex}`)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

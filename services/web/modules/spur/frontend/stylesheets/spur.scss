@@ -404,3 +404,11 @@
     max-width: min(1140px, 95vw);
   }
 }
+
+.spur-offenlegung-text {
+  margin-top: var(--spacing-05);
+  padding: var(--spacing-04);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-base, 4px);
+  white-space: pre-wrap;
+}
