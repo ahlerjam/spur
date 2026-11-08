@@ -12,6 +12,7 @@ import {
   dateienPruefen,
   ersteZeile,
   herkunftBestimmen,
+  suiteLadefehler,
   unterOrdner,
   zusammenfassung,
 } from './upstream-auswertung.mjs'
@@ -54,7 +55,11 @@ function logEnde(log, zeilen = 15) {
 }
 
 // Ein Lauf ohne Ergebnisdatei zählt als ein fehlgeschlagener Test, damit er nie als grün durchgeht.
-const ladefehler = (suite, test, log) => [{ suite, datei: '(Suite)', test, status: 'failed', fehler: logEnde(log) }]
+function ladefehler(suite, test, log) {
+  // Die Ursache steht oft über dem Stack, also vor dem Ende des Protokolls.
+  const ursache = fs.readFileSync(log, 'utf8').split('\n').find(z => /^\s*\w*Error\b/.test(z)) || ''
+  return [{ suite, datei: '(Suite)', test, status: 'failed', fehler: `${ursache}\n${logEnde(log)}` }]
+}
 
 // vitest --reporter=json: eine Datei, die nicht lädt, hat keine assertionResults, nur eine message.
 function vitestLesen(suite, datei, basis) {
@@ -188,6 +193,8 @@ function suiteLaufen(suite) {
   fs.rmSync(ergebnis, { force: true })
   const tests = SUITEN[suite](ausgeschlossen)
   if (tests.length === 0) return abbrechen(suite, ['kein einziger Test gelaufen'])
+  const ladefehler = suiteLadefehler(tests)
+  if (ladefehler.length) return abbrechen(suite, ladefehler.map(m => `${m.slice(0, 300)} (Protokoll in ${process.env.SPUR_PROTOKOLL || ergebnisOrdner})`))
   const ohneTests = dateienOhneTests(dateien, tests)
   if (ohneTests.length) return abbrechen(suite, ohneTests.map(d => `${d}: enthält keine Tests dieser Suite`))
   fs.writeFileSync(ergebnis, JSON.stringify(tests, null, 1))

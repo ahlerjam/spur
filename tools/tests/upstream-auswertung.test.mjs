@@ -1,7 +1,7 @@
 // node --test tools/tests
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { auswerten, dateiNormal, dateienOhneTests, dateienPruefen, unterOrdner, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
+import { auswerten, dateiNormal, dateienOhneTests, dateienPruefen, suiteLadefehler, unterOrdner, herkunftBestimmen, zusammenfassung } from './upstream-auswertung.mjs'
 
 const t = (datei, name, status, fehler = '') => ({ suite: 'web', datei, test: name, status, fehler })
 const b = (datei, name, herkunft = 'overleaf', grund = 'Grund.') => ({ suite: 'web', datei, test: name, herkunft, grund })
@@ -88,4 +88,10 @@ test('unterOrdner: der Ordner selbst und alles darunter, kein Namenspräfix', ()
   assert.equal(unterOrdner('test/unit', 'test/unit'), true)
   assert.equal(unterOrdner('test/unit/js/a.js', 'test/unit'), true)
   assert.equal(unterOrdner('test/unitx/a.js', 'test/unit'), false)
+})
+
+test('Ladefehler der Suite werden immer gemeldet, auch wenn ein gleichnamiger Eintrag bekannt wäre', () => {
+  const tests = [t('(Suite)', 'acceptance lädt nicht', 'failed', '/x/a.js:3\n\nSyntaxError: Unexpected end of input\n  at …'), t('a.mjs', 'x', 'passed')]
+  assert.deepEqual(suiteLadefehler(tests), ['acceptance lädt nicht: SyntaxError: Unexpected end of input'])
+  assert.deepEqual(suiteLadefehler([t('a.mjs', 'x', 'failed')]), [])
 })

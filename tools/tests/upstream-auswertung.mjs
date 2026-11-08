@@ -34,6 +34,12 @@ export function dateienOhneTests(dateien, tests) {
   return dateien.filter(d => !tests.some(t => unterOrdner(t.datei, d)))
 }
 
+// Lädt eine Suite oder ein Teil davon nicht, ist das Ergebnis unbrauchbar, nie ein bekannter Fehler.
+export function suiteLadefehler(tests) {
+  const ursache = fehler => (fehler.split('\n').find(z => /Error\b/.test(z)) || ersteZeile(fehler)).trim()
+  return tests.filter(t => t.datei === '(Suite)').map(t => `${t.test}: ${ursache(t.fehler)}`)
+}
+
 export function auswerten(tests, bekannt) {
   const bekanntIndex = new Set(bekannt.map(schluessel))
   const fehlgeschlagen = tests.filter(t => t.status === 'failed')
