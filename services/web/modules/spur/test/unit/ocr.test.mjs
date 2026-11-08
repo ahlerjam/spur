@@ -54,8 +54,9 @@ beforeEach(async () => {
 const aufnehmen = (dateiname, fixtureName) =>
   Quellen.aufnehmen({ projectId: projekt, userId: anna, dateiname, tempPfad: fixture(fixtureName), groesse: 1 })
 
-// Echte Texterkennung mit 300 dpi dauert unter Last einige Sekunden je Seite.
-const OCR_ZEIT = 60000
+// Echte Texterkennung mit 300 dpi: allein einige Sekunden je Seite, unter der Last der ganzen
+// web-Suite (spur-dev upstream web) über eine Minute.
+const OCR_ZEIT = 180000
 
 describe('ocrStarten', () => {
   it('erkennt den Text eines Scans, meldet jede Seite und markiert die Quelle als OCR', async () => {
@@ -76,6 +77,7 @@ describe('ocrStarten', () => {
   }, OCR_ZEIT)
 
   it('macht den erkannten Text durchsuchbar', async () => {
+    ocrSeite = async (_pfad, nr) => (nr === 1 ? { text: SATZ, konfidenz: 90 } : { text: '', konfidenz: null })
     const scan = await aufnehmen('scan.pdf', 'scan.pdf')
     await (await Quellen.ocrStarten(scan)).lauf
     const treffer = await Quellen.suchen(projekt, 'restore attention')

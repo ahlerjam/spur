@@ -93,8 +93,9 @@ Teilnehmerin: Antwort
   })
 })
 
-// Echte Texterkennung mit 300 dpi dauert unter Last einige Sekunden je Seite.
-const OCR_ZEIT = 60000
+// Echte Texterkennung mit 300 dpi: allein einige Sekunden je Seite, unter der Last der ganzen
+// web-Suite (spur-dev upstream web) über eine Minute.
+const OCR_ZEIT = 180000
 
 describe('OCR', () => {
   it('erkennt den Satz auf dem Bild eines Scans, mit Konfidenz', async () => {

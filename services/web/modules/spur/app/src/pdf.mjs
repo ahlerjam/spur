@@ -82,10 +82,12 @@ export async function ocrSeite(pfad, seite) {
       ['-png', '-gray', '-r', '300', '-singlefile', '-f', String(seite), '-l', String(seite), pfad, bild],
       GRENZEN
     )
+    // Ein Thread je Lauf: OpenMP belegte sonst alle Kerne des Web-Containers, und parallele
+    // Läufe überbuchten sich gegenseitig.
     const { stdout } = await ausfuehren(
       'tesseract',
       [`${bild}.png`, 'stdout', '-l', 'deu+eng', 'tsv'],
-      GRENZEN
+      { ...GRENZEN, env: { ...process.env, OMP_THREAD_LIMIT: '1' } }
     )
     return tsvAuswerten(stdout)
   } finally {
