@@ -211,6 +211,7 @@ it('begrenzt Aufrufe der Paper-Dienste je Nutzer', () => {
     ['get', '/spur/project/:project_id/recherche/zitationen'],
     ['post', '/spur/project/:project_id/recherche/aufnehmen'],
     ['post', '/spur/project/:project_id/beschaffung'],
+    ['get', `${Q}/semantik/suche`],
   ]) {
     expect(route(methode, pfad).kette.some(f => f.limiter === 'spur-recherche'), pfad).toBe(true)
   }

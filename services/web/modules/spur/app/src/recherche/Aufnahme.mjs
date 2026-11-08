@@ -146,7 +146,9 @@ export async function perDoi({ projectId, userId, doi }) {
       await ZitatManager.bibSicherstellen(projectId, docs, quelle, userId)
     } catch (error) {
       // Ohne .bib-Eintrag keine Quelle: Sonst schlüge jede Wiederholung mit „Bereits vorhanden“ fehl.
-      await QuellenManager.loeschen(quelle)
+      await QuellenManager.loeschen(quelle).catch(aufraeumFehler =>
+        logger.error({ err: aufraeumFehler, quelleId: quelle._id }, 'spur: Quelle nach gescheiterter Aufnahme nicht gelöscht')
+      )
       throw error
     }
     return quelle

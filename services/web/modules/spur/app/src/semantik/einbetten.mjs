@@ -31,16 +31,20 @@ let pipelineVersprechen = null
 
 // Das echte Modell lädt erst beim ersten Gebrauch in das Daten-Volume.
 async function echteEinbettung(text) {
-  pipelineVersprechen ??= import('@huggingface/transformers').then(({ env, pipeline }) => {
+  const laden = (pipelineVersprechen ??= import('@huggingface/transformers').then(({ env, pipeline }) => {
     env.cacheDir = modellOrdner()
     env.allowRemoteModels = true
     return pipeline('feature-extraction', MODELL, { dtype: 'q8' })
-  }).catch(error => {
-    // Ein gescheiterter Download soll beim nächsten Aufruf erneut versucht werden.
-    pipelineVersprechen = null
+  }))
+  let extraktor
+  try {
+    extraktor = await laden
+  } catch (error) {
+    // Ein gescheiterter Download soll beim nächsten Aufruf erneut versucht werden, ohne einen
+    // inzwischen neu gestarteten Download zu verwerfen.
+    if (pipelineVersprechen === laden) pipelineVersprechen = null
     throw error
-  })
-  const extraktor = await pipelineVersprechen
+  }
   const ausgabe = await extraktor(text, { pooling: 'mean', normalize: true })
   return Float32Array.from(ausgabe.data)
 }
