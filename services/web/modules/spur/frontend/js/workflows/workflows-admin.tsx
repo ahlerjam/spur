@@ -77,7 +77,8 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
         )}
       </div>
       <p className="spur-zeile-meta">
-        <code>{workflowBefehl(workflow.name)}</code> ·{workflow.beschreibung}
+        <code>{workflowBefehl(workflow.name)}</code>{' · '}
+        {workflow.beschreibung}
       </p>
       <form
         onSubmit={e => {

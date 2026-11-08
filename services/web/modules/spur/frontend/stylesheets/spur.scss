@@ -254,9 +254,13 @@
   background: var(--bg-light-secondary);
 }
 
+.spur-nachricht-claude,
+.spur-vorschlag-meldung {
+  border-left: 3px solid var(--green-50);
+}
+
 .spur-nachricht-claude {
   align-self: flex-start;
-  border-left: 3px solid var(--green-50);
   border-radius: 0;
   padding-left: var(--spacing-04);
 }
@@ -590,7 +594,6 @@
 .spur-vorschlag-meldung {
   margin: 0 0 var(--spacing-03);
   padding-left: var(--spacing-03);
-  border-left: 3px solid var(--green-50);
   color: var(--green-70);
 }
 

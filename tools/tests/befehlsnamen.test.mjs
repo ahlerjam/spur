@@ -23,11 +23,9 @@ test('README nennt die drei Workflow-Befehle mit dem Plugin-Namen', () => {
   for (const name of WORKFLOWS) assert.match(readme, new RegExp(`/plugin:spur:spur:${name}\\b`))
 })
 
-test('Panel-Hilfe baut die Befehle aus dem Plugin-Namen', () => {
-  assert.match(lesen('services/web/modules/spur/frontend/js/claude/workflow-befehl.ts'), /'\/plugin:spur:spur:'/)
-})
-
 test('kein Text nennt einen Workflow als /spur:<name>', () => {
-  for (const pfad of TEXTE) assert.doesNotMatch(lesen(pfad), ALTER_BEFEHL, pfad)
-  assert.doesNotMatch(lesen('services/web/modules/spur/frontend/js/workflows/workflows-admin.tsx'), /\/spur:\{/)
+  for (const pfad of TEXTE) {
+    assert.doesNotMatch(lesen(pfad), ALTER_BEFEHL, pfad)
+    assert.doesNotMatch(lesen(pfad), /\/spur:\{/, pfad)
+  }
 })

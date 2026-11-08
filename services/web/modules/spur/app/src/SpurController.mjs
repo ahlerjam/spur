@@ -342,8 +342,8 @@ async function botDesNutzers(req) {
 
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)
-  const { nachrichten, aeltere } = await Inbox.verlauf(projektId(req), bot._id)
-  const [lauf, verbunden, automatik] = await Promise.all([
+  const [{ nachrichten, aeltere }, lauf, verbunden, automatik] = await Promise.all([
+    Inbox.verlauf(projektId(req), bot._id),
     LaufManager.letzterLauf(projektId(req), bot._id),
     Inbox.verbunden(bot._id),
     LaufAktionen.automatik(projektId(req), new ObjectId(nutzerId(req))),

@@ -131,7 +131,6 @@ describe('Claude-Panel', function () {
       '/plugin:spur:spur:methodenteil',
       '/plugin:spur:spur:folien',
     ])
-    expect(document.body.textContent).not.to.match(/(^|[^:])\/spur:\w/)
   })
 
   it('zeigt ohne Verbindung keine Workflows', async function () {

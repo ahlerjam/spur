@@ -75,6 +75,10 @@ Alle Schritte am laufenden System (http://localhost:8080) ausgeführt; Bilder in
 - P3-f4 Vorschläge im Seitenpanel mit Limit: PASS (f3 Schritte 3–5)
 - P3-f5 Fertige Workflows starten: PASS (f1 Schritte 1–4, f4 Schritte 1–3)
 
+## /simplify (37b2d9db3b..HEAD)
+- Umgesetzt: Index `{projectId, botId, am: -1, _id: -1}` für den Verlauf (neue Migration `20261109090000_spur_verlauf_index.mjs`, ersetzt den Index nur nach `am`; `explain` zeigt IXSCAN → LIMIT ohne SORT; Rollback geprüft); `Inbox.verlauf` parallel zu Lauf, Verbindung und Automatik; grüner Rand als eine Regel für Claude-Nachricht und Erfolgsmeldung; Test der Befehlsnamen ohne Quelltext-Regex des Präfixes, doppelte Prüfungen auf `/spur:` in den Frontend-Tests entfernt (bleiben im Node-Test und in der E2E); Leerzeichen vor „·“ auf der Admin-Seite wiederhergestellt (beim Umstellen verloren).
+- Nicht umgesetzt: Panel-Abfrage nur mit neuen Nachrichten (`seit`) und „Ältere laden“ (größerer Umbau, siehe Vorschläge); eine allgemeine CSS-Regel für Overleafs Notification im schmalen Panel statt Zeilen ohne Kasten (stellt die Entscheidung aus P3 um, die Ursache in Overleafs Komponente ist nicht geklärt); Befehl vom Server mitliefern statt Präfix im Frontend (Präfix bliebe auch dann fest im Code); Seitengröße 100 und Cursor-Wiederverwendung im E2E-Helfer (nur Test); Befehl je Workflow unter dem Knopf statt eigener Hilfe-Liste (Schritt 3 verlangt die Hilfe mit genau den drei Befehlen).
+
 ## E2E und Tests
 (folgt nach dem letzten Lauf)
 
