@@ -75,6 +75,12 @@ export default {
       ...lesen,
       SpurController.zuweisungLoesen
     )
+    webRouter.post(
+      `${QUELLEN}/:quelle_id/zitate/:zitat_id/bestaetigen`,
+      ...pruefen,
+      SpurController.zitatBestaetigen
+    )
+    webRouter.post(`${QUELLEN}/:quelle_id/ocr`, ...schreiben, SpurController.ocrStarten)
     webRouter.get('/spur/project/:project_id/team', ...lesen, SpurController.team)
     webRouter.get('/spur/project/:project_id/zitate/zugewiesen', ...lesen, SpurController.zugewiesen)
     webRouter.post(

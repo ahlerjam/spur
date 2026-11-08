@@ -1365,6 +1365,63 @@ async page => {
     ok(versuch.status === 403, `Leserin markiert: ${versuch.status}`)
   }
 
+  async function editorVor(anker) {
+    await page.evaluate(text => {
+      const view = window.overleaf.unstable.store.get('editor.view')
+      view.dispatch({ selection: { anchor: view.state.doc.toString().indexOf(text) } })
+    }, anker)
+  }
+
+  features.p4f2 = async () => {
+    const SATZ = 'Short naps restore attention in night shift workers.'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Scan')
+    await panelOeffnen('Quellen')
+    const zeile = page.locator('.spur-liste li', { hasText: 'scan.pdf' })
+    await zeile.getByText('2 Seiten · Kein Text, nicht prüfbar').waitFor()
+    await zeile.getByRole('button', { name: 'Text erkennen' }).click()
+    await zeile.getByText(/Text wird erkannt: Seite \d von 2/).waitFor()
+    await zeile.getByText('2 Seiten · OCR, Sichtprüfung nötig').waitFor({ timeout: 120000 })
+    ok((await zeile.getByRole('button', { name: 'Text erkennen' }).count()) === 0, 'Knopf nach OCR')
+
+    await suchen('restore attention')
+    await page.locator('.spur-panel').getByText(/Short naps restore attention/).first().waitFor()
+    await page.getByRole('button', { name: /scan\.pdf/ }).first().click()
+    await sichtbar('Text dieser Seite per OCR erkannt. Bitte mit dem Bild vergleichen.')
+    await page.locator('.spur-seitentext', { hasText: SATZ }).waitFor()
+    await textMarkieren(SATZ)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    const zitat = page
+      .getByRole('tabpanel', { name: 'Quellen' })
+      .locator('.spur-zitate li', { hasText: SATZ })
+    await zitat.getByText('Wortlaut: OCR, nicht bestätigt').waitFor()
+
+    await editorVor('\\printbibliography')
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith('/einfuegen') && r.ok()),
+      zitat.getByRole('button', { name: 'Einfügen' }).click(),
+    ])
+    await page.waitForFunction(
+      text => window.overleaf.unstable.store.get('editor.view').state.doc.toString().includes(text),
+      `\\enquote{${SATZ}} \\autocite[1]{scan}`
+    )
+    await panelOeffnen('Prüfbericht')
+    const bericht = page
+      .getByRole('tabpanel', { name: 'Prüfbericht' })
+      .locator('.spur-zeile', { hasText: 'Short naps' })
+    await bericht.getByText('Wortlaut: OCR, nicht bestätigt').waitFor()
+    ok((await bericht.getByText('Wortlaut: exakt').count()) === 0, 'OCR-Zitat als exakt')
+
+    // Das Quellen-Panel steht noch auf der Vorschau von scan.pdf.
+    await railTab('Quellen').click()
+    await zitat.getByRole('button', { name: 'Stelle bestätigt' }).click()
+    await zitat.getByText('Wortlaut: von Mensch bestätigt').waitFor()
+    ok((await zitat.getByRole('button', { name: 'Stelle bestätigt' }).count()) === 0, 'Knopf nach Bestätigung')
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await bericht.getByText('Wortlaut: von Mensch bestätigt').waitFor()
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

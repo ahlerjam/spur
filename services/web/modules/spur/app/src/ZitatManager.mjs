@@ -1,6 +1,5 @@
 // EditorController meldet neue Dateien sofort an offene Editoren (Dateibaum).
 import EditorController from '../../../../app/src/Features/Editor/EditorController.mjs'
-import EditorRealTimeController from '../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { bibLesen } from './pruefung/bib.mjs'
 import { zitierpaket } from './pruefung/latex.mjs'
@@ -10,16 +9,10 @@ import { quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as QuellenManager from './QuellenManager.mjs'
 import { mitglieder } from './Team.mjs'
+import { zitateGeaendert as melden } from './live.mjs'
 
 const MAX_ZITAT = 2000
 const MAX_KOMMENTAR = 2000
-
-// Offene Panels laden die Zitate der Quelle neu; der Inhalt geht nicht über den Socket.
-function melden(quelle) {
-  EditorRealTimeController.emitToRoom(String(quelle.projectId), 'spur:zitate', {
-    quelleId: String(quelle._id),
-  })
-}
 
 export async function liste(quelle) {
   return await (await quotes())
@@ -87,6 +80,17 @@ export async function kommentieren(quelle, zitatId, { text, zuweisen }, userId) 
   const neu = await (await quotes()).findOneAndUpdate(
     { _id: zitat._id },
     { $push: { kommentare: kommentar }, $set: felder },
+    { returnDocument: 'after' }
+  )
+  melden(quelle)
+  return neu
+}
+
+export async function bestaetigen(quelle, zitatId, userId) {
+  const zitat = await holen(quelle, zitatId)
+  const neu = await (await quotes()).findOneAndUpdate(
+    { _id: zitat._id },
+    { $set: { bestaetigt: { von: userId, am: jetzt() } } },
     { returnDocument: 'after' }
   )
   melden(quelle)

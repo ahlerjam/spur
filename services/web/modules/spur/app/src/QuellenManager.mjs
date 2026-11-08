@@ -9,7 +9,8 @@ import { Problem } from './probleme.mjs'
 import { bearbeitungen, einstellungen, ereignisse, klone, laeufe, nachrichten, pruefCache, quellen, quellenSeiten, quotes } from './sammlungen.mjs'
 import { jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
-import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { quelleGeaendert } from './live.mjs'
 
 export const MAX_BYTES = 50 * 1024 * 1024
 const SEITE_LISTE = 100
@@ -141,6 +142,89 @@ export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groess
     throw error
   }
   return quelle
+}
+
+// Schreibt die Seite nach jeder Seite fort; steht sie länger still, ist der Prozess weg (Neustart).
+const OCR_VERWAIST_MS = 10 * 60 * 1000
+
+export function ocrZustand(quelle) {
+  if (!quelle.ocr) return null
+  const { status, fertig, gesamt, konfidenz = null, aktualisiert } = quelle.ocr
+  const verwaist = status === 'laeuft' && jetzt() - aktualisiert > OCR_VERWAIST_MS
+  return { status: verwaist ? 'abgebrochen' : status, fertig, gesamt, konfidenz }
+}
+
+export async function ocrStarten(quelle) {
+  if (quelle.art !== 'pdf' || quelle.status === 'text') {
+    throw new Problem(
+      409,
+      'ocr_unnoetig',
+      'Diese Quelle hat schon Text. Texterkennung gibt es nur für gescannte PDFs.'
+    )
+  }
+  const nun = jetzt()
+  const neu = await (await quellen()).findOneAndUpdate(
+    {
+      _id: quelle._id,
+      $or: [
+        { 'ocr.status': { $ne: 'laeuft' } },
+        { 'ocr.aktualisiert': { $lt: new Date(nun - OCR_VERWAIST_MS) } },
+      ],
+    },
+    {
+      $set: {
+        ocr: { status: 'laeuft', fertig: 0, gesamt: quelle.seitenzahl, aktualisiert: nun },
+      },
+    },
+    { returnDocument: 'after' }
+  )
+  if (!neu) {
+    throw new Problem(409, 'ocr_laeuft', 'Die Texterkennung läuft schon. Bitte kurz warten.')
+  }
+  quelleGeaendert(neu)
+  return { quelle: neu, lauf: ocrAusfuehren(neu) }
+}
+
+async function ocrAusfuehren(quelle) {
+  const sammlung = await quellen()
+  const seiten = await quellenSeiten()
+  const ergebnisse = []
+  try {
+    for (let nr = 1; nr <= quelle.seitenzahl; nr++) {
+      const ergebnis = await ocrSeite(dateiPfad(quelle), nr)
+      ergebnisse.push(ergebnis)
+      await seiten.updateOne(
+        { quelleId: quelle._id, seite: nr },
+        { $set: { text: ergebnis.text, ocrKonfidenz: ergebnis.konfidenz } }
+      )
+      await sammlung.updateOne(
+        { _id: quelle._id },
+        { $set: { 'ocr.fertig': nr, 'ocr.aktualisiert': jetzt() } }
+      )
+      quelleGeaendert(quelle)
+    }
+    const werte = ergebnisse.map(e => e.konfidenz).filter(k => k !== null)
+    await sammlung.updateOne(
+      { _id: quelle._id },
+      {
+        $set: {
+          status: ergebnisse.some(e => e.text.trim()) ? 'ocr' : 'kein_text',
+          'ocr.status': 'fertig',
+          'ocr.konfidenz': werte.length
+            ? Math.round(werte.reduce((a, b) => a + b, 0) / werte.length)
+            : null,
+          'ocr.aktualisiert': jetzt(),
+        },
+      }
+    )
+  } catch (error) {
+    logger.warn({ err: error, quelleId: quelle._id }, 'spur: Texterkennung fehlgeschlagen')
+    await sammlung.updateOne(
+      { _id: quelle._id },
+      { $set: { 'ocr.status': 'fehler', 'ocr.aktualisiert': jetzt() } }
+    )
+  }
+  quelleGeaendert(quelle)
 }
 
 export async function liste(projectId, { seite = 0 } = {}) {

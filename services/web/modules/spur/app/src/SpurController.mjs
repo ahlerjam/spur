@@ -42,6 +42,7 @@ function quelleFuerClient(q) {
     fassung: q.fassung,
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
+    ocr: QuellenManager.ocrZustand(q),
   }
 }
 
@@ -107,8 +108,8 @@ export const quellenSuche = mitProblemen(async (req, res) => {
 export const quelleSeite = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   const nummer = Number.parseInt(req.params.seite, 10)
-  const { text, label, seite } = await QuellenManager.seite(quelle, nummer)
-  res.json({ text, label, seite, seitenzahl: quelle.seitenzahl, art: quelle.art })
+  const { text, label, seite, ocrKonfidenz = null } = await QuellenManager.seite(quelle, nummer)
+  res.json({ text, label, seite, seitenzahl: quelle.seitenzahl, art: quelle.art, ocrKonfidenz })
 })
 
 export const quelleBild = mitProblemen(async (req, res) => {
@@ -197,6 +198,7 @@ async function zitateFuerClient(liste) {
     z.angelegtVon,
     ...(z.kommentare ?? []).map(k => k.von),
     ...(z.zugewiesen ? [z.zugewiesen.an, z.zugewiesen.von] : []),
+    z.bestaetigt?.von,
   ])
   const namen = await Team.namen(ids.filter(Boolean))
   const person = id => ({ id, name: Team.nameAus(namen, id) })
@@ -210,6 +212,7 @@ async function zitateFuerClient(liste) {
     zugewiesen: z.zugewiesen
       ? { an: person(z.zugewiesen.an), von: person(z.zugewiesen.von), am: z.zugewiesen.am }
       : null,
+    bestaetigt: z.bestaetigt ? { von: person(z.bestaetigt.von), am: z.bestaetigt.am } : null,
   }))
 }
 
@@ -239,6 +242,18 @@ export const zitatKommentieren = mitProblemen(async (req, res) => {
     new ObjectId(nutzerId(req))
   )
   res.status(201).json((await zitateFuerClient([zitat]))[0])
+})
+
+export const zitatBestaetigen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitat = await ZitatManager.bestaetigen(quelle, req.params.zitat_id, new ObjectId(nutzerId(req)))
+  res.json((await zitateFuerClient([zitat]))[0])
+})
+
+export const ocrStarten = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const { quelle: neu } = await QuellenManager.ocrStarten(quelle)
+  res.status(202).json(quelleFuerClient(neu))
 })
 
 export const zuweisungLoesen = mitProblemen(async (req, res) => {

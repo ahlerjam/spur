@@ -32,6 +32,7 @@ beforeEach(async () => {
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   vi.doMock('../../app/src/schalter.mjs', () => schalterAttrappe().modul)
+  vi.doMock('../../app/src/live.mjs', () => ({ quelleGeaendert: () => {}, zitateGeaendert: () => {} }))
   vi.doMock('../../app/src/Crossref.mjs', () => crossref.modul)
   Quellen = await import('../../app/src/QuellenManager.mjs')
 })

@@ -26,6 +26,7 @@ const quelle: Quelle = {
   fassung: '',
   versatz: 344,
   versatzQuelle: 'pagelabels',
+  ocr: null,
 }
 
 const zitat = (id: string, von: { id: string; name: string }, text: string): Zitat => ({
@@ -36,6 +37,7 @@ const zitat = (id: string, von: { id: string; name: string }, text: string): Zit
   von,
   kommentare: [],
   zugewiesen: null,
+  bestaetigt: null,
 })
 
 const eigenes = zitat('z1', { id: ICH, name: 'Anna Autor' }, 'Eigener Satz.')

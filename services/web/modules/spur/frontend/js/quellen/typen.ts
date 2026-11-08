@@ -1,15 +1,24 @@
+// Unter diesem Mittelwert der Tesseract-Konfidenz gilt die Erkennung als unsicher.
+export const OCR_SICHER_AB = 70
+
 export type Quelle = {
   id: string
   dateiname: string
   key: string
   art: 'pdf' | 'vtt'
   seitenzahl: number
-  status: 'text' | 'kein_text'
+  status: 'text' | 'kein_text' | 'ocr'
   doi: string | null
   titel: string | null
   fassung: string
   versatz: number | null
   versatzQuelle: 'pagelabels' | 'bestaetigt' | null
+  ocr: {
+    status: 'laeuft' | 'fertig' | 'fehler' | 'abgebrochen'
+    fertig: number
+    gesamt: number
+    konfidenz: number | null
+  } | null
 }
 
 export type Treffer = {
@@ -33,4 +42,5 @@ export type Zitat = {
   von: Person
   kommentare: { id: string; von: Person; text: string; am: string }[]
   zugewiesen: { an: Person; von: Person; am: string } | null
+  bestaetigt: { von: Person; am: string } | null
 }

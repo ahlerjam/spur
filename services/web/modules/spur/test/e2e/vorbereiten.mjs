@@ -324,6 +324,9 @@ await db.projects.updateOne(
 )
 await quelleAusFixture(team._id, teamA._id, 'smith2024.pdf')
 
+const scanProjekt = await neuAnlegen(a, 'E2E Scan', { 'main.tex': APA, 'references.bib': BIB })
+await quelleAusFixture(scanProjekt._id, a._id, 'scan.pdf')
+
 await ablageFreigeben()
 console.log('E2E-Daten bereit')
 process.exit(0)

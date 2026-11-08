@@ -120,3 +120,31 @@ describe('istProblem', () => {
     expect(istProblem(zeile)).toBe(erwartet)
   })
 })
+
+describe('OCR-Quellen', () => {
+  const OCR = { ...QUELLE, status: 'ocr', versatz: null }
+  const ocrKontext = bestaetigt => kontext({ quellen: [OCR], bestaetigt: new Map(bestaetigt) })
+
+  it('zeigt einen gefundenen Wortlaut nie als exakt, solange kein Mensch die Stelle bestätigt hat', () => {
+    const zeile = zeileBewerten(fund(), ocrKontext([]))
+    expect(zeile.wortlaut).toBe('ocr_unbestaetigt')
+    expect(istProblem(zeile)).toBe(true)
+  })
+
+  it('gilt als von Mensch bestätigt, wenn ein bestätigtes Zitat der Quelle den Text enthält', () => {
+    const zeile = zeileBewerten(
+      fund({ roh: 'consolidation of declarative memory' }),
+      ocrKontext([['q1', ['Sleep supports the  consolidation of\ndeclarative memory.']]])
+    )
+    expect(zeile.wortlaut).toBe('bestaetigt')
+  })
+
+  it('zählt bestätigte Zitate einer anderen Quelle oder mit anderem Text nicht', () => {
+    expect(zeileBewerten(fund(), ocrKontext([['q2', [SEITEN[1].text]]])).wortlaut).toBe('ocr_unbestaetigt')
+    expect(zeileBewerten(fund(), ocrKontext([['q1', ['Anfang der Studie.']]])).wortlaut).toBe('ocr_unbestaetigt')
+  })
+
+  it('lässt abweichenden Wortlaut abweichend', () => {
+    expect(zeileBewerten(fund({ roh: 'Rest supports memory.' }), ocrKontext([])).wortlaut).toBe('abweichend')
+  })
+})

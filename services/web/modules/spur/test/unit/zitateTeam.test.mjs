@@ -145,3 +145,14 @@ describe('zugewiesenAn', () => {
     expect(await Zitate.zugewiesenAn(new ObjectId(), anna)).toEqual([])
   })
 })
+
+describe('bestaetigen', () => {
+  it('hält fest, wer die Stelle bestätigt hat, und meldet es', async () => {
+    const zitat = await Zitate.markieren(quelle, MARKE, anna)
+    gesendet.length = 0
+    const neu = await Zitate.bestaetigen(quelle, String(zitat._id), ben)
+    expect(neu.bestaetigt).toEqual({ von: ben, am: new Date('2026-11-07T10:00:00Z') })
+    expect((await Zitate.holen(quelle, String(zitat._id))).bestaetigt.von).toEqual(ben)
+    expect(gesendet).toHaveLength(1)
+  })
+})

@@ -40,7 +40,11 @@ export default function Zitate({
   textElement: HTMLElement | null
 }) {
   const { t } = useTranslation()
-  const { write: darfSchreiben, comment: darfKommentieren } = usePermissionsContext()
+  const {
+    write: darfSchreiben,
+    comment: darfKommentieren,
+    trackedWrite: darfPruefen,
+  } = usePermissionsContext()
   const { view } = useEditorViewContext()
   const { socket } = useConnectionContext()
   const [zitate, setZitate] = useState<Zitat[]>([])
@@ -66,6 +70,19 @@ export default function Zitate({
     [laden, quelle.id]
   )
   useSocketListener(socket, 'spur:zitate', live)
+
+  const bestaetigen = async (zitat: Zitat) => {
+    setFehler(null)
+    try {
+      await jsonAnfrage('POST', projektPfad(`${basis}/${zitat.id}/bestaetigen`))
+      await laden()
+      // Der Knopf verschwindet: Fokus auf den neuen Status statt auf BODY.
+      document.getElementById(`spur-wortlaut-${zitat.id}`)?.focus()
+      pruefenVerzoegert()
+    } catch (error) {
+      setFehler((error as Error).message)
+    }
+  }
 
   const ich = getMeta('ol-user_id')
   const sichtbar = nurEigene ? zitate.filter(z => z.von.id === ich) : zitate
@@ -156,6 +173,20 @@ export default function Zitate({
               {' · '}
               {zitat.von.id === ich ? t('spur_von_ihnen') : t('spur_von', { name: zitat.von.name })}
             </p>
+            {quelle.status === 'ocr' && (
+              <p
+                className="spur-zeile-meta spur-ocr-wortlaut"
+                id={`spur-wortlaut-${zitat.id}`}
+                tabIndex={-1}
+              >
+                {zitat.bestaetigt ? t('spur_wortlaut_bestaetigt') : t('spur_wortlaut_ocr')}
+              </p>
+            )}
+            {quelle.status === 'ocr' && !zitat.bestaetigt && darfPruefen && (
+              <OLButton variant="secondary" size="sm" onClick={() => bestaetigen(zitat)}>
+                {t('spur_stelle_bestaetigt')}
+              </OLButton>
+            )}
             <ZitatKommentare
               zitat={zitat}
               basis={basis}

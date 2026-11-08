@@ -52,6 +52,7 @@ beforeEach(async () => {
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   vi.doMock('../../app/src/schalter.mjs', () => schalter.modul)
+  vi.doMock('../../app/src/live.mjs', () => ({ quelleGeaendert: () => {}, zitateGeaendert: () => {} }))
   vi.doMock('../../app/src/Crossref.mjs', () => crossref.modul)
   vi.doMock('../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs', () => ({
     default: { promises: { flushProjectToMongo: flush } },
@@ -152,5 +153,24 @@ describe('bereichPruefen', () => {
     const nurZweites = await PruefManager.bereichPruefen(projekt, text, zweites, zweites + 5)
     expect(nurZweites.map(z => z.wortlaut)).toEqual(['abweichend'])
     expect(await PruefManager.bereichPruefen(projekt, text, text.indexOf('\n\n') + 1, text.indexOf('\n\n') + 1)).toEqual([])
+  })
+})
+
+describe('bericht mit OCR-Quelle', () => {
+  it('meldet „OCR, nicht bestätigt“ und nach der Bestätigung eines Zitats „bestätigt“, ohne alten Cache', async () => {
+    const [smith] = await Quellen.alle(projekt)
+    await datenbank.db.collection('spurSources').updateOne({ _id: smith._id }, { $set: { status: 'ocr' } })
+    expect((await PruefManager.bericht(projekt)).zeilen[0].wortlaut).toBe('ocr_unbestaetigt')
+    await datenbank.db.collection('spurQuotes').insertOne({
+      projectId: projekt,
+      quelleId: smith._id,
+      seite: 3,
+      text: 'Sleep supports the consolidation of declarative memory.',
+      bestaetigt: { von: new ObjectId(), am: schalter.zeit },
+    })
+    await datenbank.db.collection('spurQuotes').insertOne({ projectId: new ObjectId(), quelleId: smith._id, text: 'fremd', bestaetigt: { am: schalter.zeit } })
+    const { zeilen, statistik } = await PruefManager.bericht(projekt)
+    expect(zeilen[0]).toMatchObject({ wortlaut: 'bestaetigt', problem: false })
+    expect(statistik.geprueft).toBe(2)
   })
 })

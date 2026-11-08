@@ -11,13 +11,14 @@ import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import QuelleLoeschenModal from './quelle-loeschen-modal'
 import SeitenzahlBestaetigen from './seitenzahl-bestaetigen'
 import Zitate from './zitate'
-import type { Quelle } from './typen'
+import { OCR_SICHER_AB, type Quelle } from './typen'
 
 type Seite = {
   text: string
   label: string | null
   seite: number
   seitenzahl: number
+  ocrKonfidenz: number | null
 }
 
 export default function QuelleVorschau({
@@ -106,6 +107,13 @@ export default function QuelleVorschau({
         )}
         {seite?.label && quelle.art === 'vtt' && (
           <p className="spur-zeile-meta">{seite.label}</p>
+        )}
+        {seite && quelle.status === 'ocr' && (
+          <p className="spur-ocr-hinweis">
+            {seite.ocrKonfidenz != null && seite.ocrKonfidenz < OCR_SICHER_AB
+              ? t('spur_ocr_seite_unsicher', { konfidenz: seite.ocrKonfidenz })
+              : t('spur_ocr_seite')}
+          </p>
         )}
         {seite?.text.trim() ? (
           <pre className="spur-seitentext" ref={setTextElement}>

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
-import { seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from '../../app/src/pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, tsvAuswerten, versatzAusLabels, vttSeiten } from '../../app/src/pdf.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 
 const fixture = name => fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url))
@@ -90,5 +90,40 @@ Teilnehmerin: Antwort
 
   it('liefert nichts für Text ohne Zeitmarken', () => {
     expect(vttSeiten('kein vtt')).toEqual([])
+  })
+})
+
+// Echte Texterkennung mit 300 dpi dauert unter Last einige Sekunden je Seite.
+const OCR_ZEIT = 60000
+
+describe('OCR', () => {
+  it('erkennt den Satz auf dem Bild eines Scans, mit Konfidenz', async () => {
+    const { text, konfidenz } = await ocrSeite(fixture('scan.pdf'), 1)
+    expect(text.replace(/\s+/g, ' ')).toContain('Short naps restore attention in night shift workers.')
+    expect(konfidenz).toBeGreaterThan(80)
+    expect(konfidenz).toBeLessThanOrEqual(100)
+  }, OCR_ZEIT)
+
+  it('liefert für eine leere Seite keinen Text und keine Konfidenz', async () => {
+    expect(await ocrSeite(fixture('scan.pdf'), 2)).toEqual({ text: '', konfidenz: null })
+  }, OCR_ZEIT)
+
+  it('scheitert bei einer Seite, die es nicht gibt', async () => {
+    expect(await fehlerVon(ocrSeite(fixture('scan.pdf'), 9))).toBeInstanceOf(Error)
+  })
+
+  it('setzt Zeilen und Absätze aus der TSV-Ausgabe von Tesseract zusammen', () => {
+    const kopf = 'level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext'
+    const wort = (block, par, zeile, nr, conf, text) => `5\t1\t${block}\t${par}\t${zeile}\t${nr}\t0\t0\t1\t1\t${conf}\t${text}`
+    const tsv = [
+      kopf,
+      '1\t1\t0\t0\t0\t0\t0\t0\t1\t1\t-1\t',
+      wort(1, 1, 1, 1, 90, 'Erste'),
+      wort(1, 1, 1, 2, 80, 'Zeile'),
+      wort(1, 1, 2, 1, 70, 'zweite'),
+      wort(1, 1, 2, 2, -1, ''),
+      wort(2, 1, 1, 1, 40, 'Neu'),
+    ].join('\n')
+    expect(tsvAuswerten(tsv)).toEqual({ text: 'Erste Zeile\nzweite\n\nNeu', konfidenz: 70 })
   })
 })

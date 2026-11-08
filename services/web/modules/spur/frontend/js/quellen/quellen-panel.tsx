@@ -6,18 +6,52 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
+import { useConnectionContext } from '@/features/ide-react/context/connection-context'
+import useSocketListener from '@/features/ide-react/hooks/use-socket-listener'
 import { anfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
 import Zugewiesen from './zugewiesen'
-import type { Quelle, Treffer } from './typen'
+import { OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
 
 const MAX_BYTES = 50 * 1024 * 1024
 
-function QuellenZeile({ quelle, oeffnen }: { quelle: Quelle; oeffnen: () => void }) {
+function TextStatus({ quelle }: { quelle: Quelle }) {
   const { t } = useTranslation()
+  const ocr = quelle.ocr
+  if (ocr?.status === 'laeuft') {
+    return (
+      <span role="status">
+        <OLSpinner size="sm" />{' '}
+        {t('spur_ocr_laeuft', { fertig: ocr.fertig, gesamt: ocr.gesamt })}
+      </span>
+    )
+  }
+  if (quelle.status === 'text') return <>{t('spur_text_erkannt')}</>
+  if (quelle.status === 'ocr') {
+    const unsicher = ocr?.konfidenz != null && ocr.konfidenz < OCR_SICHER_AB
+    return <>{t(unsicher ? 'spur_ocr_unsicher' : 'spur_ocr_pruefen')}</>
+  }
+  if (ocr?.status === 'fehler') return <>{t('spur_ocr_fehler')}</>
+  if (ocr?.status === 'abgebrochen') return <>{t('spur_ocr_abgebrochen')}</>
+  if (ocr?.status === 'fertig') return <>{t('spur_ocr_nichts')}</>
+  return <>{t('spur_kein_text')}</>
+}
+
+function QuellenZeile({
+  quelle,
+  oeffnen,
+  textErkennen,
+}: {
+  quelle: Quelle
+  oeffnen: () => void
+  textErkennen?: () => void
+}) {
+  const { t } = useTranslation()
+  const ocrMoeglich =
+    textErkennen && quelle.art === 'pdf' && quelle.status === 'kein_text' && quelle.ocr?.status !== 'laeuft'
   return (
     <li className="spur-zeile">
       <OLButton
@@ -33,9 +67,14 @@ function QuellenZeile({ quelle, oeffnen }: { quelle: Quelle; oeffnen: () => void
           count: quelle.seitenzahl,
         })}
         {' · '}
-        {quelle.status === 'text' ? t('spur_text_erkannt') : t('spur_kein_text')}
+        <TextStatus quelle={quelle} />
         {quelle.fassung && ` · ${quelle.fassung}`}
       </p>
+      {ocrMoeglich && (
+        <OLButton variant="secondary" size="sm" onClick={textErkennen}>
+          {t('spur_text_erkennen')}
+        </OLButton>
+      )}
     </li>
   )
 }
@@ -95,6 +134,20 @@ export default function QuellenPanel() {
     laden()
     andereLaden().catch(error => setFehler(error.message))
   }, [laden, andereLaden])
+
+  // Fortschritt der Texterkennung und Änderungen anderer an Quellen.
+  const { socket } = useConnectionContext()
+  useSocketListener(socket, 'spur:quellen', laden)
+
+  const textErkennen = async (quelle: Quelle) => {
+    setFehler(null)
+    try {
+      await anfrage(projektPfad(`/quellen/${quelle.id}/ocr`), { method: 'POST' })
+      await laden()
+    } catch (error) {
+      setFehler((error as Error).message)
+    }
+  }
 
   const hochladen = async (dateien: FileList | null) => {
     const datei = dateien?.[0]
@@ -251,6 +304,7 @@ export default function QuellenPanel() {
                   key={quelle.id}
                   quelle={quelle}
                   oeffnen={() => setOffen({ quelle, seite: 1 })}
+                  textErkennen={darfSchreiben ? () => textErkennen(quelle) : undefined}
                 />
               ))}
             </ul>

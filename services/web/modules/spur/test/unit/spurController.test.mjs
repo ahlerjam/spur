@@ -32,8 +32,10 @@ beforeEach(async () => {
       projekteMitQuellen: vi.fn(async () => []),
       klonHinweis: vi.fn(async () => null),
       uebernehmen: vi.fn(async () => 2),
+      ocrZustand: q => q.ocr ?? null,
+      ocrStarten: vi.fn(async q => ({ quelle: { ...q, ocr: { status: 'laeuft', fertig: 0, gesamt: 3 } }, lauf: Promise.resolve() })),
     },
-    Zitate: { liste: vi.fn(), markieren: vi.fn(), holen: vi.fn(), einfuegen: vi.fn(), kommentieren: vi.fn(), zuweisungLoesen: vi.fn(async () => {}), zugewiesenAn: vi.fn(async () => []) },
+    Zitate: { liste: vi.fn(), markieren: vi.fn(), holen: vi.fn(), einfuegen: vi.fn(), kommentieren: vi.fn(), bestaetigen: vi.fn(), zuweisungLoesen: vi.fn(async () => {}), zugewiesenAn: vi.fn(async () => []) },
     Team: {
       namen: vi.fn(async () => new Map([[String(anna), 'Anna Autor'], ['ben', 'Ben']])),
       nameAus: (namen, id) => namen.get(String(id)) ?? 'Gelöschtes Konto',
@@ -101,7 +103,7 @@ describe('Quellenliste und Suche', () => {
     m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
     const { res } = await ausfuehren(C.quellenListe, req({ query: { seite: '2' } }))
     expect(m.Quellen.liste).toHaveBeenCalledWith(projekt, { seite: 2 })
-    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels' })
+    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', ocr: null })
     expect(res.body).toMatchObject({ gesamt: 1, seitengroesse: 100 })
   })
 
@@ -179,7 +181,7 @@ describe('Seiten, Bilder und Dateien', () => {
   it('quelleSeite liefert Text, Label und Seitenzahl', async () => {
     const { res } = await ausfuehren(C.quelleSeite, mitQuelle())
     expect(m.Quellen.seite).toHaveBeenCalledWith(expect.anything(), 3)
-    expect(res.body).toEqual({ text: 'Text', label: '347', seite: 3, seitenzahl: 8, art: 'pdf' })
+    expect(res.body).toEqual({ text: 'Text', label: '347', seite: 3, seitenzahl: 8, art: 'pdf', ocrKonfidenz: null })
   })
 
   it('quelleBild sendet das PNG einer PDF-Seite', async () => {
@@ -355,8 +357,9 @@ describe('Zitate und Prüfbericht', () => {
           von: { id: anna, name: 'Anna Autor' },
           kommentare: [{ id: 'k1', von: { id: 'ben', name: 'Ben' }, text: 'Prüfen', am }],
           zugewiesen: { an: { id: anna, name: 'Anna Autor' }, von: { id: 'ben', name: 'Ben' }, am },
+          bestaetigt: null,
         },
-        { id: 'z2', seite: 4, label: null, text: 'Alt', von: { id: expect.any(ObjectId), name: 'Gelöschtes Konto' }, kommentare: [], zugewiesen: null },
+        { id: 'z2', seite: 4, label: null, text: 'Alt', von: { id: expect.any(ObjectId), name: 'Gelöschtes Konto' }, kommentare: [], zugewiesen: null, bestaetigt: null },
       ],
     })
   })
@@ -367,6 +370,21 @@ describe('Zitate und Prüfbericht', () => {
     expect(m.Zitate.kommentieren).toHaveBeenCalledWith(expect.anything(), 'z1', { text: 'Prüfen', zuweisen: String(anna) }, anna)
     expect(res.statusCode).toBe(201)
     expect(res.body.id).toBe('z1')
+  })
+
+  it('zitatBestaetigen nennt, wer bestätigt hat', async () => {
+    const am = new Date(0)
+    m.Zitate.bestaetigen.mockResolvedValue({ _id: 'z1', seite: 1, label: null, text: 'Satz', angelegtVon: anna, bestaetigt: { von: 'ben', am } })
+    const { res } = await ausfuehren(C.zitatBestaetigen, mitQuelle())
+    expect(m.Zitate.bestaetigen).toHaveBeenCalledWith(expect.anything(), 'z1', anna)
+    expect(res.body.bestaetigt).toEqual({ von: { id: 'ben', name: 'Ben' }, am })
+  })
+
+  it('ocrStarten antwortet mit 202 und dem Fortschritt', async () => {
+    const { res } = await ausfuehren(C.ocrStarten, mitQuelle())
+    expect(m.Quellen.ocrStarten).toHaveBeenCalled()
+    expect(res.statusCode).toBe(202)
+    expect(res.body.ocr).toEqual({ status: 'laeuft', fertig: 0, gesamt: 3 })
   })
 
   it('zuweisungLoesen antwortet mit 204', async () => {

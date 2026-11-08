@@ -21,7 +21,7 @@
     "Ein Zitat daraus zeigt „Wortlaut: OCR, nicht bestätigt“",
     "Nach „Stelle bestätigt“ zeigt es „Wortlaut: von Mensch bestätigt“"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

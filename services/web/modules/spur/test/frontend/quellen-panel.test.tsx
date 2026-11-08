@@ -47,6 +47,7 @@ describe('Quellen-Panel', function () {
           fassung: '',
           versatz: null,
           versatzQuelle: null,
+          ocr: null,
         },
       ],
       gesamt: 1,

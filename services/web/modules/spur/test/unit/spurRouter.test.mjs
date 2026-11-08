@@ -76,6 +76,8 @@ describe('Rechte der Routen', () => {
     ['post', `${Q}/:quelle_id/zitate/:zitat_id/kommentare`, 'lesen', 'zitatKommentieren'],
     ['delete', `${Q}/:quelle_id/zitate/:zitat_id/zuweisung`, 'lesen', 'zuweisungLoesen'],
     ['get', '/spur/project/:project_id/team', 'lesen', 'team'],
+    ['post', `${Q}/:quelle_id/zitate/:zitat_id/bestaetigen`, 'pruefen', 'zitatBestaetigen'],
+    ['post', `${Q}/:quelle_id/ocr`, 'schreiben', 'ocrStarten'],
     ['get', '/spur/project/:project_id/zitate/zugewiesen', 'lesen', 'zugewiesen'],
     ['get', '/spur/project/:project_id/pruefbericht', 'lesen', 'pruefbericht'],
     ['get', '/spur/project/:project_id/claude', 'lesen', 'claudeStatus'],
