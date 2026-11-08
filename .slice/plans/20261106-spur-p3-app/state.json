@@ -1,1 +1,1 @@
-{"state": "queued", "builderModel": "opus", "builderAdvisor": "opus", "dependsOn": ["20261106-spur-p2-recherche"], "where": "cloud"}
+{"state": "running", "builderModel": "opus", "builderAdvisor": "opus", "dependsOn": ["20261106-spur-p2-recherche"], "where": "cloud", "cloudSession": "https://claude.ai/code/session_01XpJUcgP48otkuxkMwZkhNc", "started": "2026-11-08T14:28:23Z"}
