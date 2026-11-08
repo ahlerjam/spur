@@ -48,6 +48,12 @@ async page => {
 
   async function projektOeffnen(name) {
     await page.goto(`${BASE}/project`)
+    // Die Liste zeigt nur 20 Projekte; e2e-a hat mehr. Wie ein Mensch über die Suche filtern.
+    await page
+      .getByPlaceholder(/^(Suche in allen Projekten|Search in all projects)…$/)
+      .filter({ visible: true })
+      .first()
+      .fill(name)
     await page.getByRole('link', { name, exact: true }).first().click()
     await page.waitForURL(/\/project\/[0-9a-f]{24}/)
     await page.getByRole('button', { name: KOMPILIEREN }).first().waitFor()
