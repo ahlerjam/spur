@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 
@@ -59,6 +59,10 @@ beforeEach(async () => {
 })
 
 const aufnehmen = doi => Aufnahme.perDoi({ projectId, userId, doi })
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('perDoi', () => {
   it('lädt das freie PDF und legt Quelle und .bib-Eintrag mit den DOI-Metadaten an', async () => {

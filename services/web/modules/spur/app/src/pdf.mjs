@@ -48,3 +48,8 @@ export function vttSeiten(text) {
   }
   return abschnitte
 }
+
+export async function seitenzahl(pfad) {
+  const { stdout } = await ausfuehren('pdfinfo', [pfad], GRENZEN)
+  return Number(/^Pages:\s+(\d+)/m.exec(stdout)?.[1] ?? 0)
+}

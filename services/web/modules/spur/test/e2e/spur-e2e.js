@@ -1585,6 +1585,67 @@ async page => {
     ok(zeilen.includes('quelle-077.pdf,quelle-77,signifikant'), `Zelle fehlt: ${zeilen.find(z => z.startsWith('quelle-077'))}`)
   }
 
+  async function kompiliertBeiClaude(token, pid) {
+    const start = await werkzeug(token, 'compile', { project_id: pid })
+    ok(!start.fehler && start.inhalt.job_id && start.inhalt.status === 'laeuft', `compile: ${JSON.stringify(start.inhalt)}`)
+    for (let i = 0; i < 240; i++) {
+      const { inhalt } = await werkzeug(token, 'job_status', { job_id: start.inhalt.job_id })
+      if (inhalt.status !== 'laeuft') return inhalt
+      await page.waitForTimeout(500)
+    }
+    fail('Compile wurde nicht fertig')
+  }
+
+  async function seitenPng(token, pid, seite) {
+    const { daten } = await mcp(token, 'tools/call', { name: 'page_image', arguments: { project_id: pid, seite } })
+    const [inhalt] = daten.result.content
+    ok(!daten.result.isError && inhalt.type === 'image' && inhalt.mimeType === 'image/png', `page_image: ${JSON.stringify(daten.result).slice(0, 300)}`)
+    const png = Buffer.from(inhalt.data, 'base64')
+    ok(png.subarray(1, 4).toString() === 'PNG', 'Kein PNG')
+    return { breite: png.readUInt32BE(16), hoehe: png.readUInt32BE(20) }
+  }
+
+  features.p2f7 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Compile')
+    const job = await kompiliertBeiClaude(token, pid)
+    ok(job.status === 'fertig' && job.ergebnis.compile === 'success', `job_status: ${JSON.stringify(job)}`)
+    const seite = await seitenPng(token, pid, 2)
+    ok(seite.hoehe > seite.breite, `Artikelseite ${seite.breite}×${seite.hoehe}`)
+    const zuWeit = await werkzeug(token, 'page_image', { project_id: pid, seite: 3 })
+    ok(zuWeit.fehler && zuWeit.inhalt.fehler === 'seite_fehlt', `Seite 3: ${JSON.stringify(zuWeit.inhalt)}`)
+
+    const kaputt = await projektId(token, 'E2E Kaputt')
+    ok((await kompiliertBeiClaude(token, kaputt)).status === 'fertig', 'Kaputtes Dokument nicht fertig')
+    const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: kaputt })
+    const fehler = log.fehler.find(f => f.meldung === 'Undefined control sequence.')
+    ok(fehler?.zeile === 4 && fehler.kontext.includes('\\kaputtesmakro'), `compile_log: ${JSON.stringify(log.fehler)}`)
+
+    const folien = await projektId(token, 'E2E Folien')
+    const BEAMER = String.raw`\documentclass{beamer}
+\begin{document}
+\begin{frame}{Schlaf und Gedächtnis}
+Slow-wave sleep stabilisiert Gedächtnisspuren.
+\end{frame}
+\begin{frame}{Ergebnisse}
+\begin{itemize}
+\item Zwei Nächte
+\item Gemischte Modelle
+\end{itemize}
+\end{frame}
+\end{document}
+`
+    const edit = await werkzeug(token, 'doc_edit', { project_id: folien, pfad: 'main.tex', alt: 'Folien folgen.\n', neu: BEAMER, idempotenz_schluessel: `folien-${Date.now()}` })
+    ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
+    const quelltext = (await werkzeug(token, 'doc_read', { project_id: folien, pfad: 'main.tex' })).inhalt.text
+    ok(quelltext.includes('\\begin{frame}{Ergebnisse}'), `Quelltext: ${quelltext}`)
+    const folienJob = await kompiliertBeiClaude(token, folien)
+    ok(folienJob.ergebnis.compile === 'success', `Beamer: ${JSON.stringify(folienJob)}`)
+    const folie = await seitenPng(token, folien, 2)
+    ok(folie.breite > folie.hoehe, `Folie ${folie.breite}×${folie.hoehe} ist kein Querformat`)
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

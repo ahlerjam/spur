@@ -39,7 +39,9 @@ function serverBauen({ authInfo }) {
       { description: werkzeug.description, inputSchema: werkzeug.inputSchema },
       async (args, ctx) => {
         try {
-          return antwortVon(await werkzeug.ausfuehren(args, kontext, ctx))
+          const ergebnis = await werkzeug.ausfuehren(args, kontext, ctx)
+          // Werkzeuge mit eigenem MCP-Inhalt (etwa Bilder) liefern content selbst.
+          return werkzeug.eigenerInhalt ? ergebnis : antwortVon(ergebnis)
         } catch (error) {
           if (error instanceof WerkzeugFehler) return fehlerVon(error.code, error.message)
           if (error instanceof Problem) return fehlerVon(error.typ, error.message)

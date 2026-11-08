@@ -15,6 +15,7 @@ import * as Recherche from '../recherche/Recherche.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
+import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
 
 const SEITE = 50
 const MAX_TEXT = 40000
@@ -401,6 +402,43 @@ Object.assign(WERKZEUGE, {
     async ausfuehren({ project_id: pid, source_id: quelleId, spalte, text }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, SCHREIBEN)
       return await Literatur.vorschlagen(projectId, { quelleId, spalte, text, botId })
+    },
+  },
+
+  compile: {
+    description: 'Kompiliert das Projekt wie der Knopf im Editor. Liefert sofort ein Job-Handle; den Stand meldet job_status.',
+    inputSchema: z.object({ project_id: id }),
+    async ausfuehren({ project_id: pid }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await Kompilieren.starten({ projectId, menschId, botId })
+    },
+  },
+
+  job_status: {
+    description: 'Stand eines Jobs: „laeuft“, „fertig“ oder „fehlgeschlagen“, dazu das Ergebnis.',
+    inputSchema: z.object({ job_id: id }),
+    async ausfuehren({ job_id: jobId }, { botId }) {
+      return await Kompilieren.status(jobId, botId)
+    },
+  },
+
+  compile_log: {
+    description: 'Fehler des letzten Compiles mit Zeile und Meldung, dazu das Ende des LaTeX-Logs.',
+    inputSchema: z.object({ project_id: id }),
+    async ausfuehren({ project_id: pid }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await Kompilieren.log({ projectId, botId })
+    },
+  },
+
+  page_image: {
+    description: 'Eine Seite des zuletzt kompilierten PDFs als PNG, etwa um Layout und Folien zu prüfen.',
+    inputSchema: z.object({ project_id: id, seite: z.number().int().min(1).max(2000) }),
+    eigenerInhalt: true,
+    async ausfuehren({ project_id: pid, seite }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      const bild = await Kompilieren.seitenBild({ projectId, botId, seite })
+      return { content: [{ type: 'image', data: bild.toString('base64'), mimeType: 'image/png' }] }
     },
   },
 })

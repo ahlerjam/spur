@@ -41,7 +41,7 @@
 "`compile_log` liefert die Fehlerzeile eines kaputten Dokuments",
 "`page_image` liefert Seite 2 als PNG",
 "Ein Beamer-Projekt aus dem Fake-Client kompiliert zu Folien mit LaTeX-Quelltext"
-], "passes": false, "ui": false},
+], "passes": true, "ui": false},
 {"id": "f8", "title": "Zahlen kommen aus ergebnisse.tex", "steps": [
 "Der Fake-Client legt `ergebnisse.tex` mit `\\newcommand{\\nGesamt}{412}` an: Der Inhalt erscheint als Track Change",
 "Im PDF steht nach `\\nGesamt` die Zahl 412",

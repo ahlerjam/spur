@@ -313,6 +313,22 @@ await neuAnlegen(a, 'E2E Recherche Ziel', { 'main.tex': LEER })
 await neuAnlegen(a, 'E2E Beschaffung', { 'main.tex': LEER })
 await neuAnlegen(a, 'E2E Import', { 'main.tex': LEER })
 await neuAnlegen(a, 'E2E Literatur', { 'main.tex': LEER })
+await neuAnlegen(a, 'E2E Compile', {
+  'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Erste Seite.
+\newpage
+Zweite Seite.
+\end{document}`,
+})
+await neuAnlegen(a, 'E2E Kaputt', {
+  'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Text davor.
+\kaputtesmakro{}
+\end{document}`,
+})
+await neuAnlegen(a, 'E2E Folien', { 'main.tex': 'Folien folgen.\n' })
 for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll]) {
   await (await sammlung()).deleteMany({})
 }
