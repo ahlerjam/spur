@@ -63,6 +63,8 @@ export default {
     webRouter.post(`${QUELLEN}/holen`, ...schreiben, SpurController.quellenHolen)
     webRouter.delete(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleLoeschen)
     webRouter.get(`${QUELLEN}/:quelle_id/zitate`, ...lesen, SpurController.zitate)
+    webRouter.get(`${QUELLEN}/:quelle_id/notizen`, ...lesen, SpurController.notizen)
+    webRouter.put(`${QUELLEN}/:quelle_id/notizen`, ...schreiben, SpurController.notizSetzen)
     webRouter.post(`${QUELLEN}/:quelle_id/zitate`, ...schreiben, SpurController.zitatMarkieren)
     webRouter.post(
       `${QUELLEN}/:quelle_id/zitate/:zitat_id/einfuegen`,
@@ -93,6 +95,13 @@ export default {
     webRouter.get(`${BESCHAFFUNG}/export/:format`, ...lesen, SpurController.beschaffungExport)
     webRouter.post(`${BESCHAFFUNG}/hochladen`, ...schreiben, hochladenMitGrenze, SpurController.beschaffungHochladen)
     webRouter.post(`${BESCHAFFUNG}/:eintrag_id/zuordnen`, ...schreiben, SpurController.beschaffungZuordnen)
+    const MATRIX = '/spur/project/:project_id/matrix'
+    webRouter.get(MATRIX, ...lesen, SpurController.matrix)
+    webRouter.get(`${MATRIX}.csv`, ...lesen, SpurController.matrixExport)
+    webRouter.post(`${MATRIX}/spalten`, ...schreiben, SpurController.matrixSpalte)
+    webRouter.put(`${MATRIX}/zellen`, ...schreiben, SpurController.matrixZelle)
+    webRouter.post(`${MATRIX}/zellen/bestaetigen`, ...schreiben, SpurController.matrixBestaetigen)
+    webRouter.post(`${MATRIX}/zellen/verwerfen`, ...schreiben, SpurController.matrixVerwerfen)
     webRouter.get('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroSammlungen)
     webRouter.post('/spur/project/:project_id/import/zotero', ...schreiben, SpurController.zoteroImportieren)
     webRouter.put('/spur/beschaffung/vorlage', angemeldet, SpurController.bibliotheksvorlageSetzen)

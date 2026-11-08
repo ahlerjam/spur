@@ -346,3 +346,61 @@
 .spur-import-fehler {
   color: var(--content-danger);
 }
+
+.spur-notiz {
+  margin: var(--spacing-03) 0;
+
+  .form-label {
+    margin-bottom: var(--spacing-02);
+    font-size: var(--font-size-02);
+  }
+}
+
+.spur-notiz-aktion {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-03);
+  margin-top: var(--spacing-02);
+}
+
+.spur-matrix-werkzeuge {
+  margin-bottom: var(--spacing-04);
+}
+
+.spur-matrix-rahmen {
+  overflow-x: auto;
+}
+
+.spur-matrix {
+  caption {
+    caption-side: top;
+    color: var(--content-secondary);
+  }
+
+  th[scope='row'] {
+    min-width: 12rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .spur-matrix-zelle {
+    min-width: 12rem;
+  }
+}
+
+.spur-matrix-vorschlag {
+  margin-top: var(--spacing-02);
+  padding: var(--spacing-02) var(--spacing-03);
+  border-left: 3px solid var(--border-active);
+  background: var(--bg-light-secondary);
+
+  p {
+    margin: 0 0 var(--spacing-02);
+  }
+}
+
+@media (min-width: 768px) {
+  .spur-matrix-dialog {
+    max-width: min(1140px, 95vw);
+  }
+}

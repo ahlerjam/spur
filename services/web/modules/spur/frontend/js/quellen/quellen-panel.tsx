@@ -8,6 +8,7 @@ import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
+import MatrixModal from '../literatur/matrix-modal'
 import ImportModal from './import-modal'
 import QuellenHolenModal, { type Projekt } from './quellen-holen-modal'
 import QuelleVorschau from './quelle-vorschau'
@@ -56,6 +57,7 @@ export default function QuellenPanel() {
   const [holenDialog, setHolenDialog] = useState<{ vorauswahl?: string } | null>(null)
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'info'; text: string } | null>(null)
   const [importOffen, setImportOffen] = useState(false)
+  const [matrixOffen, setMatrixOffen] = useState(false)
   const dateiFeld = useRef<HTMLInputElement>(null)
   const sucheFeld = useRef<HTMLInputElement>(null)
   const warOffen = useRef(false)
@@ -193,6 +195,9 @@ export default function QuellenPanel() {
         >
           {t('spur_quellen_exportieren')}
         </OLButton>
+        <OLButton variant="secondary" size="sm" onClick={() => setMatrixOffen(true)}>
+          {t('spur_literaturmatrix')}
+        </OLButton>
       </div>
       {klonVon && darfSchreiben && (
         <div className="spur-panel-hinweis">
@@ -269,6 +274,7 @@ export default function QuellenPanel() {
           </>
         )}
       </div>
+      {matrixOffen && <MatrixModal schliessen={() => setMatrixOffen(false)} />}
       {importOffen && (
         <ImportModal
           schliessen={() => setImportOffen(false)}

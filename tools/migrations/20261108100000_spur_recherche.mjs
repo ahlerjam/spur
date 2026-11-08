@@ -3,13 +3,18 @@ import { getCollectionInternal } from './lib/mongodb.mjs'
 
 const tags = ['server-ce', 'server-pro']
 
-// P2: Eine DOI steht höchstens einmal je Projekt auf der Beschaffungsliste; Protokoll neueste zuerst.
+// P2: Eine DOI steht höchstens einmal je Projekt auf der Beschaffungsliste, je Quelle und Zitat gibt es eine
+// Notiz, je Quelle und Spalte eine Matrixzelle; das Protokoll liest neueste zuerst.
 const indexes = {
   spurAcquisitions: [{ key: { projectId: 1, doi: 1 }, name: 'projectId_1_doi_1', unique: true }],
   spurSearchLog: [{ key: { projectId: 1, datum: -1 }, name: 'projectId_1_datum_-1' }],
+  spurNotes: [{ key: { projectId: 1, quelleId: 1, zitatId: 1 }, name: 'projectId_1_quelleId_1_zitatId_1', unique: true }],
+  spurMatrixCells: [
+    { key: { projectId: 1, quelleId: 1, spalteId: 1 }, name: 'projectId_1_quelleId_1_spalteId_1', unique: true },
+  ],
 }
 
-const SAMMLUNGEN = [...Object.keys(indexes), 'spurDrossel', 'spurPaperCache']
+const SAMMLUNGEN = [...Object.keys(indexes), 'spurDrossel', 'spurPaperCache', 'spurMatrix']
 
 async function up() {
   for (const [name, liste] of Object.entries(indexes)) {

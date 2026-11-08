@@ -35,7 +35,7 @@
 "Die Matrix zeigt Quellen als Zeilen und frei wählbare Spalten",
 "Der Fake-Client füllt eine Zelle per Tool als Vorschlag, der Nutzer bestätigt sie",
 "Export liefert CSV; 300 Zeilen bleiben bedienbar"
-], "passes": false, "ui": true},
+], "passes": true, "ui": true},
 {"id": "f7", "title": "Claude sieht das echte Compile-Ergebnis", "steps": [
 "`compile` liefert ein Job-Handle, `job_status` meldet „fertig“",
 "`compile_log` liefert die Fehlerzeile eines kaputten Dokuments",

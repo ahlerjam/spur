@@ -7,6 +7,7 @@ import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { pruefenVerzoegert } from '../pruefung/pruef-store'
+import NotizFeld, { notizSchluessel, type Notizen } from './notiz-feld'
 import type { Quelle } from './typen'
 
 type Zitat = { id: string; seite: number; label: string | null; text: string }
@@ -40,6 +41,7 @@ export default function Zitate({
   const { view } = useEditorViewContext()
   const [zitate, setZitate] = useState<Zitat[]>([])
   const [fehler, setFehler] = useState<string | null>(null)
+  const [notizen, setNotizen] = useState<Notizen>({})
   const auswahl = useAuswahlIn(textElement)
   const basis = `/quellen/${quelle.id}/zitate`
   const kannEinfuegen = darfSchreiben && Boolean(view)
@@ -52,6 +54,14 @@ export default function Zitate({
   useEffect(() => {
     laden().catch(error => setFehler(error.message))
   }, [laden])
+
+  useEffect(() => {
+    anfrage<{ notizen: { zitatId: string | null; text: string }[] }>(projektPfad(`/quellen/${quelle.id}/notizen`))
+      .then(antwort =>
+        setNotizen(Object.fromEntries(antwort.notizen.map(n => [notizSchluessel(n.zitatId), n.text])))
+      )
+      .catch(error => setFehler(error.message))
+  }, [quelle.id])
 
   const speichern = async () => {
     setFehler(null)
@@ -90,6 +100,12 @@ export default function Zitate({
 
   return (
     <section className="spur-zitate" aria-labelledby="spur-zitate-titel">
+      <NotizFeld
+        quelleId={quelle.id}
+        label={t('spur_notiz_quelle')}
+        gespeichert={notizen[notizSchluessel()] ?? ''}
+        darfSchreiben={darfSchreiben}
+      />
       {darfSchreiben && (
         <OLButton
           variant="primary"
@@ -126,6 +142,13 @@ export default function Zitate({
             >
               {t('spur_einfuegen')}
             </OLButton>
+            <NotizFeld
+              quelleId={quelle.id}
+              zitatId={zitat.id}
+              label={t('spur_notiz_zitat')}
+              gespeichert={notizen[notizSchluessel(zitat.id)] ?? ''}
+              darfSchreiben={darfSchreiben}
+            />
           </li>
         ))}
       </ul>

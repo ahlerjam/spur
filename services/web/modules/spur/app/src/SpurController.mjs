@@ -18,6 +18,7 @@ import * as Recherche from './recherche/Recherche.mjs'
 import * as Aufnahme from './recherche/Aufnahme.mjs'
 import * as Beschaffung from './recherche/Beschaffung.mjs'
 import * as Import from './recherche/Import.mjs'
+import * as Literatur from './literatur/Literatur.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -420,4 +421,51 @@ export const zoteroImportieren = mitProblemen(async (req, res) => {
       sammlung: String(req.body?.sammlung ?? ''),
     })
   )
+})
+
+export const notizen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  res.json({ notizen: await Literatur.notizen(quelle) })
+})
+
+export const notizSetzen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitatId = req.body?.zitat_id ? String(req.body.zitat_id) : null
+  if (zitatId) await ZitatManager.holen(quelle, zitatId)
+  await Literatur.notizSetzen(projektId(req), quelle, {
+    zitatId,
+    text: req.body?.text,
+    userId: new ObjectId(nutzerId(req)),
+  })
+  res.sendStatus(204)
+})
+
+export const matrix = mitProblemen(async (req, res) => {
+  res.json(await Literatur.matrix(projektId(req), { seite: Math.max(1, seiteAus(req.query.seite)) }))
+})
+
+export const matrixExport = mitProblemen(async (req, res) => {
+  res.attachment('literaturmatrix.csv').type('text/csv; charset=utf-8')
+  res.send(await Literatur.matrixCsv(projektId(req)))
+})
+
+export const matrixSpalte = mitProblemen(async (req, res) => {
+  res.status(201).json(await Literatur.spalteAnlegen(projektId(req), req.body?.name))
+})
+
+const zellAdresse = req => ({ quelleId: String(req.body?.quelle_id ?? ''), spalteId: String(req.body?.spalte_id ?? '') })
+
+export const matrixZelle = mitProblemen(async (req, res) => {
+  await Literatur.zelleSetzen(projektId(req), { ...zellAdresse(req), text: req.body?.text })
+  res.sendStatus(204)
+})
+
+export const matrixBestaetigen = mitProblemen(async (req, res) => {
+  await Literatur.vorschlagBestaetigen(projektId(req), zellAdresse(req))
+  res.sendStatus(204)
+})
+
+export const matrixVerwerfen = mitProblemen(async (req, res) => {
+  await Literatur.vorschlagVerwerfen(projektId(req), zellAdresse(req))
+  res.sendStatus(204)
 })

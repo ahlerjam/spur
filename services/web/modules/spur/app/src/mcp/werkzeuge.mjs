@@ -14,6 +14,7 @@ import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
+import * as Literatur from '../literatur/Literatur.mjs'
 
 const SEITE = 50
 const MAX_TEXT = 40000
@@ -389,6 +390,17 @@ Object.assign(WERKZEUGE, {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
       const eintrag = await Beschaffung.hinzufuegen({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
       return { eintrag_id: eintrag._id, doi: eintrag.doi, titel: eintrag.meta.titel, status: eintrag.status }
+    },
+  },
+
+  matrix_suggest: {
+    description:
+      'Schlägt den Inhalt einer Zelle der Literaturmatrix vor (Quelle als Zeile, Spalte per Name). Die Person bestätigt ' +
+      'oder verwirft den Vorschlag; vorhandener Text bleibt bis dahin stehen.',
+    inputSchema: z.object({ project_id: id, source_id: id, spalte: z.string().min(1).max(80), text: z.string().min(1).max(2000) }),
+    async ausfuehren({ project_id: pid, source_id: quelleId, spalte, text }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, SCHREIBEN)
+      return await Literatur.vorschlagen(projectId, { quelleId, spalte, text, botId })
     },
   },
 })

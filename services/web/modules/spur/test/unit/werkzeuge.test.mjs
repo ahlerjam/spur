@@ -36,6 +36,7 @@ beforeEach(async () => {
     Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
     Crossref: { werk: vi.fn() },
     Beschaffung: { hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })) },
+    Literatur: { vorschlagen: vi.fn(async () => ({ quelle_id: 'q', spalte: 'Methode' })) },
     Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
     Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
   }
@@ -52,6 +53,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/Crossref.mjs', () => m.Crossref)
   vi.doMock('../../app/src/recherche/Recherche.mjs', () => m.Recherche)
   vi.doMock('../../app/src/recherche/Aufnahme.mjs', () => m.Aufnahme)
+  vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
   vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
   ;({ WERKZEUGE } = await import('../../app/src/mcp/werkzeuge.mjs'))
   recht.vergeben(anna, projekt, { stufe: 'owner' })
@@ -403,5 +405,16 @@ describe('Recherche', () => {
       titel: 'T',
       status: 'offen',
     })
+  })
+
+  it('matrix_suggest legt nur einen Vorschlag des Bots an und verlangt Schreibrechte', async () => {
+    const quelle = String(new ObjectId())
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('matrix_suggest', { project_id: projekt, source_id: quelle, spalte: 'Methode', text: 'x' }))).toMatchObject({
+      code: 'keine_rechte',
+    })
+    mitStufe('review')
+    await aufruf('matrix_suggest', { project_id: projekt, source_id: quelle, spalte: 'Methode', text: 'x' })
+    expect(m.Literatur.vorschlagen).toHaveBeenCalledWith(new ObjectId(projekt), { quelleId: quelle, spalte: 'Methode', text: 'x', botId: bot })
   })
 })

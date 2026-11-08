@@ -1492,6 +1492,99 @@ async page => {
     ok(bib.split('@article{keller_spindles_2014,').length === 2, `.bib:\n${bib}`)
   }
 
+  features.p2f6 = async () => {
+    const SATZ = 'Sleep supports the consolidation of declarative memory.'
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Literatur')
+    await panelOeffnen('Quellen')
+    await hochladen('smith2024.pdf')
+    const vorschauOeffnen = async () => {
+      await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+      await page.getByRole('button', { name: 'Nächste Seite' }).click()
+      await page.getByRole('button', { name: 'Nächste Seite' }).click()
+      await sichtbar('Seite 347 (PDF-Seite 3 von 8)')
+    }
+    await vorschauOeffnen()
+    await textMarkieren(SATZ)
+    await page.getByRole('button', { name: 'Zitat speichern' }).click()
+    const zitat = page.locator('.spur-zitate li', { hasText: SATZ }).first()
+    await zitat.waitFor()
+    const notizQuelle = page.getByLabel('Notiz zur Quelle')
+    await notizQuelle.fill('Gute Methodik, kleine Stichprobe')
+    await page.locator('.spur-notiz', { has: notizQuelle }).getByRole('button', { name: 'Notiz speichern' }).click()
+    await page.locator('.spur-notiz', { has: notizQuelle }).getByText('Gespeichert').waitFor()
+    await zitat.getByLabel('Notiz zum Zitat').fill('Kernaussage für Kapitel 2')
+    await zitat.getByRole('button', { name: 'Notiz speichern' }).click()
+    await zitat.getByText('Gespeichert').waitFor()
+
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Quellen')
+    await vorschauOeffnen()
+    await page.waitForFunction(() => document.querySelector('.spur-notiz textarea')?.value)
+    ok((await page.getByLabel('Notiz zur Quelle').inputValue()) === 'Gute Methodik, kleine Stichprobe', 'Quellennotiz weg')
+    const zitatNachher = page.locator('.spur-zitate li', { hasText: SATZ }).first()
+    ok((await zitatNachher.getByLabel('Notiz zum Zitat').inputValue()) === 'Kernaussage für Kapitel 2', 'Zitatnotiz weg')
+    await page.getByRole('button', { name: 'Zurück' }).first().click()
+
+    const dialog = page.locator('.modal')
+    const matrixOeffnen = async () => {
+      await page.getByRole('button', { name: 'Literaturmatrix' }).click()
+      await dialog.locator('caption').waitFor({ timeout: 10000 })
+    }
+    await matrixOeffnen()
+    await dialog.getByPlaceholder('Neue Spalte, etwa „Methode“').fill('Methode')
+    await dialog.getByRole('button', { name: 'Spalte hinzufügen' }).click()
+    await dialog.getByRole('columnheader', { name: 'Methode' }).waitFor()
+    await dialog.getByRole('rowheader', { name: 'smith2024.pdf' }).waitFor()
+
+    const token = 'spur_e2e_fake'
+    const pid = await projektId(token, 'E2E Literatur')
+    const quelle = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege[0]
+    const VORSCHLAG = 'Zwei Nächte, gemischte Modelle'
+    const vorschlag = await werkzeug(token, 'matrix_suggest', { project_id: pid, source_id: quelle.id, spalte: 'Methode', text: VORSCHLAG })
+    ok(!vorschlag.fehler, `matrix_suggest: ${JSON.stringify(vorschlag.inhalt)}`)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await matrixOeffnen()
+    const zelle = dialog.locator('.spur-matrix-zelle', { has: page.getByLabel('Methode: smith2024.pdf') })
+    await zelle.getByText(VORSCHLAG).waitFor()
+    ok((await zelle.getByLabel('Methode: smith2024.pdf').inputValue()) === '', 'Vorschlag ohne Bestätigung übernommen')
+    await zelle.getByRole('button', { name: 'Übernehmen' }).click()
+    await page.waitForFunction(t => document.querySelector('.spur-matrix-zelle input')?.value === t, VORSCHLAG)
+    ok((await zelle.getByText('Vorschlag von Claude:').count()) === 0, 'Vorschlag bleibt stehen')
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      dialog.getByRole('link', { name: 'Als CSV exportieren' }).click(),
+    ])
+    const csv = await (await page.request.get(download.url())).text()
+    ok(csv.startsWith('Quelle,Key,Methode\n') && csv.includes(`smith2024.pdf,smith2024,"${VORSCHLAG}"`), `CSV:\n${csv}`)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+
+    // 300 Zeilen: seitenweise, Eingaben wirken auch auf späteren Seiten.
+    await projektOeffnen('E2E Viele')
+    await panelOeffnen('Quellen')
+    const start = Date.now()
+    await matrixOeffnen()
+    await dialog.getByText('Zeilen 1–50 von 300').waitFor()
+    ok(Date.now() - start < 5000, `Matrix öffnet in ${Date.now() - start} ms`)
+    await dialog.getByPlaceholder('Neue Spalte, etwa „Methode“').fill('Ergebnis')
+    await dialog.getByRole('button', { name: 'Spalte hinzufügen' }).click()
+    await dialog.getByRole('columnheader', { name: 'Ergebnis' }).waitFor()
+    await dialog.getByRole('button', { name: 'Nächste Seite' }).click()
+    await dialog.getByText('Zeilen 51–100 von 300').waitFor()
+    const feld = dialog.getByLabel('Ergebnis: quelle-077.pdf')
+    await feld.fill('signifikant')
+    await feld.blur()
+    await page.waitForResponse(r => r.url().includes('/matrix') && r.request().method() === 'GET')
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    const viele = await projektId(token, 'E2E Viele')
+    const export300 = await (await page.request.get(`${BASE}/spur/project/${viele}/matrix.csv`)).text()
+    const zeilen = export300.trim().split('\n')
+    ok(zeilen.length === 301, `CSV mit ${zeilen.length} Zeilen`)
+    ok(zeilen.includes('quelle-077.pdf,quelle-77,signifikant'), `Zelle fehlt: ${zeilen.find(z => z.startsWith('quelle-077'))}`)
+  }
+
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue
