@@ -26,9 +26,35 @@ const doiKlein = doi => doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').toLow
 const arxivDoi = id => `10.48550/arxiv.${id.replace(/v\d+$/, '')}`
 const leerzeichen = text => text?.replace(/\s+/g, ' ').trim() ?? null
 const xmlText = wert => (typeof wert === 'string' ? wert : wert?._)
+const ENTITAETEN = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
+const entitaeten = text =>
+  text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (ganz, e) => {
+    if (e[0] !== '#') return ENTITAETEN[e.toLowerCase()] ?? ganz
+    const zahl = Number(e[1].toLowerCase() === 'x' ? `0x${e.slice(2)}` : e.slice(1))
+    return zahl <= 0x10ffff ? String.fromCodePoint(zahl) : ganz
+  })
+// Crossref liefert JATS; die Überschrift „Abstract“ gehört nicht zum Text.
+const ohneTags = text =>
+  leerzeichen(
+    entitaeten(
+      text
+        ?.replace(/<jats:title>[^<]*<\/jats:title>/g, '')
+        // Inline-Auszeichnung (H<sub>2</sub>O, kursiv) gehört zum Wort, Absätze trennen.
+        .replace(/<\/?(?:jats:)?(?:sub|sup|italic|bold|sc|underline|monospace)\b[^>]*>/g, '')
+        .replace(/<[^>]+>/g, ' ') ?? ''
+    ).replace(/\s+([.,;:])/g, '$1')
+  ) || null
+
+// OpenAlex liefert Abstracts als Wort → Positionen.
+function ausIndex(index) {
+  if (!index) return null
+  const woerter = []
+  for (const [wort, stellen] of Object.entries(index)) for (const i of stellen) woerter[i] = wort
+  return woerter.filter(Boolean).join(' ') || null
+}
 
 function treffer(dienst, felder) {
-  return { frei: null, pdf: null, lizenz: null, ...felder, dienste: [dienst] }
+  return { frei: null, pdf: null, lizenz: null, abstract: null, ...felder, dienste: [dienst] }
 }
 
 function arxivEintrag(e) {
@@ -39,6 +65,7 @@ function arxivEintrag(e) {
     titel: leerzeichen(xmlText(e.title?.[0])),
     autoren: (e.author ?? []).map(a => xmlText(a.name[0])),
     jahr: Number(xmlText(e.published?.[0])?.slice(0, 4)) || null,
+    abstract: leerzeichen(xmlText(e.summary?.[0])) || null,
     pdf: (e.link ?? []).find(l => l.$?.title === 'pdf')?.$.href ?? null,
   }
 }
@@ -78,6 +105,7 @@ function openalexWerk(w) {
     titel: w.display_name ?? w.title ?? null,
     autoren: (w.authorships ?? []).map(a => a.author?.display_name).filter(Boolean),
     jahr: w.publication_year ?? null,
+    abstract: ausIndex(w.abstract_inverted_index),
     frei: w.open_access?.is_oa ?? null,
     pdf: w.best_oa_location?.pdf_url ?? null,
     lizenz: w.best_oa_location?.license ?? null,
@@ -111,7 +139,7 @@ const openalex = {
   },
 }
 
-const S2_FELDER = 'title,year,authors,externalIds,isOpenAccess,openAccessPdf'
+const S2_FELDER = 'title,year,authors,externalIds,isOpenAccess,openAccessPdf,abstract'
 
 function s2Paper(p) {
   const ids = p.externalIds ?? {}
@@ -120,6 +148,7 @@ function s2Paper(p) {
     titel: p.title ?? null,
     autoren: (p.authors ?? []).map(a => a.name),
     jahr: p.year ?? null,
+    abstract: p.abstract || null,
     frei: p.isOpenAccess ?? null,
     pdf: p.openAccessPdf?.url || null,
   })
@@ -164,7 +193,7 @@ const crossref = {
     url.searchParams.set('query', anfrage)
     url.searchParams.set('rows', String(PRO_SEITE))
     url.searchParams.set('offset', String(seite * PRO_SEITE))
-    url.searchParams.set('select', 'DOI,title,author,issued')
+    url.searchParams.set('select', 'DOI,title,author,issued,abstract')
     if (process.env.CROSSREF_MAILTO) url.searchParams.set('mailto', process.env.CROSSREF_MAILTO)
     const daten = await abrufen(this, url.toString())
     const items = daten?.message?.items ?? []
@@ -175,6 +204,7 @@ const crossref = {
           titel: i.title?.[0] ?? null,
           autoren: (i.author ?? []).map(a => [a.given, a.family ?? a.name].filter(Boolean).join(' ')),
           jahr: i.issued?.['date-parts']?.[0]?.[0] ?? null,
+          abstract: ohneTags(i.abstract),
         })
       ),
       gesamt: daten?.message?.['total-results'] ?? 0,

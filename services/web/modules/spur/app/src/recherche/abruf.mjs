@@ -1,4 +1,5 @@
 import logger from '@overleaf/logger'
+import { meldung } from '../meldungen.mjs'
 import { drossel, paperCache } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 
@@ -10,8 +11,8 @@ export class DienstFehler extends Error {
   constructor(dienst, art) {
     super(
       art === 'limit'
-        ? `${dienst.anzeige}: Limit erreicht. Bitte in einigen Minuten erneut suchen.`
-        : `${dienst.anzeige} nicht erreichbar`
+        ? meldung('spur_fehler_dienst_limit', { dienst: dienst.anzeige })
+        : meldung('spur_fehler_dienst_nicht_erreichbar', { dienst: dienst.anzeige })
     )
     this.dienst = dienst.name
     this.art = art

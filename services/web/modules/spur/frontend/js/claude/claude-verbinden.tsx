@@ -4,6 +4,7 @@ import OLButton from '@/shared/components/ol/ol-button'
 import Notification from '@/shared/components/notification'
 import getMeta from '@/utils/meta'
 import { anfrage, jsonAnfrage } from '../api'
+import BefehlKasten from './befehl-kasten'
 
 type Token = { id: string; angelegt: string; ablauf: string; abgelaufen: boolean }
 
@@ -21,13 +22,21 @@ export function startBefehl() {
   return `claude --allowedTools "${regeln}"`
 }
 
-function einrichtung(token: string) {
+function schritte(token: string) {
   const adresse = `${getMeta('ol-ExposedSettings').siteUrl}/spur/mcp`
   return [
-    'claude plugin marketplace add ahlerjam/spur',
-    `claude plugin install spur@spur --config server_url=${adresse} --config token=${token}`,
-    startBefehl(),
-  ].join('\n')
+    {
+      titel: 'spur_schritt_bekannt_machen',
+      text: 'spur_schritt_bekannt_machen_text',
+      befehl: 'claude plugin marketplace add ahlerjam/spur',
+    },
+    {
+      titel: 'spur_schritt_konto',
+      text: 'spur_schritt_konto_text',
+      befehl: `claude plugin install spur@spur --config server_url=${adresse} --config token=${token}`,
+    },
+    { titel: 'spur_schritt_starten', text: 'spur_schritt_starten_text', befehl: startBefehl() },
+  ]
 }
 
 const datum = (wert: string) => new Date(wert).toLocaleDateString()
@@ -37,7 +46,6 @@ export default function ClaudeVerbinden() {
   const [tokens, setTokens] = useState<Token[] | null>(null)
   const [neu, setNeu] = useState<string | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
-  const [kopiert, setKopiert] = useState(false)
 
   const laden = useCallback(async () => {
     try {
@@ -53,7 +61,6 @@ export default function ClaudeVerbinden() {
 
   const erzeugen = async () => {
     setFehler(null)
-    setKopiert(false)
     try {
       const { token } = await jsonAnfrage<{ token: string }>('POST', '/spur/claude/tokens')
       setNeu(token)
@@ -74,12 +81,6 @@ export default function ClaudeVerbinden() {
     }
   }
 
-  const kopieren = async () => {
-    if (!neu) return
-    await navigator.clipboard.writeText(einrichtung(neu))
-    setKopiert(true)
-  }
-
   return (
     <div className="settings-widget-container spur-claude-verbinden">
       <div className="description-container">
@@ -89,14 +90,19 @@ export default function ClaudeVerbinden() {
         <p className="small">{t('spur_claude_verbinden_text')}</p>
         {fehler && <Notification type="error" content={fehler} />}
         {neu && (
-          <div className="spur-token-neu">
+          <div className="spur-token-neu" data-spur-token={neu}>
+            <h5>{t('spur_verbinden_anleitung')}</h5>
             <p className="small">{t('spur_token_einmalig')}</p>
-            <pre className="spur-befehl" data-spur-token={neu}>
-              {einrichtung(neu)}
-            </pre>
-            <OLButton variant="secondary" size="sm" onClick={kopieren}>
-              {kopiert ? t('spur_kopiert') : t('spur_befehl_kopieren')}
-            </OLButton>
+            <ol className="spur-schritte">
+              {schritte(neu).map(schritt => (
+                // Neues Token: alle drei Kästen neu, jeder Knopf zeigt wieder „Kopieren“.
+                <li key={`${neu}-${schritt.titel}`}>
+                  <h6>{t(schritt.titel)}</h6>
+                  <p className="small">{t(schritt.text)}</p>
+                  <BefehlKasten befehl={schritt.befehl} />
+                </li>
+              ))}
+            </ol>
           </div>
         )}
         <ul className="spur-liste">

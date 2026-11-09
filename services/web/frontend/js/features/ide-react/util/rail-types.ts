@@ -14,6 +14,7 @@ export type RailElement = {
   hide?: boolean | (() => boolean)
   disabled?: boolean
   mountOnFirstLoad?: boolean
+  defaultSize?: number
   ref?: React.RefObject<HTMLButtonElement>
   tab?: typeof RailTab
 }

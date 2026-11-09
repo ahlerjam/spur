@@ -48,7 +48,7 @@ async function pdfAuslesen(pfad) {
     throw new Problem(
       422,
       'datei_unlesbar',
-      'Die PDF-Datei lässt sich nicht lesen. Bitte eine andere Fassung hochladen.'
+      'spur_fehler_pdf_unlesbar'
     )
   })
   const seiten = texte.map((text, i) => ({ seite: i + 1, label: null, text }))
@@ -89,7 +89,7 @@ function pruefeDateityp(dateiname) {
     throw new Problem(
       415,
       'dateityp',
-      'Dieser Dateityp wird nicht unterstützt. Bitte eine PDF- oder VTT-Datei hochladen.'
+      'spur_fehler_dateityp'
     )
   }
 }
@@ -98,7 +98,7 @@ const vorhandenFehler = name =>
   new Problem(
     409,
     'quelle_vorhanden',
-    `„${name}“ ist schon vorhanden. Bitte die Datei umbenennen oder die alte Quelle löschen.`
+    'spur_fehler_datei_vorhanden', { name }
   )
 
 // Legt Quelle, Datei und Seiten an. Der eindeutige Index auf (projectId, key) entscheidet bei
@@ -177,7 +177,7 @@ export async function webAufnehmen({ projectId, userId, url }) {
     throw new Problem(
       409,
       'quelle_vorhanden',
-      `Diese Webseite ist schon als Quelle vorhanden („${gleich.meta?.titel ?? gleich.dateiname}“).`
+      'spur_fehler_webseite_vorhanden', { name: gleich.meta?.titel ?? gleich.dateiname }
     )
   }
   const belegt = new Set(belegteKeys)
@@ -232,14 +232,14 @@ export async function ocrStarten(quelle) {
     throw new Problem(
       409,
       'ocr_unnoetig',
-      'Diese Quelle hat schon Text. Texterkennung gibt es nur für gescannte PDFs ohne Text.'
+      'spur_fehler_ocr_unnoetig'
     )
   }
   if (ocrLaeufe >= OCR_PARALLEL) {
     throw new Problem(
       429,
       'ocr_ausgelastet',
-      'Gerade laufen schon zwei Texterkennungen. Bitte in einigen Minuten erneut starten.'
+      'spur_fehler_ocr_ausgelastet'
     )
   }
   const nun = jetzt()
@@ -259,7 +259,7 @@ export async function ocrStarten(quelle) {
     { returnDocument: 'after' }
   )
   if (!neu) {
-    throw new Problem(409, 'ocr_laeuft', 'Die Texterkennung läuft schon. Bitte kurz warten.')
+    throw new Problem(409, 'ocr_laeuft', 'spur_fehler_ocr_laeuft')
   }
   quelleGeaendert(neu)
   ocrLaeufe++
@@ -347,7 +347,7 @@ function quelleFehlt() {
   return new Problem(
     404,
     'quelle_fehlt',
-    'Diese Quelle gibt es nicht mehr. Bitte die Liste neu laden.'
+    'spur_fehler_quelle_fehlt'
   )
 }
 
@@ -371,7 +371,7 @@ export async function seite(quelle, nummer) {
     seite: nummer,
   })
   if (!eintrag) {
-    throw new Problem(404, 'seite_fehlt', 'Diese Seite gibt es in der Quelle nicht.')
+    throw new Problem(404, 'seite_fehlt', 'spur_fehler_seite_fehlt')
   }
   return eintrag
 }

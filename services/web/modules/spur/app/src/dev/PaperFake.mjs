@@ -43,6 +43,13 @@ function suche(dienst, anfrage) {
   )
 }
 
+function invertiert(text) {
+  if (!text) return null
+  const index = {}
+  text.split(' ').forEach((wort, i) => (index[wort] ??= []).push(i))
+  return index
+}
+
 const pdfUrl = (req, w) => (w.pdf ? `${req.protocol}://${req.get('host')}${req.baseUrl}/pdf/${w.pdf}` : null)
 
 function openalexWerk(req, w) {
@@ -53,6 +60,7 @@ function openalexWerk(req, w) {
     publication_year: w.jahr,
     authorships: w.autoren.map(([vor, nach]) => ({ author: { display_name: `${vor} ${nach}` } })),
     open_access: { is_oa: w.frei },
+    abstract_inverted_index: invertiert(w.abstract),
     best_oa_location: w.frei ? { pdf_url: pdfUrl(req, w), license: w.lizenz } : null,
   }
 }
@@ -66,6 +74,7 @@ function s2Paper(req, w) {
     externalIds: w.arxiv ? { ArXiv: w.arxiv, DOI: w.doi } : { DOI: w.doi },
     isOpenAccess: w.frei,
     openAccessPdf: w.frei ? { url: pdfUrl(req, w) } : null,
+    abstract: w.abstract ?? null,
   }
 }
 
@@ -75,6 +84,7 @@ function crossrefWerk(w) {
     title: [w.titel],
     author: w.autoren.map(([given, family]) => ({ given, family })),
     issued: { 'date-parts': [[w.jahr]] },
+    ...(w.abstract && { abstract: `<jats:p>${xml(w.abstract)}</jats:p>` }),
     'container-title': [w.journal],
     page: w.seiten,
     type: 'journal-article',
@@ -90,6 +100,7 @@ function atom(req, werke, gesamt) {
     <id>http://arxiv.org/abs/${w.arxiv}v1</id>
     <published>${w.jahr}-01-03T00:00:00Z</published>
     <title>${xml(w.titel)}</title>
+    <summary>${xml(w.abstract ?? '')}</summary>
 ${w.autoren.map(([vor, nach]) => `    <author><name>${xml(`${vor} ${nach}`)}</name></author>`).join('\n')}
     <link title="pdf" href="${pdfUrl(req, w)}" rel="related" type="application/pdf"/>
   </entry>`

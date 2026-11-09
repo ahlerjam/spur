@@ -9,9 +9,9 @@ const MAX_ZELLE = 2000
 const MAX_SPALTEN = 30
 const ZEILEN_SEITE = 50
 
-const zuLang = max => new Problem(413, 'zu_lang', `Höchstens ${max} Zeichen. Bitte kürzen.`)
-const quelleFehlt = () => new Problem(404, 'quelle_fehlt', 'Diese Quelle gibt es nicht mehr. Bitte die Liste neu laden.')
-const spalteFehlt = () => new Problem(404, 'spalte_fehlt', 'Diese Spalte gibt es nicht. Bitte zuerst in der Matrix anlegen.')
+const zuLang = max => new Problem(413, 'zu_lang', 'spur_fehler_zu_lang', { max })
+const quelleFehlt = () => new Problem(404, 'quelle_fehlt', 'spur_fehler_quelle_fehlt')
+const spalteFehlt = () => new Problem(404, 'spalte_fehlt', 'spur_fehler_spalte_fehlt')
 
 export async function notizen(quelle) {
   const liste = await (await notizSammlung()).find({ projectId: quelle.projectId, quelleId: quelle._id }).sort({ zitatId: 1 }).toArray()
@@ -22,7 +22,7 @@ export async function notizen(quelle) {
 export async function notizSetzen(projectId, quelle, { zitatId, text, userId }) {
   const wert = String(text ?? '').trim()
   if (wert.length > MAX_NOTIZ) throw zuLang(MAX_NOTIZ)
-  if (zitatId && !ObjectId.isValid(zitatId)) throw new Problem(404, 'zitat_fehlt', 'Dieses Zitat gibt es nicht mehr.')
+  if (zitatId && !ObjectId.isValid(zitatId)) throw new Problem(404, 'zitat_fehlt', 'spur_fehler_zitat_fehlt')
   const filter = { projectId, quelleId: quelle._id, zitatId: zitatId ? new ObjectId(zitatId) : null }
   const sammlung = await notizSammlung()
   if (!wert) return void (await sammlung.deleteOne(filter))
@@ -36,13 +36,13 @@ async function spaltenVon(projectId) {
 export async function spalteAnlegen(projectId, name) {
   const wert = String(name ?? '').trim()
   if (!wert || wert.length > 80) {
-    throw new Problem(400, 'spalte_ungueltig', 'Bitte einen Spaltennamen mit 1 bis 80 Zeichen angeben.')
+    throw new Problem(400, 'spalte_ungueltig', 'spur_fehler_spalte_ungueltig')
   }
   const spalten = await spaltenVon(projectId)
   if (spalten.some(s => s.name.toLowerCase() === wert.toLowerCase())) {
-    throw new Problem(409, 'spalte_vorhanden', `Die Spalte „${wert}“ gibt es schon.`)
+    throw new Problem(409, 'spalte_vorhanden', 'spur_fehler_spalte_vorhanden', { name: wert })
   }
-  if (spalten.length >= MAX_SPALTEN) throw new Problem(409, 'zu_viele_spalten', `Höchstens ${MAX_SPALTEN} Spalten.`)
+  if (spalten.length >= MAX_SPALTEN) throw new Problem(409, 'zu_viele_spalten', 'spur_fehler_zu_viele_spalten', { max: MAX_SPALTEN })
   const spalte = { id: String(new ObjectId()), name: wert }
   // Die Bedingung auf die Länge verhindert, dass zwei gleichzeitige Aufrufe denselben Platz belegen.
   const ergebnis = await (await matrixSpalten()).updateOne(
@@ -50,10 +50,10 @@ export async function spalteAnlegen(projectId, name) {
     { $push: { spalten: spalte } },
     { upsert: true }
   ).catch(error => {
-    if (error.code === 11000) throw new Problem(409, 'spalte_vorhanden', `Die Spalte „${wert}“ gibt es schon.`)
+    if (error.code === 11000) throw new Problem(409, 'spalte_vorhanden', 'spur_fehler_spalte_vorhanden', { name: wert })
     throw error
   })
-  if (!ergebnis.modifiedCount && !ergebnis.upsertedCount) throw new Problem(409, 'spalte_vorhanden', `Die Spalte „${wert}“ gibt es schon.`)
+  if (!ergebnis.modifiedCount && !ergebnis.upsertedCount) throw new Problem(409, 'spalte_vorhanden', 'spur_fehler_spalte_vorhanden', { name: wert })
   return spalte
 }
 
@@ -94,7 +94,7 @@ export async function vorschlagBestaetigen(projectId, { quelleId, spalteId }) {
   const filter = await zelle(projectId, quelleId, spalteId)
   const sammlung = await matrixZellen()
   const eintrag = await sammlung.findOne({ ...filter, vorschlag: { $type: 'object' } })
-  if (!eintrag) throw new Problem(409, 'kein_vorschlag', 'Für diese Zelle gibt es keinen Vorschlag mehr.')
+  if (!eintrag) throw new Problem(409, 'kein_vorschlag', 'spur_fehler_kein_vorschlag')
   await sammlung.updateOne({ _id: eintrag._id }, { $set: { text: eintrag.vorschlag.text }, $unset: { vorschlag: '' } })
 }
 

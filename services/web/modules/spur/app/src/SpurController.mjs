@@ -65,7 +65,7 @@ async function nurMitglieder(req) {
     throw new Problem(
       403,
       'nur_mitglieder',
-      'Quelldateien können nur Projektmitglieder herunterladen. Bitte um eine Einladung.'
+      'spur_fehler_download_nur_mitglieder'
     )
   }
 }
@@ -78,7 +78,7 @@ export const quellenListe = mitProblemen(async (req, res) => {
 
 async function hochgeladeneQuelle(req) {
   if (!req.file) {
-    throw new Problem(400, 'datei_fehlt', 'Es kam keine Datei an. Bitte erneut hochladen.')
+    throw new Problem(400, 'datei_fehlt', 'spur_fehler_datei_fehlt')
   }
   try {
     return await QuellenManager.aufnehmen({
@@ -139,7 +139,7 @@ export const quelleBild = mitProblemen(async (req, res) => {
   const nummer = Number.parseInt(req.params.seite, 10)
   await QuellenManager.seite(quelle, nummer)
   if (quelle.art !== 'pdf') {
-    throw new Problem(404, 'kein_bild', 'Nur PDF-Quellen haben Seitenbilder.')
+    throw new Problem(404, 'kein_bild', 'spur_fehler_kein_seitenbild')
   }
   const pfad = await QuellenManager.bild(quelle, nummer)
   res.type('png')
@@ -157,14 +157,14 @@ export const quelleAendern = mitProblemen(async (req, res) => {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   const { fassung, versatz } = req.body
   if (fassung !== undefined && (typeof fassung !== 'string' || fassung.length > 200)) {
-    throw new Problem(422, 'fassung', 'Die Fassung darf höchstens 200 Zeichen lang sein.')
+    throw new Problem(422, 'fassung', 'spur_fehler_fassung_zu_lang', { max: 200 })
   }
   if (versatz !== undefined && quelle.art !== 'pdf') {
-    throw new Problem(422, 'versatz', 'Nur PDF-Quellen haben Seitenzahlen.')
+    throw new Problem(422, 'versatz', 'spur_fehler_versatz_nur_pdf')
   }
   // Gedruckte Seitenzahlen liegen in Zeitschriften weit über der PDF-Seite, aber nie über 100000.
   if (versatz !== undefined && versatz !== null && !(Number.isInteger(versatz) && Math.abs(versatz) <= 100000)) {
-    throw new Problem(422, 'versatz', 'Der Versatz muss eine ganze Zahl zwischen -100000 und 100000 sein.')
+    throw new Problem(422, 'versatz', 'spur_fehler_versatz_ungueltig')
   }
   res.json(quelleFuerClient(await QuellenManager.aendern(quelle, { fassung, versatz })))
 })
@@ -194,7 +194,7 @@ export const andereProjekte = mitProblemen(async (req, res) => {
 export const quellenHolen = mitProblemen(async (req, res) => {
   const { projekt } = req.body
   if (!ObjectId.isValid(projekt)) {
-    throw new Problem(422, 'projekt', 'Bitte ein Projekt auswählen.')
+    throw new Problem(422, 'projekt', 'spur_fehler_projekt_fehlt')
   }
   const darf = await CollaboratorsGetter.promises.isUserInvitedMemberOfProject(
     nutzerId(req),
@@ -204,7 +204,7 @@ export const quellenHolen = mitProblemen(async (req, res) => {
     throw new Problem(
       403,
       'nur_mitglieder',
-      'Quellen lassen sich nur aus Projekten holen, in denen Sie Mitglied sind.'
+      'spur_fehler_uebernahme_nur_mitglieder'
     )
   }
   const anzahl = await QuellenManager.uebernehmen(
@@ -360,7 +360,7 @@ export const claudeStatus = mitProblemen(async (req, res) => {
 export const claudeAuftrag = mitProblemen(async (req, res) => {
   const text = typeof req.body.text === 'string' ? req.body.text.trim() : ''
   if (!text || text.length > 20000) {
-    throw new Problem(422, 'auftrag', 'Bitte einen Auftrag mit 1 bis 20000 Zeichen schreiben.')
+    throw new Problem(422, 'auftrag', 'spur_fehler_auftrag_text')
   }
   const bot = await botDesNutzers(req)
   const nachricht = await Inbox.auftragAnlegen({ projectId: projektId(req), botId: bot._id, text })
@@ -369,13 +369,21 @@ export const claudeAuftrag = mitProblemen(async (req, res) => {
 
 export const workflows = mitProblemen(async (req, res) => {
   const liste = await Workflows.liste()
-  // Den Text holt workflowStarten selbst; das Panel braucht nur Name, Titel und Beschreibung.
-  res.json({ workflows: liste.map(({ name, titel, beschreibung }) => ({ name, titel, beschreibung })) })
+  // Den Text holt workflowStarten selbst; das Panel braucht Name, Titel, Beschreibung und die Eingaben.
+  res.json({
+    workflows: liste.map(({ name, titel, beschreibung, eingaben = [] }) => ({ name, titel, beschreibung, eingaben })),
+  })
 })
 
 export const workflowStarten = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)
-  const nachricht = await Workflows.starten({ projectId: projektId(req), botId: bot._id, name: req.params.name })
+  const { thema, anzahl } = req.body ?? {}
+  const nachricht = await Workflows.starten({
+    projectId: projektId(req),
+    botId: bot._id,
+    name: req.params.name,
+    argumente: { thema, anzahl },
+  })
   res.status(201).json({ id: nachricht._id })
 })
 
@@ -383,7 +391,7 @@ const changeIds = req => {
   const ids = req.body?.change_ids
   if (ids === undefined) return undefined
   if (!Array.isArray(ids) || !ids.every(id => typeof id === 'string')) {
-    throw new Problem(422, 'change_ids', 'change_ids muss eine Liste von Texten sein.')
+    throw new Problem(422, 'change_ids', 'spur_fehler_change_ids')
   }
   return ids
 }
@@ -416,7 +424,7 @@ export const laufZuruecknehmen = mitProblemen(async (req, res) => {
 
 export const automatikSetzen = mitProblemen(async (req, res) => {
   if (typeof req.body.an !== 'boolean') {
-    throw new Problem(422, 'automatik', 'an muss true oder false sein.')
+    throw new Problem(422, 'automatik', 'spur_fehler_automatik_wert')
   }
   await LaufAktionen.automatikSetzen(projektId(req), new ObjectId(nutzerId(req)), req.body.an)
   res.sendStatus(204)

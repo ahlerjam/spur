@@ -1,6 +1,8 @@
+import { meldung } from '../meldungen.mjs'
+
 export class WerkzeugFehler extends Error {
-  constructor(code, detail) {
-    super(detail)
+  constructor(code, schluessel, werte) {
+    super(meldung(schluessel, werte))
     this.code = code
   }
 }

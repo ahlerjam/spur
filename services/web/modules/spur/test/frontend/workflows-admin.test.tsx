@@ -27,10 +27,15 @@ describe('Workflows im Admin-Bereich', function () {
     fetchMock.removeRoutes().clearHistory()
   })
 
-  it('zeigt die drei Workflows mit ihrem Text und speichert eine Änderung', async function () {
+  it('zeigt die vier Workflows mit ihrem Text und speichert eine Änderung', async function () {
     let folien = workflow('folien', 'Folien aus Paper')
     fetchMock.get(LISTE, () => ({
-      workflows: [workflow('literaturueberblick', 'Literaturüberblick'), workflow('methodenteil', 'Methodenteil'), folien],
+      workflows: [
+        workflow('literaturueberblick', 'Literaturüberblick'),
+        workflow('methodenteil', 'Methodenteil'),
+        folien,
+        workflow('quellen_sammeln', 'Quellen sammeln'),
+      ],
     }))
     fetchMock.put(FOLIEN, ({ options }) => {
       folien = { ...folien, text: JSON.parse(String(options.body)).text, angepasst: true }

@@ -25,10 +25,10 @@ export async function spurUpdate(projectId, docId, op, version, { userId, tracke
     )
   } catch (error) {
     if (error instanceof RequestFailedError && error.response.status === 409) {
-      throw new Problem(409, 'konflikt', 'Das Dokument hat sich inzwischen geändert. Bitte neu laden und erneut versuchen.')
+      throw new Problem(409, 'konflikt', 'spur_fehler_doc_geaendert')
     }
     if (error instanceof RequestFailedError && error.response.status === 404) {
-      throw new Problem(404, 'doc_fehlt', 'Das Dokument gibt es nicht (mehr).')
+      throw new Problem(404, 'doc_fehlt', 'spur_fehler_doc_fehlt')
     }
     throw error
   }

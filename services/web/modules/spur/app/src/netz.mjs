@@ -9,7 +9,7 @@ export const gesperrtFehler = () =>
   new Problem(
     422,
     'adresse_gesperrt',
-    'Adressen im lokalen Netz lassen sich nicht aufnehmen. Bitte eine öffentliche Webseite angeben.'
+    'spur_fehler_adresse_gesperrt'
   )
 
 // Nicht öffentlich erreichbare Netze. BlockList prüft IPv4-gemappte IPv6-Adressen (::ffff:…) in

@@ -4,6 +4,8 @@ import ClaudePanel from './claude-panel'
 
 const eintrag = {
   key: 'spur-claude',
+  // Seitenbilder, Befehle und Formulare brauchen mehr Platz als Overleafs 15 %.
+  defaultSize: 25,
   icon: 'smart_toy',
   get title() {
     return i18n.t('spur_claude')

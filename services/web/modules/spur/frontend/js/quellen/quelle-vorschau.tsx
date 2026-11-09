@@ -1,25 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLButton from '@/shared/components/ol/ol-button'
+import OLIconButton from '@/shared/components/ol/ol-icon-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
-import { anfrage, jsonAnfrage, projektPfad } from '../api'
+import { jsonAnfrage, projektPfad } from '../api'
+import QuelleGross from './quelle-gross'
 import QuelleLoeschenModal from './quelle-loeschen-modal'
+import { useSeite } from './seite'
+import SeitenBlaettern from './seiten-blaettern'
 import SeitenzahlBestaetigen from './seitenzahl-bestaetigen'
+import Seitenbild from './seitenbild'
 import Zitate from './zitate'
 import { anzeigename, datumLang, OCR_SICHER_AB, type Quelle } from './typen'
-
-type Seite = {
-  text: string
-  label: string | null
-  seite: number
-  seitenzahl: number
-  ocrKonfidenz: number | null
-}
 
 export default function QuelleVorschau({
   quelle,
@@ -33,24 +30,14 @@ export default function QuelleVorschau({
   const { t, i18n } = useTranslation()
   const { write: darfSchreiben } = usePermissionsContext()
   const [nummer, setNummer] = useState(startSeite)
-  const [seite, setSeite] = useState<Seite | null>(null)
+  const { seite, fehler: seitenFehler } = useSeite(quelle.id, nummer)
   const [fehler, setFehler] = useState<string | null>(null)
   const [fassung, setFassung] = useState(quelle.fassung)
   const [gespeichert, setGespeichert] = useState(false)
   const [loeschDialog, setLoeschDialog] = useState(false)
   const [textElement, setTextElement] = useState<HTMLElement | null>(null)
+  const [gross, setGross] = useState(false)
   const basis = `/quellen/${quelle.id}`
-
-  useEffect(() => {
-    let aktuell = true
-    setSeite(null)
-    anfrage<Seite>(projektPfad(`${basis}/seiten/${nummer}`))
-      .then(s => aktuell && setSeite(s))
-      .catch(e => aktuell && setFehler(e.message))
-    return () => {
-      aktuell = false
-    }
-  }, [basis, nummer])
 
   const fassungSpeichern = async () => {
     setFehler(null)
@@ -66,49 +53,38 @@ export default function QuelleVorschau({
     <div className="spur-panel">
       <RailPanelHeader title={anzeigename(quelle)} />
       <div className="spur-panel-werkzeuge">
-        <OLButton variant="secondary" size="sm" onClick={schliessen}>
-          {t('spur_zurueck')}
-        </OLButton>
+        <OLIconButton
+          variant="secondary"
+          size="sm"
+          icon="arrow_back"
+          accessibilityLabel={t('spur_zurueck')}
+          onClick={schliessen}
+        />
         {quelle.web ? (
           <span className="spur-seitenzahl">
             {t('spur_abgerufen_am', { datum: datumLang(quelle.web.abgerufenAm, i18n.language) })}
           </span>
         ) : (
-          <>
-            <span className="spur-seitenzahl" aria-live="polite">
-              {seite?.label && quelle.art === 'pdf'
-                ? t('spur_seite_label_von', {
-                    seite: seite.label,
-                    nr: nummer,
-                    gesamt: quelle.seitenzahl,
-                  })
-                : t('spur_seite_von', { seite: nummer, gesamt: quelle.seitenzahl })}
-            </span>
-            <OLButton
-              variant="ghost"
-              size="sm"
-              disabled={nummer <= 1}
-              onClick={() => setNummer(nummer - 1)}
-            >
-              {t('spur_vorherige_seite')}
-            </OLButton>
-            <OLButton
-              variant="ghost"
-              size="sm"
-              disabled={nummer >= quelle.seitenzahl}
-              onClick={() => setNummer(nummer + 1)}
-            >
-              {t('spur_naechste_seite')}
-            </OLButton>
-          </>
+          <SeitenBlaettern quelle={quelle} nummer={nummer} seite={seite} setNummer={setNummer} />
         )}
       </div>
       <div className="spur-panel-inhalt">
+        {seitenFehler && <Notification type="warning" content={seitenFehler} />}
         {fehler && <Notification type="error" content={fehler} />}
-        {!seite && !fehler && <OLSpinner size="sm" />}
+        {!seite && !seitenFehler && <OLSpinner size="sm" />}
+        {seite && (
+          <OLButton
+            className="spur-gross-oeffnen"
+            variant="secondary"
+            size="sm"
+            leadingIcon="open_in_full"
+            onClick={() => setGross(true)}
+          >
+            {t('spur_gross_oeffnen')}
+          </OLButton>
+        )}
         {seite && quelle.art === 'pdf' && (
-          <img
-            className="spur-seitenbild"
+          <Seitenbild
             alt={t('spur_seite_von', { seite: nummer, gesamt: quelle.seitenzahl })}
             src={projektPfad(`${basis}/seiten/${nummer}/bild`)}
           />
@@ -135,7 +111,8 @@ export default function QuelleVorschau({
         ) : (
           seite && <p className="spur-leer">{t('spur_kein_text')}</p>
         )}
-        {seite?.text.trim() && (
+        {/* Solange die große Ansicht offen ist, arbeitet nur deren Zitatliste (sonst doppelte IDs und Zustände). */}
+        {seite?.text.trim() && !gross && (
           <Zitate quelle={quelle} seite={nummer} textElement={textElement} />
         )}
         {darfSchreiben && seite && quelle.art === 'pdf' && seite.text.trim() && (
@@ -186,6 +163,9 @@ export default function QuelleVorschau({
           </OLButton>
         )}
       </div>
+      {gross && (
+        <QuelleGross quelle={quelle} startSeite={nummer} schliessen={() => setGross(false)} />
+      )}
       {loeschDialog && (
         <QuelleLoeschenModal
           quelle={quelle}

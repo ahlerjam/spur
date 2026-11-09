@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
 let SchreibManager
@@ -149,7 +150,7 @@ describe('docEdit', () => {
   it('meldet konflikt, wenn der Alttext fehlt', async () => {
     const fehler = await fehlerVon(bearbeiten({ alt: 'Gibt es nicht.' }))
     expect(fehler).toMatchObject({ code: 'konflikt' })
-    expect(fehler.message).toMatch(/steht nicht im Dokument/)
+    expect(fehler.message).toBe(meldung('spur_fehler_alttext_fehlt'))
     expect(spurUpdate).not.toHaveBeenCalled()
   })
 
@@ -157,7 +158,7 @@ describe('docEdit', () => {
     docSetzen(KAPITEL, 'Satz. Satz.')
     const fehler = await fehlerVon(bearbeiten({ alt: 'Satz.' }))
     expect(fehler).toMatchObject({ code: 'konflikt' })
-    expect(fehler.message).toMatch(/mehrfach/)
+    expect(fehler.message).toBe(meldung('spur_fehler_alttext_mehrfach'))
   })
 
   it('stoppt bei fast 2000 offenen Änderungen mit grenze_changes', async () => {
@@ -305,20 +306,20 @@ describe('Idempotenz', () => {
     await bearbeiten()
     const fehler = await fehlerVon(bearbeiten({ neu: 'Etwas ganz anderes.' }))
     expect(fehler).toMatchObject({ code: 'konflikt' })
-    expect(fehler.message).toMatch(/andere Änderung/)
+    expect(fehler.message).toBe(meldung('spur_fehler_idempotenz_andere_aenderung'))
   })
 
   it('weist denselben Schlüssel in einem anderen Projekt ab', async () => {
     await bearbeiten()
     const fehler = await fehlerVon(bearbeiten({ projectId: new ObjectId() }))
-    expect(fehler.message).toMatch(/anderen Projekt/)
+    expect(fehler.message).toBe(meldung('spur_fehler_idempotenz_anderes_projekt'))
   })
 
   it('meldet einen Aufruf, der noch läuft, als konflikt', async () => {
     await datenbank.db.collection('spurEdits').insertOne({ botId: bot, schluessel: 'schluessel-0001', projectId: projekt, am: schalter.zeit })
     const fehler = await fehlerVon(bearbeiten())
     expect(fehler).toMatchObject({ code: 'konflikt' })
-    expect(fehler.message).toMatch(/läuft noch/)
+    expect(fehler.message).toBe(meldung('spur_fehler_idempotenz_laeuft'))
   })
 
   it('gibt eine verwaiste Reservierung nach zwei Minuten frei und schreibt', async () => {
@@ -369,7 +370,7 @@ describe('Idempotenz', () => {
       const fehler = await fehlerVon(
         neu.docEdit({ projectId: projekt, botId: bot, pfad: 'kapitel.tex', alt: 'a', neu: 'b', schluessel: 'schluessel-0001' })
       )
-      expect(fehler.message).toMatch(/gerade gescheitert/)
+      expect(fehler.message).toBe(meldung('spur_fehler_idempotenz_gescheitert'))
     } finally {
       datenbank.mongodbModul.getCollectionInternal = echt
     }

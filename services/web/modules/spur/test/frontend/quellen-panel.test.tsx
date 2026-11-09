@@ -81,14 +81,14 @@ describe('Quellen-Panel', function () {
     fetchMock.get(/\/quellen\/q1\/seiten\/3$/, { text: 'Sleep supports', label: '347', seite: 3, seitenzahl: 8 })
     fetchMock.get(/\/quellen\/q1\/zitate$/, { zitate: [] })
     zeigen()
-    await screen.findByText('Anna Autor hat Ihnen ein Zitat zugewiesen: „Sleep supports“ (smith2024.pdf, S. 347)')
+    await screen.findByText('Anna Autor hat dir ein Zitat zugewiesen: „Sleep supports“ (smith2024.pdf, S. 347)')
     screen.getByRole('button', { name: 'Öffnen' }).click()
     await screen.findByText('Seite 347 (PDF-Seite 3 von 8)')
   })
 
   it('weist beim Hochladen eines Transkripts auf den KI-Anbieter hin, bei einem PDF nicht', async function () {
     const HINWEIS =
-      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.'
+      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisiere Interviews am besten vor dem Hochladen.'
     fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
     fetchMock.post(QUELLEN, { status: 201, body: {} })
     zeigen()

@@ -8,6 +8,8 @@ async page => {
   const FIXTURES =
     globalThis.SPUR_FIXTURES || 'services/web/modules/spur/test/fixtures'
   const nur = new URL(page.url()).hash.slice(1).split(',').filter(Boolean)
+  // Die Schritte gehen von 1280 px aus; ein Fenster aus einem früheren Lauf kann schmaler sein.
+  await page.setViewportSize({ width: 1280, height: 720 })
   const konsolenFehler = []
   const beiFehler = e => konsolenFehler.push(e.message)
   page.on('pageerror', beiFehler)
@@ -111,13 +113,13 @@ async page => {
 
   async function quelleHolen(projekt) {
     await page.getByRole('button', { name: 'Aus anderem Projekt holen' }).click()
-    await page.getByLabel('Projekt').selectOption({ label: projekt })
+    await page.getByLabel('Projekt', { exact: true }).selectOption({ label: projekt })
     await page.locator('.modal').getByRole('button', { name: 'Holen', exact: true }).click()
     await page.locator('.modal').waitFor({ state: 'detached' })
   }
 
-  async function textMarkieren(text) {
-    await page.locator('.spur-seitentext').evaluate((el, gesucht) => {
+  async function textMarkieren(text, bereich = page) {
+    await bereich.locator('.spur-seitentext').evaluate((el, gesucht) => {
       const knoten = el.firstChild
       const start = knoten.textContent.indexOf(gesucht)
       const bereich = document.createRange()
@@ -508,7 +510,7 @@ async page => {
       await projektOeffnen('E2E APA')
       await panelOeffnen('Quellen')
       await page.getByRole('button', { name: 'Aus anderem Projekt holen' }).click()
-      await page.getByLabel('Projekt').selectOption({ label: 'Demo' })
+      await page.getByLabel('Projekt', { exact: true }).selectOption({ label: 'Demo' })
       await page.getByRole('button', { name: 'Holen', exact: true }).click()
       await sichtbar('1 Quelle geholt')
       await quelleHolen('Demo')
@@ -688,14 +690,14 @@ async page => {
       await page.goto(`${BASE}/user/settings`)
       await page.getByRole('heading', { name: 'Claude verbinden' }).waitFor()
       await page.getByRole('button', { name: 'Token erzeugen' }).click()
-      const befehl = page.locator('.spur-befehl')
+      const befehl = page.locator('.spur-token-neu')
       await befehl.waitFor()
       const token = await befehl.getAttribute('data-spur-token')
       const text = await befehl.innerText()
       ok(text.includes(`token=${token}`), 'Token fehlt im Befehl')
       ok(text.includes('claude plugin install spur@spur'), 'Plugin-Befehl fehlt')
       ok(text.includes('mcp__plugin_spur_spur__doc_edit'), 'Allow-Regel fehlt')
-      await sichtbar('Dieses Token erscheint nur einmal')
+      await sichtbar('Deinen Schlüssel siehst du nur jetzt')
 
       const liste = (await (await page.request.get(`${BASE}/spur/claude/tokens`)).json()).tokens
       ok(!JSON.stringify(liste).includes(token), 'Token im Klartext gespeichert')
@@ -739,8 +741,8 @@ async page => {
           const text = (await page.locator('body').innerText()).slice(0, 400).replace(/\s+/g, ' ')
           fail(`Token erzeugen fehlt auf ${page.url()}: ${text} (${error.message.split('\n')[0]})`)
         })
-      await page.locator('.spur-befehl').waitFor()
-      const erstes = await page.locator('.spur-befehl').getAttribute('data-spur-token')
+      await page.locator('.spur-token-neu').waitFor()
+      const erstes = await page.locator('.spur-token-neu').getAttribute('data-spur-token')
       const neuPid = await projektId(erstes, 'E2E Neu')
       const angefuegt = await werkzeug(erstes, 'doc_edit', {
         project_id: neuPid, pfad: 'main.tex', neu: 'Von Claude angefügt.', idempotenz_schluessel: 'e2e-neu-1',
@@ -768,7 +770,7 @@ async page => {
         'quote_mark', 'check_report', 'bib_list', 'doc_edit', 'doc_create', 'run_status',
         'run_finish', 'wait_for_event', 'events_since', 'reply',
       ]
-      // P2 ergänzt laut docs/mcp-vertrag.md Recherche, Aufnahme, Matrix und Compile.
+      // P2 ergänzt laut docs/mcp-contract.md Recherche, Aufnahme, Matrix und Compile.
       const P2 = [
         'paper_search', 'paper_citations', 'source_add', 'acquisition_add', 'matrix_suggest',
         'compile', 'job_status', 'compile_log', 'page_image',
@@ -1775,7 +1777,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       ok(text.includes(teil), `Offenlegung ohne „${teil}“:\n${text}`)
     }
     ok(!text.includes('Modell'), 'Modell ohne Angabe genannt')
-    await dialog.getByLabel('Modell (optional, wird nur genannt, wenn Sie es eintragen)').fill('Claude Opus 5.5')
+    await dialog.getByLabel('Modell (optional, wird nur genannt, wenn du es einträgst)').fill('Claude Opus 5.5')
     await dialog.getByText('Modell: Claude Opus 5.5.', { exact: false }).waitFor()
 
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
@@ -1832,7 +1834,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       await erster.waitFor()
       const text = await erster.textContent()
       ok(text.includes('smith2024.pdf') && text.includes('S. 347') && text.includes('Sleep supports the consolidation'), `Erster Treffer: ${text}`)
-      await page.locator('.spur-semantik').getByText('Sie belegen kein Zitat.', { exact: false }).waitFor()
+      await page.locator('.spur-semantik').getByText('Ein Zitat belegen sie nicht.', { exact: false }).waitFor()
       ok((await bericht()) === berichtVorher, 'Semantische Treffer ändern den Prüfbericht')
     } finally {
       await fakeSteuern(AUS)
@@ -1883,7 +1885,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await projektOeffnen('E2E Team')
     await panelOeffnen('Quellen')
     await quelleSeite3('smith2024.pdf')
-    await sichtbar('Markieren Sie oben Text und speichern Sie ihn als Zitat.')
+    await sichtbar('Markiere oben Text und speichere ihn als Zitat.')
 
     const a = await zweiteSeite()
     try {
@@ -1895,7 +1897,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
         await textMarkieren(SATZ_A)
         await page.getByRole('button', { name: 'Zitat speichern' }).click()
         await sichtbar(`„${SATZ_A}“`)
-        await sichtbar(/S\. 347 · von Ihnen/)
+        await sichtbar(/S\. 347 · von dir/)
         // Zurück zur Liste: Dort erscheint gleich der Hinweis auf die Zuweisung.
         await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
         await page.getByRole('button', { name: 'smith2024.pdf' }).waitFor()
@@ -1912,7 +1914,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       await zeile.getByText('Bitte die Seitenzahl prüfen.').waitFor()
 
       await alsSeite(a.seite, async () => {
-        await sichtbar(`Ben Berater hat Ihnen ein Zitat zugewiesen: „${SATZ_A}“ (smith2024.pdf, S. 347)`)
+        await sichtbar(`Ben Berater hat dir ein Zitat zugewiesen: „${SATZ_A}“ (smith2024.pdf, S. 347)`)
         await page.getByRole('button', { name: 'Öffnen', exact: true }).click()
         await sichtbar('Seite 347 (PDF-Seite 3 von 8)')
         await sichtbar('Zugewiesen an Anna Autor')
@@ -2084,7 +2086,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
 
   features.p4f4 = async () => {
     const HINWEIS =
-      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen.'
+      'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisiere Interviews am besten vor dem Hochladen.'
+    // Die README ist englisch (spur_transkript_hinweis in en.json); die Oberfläche der E2E-Instanz bleibt deutsch.
+    const README_HINWEIS =
+      'Transcripts are sent to the AI provider when Claude reads them. Ideally, pseudonymise interviews before uploading them.'
     await anmelden('e2e-a@example.org')
     await projektOeffnen('E2E Transkript')
     await panelOeffnen('Quellen')
@@ -2102,8 +2107,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await hinweis.waitFor({ state: 'detached' })
 
     const readme = await repoDatei(`${FIXTURES}/../../../../../../README.md`)
-    const abschnitt = readme.split('\n## ').find(teil => teil.startsWith('Claude und Ihre Daten'))
-    ok(abschnitt?.includes(HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude und Ihre Daten“')
+    const abschnitt = readme.split('\n## ').find(teil => teil.startsWith('Claude and your data'))
+    ok(abschnitt?.includes(README_HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude and your data“')
   }
 
   // P3: Ada (e2e-p3a) und Bo (e2e-p3b) haben je ein festes Test-Token aus vorbereiten.mjs.
@@ -2260,6 +2265,13 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click(),
     ])
     ok(gesendet.status() === 204, `Kommentar von Bo: ${gesendet.status()}`)
+    // Overleaf schickt die Kommentar-Op gesammelt, etwa 2 s nach dem Thread-Text; wer vorher die Seite verlässt,
+    // verliert sie. Darum warten, bis der Server den Kommentar kennt.
+    const gespeichert = async () =>
+      (await (await page.request.get(`${BASE}/project/${pid}/ranges`)).json()).some(doc => doc.ranges.comments?.length)
+    for (let ende = Date.now() + 20000; !(await gespeichert()); await page.waitForTimeout(250)) {
+      ok(Date.now() < ende, 'Kommentar von Bo nach 20 s nicht beim Server')
+    }
     const thread = await reviewEintrag('Bo meint: Das ist zu stark.')
 
     await anmelden('e2e-p3a@example.org')
@@ -2395,7 +2407,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
 
     const vorAuftraegen = (await ereignisseVon(ADA, 'task_created')).length
     await karte.getByRole('button', { name: 'Übernehmen' }).click()
-    await vorschlaegePanel().getByText('Claude hat den Auftrag. Den Lauf sehen Sie im Claude-Panel.').waitFor()
+    await vorschlaegePanel().getByText('Claude hat den Auftrag. Den Lauf siehst du im Claude-Panel.').waitFor()
     await karte.waitFor({ state: 'detached' })
     const auftraege = await bisEreignisse(ADA, 'task_created', vorAuftraegen + 1)
     ok(auftraege.at(-1).daten.text.includes(BELEG), `Auftrag: ${JSON.stringify(auftraege.at(-1).daten)}`)
@@ -2454,9 +2466,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok(pause[0].daten.art === 'belegloses_argument' && pause[0].daten.doc_id === docId, `Tipp-Pause: ${JSON.stringify(pause[0].daten)}`)
   }
 
-  const WORKFLOWS = ['literaturueberblick', 'methodenteil', 'folien']
-  const promptText = async name =>
-    (await mcp(ADA, 'prompts/get', { name, arguments: {} })).daten.result.messages[0].content.text
+  const WORKFLOWS = ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln']
+  const promptText = async (name, args = name === 'quellen_sammeln' ? { thema: 'Schlaf' } : {}) =>
+    (await mcp(ADA, 'prompts/get', { name, arguments: args })).daten.result.messages[0].content.text
 
   // Klickt im Claude-Panel einen Workflow und liefert das Ereignis, das der wartende Fake-Client erhält.
   async function workflowKlicken(projekt, titel) {
@@ -2487,7 +2499,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const { daten } = await mcp(ADA, 'prompts/list')
     const prompts = daten.result.prompts
     ok(JSON.stringify(prompts.map(p => p.name)) === JSON.stringify(WORKFLOWS), `prompts/list: ${prompts.map(p => p.name)}`)
-    ok(prompts.every(p => p.arguments?.every(a => !a.required)), 'Prompt mit Pflichtargument')
+    const pflicht = prompts.flatMap(p => p.arguments.filter(a => a.required).map(a => `${p.name}.${a.name}`))
+    ok(JSON.stringify(pflicht) === '["quellen_sammeln.thema"]', `Pflichtargumente: ${pflicht}`)
     const texte = {}
     for (const name of WORKFLOWS) {
       texte[name] = await promptText(name)
@@ -2502,14 +2515,19 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok(pluginJson.name === 'spur', `Plugin-Name: ${pluginJson.name}`)
     const BEFEHLE = WORKFLOWS.map(n => `/plugin:${pluginJson.name}:spur:${n}`)
 
-    const titel = { literaturueberblick: 'Literaturüberblick', methodenteil: 'Methodenteil', folien: 'Folien aus Paper' }
+    const titel = {
+      literaturueberblick: 'Literaturüberblick',
+      methodenteil: 'Methodenteil',
+      folien: 'Folien aus Paper',
+      quellen_sammeln: 'Quellen sammeln',
+    }
     await anmelden('e2e-p3a@example.org')
     await projektOeffnen('E2E Workflows')
     const pid = page.url().split('/').pop()
     await panelOeffnen('Claude')
     await verbinden(ADA)
     await claudePanel().getByText('Workflows', { exact: true }).click()
-    const knoepfe = await claudePanel().locator('.spur-workflow button').allInnerTexts()
+    const knoepfe = await claudePanel().locator('.spur-workflow > button').allInnerTexts()
     ok(JSON.stringify(knoepfe) === JSON.stringify(WORKFLOWS.map(n => titel[n])), `Panel: ${knoepfe}`)
     const hilfe = await claudePanel().getByRole('list', { name: 'Befehle in Claude Code' }).getByRole('listitem').allInnerTexts()
     ok(JSON.stringify(hilfe) === JSON.stringify(BEFEHLE), `Hilfe im Panel: ${hilfe}`)
@@ -2543,6 +2561,564 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       })
     }
     ok((await promptText('methodenteil')) === texte.methodenteil, 'Standardtext nicht wiederhergestellt')
+  }
+
+  // P5: Nachbesserungen aus der Abnahme.
+  async function breite(px) {
+    await page.setViewportSize({ width: px, height: px < 400 ? 740 : 690 })
+  }
+
+  async function ohneSeitlichesRollen(wo) {
+    const masse = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth])
+    ok(masse[0] <= masse[1], `${wo}: Seite rollt seitlich (${masse})`)
+  }
+
+  // Führt `schritte` im Editor-Design `thema` aus ('' dunkel, 'light-' hell) und stellt danach das vorige Design her.
+  async function mitDesign(thema, schritte) {
+    const vorher = await page.evaluate(() => JSON.parse(document.querySelector('meta[name="ol-userSettings"]').content).overallTheme)
+    await seitenPost('/user/settings', { overallTheme: thema })
+    try {
+      return await schritte()
+    } finally {
+      await seitenPost('/user/settings', { overallTheme: vorher })
+    }
+  }
+
+  // Alle sichtbaren, bedienbaren Texte eines Bereichs mit Kontrast unter 4,5:1 (WCAG, gegen den ersten
+  // nicht durchsichtigen Hintergrund darunter).
+  async function unlesbar(bereich) {
+    return await bereich.evaluate(wurzel => {
+      const rgb = s => s.match(/[\d.]+/g).slice(0, 3).map(Number)
+      const kanal = c => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+      const hell = ([r, g, b]) => 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b)
+      const hinten = el => {
+        for (let e = el; e; e = e.parentElement) {
+          const farbe = getComputedStyle(e).backgroundColor
+          if (!/^rgba\(.*, 0\)$|transparent/.test(farbe)) return farbe
+        }
+        return 'rgb(255, 255, 255)'
+      }
+      const schlecht = []
+      for (const el of wurzel.querySelectorAll('*')) {
+        if (!el.offsetParent || el.closest('[disabled], .disabled, [aria-disabled=true]')) continue
+        if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue
+        const [a, b] = [hell(rgb(getComputedStyle(el).color)), hell(rgb(hinten(el)))]
+        const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+        if (k < 4.5) schlecht.push(`${el.textContent.trim().slice(0, 40)} (${k.toFixed(2)})`)
+      }
+      return [...new Set(schlecht)]
+    })
+  }
+
+  features.p5f1 = async () => {
+    const logos = []
+    const merken = r => /overleaf-o[-.]/.test(r.url()) && logos.push(r.url())
+    page.on('request', merken)
+    try {
+      await breite(1280)
+      await anmelden('e2e-a@example.org')
+      const kopf = page.locator('.navbar-title')
+      ok((await kopf.innerText()).trim() === 'spur', `Projektliste: ${await kopf.innerText()}`)
+      ok((await page.locator('.navbar-logo').count()) === 0, 'Projektliste zeigt .navbar-logo')
+      await page.goto(`${BASE}/user/settings`)
+      ok((await page.locator('.navbar-title').innerText()).trim() === 'spur', 'Einstellungen ohne Schriftzug')
+      ok((await page.locator('.navbar-logo').count()) === 0, 'Einstellungen zeigen .navbar-logo')
+
+      await projektOeffnen('E2E APA')
+      for (const thema of ['light-', '']) {
+        await mitDesign(thema, async () => {
+          for (const px of [1280, 360]) {
+            await breite(px)
+            await projektOeffnen('E2E APA')
+            const link = page.getByRole('link', { name: 'spur, zur Projektliste' })
+            ok((await link.innerText()).trim() === 'spur', `Editor: ${await link.innerText()}`)
+            const schlecht = await unlesbar(link)
+            ok(schlecht.length === 0, `Schriftzug bei ${px} px, Thema „${thema}“: ${schlecht}`)
+            ok(await link.evaluate(a => a.scrollWidth <= a.clientWidth && a.getBoundingClientRect().right <= innerWidth), `Schriftzug läuft über bei ${px} px`)
+            await ohneSeitlichesRollen(`Editor ${px} px`)
+          }
+        })
+      }
+      await breite(1280)
+      await projektOeffnen('E2E APA')
+      await page.getByRole('link', { name: 'spur, zur Projektliste' }).click()
+      await page.waitForURL(`${BASE}/project`)
+      await projektOeffnen('E2E APA')
+      // Vom Seitenanfang aus; im Editor würde Tab einrücken.
+      await page.evaluate(() => document.activeElement?.blur())
+      let gefunden = false
+      for (let i = 0; i < 40 && !gefunden; i++) {
+        await page.keyboard.press('Tab')
+        gefunden = await page.evaluate(() => document.activeElement?.getAttribute('aria-label') === 'spur, zur Projektliste')
+      }
+      ok(gefunden, 'Schriftzug per Tab nicht erreichbar')
+      await page.keyboard.press('Enter')
+      await page.waitForURL(`${BASE}/project`)
+      ok(logos.length === 0, `Overleaf-Logo geladen: ${logos.join(', ')}`)
+    } finally {
+      page.off('request', merken)
+      await breite(1280)
+    }
+  }
+
+  features.p5f2 = async () => {
+    await page.setViewportSize({ width: 1280, height: 690 })
+    await anmelden('e2e-a@example.org')
+    const seite = page.locator('.project-list-sidebar-scroll')
+    await seite.getByText('Stichwörter', { exact: true }).waitFor()
+    ok(!(await page.locator('body').innerText()).includes('Stichwörter organisieren'), '„Stichwörter organisieren“ steht noch da')
+    const masse = await seite.evaluate(el => [el.scrollWidth, el.clientWidth])
+    ok(masse[0] <= masse[1], `Seitenmenü rollt seitlich: ${masse}`)
+    const unten = (await page.locator('.ds-nav-ds-name').textContent()).trim()
+    ok(unten === 'Overleaf CE+ · spur', `Unterste Zeile: ${unten}`)
+
+    await page.goto(`${BASE}/user/settings`)
+    const github = page.getByRole('link', { name: 'spur @ GitHub' })
+    ok((await github.getAttribute('href')) === 'https://github.com/ahlerjam/spur', `Fußzeile: ${await github.getAttribute('href')}`)
+    ok(!(await page.locator('body').innerText()).includes('spur auf GitHub'), '„spur auf GitHub“ steht noch da')
+
+    await page.goto(`${BASE}/project`)
+    await seite.getByRole('button', { name: 'Neues Stichwort' }).click()
+    const modal = page.locator('.modal')
+    await modal.getByLabel('Neuer Stichwortname').fill('Diss')
+    await modal.getByRole('button', { name: 'Erstellen' }).click()
+    await modal.waitFor({ state: 'detached' })
+    try {
+      await page.getByPlaceholder('Suche in allen Projekten…').filter({ visible: true }).first().fill('E2E APA')
+      await page.getByRole('checkbox', { name: 'E2E APA auswählen' }).check()
+      await page.getByRole('button', { name: 'Stichworte' }).click()
+      await page.locator('.dropdown-menu.show').getByRole('menuitem', { name: 'Diss' }).click()
+      await page.keyboard.press('Escape')
+      await page.getByPlaceholder('Suche in allen Projekten…').filter({ visible: true }).first().fill('')
+      await seite.getByRole('button', { name: 'Diss (1)' }).click()
+      await page.waitForURL(/\/project\/tags\//)
+      const zeilen = page.locator('table tbody tr').filter({ visible: true })
+      await zeilen.first().getByRole('link', { name: 'E2E APA' }).waitFor()
+      ok((await zeilen.count()) === 1, `Stichwort zeigt ${await zeilen.count()} Projekte`)
+      await breite(360)
+      await ohneSeitlichesRollen('Projektliste 360 px')
+      await breite(1280)
+    } finally {
+      await page.getByRole('button', { name: 'Aktionsmenü für Diss öffnen' }).click()
+      await page.locator('.dropdown-menu.show').getByRole('menuitem', { name: 'Löschen' }).click()
+      await modal.getByRole('button', { name: 'Löschen', exact: true }).click()
+      await modal.waitFor({ state: 'detached' })
+    }
+    ok(!(await seite.innerText()).includes('Diss'), 'Stichwort nicht gelöscht')
+  }
+
+  const ANLEITUNG = [
+    ['spur bei Claude Code bekannt machen', 'Das brauchst du nur einmal pro Rechner.'],
+    ['spur mit deinem Konto verbinden', 'Der Befehl enthält deinen persönlichen Schlüssel. Gib ihn nicht weiter.'],
+    [
+      'Claude Code starten',
+      'Starte damit Claude Code im Terminal. Claude darf dann in spur schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.',
+    ],
+  ]
+  const SCHREIBWERKZEUGE = ['quote_mark', 'doc_edit', 'doc_create', 'reply', 'run_finish', 'wait_for_event']
+  const START = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
+
+  // Kein Kasten ist breiter als sein Container, kein Befehl wird abgeschnitten.
+  async function kaestenGanz(wo) {
+    const falsch = await page.locator('.spur-befehl-kasten').evaluateAll(kaesten =>
+      kaesten
+        .map(k => {
+          const pre = k.querySelector('pre')
+          const eltern = k.parentElement.getBoundingClientRect()
+          return pre.scrollWidth > pre.clientWidth || pre.scrollHeight > pre.clientHeight + 1 || k.getBoundingClientRect().right > eltern.right + 1
+            ? pre.textContent.slice(0, 40)
+            : null
+        })
+        .filter(Boolean)
+    )
+    ok(falsch.length === 0, `${wo}: abgeschnitten oder zu breit: ${falsch}`)
+  }
+
+  features.p5f3 = async () => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await page.goto(`${BASE}/user/settings`)
+    await page.getByRole('button', { name: 'Token erzeugen' }).click()
+    const neu = page.locator('.spur-token-neu')
+    await neu.getByRole('heading', { name: 'So verbindest du Claude Code' }).waitFor()
+    await neu.getByText('Deinen Schlüssel siehst du nur jetzt. Kopiere die Befehle, bevor du die Seite verlässt.', { exact: true }).waitFor()
+    const token = await neu.getAttribute('data-spur-token')
+    const schritte = neu.locator('ol > li')
+    ok((await schritte.count()) === 3, `Schritte: ${await schritte.count()}`)
+    const befehle = [
+      'claude plugin marketplace add ahlerjam/spur',
+      `claude plugin install spur@spur --config server_url=${BASE}/spur/mcp --config token=${token}`,
+      START,
+    ]
+    for (const [i, [titel, text]] of ANLEITUNG.entries()) {
+      const schritt = schritte.nth(i)
+      ok((await schritt.getByRole('heading').innerText()) === titel, `Schritt ${i + 1}: ${await schritt.getByRole('heading').innerText()}`)
+      await schritt.getByText(text, { exact: true }).waitFor()
+      ok((await schritt.locator('pre').textContent()) === befehle[i], `Befehl ${i + 1}: ${await schritt.locator('pre').textContent()}`)
+      ok((await schritt.getByRole('button', { name: 'Kopieren' }).count()) === 1, `Schritt ${i + 1} ohne Kopierknopf`)
+    }
+    await schritte.nth(1).getByRole('button', { name: 'Kopieren' }).click()
+    await schritte.nth(1).getByRole('button', { name: 'Kopiert' }).waitFor()
+    const kopiert = await page.evaluate(() => navigator.clipboard.readText())
+    ok(kopiert === befehle[1], `Zwischenablage: ${kopiert}`)
+    ok((await neu.getByRole('button', { name: 'Kopieren' }).count()) === 2, 'Andere Knöpfe zeigen nicht mehr „Kopieren“')
+    await kaestenGanz('Token-Dialog 1280 px')
+    await breite(360)
+    await kaestenGanz('Token-Dialog 360 px')
+    await ohneSeitlichesRollen('Kontoeinstellungen 360 px')
+    await breite(1280)
+
+    await projektOeffnen('Demo')
+    await panelOeffnen('Claude')
+    await claudePanel().getByText('Claude nicht verbunden').waitFor()
+    const kasten = claudePanel().locator('.spur-befehl-kasten')
+    ok((await kasten.locator('pre').textContent()) === START, `Startbefehl im Panel: ${await kasten.locator('pre').textContent()}`)
+    await kaestenGanz('Claude-Panel')
+    await kasten.getByRole('button', { name: 'Kopieren' }).click()
+    await kasten.getByRole('button', { name: 'Kopiert' }).waitFor()
+    ok((await page.evaluate(() => navigator.clipboard.readText())) === START, 'Panel kopiert nicht den Startbefehl')
+    // Der Befehl muss in beiden Designs des Editors lesbar sein (Abnahme: im dunklen Design 1:1).
+    for (const thema of ['', 'light-']) {
+      await mitDesign(thema, async () => {
+        await page.reload()
+        await page.locator('.cm-content').first().waitFor()
+        await panelOeffnen('Claude')
+        const kasten = claudePanel().locator('.spur-befehl-kasten')
+        await kasten.waitFor()
+        const schlecht = await unlesbar(kasten)
+        ok(schlecht.length === 0, `Startbefehl im Design „${thema || 'dunkel'}“: ${schlecht}`)
+      })
+    }
+  }
+
+  features.p5f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    // Ein neues Projekt (vorbereiten.mjs) hat noch keine Quellen und, nach dem Hochladen, eine leere Zitatliste.
+    try {
+      for (const px of [1280, 360]) {
+        await breite(px)
+        await page.goto(`${BASE}/user/settings`)
+        const text = await page.locator('.spur-claude-verbinden p.small').first().innerText()
+        ok(text.startsWith('Verbinde dein eigenes Claude Code.'), `Claude verbinden: ${text}`)
+        await ohneSeitlichesRollen(`Einstellungen ${px} px`)
+
+        await projektOeffnen('E2E Leer P5')
+        await panelOeffnen('Quellen')
+        if (px === 1280) {
+          await sichtbar('Noch keine Quellen')
+          await hochladen('smith2024.pdf')
+        }
+        await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+        await sichtbar('Markiere oben Text und speichere ihn als Zitat.')
+        await panelOeffnen('Recherche')
+        await sichtbar('Suche nach einem Thema, einem Titel oder einer DOI.')
+        await panelOeffnen('Vorschläge')
+        await sichtbar('Vorschläge sind aus. Stell oben einen Auslöser auf „Vorschlag“.')
+        for (const name of ['Quellen', 'Recherche', 'Vorschläge', 'Claude']) {
+          const panel = page.getByRole('tabpanel', { name })
+          await panelSichern(name, panel)
+          ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth), `${name} läuft über bei ${px} px`)
+          ok(!/\b(Sie|Ihr|Ihre|Ihnen)\b/.test(await panel.innerText()), `${name} siezt: ${await panel.innerText()}`)
+          const schlecht = await unlesbar(panel)
+          ok(schlecht.length === 0, `${name} bei ${px} px schlecht lesbar: ${schlecht.join(' | ')}`)
+        }
+        await ohneSeitlichesRollen(`Editor ${px} px`)
+      }
+    } finally {
+      await breite(1280)
+    }
+  }
+
+  features.p5f5 = async () => {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Chat')
+    const pid = page.url().split('/').pop()
+    const antwort = await seitenPost(`/spur/project/${pid}/vorschlaege/tipp-pause`, { doc_id: 'aaaaaaaaaaaaaaaaaaaaaaaa' })
+    ok(
+      antwort.status === 404 && antwort.daten.title === 'doc_fehlt' && antwort.daten.detail === 'Das Dokument gibt es nicht (mehr).',
+      `tipp-pause: ${antwort.status} ${JSON.stringify(antwort.daten)}`
+    )
+    const falsch = await werkzeug(ADA, 'doc_edit', {
+      project_id: pid, pfad: 'main.tex', alt: 'Diesen Text gibt es nicht.', neu: 'x', idempotenz_schluessel: 'p5f5-falsch',
+    })
+    ok(
+      falsch.fehler && falsch.inhalt.fehler === 'konflikt' &&
+        falsch.inhalt.detail === 'Der erwartete Alttext steht nicht im Dokument. Bitte neu lesen.',
+      `doc_edit: ${JSON.stringify(falsch.inhalt)}`
+    )
+
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Scan')
+    await panelOeffnen('Quellen')
+    await page.route(/\/seiten\/1\/bild$/, route => route.continue({ url: route.request().url().replace(/\/1\/bild$/, '/999/bild') }))
+    try {
+      await page.getByRole('button', { name: 'scan.pdf' }).click()
+      await page.locator('.spur-panel .notification', { hasText: 'Diese Seite gibt es in der Quelle nicht.' }).waitFor()
+      ok((await page.locator('img.spur-seitenbild').count()) === 0, 'Kaputtes Seitenbild statt Hinweis')
+    } finally {
+      await page.unroute(/\/seiten\/1\/bild$/)
+    }
+  }
+
+  async function grossOeffnen() {
+    const knopf = page.getByRole('button', { name: 'Groß öffnen' })
+    await knopf.click()
+    const dialog = page.getByRole('dialog')
+    await dialog.waitFor()
+    return { knopf, dialog }
+  }
+
+  features.p5f6 = async () => {
+    const SATZ = 'Sleep supports the consolidation of declarative memory.'
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Quellen')
+    await panelOeffnen('Quellen')
+    if (!(await page.getByRole('button', { name: 'smith2024.pdf' }).isVisible())) await hochladen('smith2024.pdf')
+    await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+    await page.locator('img.spur-seitenbild').waitFor()
+    const leiste = page.locator('.spur-panel-werkzeuge')
+    const kanten = await Promise.all(
+      [leiste.getByRole('button', { name: 'Zurück' }), leiste.locator('.spur-seitenzahl'), leiste.getByRole('button', { name: 'Vorherige Seite' }), leiste.getByRole('button', { name: 'Nächste Seite' })].map(
+        async l => Math.round((await l.boundingBox()).y + (await l.boundingBox()).height / 2)
+      )
+    )
+    ok(Math.max(...kanten) - Math.min(...kanten) <= 4, `Werkzeugleiste nicht in einer Zeile: ${kanten}`)
+    const panelBreite = (await page.locator('img.spur-seitenbild').boundingBox()).width
+
+    const { knopf, dialog } = await grossOeffnen()
+    await dialog.getByRole('heading', { name: 'smith2024.pdf' }).waitFor()
+    // Die Seitenbeschriftung hängt vom Versatz ab, den frühere Features bestätigen.
+    const SEITE = n => new RegExp(`^Seite (\\S+ \\(PDF-Seite ${n} von 8\\)|${n} von 8)$`)
+    await dialog.getByText(SEITE(1)).waitFor()
+    const bild = dialog.locator('img.spur-seitenbild')
+    await bild.waitFor()
+    const grossBreite = (await bild.boundingBox()).width
+    ok(grossBreite >= 2 * panelBreite, `Seitenbild ${grossBreite} px, im Panel ${panelBreite} px`)
+    const vorige = dialog.getByRole('button', { name: 'Vorherige Seite' })
+    ok(await vorige.isDisabled(), 'Vorherige Seite auf Seite 1 aktiv')
+    await dialog.getByRole('button', { name: 'Nächste Seite' }).click()
+    await dialog.getByText(SEITE(2)).waitFor()
+    await vorige.click()
+    await dialog.getByText(SEITE(1)).waitFor()
+
+    const groesser = dialog.getByRole('button', { name: 'Vergrößern' })
+    const kleiner = dialog.getByRole('button', { name: 'Verkleinern' })
+    await dialog.getByText('100 %', { exact: true }).waitFor()
+    await groesser.click()
+    await dialog.getByText('125 %', { exact: true }).waitFor()
+    await groesser.click()
+    await dialog.getByText('150 %', { exact: true }).waitFor()
+    await kleiner.click()
+    await dialog.getByText('125 %', { exact: true }).waitFor()
+    await groesser.click()
+    await groesser.click()
+    await dialog.getByText('200 %', { exact: true }).waitFor()
+    ok(await groesser.isDisabled(), 'Vergrößern bei 200 % aktiv')
+    const flaeche = dialog.locator('.spur-gross-bild')
+    ok(await flaeche.evaluate(el => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight), 'Seite bei 200 % nicht rollbar')
+    await ohneSeitlichesRollen('Große Ansicht 200 %')
+    for (let i = 0; i < 4; i++) await kleiner.click()
+    await dialog.getByText('75 %', { exact: true }).waitFor()
+    ok(await kleiner.isDisabled(), 'Verkleinern bei 75 % aktiv')
+
+    await dialog.getByRole('button', { name: 'Nächste Seite' }).click()
+    await dialog.getByRole('button', { name: 'Nächste Seite' }).click()
+    await dialog.locator('.spur-seitentext', { hasText: SATZ }).waitFor()
+    await textMarkieren(SATZ, dialog)
+    await dialog.getByRole('button', { name: 'Zitat speichern' }).click()
+    await dialog.locator('.spur-zitate li', { hasText: SATZ }).waitFor()
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'detached' })
+    ok(await knopf.evaluate(el => el === document.activeElement), 'Fokus nach Esc nicht auf „Groß öffnen“')
+    await page.getByRole('tabpanel', { name: 'Quellen' }).locator('.spur-zitate li', { hasText: SATZ }).waitFor()
+    const zweiter = await grossOeffnen()
+    await zweiter.dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
+    await zweiter.dialog.waitFor({ state: 'detached' })
+    ok(await knopf.evaluate(el => el === document.activeElement), 'Fokus nach „Schließen“ nicht auf „Groß öffnen“')
+
+    await breite(360)
+    const klein = await grossOeffnen()
+    const box = await klein.dialog.locator('.modal-content').boundingBox()
+    ok(box.width >= 355 && box.x <= 1, `Große Ansicht bei 360 px: ${JSON.stringify(box)}`)
+    const zuKlein = await klein.dialog.getByRole('button').evaluateAll(knoepfe =>
+      knoepfe.filter(k => k.offsetParent).map(k => [k.textContent.trim() || k.getAttribute('aria-label'), k.getBoundingClientRect()]).filter(([, r]) => r.width < 24 || r.height < 24).map(([n]) => n)
+    )
+    ok(zuKlein.length === 0, `Knöpfe unter 24 px: ${zuKlein}`)
+    await ohneSeitlichesRollen('Große Ansicht 360 px')
+    await page.keyboard.press('Escape')
+    await klein.dialog.waitFor({ state: 'detached' })
+    await breite(1280)
+
+    for (const [projekt, quelle] of [['E2E Scan', 'scan.pdf']]) {
+      await projektOeffnen(projekt)
+      await panelOeffnen('Quellen')
+      await page.getByRole('button', { name: quelle }).click()
+      const { dialog: d } = await grossOeffnen()
+      await d.getByRole('heading', { name: quelle }).waitFor()
+      await d.locator('img.spur-seitenbild').waitFor()
+      await page.keyboard.press('Escape')
+      await d.waitFor({ state: 'detached' })
+    }
+    await projektOeffnen('E2E Web')
+    await panelOeffnen('Quellen')
+    const web = page.getByRole('button', { name: 'Schlafhygiene im Schichtdienst' })
+    if (!(await web.isVisible())) {
+      await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+      await page.getByLabel('Adresse der Webseite').fill('http://127.0.0.1/spur/dev/web/testseite')
+      await page.getByRole('button', { name: 'Aufnehmen', exact: true }).click()
+    }
+    await web.click()
+    const { dialog: w } = await grossOeffnen()
+    await w.locator('.spur-seitentext', { hasText: 'Regular sleep times' }).waitFor()
+    await page.keyboard.press('Escape')
+    await w.waitFor({ state: 'detached' })
+  }
+
+  features.p5f7 = async () => {
+    await breite(1280)
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Workflows')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    await verbinden(ADA)
+    await claudePanel().getByText('Workflows', { exact: true }).click()
+    const knoepfe = await claudePanel().locator('.spur-workflow > button').allInnerTexts()
+    ok(
+      JSON.stringify(knoepfe) === JSON.stringify(['Literaturüberblick', 'Methodenteil', 'Folien aus Paper', 'Quellen sammeln']),
+      `Workflows: ${knoepfe}`
+    )
+    const hilfe = await claudePanel().getByRole('list', { name: 'Befehle in Claude Code' }).getByRole('listitem').allInnerTexts()
+    ok(hilfe[3] === '/plugin:spur:spur:quellen_sammeln', `Befehl: ${hilfe[3]}`)
+
+    await claudePanel().getByRole('button', { name: 'Quellen sammeln', exact: true }).click()
+    const thema = claudePanel().getByLabel('Thema')
+    const anzahl = claudePanel().getByLabel('Anzahl')
+    ok((await anzahl.inputValue()) === '20', `Anzahl vorbelegt: ${await anzahl.inputValue()}`)
+    const starten = claudePanel().getByRole('button', { name: 'Sammeln starten' })
+    const beschreibung = async feld => page.locator(`#${await feld.getAttribute('aria-describedby')}`).innerText()
+    await starten.click()
+    await claudePanel().getByText('Gib ein Thema an.').waitFor()
+    ok((await thema.getAttribute('aria-invalid')) === 'true' && (await beschreibung(thema)).includes('Gib ein Thema an.'), 'Themenfehler nicht am Feld')
+    await thema.fill('Schlaf und Gedächtnis')
+    for (const wert of ['abc', '0']) {
+      await anzahl.fill(wert)
+      await starten.click()
+      await claudePanel().getByText('Gib eine Zahl ab 1 oder „max“ an.').waitFor()
+      ok((await anzahl.getAttribute('aria-invalid')) === 'true' && (await beschreibung(anzahl)).includes('Gib eine Zahl ab 1 oder „max“ an.'), `Anzahl „${wert}“ nicht am Feld gemeldet`)
+    }
+    for (const px of [360, 1280]) {
+      await breite(px)
+      await ohneSeitlichesRollen(`Formular ${px} px`)
+      ok(await claudePanel().evaluate(el => el.scrollWidth <= el.clientWidth), `Claude-Panel läuft über bei ${px} px`)
+    }
+    await breite(1280)
+    // Formular samt Fehlern und Befehlsliste im dunklen Design lesbar (die Abnahme fand dort Kontrast 1:1).
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    await mitDesign('', async () => {
+      await page.reload()
+      await page.locator('.cm-content').first().waitFor()
+      await panelOeffnen('Claude')
+      await verbinden(ADA)
+      const workflows = claudePanel().locator('details.spur-workflows')
+      if (!(await workflows.evaluate(el => el.open))) await workflows.locator('summary').click()
+      await claudePanel().getByRole('button', { name: 'Quellen sammeln', exact: true }).click()
+      await claudePanel().getByLabel('Anzahl').fill('abc')
+      await claudePanel().getByRole('button', { name: 'Sammeln starten' }).click()
+      await claudePanel().getByText('Gib ein Thema an.').waitFor()
+      const schlecht = await unlesbar(claudePanel())
+      ok(schlecht.length === 0, `Formular im dunklen Design schlecht lesbar: ${schlecht.join(' | ')}`)
+      await page.evaluate(() => window.__spur.abbruch.abort())
+    })
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Claude')
+    await verbinden(ADA)
+    await claudePanel().getByText('Workflows', { exact: true }).click()
+    await claudePanel().getByRole('button', { name: 'Quellen sammeln', exact: true }).click()
+    await thema.fill('Schlaf und Gedächtnis')
+    await anzahl.fill('30')
+    await starten.click()
+    await page.waitForFunction(() => window.__spur.log.some(e => e.msg?.result), null, { timeout: 5000 })
+    const { ereignis } = await page.evaluate(() => JSON.parse(window.__spur.log.find(e => e.msg?.result).msg.result.content[0].text))
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    const text = ereignis?.daten.text ?? ''
+    ok(ereignis?.typ === 'task_created' && ereignis.project_id === pid && ereignis.daten.workflow === 'quellen_sammeln', `Auftrag: ${JSON.stringify(ereignis).slice(0, 200)}`)
+    ok(text.includes('Thema: Schlaf und Gedächtnis') && text.includes('Anzahl: 30'), `Thema oder Anzahl fehlen: ${text.slice(-200)}`)
+    for (const teil of ['paper_citations', 'Zitationszahl', 'Abstract', '„wichtig“ oder „nicht wichtig“', 'acquisition_add', 'run_finish', 'Literaturüberblick']) {
+      ok(text.includes(teil), `Workflow-Text ohne „${teil}“`)
+    }
+
+    const { daten } = await mcp(ADA, 'prompts/list')
+    const prompt = daten.result.prompts.find(p => p.name === 'quellen_sammeln')
+    ok(
+      JSON.stringify(prompt?.arguments.map(a => [a.name, Boolean(a.required)])) === '[["thema",true],["anzahl",false]]',
+      `prompts/list: ${JSON.stringify(prompt)}`
+    )
+    const viaMcp = await promptText('quellen_sammeln', { thema: 'Schlaf' })
+    ok(viaMcp === text.replace('Thema: Schlaf und Gedächtnis', 'Thema: Schlaf').replace('Anzahl: 30', 'Anzahl: 20'), 'prompts/get liefert einen anderen Text als das Panel')
+    ok(/Anzahl: max\. Es gibt keine Obergrenze; arbeite in Etappen\./.test(await promptText('quellen_sammeln', { thema: 'Schlaf', anzahl: 'max' })), 'max ohne Hinweis auf Etappen')
+
+    // Ablauf wie Claude mit dem Paper-Fake: suchen, frei aufnehmen, nicht frei beschaffen, Duplikat erkennen.
+    const suche = await werkzeug(ADA, 'paper_search', { project_id: pid, anfrage: 'sleep memory' })
+    const treffer = suche.inhalt.treffer
+    ok(treffer.length > 0 && treffer.every(t => typeof t.abstract === 'string'), `Abstracts: ${JSON.stringify(treffer.map(t => t.abstract)).slice(0, 200)}`)
+    const frei = treffer.find(t => t.frei && t.abstract)
+    const unfrei = treffer.find(t => t.frei === false && t.abstract)
+    ok(frei && unfrei && treffer.some(t => t.abstract === ''), `Treffer: ${JSON.stringify(treffer.map(t => [t.doi, t.frei, t.abstract.length]))}`)
+    const aufgenommen = await werkzeug(ADA, 'source_add', { project_id: pid, doi: frei.doi })
+    ok(!aufgenommen.fehler, `source_add: ${JSON.stringify(aufgenommen.inhalt)}`)
+    const doppelt = await werkzeug(ADA, 'source_add', { project_id: pid, doi: frei.doi })
+    ok(doppelt.fehler && doppelt.inhalt.fehler === 'quelle_vorhanden', `Duplikat: ${JSON.stringify(doppelt.inhalt)}`)
+    const beschafft = await werkzeug(ADA, 'acquisition_add', { project_id: pid, doi: unfrei.doi })
+    ok(!beschafft.fehler, `acquisition_add: ${JSON.stringify(beschafft.inhalt)}`)
+    await panelOeffnen('Quellen')
+    await page.getByRole('button', { name: aufgenommen.inhalt.dateiname }).waitFor()
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Beschaffung' }).click()
+    await page.getByRole('tabpanel', { name: 'Recherche' }).getByText(unfrei.titel).first().waitFor()
+
+    await adminWorkflowText('Quellen sammeln', async abschnitt => {
+      await abschnitt.getByText('/plugin:spur:spur:quellen_sammeln', { exact: true }).waitFor()
+      await abschnitt.getByLabel('Text für „Quellen sammeln“').fill('Workflow „Quellen sammeln“ (angepasst).')
+      await abschnitt.getByRole('button', { name: 'Speichern' }).click()
+      await abschnitt.getByText('Gespeichert. Der neue Text gilt ab sofort.').waitFor()
+    })
+    try {
+      ok((await promptText('quellen_sammeln', { thema: 'Schlaf' })).startsWith('Workflow „Quellen sammeln“ (angepasst).'), 'Änderung gilt nicht')
+    } finally {
+      await adminWorkflowText('Quellen sammeln', async abschnitt => {
+        await abschnitt.getByRole('button', { name: 'Standard wiederherstellen' }).click()
+        await abschnitt.getByText('Standardtext wiederhergestellt.').waitFor()
+      })
+    }
+    ok((await promptText('quellen_sammeln', { thema: 'Schlaf' })) === viaMcp, 'Standardtext nicht wiederhergestellt')
+  }
+
+  features.p5f8 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const teile = ['### Prerequisites', 'make start', '### First admin account', '/launchpad', '### Settings', 'SPUR_URL', 'SPUR_PORT', 'SPUR_IMAGE', 'OVERLEAF_SITE_LANGUAGE', '### Public operation', 'docker-compose.sandbox.yml', '#### HTTPS', 'reverse_proxy', '### Backup']
+    const stellen = teile.map(t => readme.indexOf(t))
+    ok(stellen.every((x, i) => x > 0 && (i === 0 || x > stellen[i - 1])), `Installation in falscher Reihenfolge: ${JSON.stringify(teile.map((t, i) => [t, stellen[i]]))}`)
+    ok(/MongoDB 8/.test(readme) && readme.includes('git clone'), 'Voraussetzungen oder git clone fehlen')
+    for (const name of ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln']) {
+      ok(readme.includes(`/plugin:spur:spur:${name}`), `README ohne /plugin:spur:spur:${name}`)
+    }
+    for (const befehl of ['claude plugin marketplace add ahlerjam/spur', 'claude plugin install spur@spur', START]) {
+      ok(readme.includes(befehl), `README ohne Schritt: ${befehl.slice(0, 40)}`)
+    }
+    for (const datei of ['README.md', 'CLAUDE.md', 'docs/backlog.md', 'docs/mcp-contract.md', 'plugins/spur/skills/spur/SKILL.md']) {
+      const text = await repoDatei(`${REPO}/${datei}`)
+      ok(!/[–—]/.test(text), `${datei} enthält Gedankenstriche`)
+      const deutsch = (text.replace(/`[^`]*`|„[^“]*“|"[^"]*"/g, '').match(/\b(und|nicht|oder|wird|werden|Sie)\b/g) ?? []).length
+      ok(deutsch === 0, `${datei}: ${deutsch} deutsche Wörter außerhalb von Code und Zitaten`)
+    }
+    const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
+    const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
+    ok(eintraege === 35, `Backlog hat ${eintraege} Einträge statt 35`)
+    ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /1616/.test(backlog), 'Backlog ohne Transformers, Tesseract oder 1616 Übersetzungen')
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

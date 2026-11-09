@@ -804,7 +804,7 @@ module.exports = {
 
     right_footer: [
       {
-        text: '<a href="https://github.com/ahlerjam/spur">spur auf GitHub</a>',
+        text: '<a href="https://github.com/ahlerjam/spur">spur @ GitHub</a>',
       },
     ],
 

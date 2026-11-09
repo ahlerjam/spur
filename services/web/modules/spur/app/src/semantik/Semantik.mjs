@@ -1,6 +1,7 @@
 import logger from '@overleaf/logger'
 import mongodb from 'mongodb-legacy'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { meldung } from '../meldungen.mjs'
 import { Problem } from '../probleme.mjs'
 import { jobs, quellen, quellenSeiten } from '../sammlungen.mjs'
 import { jetzt, semantikAn } from '../schalter.mjs'
@@ -18,7 +19,7 @@ const ausBinaer = binaer => new Float32Array(Uint8Array.from(binaer.buffer).buff
 const alsBinaer = vektor => new Binary(Buffer.from(vektor.buffer, vektor.byteOffset, vektor.byteLength))
 
 function pruefeAn() {
-  if (!semantikAn()) throw new Problem(404, 'semantik_aus', 'Die semantische Suche ist auf dieser Installation aus.')
+  if (!semantikAn()) throw new Problem(404, 'semantik_aus', 'spur_fehler_semantik_aus')
 }
 
 const mitText = projectId => ({ projectId, text: { $regex: '\\S' } })
@@ -60,7 +61,7 @@ export async function indexieren(projectId) {
       logger.error({ err: error, projectId }, 'spur: Indexieren fehlgeschlagen')
       return sammlung.updateOne(
         { _id: job._id },
-        { $set: { status: 'fehlgeschlagen', fehler: 'Das Indexieren ist fehlgeschlagen. Bitte erneut starten.' } }
+        { $set: { status: 'fehlgeschlagen', fehler: meldung('spur_fehler_indexieren_fehlgeschlagen') } }
       )
     })
   return { job_id: job._id, ende }
@@ -70,7 +71,7 @@ export async function indexieren(projectId) {
 export async function suchen(projectId, anfrage) {
   pruefeAn()
   const text = String(anfrage ?? '').trim()
-  if (!text) throw new Problem(400, 'anfrage_fehlt', 'Bitte beschreiben Sie, was Sie suchen.')
+  if (!text) throw new Problem(400, 'anfrage_fehlt', 'spur_fehler_suchtext_fehlt')
   const frage = await einbetten(text.slice(0, 1000), 'query')
   const seiten = await (await quellenSeiten())
     .find({ projectId, vektor: { $exists: true } }, { projection: { quelleId: 1, seite: 1, label: 1, text: 1, vektor: 1 } })

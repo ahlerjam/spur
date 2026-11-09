@@ -17,7 +17,7 @@ const nichtErreichbar = () =>
   new Problem(
     502,
     'seite_nicht_erreichbar',
-    'Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.'
+    'spur_fehler_seite_nicht_erreichbar'
   )
 
 function adressePruefen(eingabe) {
@@ -31,7 +31,7 @@ function adressePruefen(eingabe) {
     throw new Problem(
       422,
       'adresse_ungueltig',
-      'Bitte eine vollständige Adresse mit http:// oder https:// eingeben.'
+      'spur_fehler_adresse_ungueltig'
     )
   }
   return url
@@ -56,7 +56,7 @@ async function koerperLesen(antwort) {
     laenge += teil.length
     if (laenge > MAX_BYTES) {
       antwort.destroy()
-      throw new Problem(413, 'seite_zu_gross', 'Die Seite ist größer als 5 MB und lässt sich nicht aufnehmen.')
+      throw new Problem(413, 'seite_zu_gross', 'spur_fehler_seite_zu_gross')
     }
     teile.push(teil)
   }
@@ -121,7 +121,7 @@ export async function abrufen(eingabe, { gesperrt = adresseGesperrt, zeitMs = 15
       throw new Problem(
         415,
         'keine_webseite',
-        'Unter dieser Adresse liegt keine Webseite. PDFs bitte herunterladen und hochladen.'
+        'spur_fehler_keine_webseite'
       )
     }
     const inhalt = await koerperLesen(antwort).catch(error => {

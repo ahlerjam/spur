@@ -4,6 +4,8 @@ import QuellenPanel from './quellen-panel'
 
 const eintrag = {
   key: 'spur-quellen',
+  // Seitenbilder, Befehle und Formulare brauchen mehr Platz als Overleafs 15 %.
+  defaultSize: 25,
   icon: 'book_5',
   get title() {
     return i18n.t('spur_quellen')

@@ -4,6 +4,8 @@ import VorschlaegePanel from './vorschlaege-panel'
 
 const eintrag = {
   key: 'spur-vorschlaege',
+  // Seitenbilder, Befehle und Formulare brauchen mehr Platz als Overleafs 15 %.
+  defaultSize: 25,
   icon: 'lightbulb',
   get title() {
     return i18n.t('spur_vorschlaege')

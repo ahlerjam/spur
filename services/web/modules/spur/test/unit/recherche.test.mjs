@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let Recherche
 let Abruf
@@ -18,6 +19,8 @@ const ATOM = `<?xml version="1.0"?>
     <published>2024-01-03T00:00:00Z</published>
     <title>Sleep-like replay
       improves memory</title>
+    <summary>  Replay during
+      sleep-like phases.  </summary>
     <author><name>Alice Smith</name></author>
     <link title="pdf" href="http://arxiv.org/pdf/2401.01234v2" rel="related"/>
   </entry>
@@ -35,6 +38,7 @@ const ANTWORTEN = {
           authorships: [{ author: { display_name: 'Susanne Diekelmann' } }],
           publication_year: 2010,
           open_access: { is_oa: false },
+          abstract_inverted_index: { Sleep: [0], supports: [1], 'memory.': [2] },
         },
       ],
     },
@@ -144,11 +148,53 @@ describe('suchen', () => {
     expect(ergebnis.treffer).toHaveLength(2)
   })
 
+  it('liefert je Treffer das Abstract aus dem ersten Dienst, der eines hat', async () => {
+    const { treffer } = await suchen('sleep memory consolidation')
+    expect(treffer.find(t => t.doi === '10.1038/nrn2762').abstract).toBe('Sleep supports memory.')
+    expect(treffer.find(t => t.doi === '10.48550/arxiv.2401.01234').abstract).toBe('Replay during sleep-like phases.')
+  })
+
+  it('nimmt Abstracts aus Crossref und Semantic Scholar und lässt fehlende leer', async () => {
+    ausfall.add('arxiv')
+    sonder = url => {
+      if (url.includes('/fake/openalex')) {
+        return { meta: { count: 1 }, results: [{ doi: 'https://doi.org/10.1/ohne', display_name: 'Ohne Abstract' }] }
+      }
+      if (url.includes('/fake/s2')) {
+        return { total: 1, data: [{ title: 'Sleep-like replay', externalIds: { ArXiv: '2401.01234' }, abstract: `Aus S2. ${'lang '.repeat(118)}l😀 danach` }] }
+      }
+      if (url.includes('/fake/works')) {
+        return {
+          message: {
+            'total-results': 1,
+            items: [
+              {
+                DOI: '10.1038/nrn2762',
+                title: ['The memory function'],
+                abstract: '<jats:title>Abstract</jats:title><jats:p>Aus <jats:italic>Crossref</jats:italic> &amp; &lt;5 %.&#1114112; H<jats:sub>2</jats:sub>O &#X41;</jats:p><jats:p>Zweiter.</jats:p>',
+              },
+            ],
+          },
+        }
+      }
+      return null
+    }
+    const { treffer } = await suchen('sleep memory consolidation')
+    const abstract = doi => treffer.find(t => t.doi === doi).abstract
+    expect(abstract('10.1038/nrn2762')).toBe('Aus Crossref & <5 %.&#1114112; H2O A Zweiter.')
+    // Lange Abstracts werden gekürzt, damit eine Seite paper_search unter 10.000 Tokens bleibt.
+    expect(abstract('10.48550/arxiv.2401.01234').startsWith('Aus S2. lang')).toBe(true)
+    // 600 Zeichen enden genau im Emoji: gekürzt wird an Zeichen, nicht an UTF-16-Einheiten.
+    expect(abstract('10.48550/arxiv.2401.01234')).toBe(`Aus S2. ${'lang '.repeat(118)}l😀…`)
+    expect(abstract('10.48550/arxiv.2401.01234').endsWith('…')).toBe(true)
+    expect(abstract('10.1/ohne')).toBe('')
+  })
+
   it('meldet einen ausgefallenen Dienst mit Namen und zeigt die übrigen Treffer', async () => {
     ausfall.add('s2')
     const ergebnis = await suchen('sleep memory consolidation')
     expect(ergebnis.fehler).toEqual([
-      { dienst: 's2', art: 'nicht_erreichbar', text: 'Semantic Scholar nicht erreichbar' },
+      { dienst: 's2', art: 'nicht_erreichbar', text: meldung('spur_fehler_dienst_nicht_erreichbar', { dienst: 'Semantic Scholar' }) },
     ])
     expect(ergebnis.treffer.map(t => t.doi)).toContain('10.1038/nrn2762')
   })
@@ -168,8 +214,8 @@ describe('suchen', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}), text: async () => '<feed/>' })))
     const ergebnis = await suchen('sleep')
     expect(ergebnis.hinweise).toEqual([
-      'OpenAlex ist aus: Der Betreiber hat keinen API-Key hinterlegt (OPENALEX_API_KEY).',
-      'Semantic Scholar ist aus: Der Betreiber hat keinen API-Key hinterlegt (SEMANTIC_SCHOLAR_API_KEY).',
+      meldung('spur_fehler_suchdienst_aus', { dienst: 'OpenAlex', variable: 'OPENALEX_API_KEY' }),
+      meldung('spur_fehler_suchdienst_aus', { dienst: 'Semantic Scholar', variable: 'SEMANTIC_SCHOLAR_API_KEY' }),
     ])
     const hosts = fetch.mock.calls.map(([url]) => new URL(url).host)
     expect(hosts.sort()).toEqual(['api.crossref.org', 'export.arxiv.org'])
@@ -223,7 +269,7 @@ describe('platzHolen', () => {
     const vorher = (await datenbank.db.collection('spurDrossel').findOne({ _id: 's2' })).naechster
     expect(await fehlerVon(Abruf.platzHolen(dienst))).toMatchObject({
       art: 'limit',
-      message: 'Semantic Scholar: Limit erreicht. Bitte in einigen Minuten erneut suchen.',
+      message: meldung('spur_fehler_dienst_limit', { dienst: 'Semantic Scholar' }),
     })
     expect((await datenbank.db.collection('spurDrossel').findOne({ _id: 's2' })).naechster).toBe(vorher)
   })
@@ -276,7 +322,7 @@ describe('zitationen', () => {
   it('meldet einen ausgefallenen Dienst und liefert die übrigen Zitationen', async () => {
     ausfall.add('openalex')
     const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
-    expect(ergebnis.fehler.map(f => f.text)).toEqual(['OpenAlex nicht erreichbar'])
+    expect(ergebnis.fehler.map(f => f.text)).toEqual([meldung('spur_fehler_dienst_nicht_erreichbar', { dienst: 'OpenAlex' })])
     expect(ergebnis.treffer).toHaveLength(2)
   })
 

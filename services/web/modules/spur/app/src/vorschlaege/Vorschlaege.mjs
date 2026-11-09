@@ -14,12 +14,12 @@ const MAX_OFFEN = 100
 
 function artPruefen(art) {
   if (!ARTEN.includes(art)) {
-    throw new Problem(422, 'schalter', `Unbekannter Schalter. Erlaubt: ${ARTEN.join(', ')}.`)
+    throw new Problem(422, 'schalter', 'spur_fehler_schalter', { erlaubt: ARTEN.join(', ') })
   }
 }
 
 function wertPruefen(wert) {
-  if (!WERTE.includes(wert)) throw new Problem(422, 'schalter_wert', `Der Wert muss ${WERTE.join(' oder ')} sein.`)
+  if (!WERTE.includes(wert)) throw new Problem(422, 'schalter_wert', 'spur_fehler_schalter_wert', { erlaubt: WERTE.join(', ') })
 }
 
 const nachArt = quelle => Object.fromEntries(ARTEN.map(art => [art, quelle?.[art] ?? null]))
@@ -106,7 +106,7 @@ export async function projektSetzen(projectId, art, wert) {
 
 export async function limitSetzen(menschId, limit) {
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-    throw new Problem(422, 'limit', `Das Tageslimit muss eine ganze Zahl von 1 bis ${MAX_LIMIT} sein.`)
+    throw new Problem(422, 'limit', 'spur_fehler_limit', { max: MAX_LIMIT })
   }
   await (await einstellungen()).updateOne(limitFilter(menschId), { $set: { vorschlagLimit: limit } }, { upsert: true })
 }
@@ -131,7 +131,7 @@ export async function vorschlagen({ projectId, botId, art, titel, text, pfad }) 
     throw new Problem(
       409,
       'vorschlaege_voll',
-      `Im Panel liegen schon ${MAX_OFFEN} offene Vorschläge. Bitte erst warten, bis die Person welche übernimmt oder verwirft.`
+      'spur_fehler_vorschlaege_voll', { max: MAX_OFFEN }
     )
   }
   const { insertedId } = await sammlung.insertOne({
@@ -156,7 +156,7 @@ async function erledigen(projectId, menschId, id, status) {
           { $set: { status, erledigt: jetzt() } }
         )
       : null
-  if (!vorschlag) throw new Problem(404, 'vorschlag_fehlt', 'Diesen Vorschlag gibt es nicht mehr. Bitte das Panel neu laden.')
+  if (!vorschlag) throw new Problem(404, 'vorschlag_fehlt', 'spur_fehler_vorschlag_fehlt')
   return vorschlag
 }
 

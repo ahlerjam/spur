@@ -3,6 +3,38 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  color: var(--content-primary-themed);
+
+  // Overleafs Überschriften und Formulare sind für helle Seiten gesetzt; im dunklen Rail wären sie unlesbar.
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--content-primary-themed);
+  }
+
+  .form-label,
+  .form-text {
+    color: var(--content-secondary-themed);
+  }
+
+  code {
+    color: var(--content-primary-themed);
+  }
+
+  // Nur Hilfetexte am Feld; Abzeichen haben eigenen Hintergrund und bleiben, wie Overleaf sie setzt.
+  .form-text.text-danger {
+    color: var(--content-danger-themed) !important;
+  }
+
+  .form-text.text-success {
+    color: var(--content-positive-themed) !important;
+  }
+
+  .form-text.text-warning {
+    color: var(--content-warning-themed) !important;
+  }
 }
 
 .spur-panel-werkzeuge {
@@ -61,7 +93,7 @@
 
 .spur-zeile {
   padding: var(--spacing-03) 0;
-  border-bottom: 1px solid var(--border-divider);
+  border-bottom: 1px solid var(--border-divider-themed);
   overflow-wrap: anywhere;
 }
 
@@ -84,7 +116,7 @@
   // Adressen und lange Wörter umbrechen, auch außerhalb einer Listenzeile.
   overflow-wrap: anywhere;
   font-size: var(--font-size-02);
-  color: var(--content-secondary);
+  color: var(--content-secondary-themed);
 }
 
 .spur-leer {
@@ -102,10 +134,101 @@
   font-size: var(--font-size-02);
 }
 
+.spur-blaettern,
+.spur-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-02);
+}
+
+.spur-gross-oeffnen {
+  margin-bottom: var(--spacing-03);
+}
+
+.spur-gross {
+  .modal-dialog {
+    max-width: none;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+  }
+
+  .modal-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .modal-header {
+    gap: var(--spacing-04);
+
+    .modal-title {
+      flex: 1;
+      min-width: 0;
+      font-size: var(--font-size-05);
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+.spur-gross-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-03) var(--spacing-07);
+  padding: var(--spacing-03) var(--spacing-06);
+  border-bottom: 1px solid var(--border-divider-themed);
+}
+
+.spur-zoom-wert {
+  min-width: 4ch;
+  text-align: center;
+  font-size: var(--font-size-02);
+  font-variant-numeric: tabular-nums;
+}
+
+.spur-gross-inhalt.modal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--spacing-06);
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.spur-gross-bild,
+.spur-gross-text {
+  min-height: 0;
+  overflow: auto;
+}
+
+.spur-gross-bild .spur-seitenbild {
+  max-width: none;
+  margin: 0 auto;
+}
+
+@media (max-width: 767px) {
+  .spur-gross-inhalt.modal-body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+
+  .spur-gross-bild,
+  .spur-gross-text {
+    overflow: visible;
+  }
+
+  .spur-gross-bild {
+    overflow-x: auto;
+  }
+}
+
 .spur-seitenbild {
   display: block;
   width: 100%;
-  border: 1px solid var(--border-divider);
+  border: 1px solid var(--border-divider-themed);
 }
 
 .spur-seitentext {
@@ -126,12 +249,12 @@
 
 .spur-marke-rot {
   background-color: rgb(179 38 30 / 18%);
-  border-bottom: 2px solid var(--content-danger);
+  border-bottom: 2px solid var(--content-danger-themed);
 }
 
 .spur-marke-gelb {
   background-color: rgb(204 136 0 / 18%);
-  border-bottom: 2px dotted var(--content-warning);
+  border-bottom: 2px dotted var(--content-warning-themed);
 }
 
 .spur-zitate {
@@ -150,7 +273,7 @@
 .spur-kommentare {
   margin: var(--spacing-02) 0;
   padding-left: var(--spacing-04);
-  border-left: 2px solid var(--border-divider);
+  border-left: 2px solid var(--border-divider-themed);
   list-style: none;
   font-size: var(--font-size-02);
 }
@@ -161,7 +284,7 @@
 
 .spur-zugewiesen {
   font-weight: 600;
-  color: var(--content-primary);
+  color: var(--content-primary-themed);
 }
 
 .spur-kommentar-form,
@@ -206,9 +329,44 @@
   }
 }
 
+.spur-befehl-kasten {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-02);
+  margin: var(--spacing-02) 0 var(--spacing-04);
+  min-width: 0;
+}
+
 .spur-befehl {
+  align-self: stretch;
+  margin: 0;
+  padding: var(--spacing-03);
+  font-size: var(--font-size-01);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  color: var(--content-primary-themed);
+  background: var(--bg-secondary-themed);
+  border: 1px solid var(--border-divider-themed);
+  border-radius: var(--border-radius-base);
+}
+
+.spur-schritte {
+  padding-left: var(--spacing-06);
+  margin: var(--spacing-04) 0 0;
+
+  > li::marker {
+    font-weight: 600;
+  }
+
+  h6 {
+    margin: 0 0 var(--spacing-01);
+    font-size: var(--font-size-03);
+  }
+
+  p {
+    margin: 0;
+  }
 }
 
 .spur-claude-status {
@@ -227,7 +385,7 @@
   display: flex;
   flex-direction: column-reverse;
   padding: 0 var(--spacing-05);
-  border-top: 1px solid var(--border-divider);
+  border-top: 1px solid var(--border-divider-themed);
 }
 
 .spur-chat {
@@ -251,7 +409,8 @@
 
 .spur-nachricht-mensch {
   align-self: flex-end;
-  background: var(--bg-light-secondary);
+  color: var(--content-primary-themed);
+  background: var(--bg-secondary-themed);
 }
 
 .spur-nachricht-claude,
@@ -270,7 +429,7 @@
 }
 
 .spur-chat-wartet {
-  color: var(--content-secondary);
+  color: var(--content-secondary-themed);
   font-size: var(--font-size-02);
   font-style: italic;
 }
@@ -281,22 +440,11 @@
   align-items: flex-start;
   gap: var(--spacing-02);
   padding: var(--spacing-04) var(--spacing-05);
-  border-top: 1px solid var(--border-divider);
+  border-top: 1px solid var(--border-divider-themed);
 
   textarea {
     width: 100%;
   }
-}
-
-// Im schmalen Panel: eine Zeile mit Scrollbalken statt einer Spalte aus Wortfetzen.
-.spur-befehl-kompakt {
-  white-space: pre;
-  overflow-x: auto;
-  font-size: var(--font-size-01);
-  padding: var(--spacing-02);
-  margin: var(--spacing-02) 0;
-  background: var(--bg-light-secondary);
-  border-radius: var(--border-radius-base);
 }
 
 .spur-nachricht-text {
@@ -308,7 +456,7 @@
 .spur-lauf-karte {
   margin: var(--spacing-05) 0;
   padding: var(--spacing-04);
-  border: 1px solid var(--border-divider);
+  border: 1px solid var(--border-divider-themed);
   border-radius: var(--border-radius-base, 4px);
   // LaTeX-Befehle haben keine Umbruchstellen und ragten sonst aus der Karte.
   overflow-wrap: anywhere;
@@ -330,7 +478,7 @@
 
 .spur-lauf-rot {
   margin-top: var(--spacing-03);
-  color: var(--content-danger);
+  color: var(--content-danger-themed);
 }
 
 .spur-ohne-rand {
@@ -390,7 +538,7 @@
   gap: var(--spacing-02);
   padding: 0 var(--spacing-05);
   margin-bottom: var(--spacing-03);
-  border-bottom: 1px solid var(--border-divider);
+  border-bottom: 1px solid var(--border-divider-themed);
 }
 
 .spur-reiter-knopf {
@@ -399,11 +547,11 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
-  color: var(--content-secondary);
+  color: var(--content-secondary-themed);
 
   &[aria-selected='true'] {
     border-bottom-color: var(--border-active);
-    color: var(--content-primary);
+    color: var(--content-primary-themed);
     font-weight: 600;
   }
 
@@ -417,7 +565,7 @@
   flex-basis: 100%;
   margin-top: var(--spacing-02);
   padding-left: var(--spacing-04);
-  border-left: 2px solid var(--border-divider);
+  border-left: 2px solid var(--border-divider-themed);
 }
 
 .spur-zitationen-titel {
@@ -467,7 +615,7 @@
 }
 
 .spur-import-fehler {
-  color: var(--content-danger);
+  color: var(--content-danger-themed);
 }
 
 .spur-notiz {
@@ -497,7 +645,7 @@
 .spur-matrix {
   caption {
     caption-side: top;
-    color: var(--content-secondary);
+    color: var(--content-secondary-themed);
   }
 
   th[scope='row'] {
@@ -515,7 +663,8 @@
   margin-top: var(--spacing-02);
   padding: var(--spacing-02) var(--spacing-03);
   border-left: 3px solid var(--border-active);
-  background: var(--bg-light-secondary);
+  color: var(--content-primary-themed);
+  background: var(--bg-secondary-themed);
 
   p {
     margin: 0 0 var(--spacing-02);
@@ -531,7 +680,7 @@
 .spur-offenlegung-text {
   margin-top: var(--spacing-05);
   padding: var(--spacing-04);
-  border: 1px solid var(--border-divider);
+  border: 1px solid var(--border-divider-themed);
   border-radius: var(--border-radius-base, 4px);
   white-space: pre-wrap;
 }
@@ -539,7 +688,7 @@
 .spur-semantik {
   margin-bottom: var(--spacing-05);
   padding-bottom: var(--spacing-04);
-  border-bottom: 1px solid var(--border-divider);
+  border-bottom: 1px solid var(--border-divider-themed);
 }
 
 // Im schmalen Panel umbrechen statt abschneiden.
@@ -558,7 +707,7 @@
   margin: var(--spacing-03) 0 var(--spacing-02);
   font-size: var(--font-size-02);
   font-weight: 600;
-  color: var(--content-primary);
+  color: var(--content-primary-themed);
 }
 
 .spur-abschnitt {
@@ -569,7 +718,7 @@
 
 .spur-vorschlag-einstellungen {
   padding-bottom: var(--spacing-04);
-  border-bottom: 1px solid var(--border-divider);
+  border-bottom: 1px solid var(--border-divider-themed);
 }
 
 .spur-vorschlag-schalter {
@@ -583,7 +732,7 @@
 .spur-vorschlag-projekt {
   margin-top: var(--spacing-04);
   padding-top: var(--spacing-01);
-  border-top: 1px dashed var(--border-divider);
+  border-top: 1px dashed var(--border-divider-themed);
 
   legend {
     float: none;
@@ -617,7 +766,7 @@
 
 .spur-vorschlag-karte {
   padding: var(--spacing-04);
-  border: 1px solid var(--border-divider);
+  border: 1px solid var(--border-divider-themed);
   border-radius: var(--border-radius-base, 4px);
   overflow-wrap: anywhere;
 
@@ -637,7 +786,7 @@
 
 .spur-workflows {
   padding: var(--spacing-03) var(--spacing-05) 0;
-  border-top: 1px solid var(--border-divider);
+  border-top: 1px solid var(--border-divider-themed);
 
   summary {
     font-weight: 600;
@@ -655,9 +804,25 @@
   padding: var(--spacing-02) 0;
 }
 
+.spur-workflow-formular {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-03);
+  margin-top: var(--spacing-03);
+  padding: var(--spacing-04);
+  border: 1px solid var(--border-divider-themed);
+  border-radius: var(--border-radius-base);
+
+  .form-group {
+    align-self: stretch;
+    margin: 0;
+  }
+}
+
 .spur-workflows-hilfe {
   padding: var(--spacing-03) 0;
-  border-top: 1px solid var(--border-divider);
+  border-top: 1px solid var(--border-divider-themed);
 
   p {
     margin: 0 0 var(--spacing-02);
@@ -683,7 +848,7 @@
 
 .spur-workflow-admin {
   padding: var(--spacing-06) 0;
-  border-top: 1px solid var(--border-divider);
+  border-top: 1px solid var(--border-divider-themed);
 
   h2 {
     font-size: var(--font-size-05);

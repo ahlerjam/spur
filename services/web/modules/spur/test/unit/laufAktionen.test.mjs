@@ -3,6 +3,7 @@ import { kontextUm } from '../../app/src/schreiben/ops.mjs'
 import { berechtigung } from './hilfen/berechtigung.mjs'
 import { ObjectId, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
 let LaufAktionen
@@ -270,7 +271,7 @@ describe('zuruecknehmen', () => {
     const l = await lauf({ status: 'angenommen', angenommen })
     const fehler = await fehlerVon(LaufAktionen.zuruecknehmen(projekt, l, anna))
     expect(fehler).toMatchObject({ status: 409, typ: 'konflikt' })
-    expect(fehler.message).toMatch(/Konflikt in Zeile 1:/)
+    expect(fehler.message).toBe(meldung('spur_fehler_rueckname_konflikt', { zeile: 1 }))
     expect(spurUpdate).not.toHaveBeenCalled()
     expect((await gespeichert(l)).status).toBe('angenommen')
   })

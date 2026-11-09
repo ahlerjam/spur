@@ -3,8 +3,9 @@ import de from '../../../../../locales/de.json'
 
 // Die Test-Bootstrap lädt nur Englisch; die spur-Oberfläche wird auf Deutsch geprüft.
 export function deutschAktivieren() {
-  const vorher = i18n.language
+  let vorher: string
   before(async function () {
+    vorher = i18n.language
     i18n.addResourceBundle('de', 'translation', de, true, true)
     await i18n.changeLanguage('de')
   })

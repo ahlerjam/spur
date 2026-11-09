@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 
 const lesen = pfad => readFileSync(new URL(`../../${pfad}`, import.meta.url), 'utf8')
-const WORKFLOWS = ['literaturueberblick', 'methodenteil', 'folien']
-const ALTER_BEFEHL = /(^|[^:\w])\/spur:(literaturueberblick|methodenteil|folien)\b/m
+const WORKFLOWS = ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln']
+const ALTER_BEFEHL = /(^|[^:\w])\/spur:(literaturueberblick|methodenteil|folien|quellen_sammeln)\b/m
 
 const TEXTE = [
   'README.md',
@@ -18,7 +18,7 @@ const TEXTE = [
   'plugins/spur/skills/spur/SKILL.md',
 ]
 
-test('README nennt die drei Workflow-Befehle mit dem Plugin-Namen', () => {
+test('README nennt die vier Workflow-Befehle mit dem Plugin-Namen', () => {
   const readme = lesen('README.md')
   for (const name of WORKFLOWS) assert.match(readme, new RegExp(`/plugin:spur:spur:${name}\\b`))
 })

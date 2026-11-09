@@ -119,11 +119,12 @@ describe('warteAufEreignis', () => {
   it('beendet den älteren Aufruf, wenn derselbe Bot erneut wartet', async () => {
     const alt = Inbox.warteAufEreignis(bot, { maxMs: 60000 })
     await new Promise(r => setTimeout(r, 100))
-    const neu = Inbox.warteAufEreignis(bot, kurz(4000))
+    // Großzügig: Der Aufruf endet, sobald der Auftrag da ist; unter Last (Overleafs Gesamtlauf) dauert das länger.
+    const neu = Inbox.warteAufEreignis(bot, kurz(15000))
     expect(await alt).toBeNull()
     await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'für den neuen' })
     expect((await neu).daten.text).toBe('für den neuen')
-  })
+  }, 30000)
 
   it('gibt einen Auftrag wieder frei, wenn der Aufruf abgebrochen wird, während er ihn holt', async () => {
     await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'darf nicht verloren gehen' })

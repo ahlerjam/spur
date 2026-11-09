@@ -1,10 +1,14 @@
 # spur
 
-spur ist eine selbst gehostete Schreibumgebung für wissenschaftliche Arbeiten auf Basis von [overleaf-cep](https://github.com/yu-i-i/overleaf-cep). Sie verwalten Quellen im Editor, fügen Zitate per Knopf ein und sehen in einem Prüfbericht, ob Wortlaut, Seite und Referenz stimmen und ob eine Arbeit zurückgezogen wurde. Ihr eigenes Claude Code schreibt mit, ohne Zitate erfinden zu können.
+spur is a self-hosted writing environment for academic papers, built on [overleaf-cep](https://github.com/yu-i-i/overleaf-cep). You manage sources in the editor, insert citations with a button, and use a check report to see whether wording, page and reference match and whether a paper has been retracted. Your own Claude Code writes along and cannot invent citations.
 
 ## Installation
 
-Sie brauchen Docker mit Compose und `make`. MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13 ([SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912)); Server brauchen einen Kernel bis 6.18 oder ab 7.0.14.
+### Prerequisites
+
+You need Docker with Compose and `make`. MongoDB 8 does not start on Linux kernels 6.19 to 7.0.13 ([SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912)). Servers need a kernel up to 6.18 or from 7.0.14.
+
+### Clone and start
 
 ```sh
 git clone https://github.com/ahlerjam/spur.git
@@ -12,34 +16,34 @@ cd spur
 make start
 ```
 
-`make start` legt beim ersten Start ein `.env` mit einem zufälligen `OVERLEAF_INVITE_TOKEN_SECRET` an und startet das veröffentlichte Image. Ohne dieses Secret startet der Container nicht. spur läuft danach auf <http://localhost:8080>. Das erste Administratorkonto legen Sie unter `/launchpad` an.
+On the first start, `make start` creates a `.env` file with a random `OVERLEAF_INVITE_TOKEN_SECRET` and starts the published image. The container does not start without this secret. spur then runs on <http://localhost:8080>.
 
-| Befehl | Wirkung |
-|---|---|
-| `make start` | Startet spur |
-| `make stop` | Stoppt spur |
-| `make seed` | Legt Demo-Daten an |
-| `make test` | Führt die Unit-Tests aus |
-| `make e2e` | Führt Playwright gegen den laufenden Stack aus |
+### First admin account
 
-`SPUR_URL`, `SPUR_PORT` und `SPUR_IMAGE` ändern Adresse, Port und Image. Die Sprache gilt für die ganze Installation: Standard ist Deutsch, `OVERLEAF_SITE_LANGUAGE=en` im `.env` stellt auf Englisch um. Backups umfassen das Volume `spur_data` und die MongoDB.
+Create the first administrator account at `/launchpad`, for example <http://localhost:8080/launchpad>.
 
-Betreiben Sie spur öffentlich, ist die Compile-Sandbox Pflicht:
+### Settings
+
+`SPUR_URL`, `SPUR_PORT` and `SPUR_IMAGE` change the address, the port and the image. The language applies to the whole installation: the default is German, and `OVERLEAF_SITE_LANGUAGE=en` in `.env` switches to English.
+
+### Public operation
+
+If you run spur publicly, the compile sandbox is required:
 
 ```sh
 SPUR_DATA_DIR=/srv/spur docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
 ```
 
-### HTTPS
+#### HTTPS
 
-Für einen Server im Netz gehört ein Reverse Proxy mit TLS vor spur. Im `.env` stehen dann:
+A server on the internet needs a reverse proxy with TLS in front of spur. Then `.env` contains:
 
 ```sh
 SPUR_URL=https://spur.example.org
 OVERLEAF_SECURE_COOKIE=true
 ```
 
-Beispiel für [Caddy](https://caddyserver.com), das Zertifikate selbst holt:
+Example for [Caddy](https://caddyserver.com), which fetches certificates itself:
 
 ```
 spur.example.org {
@@ -49,60 +53,88 @@ spur.example.org {
 }
 ```
 
-`flush_interval -1` reicht Antworten sofort durch. Das braucht der MCP-Endpunkt `/spur/mcp`, der lange auf Aufträge wartet und alle 30 Sekunden Fortschritt sendet. Läuft der Proxy nicht auf demselben Rechner, ergänzen Sie seine Adresse in `OVERLEAF_TRUSTED_PROXY_IPS` (zum Beispiel `loopback,10.0.0.5`).
+`flush_interval -1` passes responses through immediately. The MCP endpoint `/spur/mcp` needs this: it waits a long time for jobs and sends progress every 30 seconds. If the proxy does not run on the same machine, add its address to `OVERLEAF_TRUSTED_PROXY_IPS` (for example `loopback,10.0.0.5`).
 
-## Entwicklung und Tests
+### Backup
 
-Entwickelt wird mit `spur-dev` aus `tools/spur-dev/`: `tools/spur-dev/spur-dev install` legt den Befehl an, `spur-dev up` startet den Stack aus dem Dev-Image mit dem eingehängten Quellcode.
+The repository ships no backup command. A backup covers the volume `spur_data` and the MongoDB data in the volume `spur_mongo`. With the sandbox override, the host directory `SPUR_DATA_DIR` takes the place of `spur_data`. `spur-dev dump` and `spur-dev restore` are for development only.
 
-| Befehl | Wirkung |
+## Make targets
+
+| Command | Effect |
 |---|---|
-| `spur-dev test` | spur-Unit-Tests mit Abdeckungsbericht für `modules/spur/app/src` (mindestens 80 % der Zeilen) |
-| `spur-dev upstream web` | Overleafs web-Unit-Suite |
-| `spur-dev upstream frontend` | Overleafs Frontend-Suite, mit den Tests unter `modules/spur/test/frontend` |
-| `spur-dev upstream du` | Unit- und Acceptance-Tests des document-updater |
-| `spur-dev upstream alle` | Alle drei Suiten nacheinander |
-| `spur-dev upstream vergleich` | Dieselben Suiten auf `main` (Overleaf), `ext-ce` (overleaf-cep) und dem aktuellen Stand; schreibt die Liste bekannter Fehler neu |
-| `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` | Setzt die E2E-Daten zurück; `make e2e` tut das vor dem ersten Feature auch selbst |
+| `make start` | Starts spur |
+| `make stop` | Stops spur |
+| `make seed` | Creates demo data |
+| `make test` | Runs the unit tests |
+| `make e2e` | Runs Playwright against the running stack |
 
-Die `upstream`-Befehle laufen in einem eigenen Container mit `NODE_ENV=test` und einer eigenen Test-Datenbank und enden mit der Zeile `bestanden, fehlgeschlagen, bekannt, neu`. Sie scheitern mit Exit 1 nur an neuen Fehlern und mit Exit 2, wenn eine angegebene Datei fehlt, ausgeschlossen ist oder keine Tests enthält, oder wenn gar kein Test läuft. Fehler, die schon in Overleaf oder overleaf-cep auftreten, stehen mit Herkunft und Grund in `tools/tests/upstream-bekannt.json`; Testdateien, die Module von Overleaf Server Pro brauchen, stehen in `tools/tests/upstream-ausschluss.json`. Ein Eintrag mit Herkunft `spur` ist nicht erlaubt: Was spur kaputt macht, wird behoben. Einzelne Dateien prüfen Sie mit `spur-dev upstream web test/unit/src/…`. In jedem Pull Request laufen die Jobs `test` (Stack, Unit-Tests, E2E) und `upstream`.
+## Development and tests
 
-## Claude und Ihre Daten
+Development uses `spur-dev` from `tools/spur-dev/`: `tools/spur-dev/spur-dev install` installs the command, and `spur-dev up` starts the stack from the dev image with the source code mounted.
 
-Unter Einstellungen, „Claude verbinden“, erzeugt spur ein Token und zeigt die Befehle, die das Plugin `spur` aus diesem Repository in Claude Code einrichten:
+| Command | Effect |
+|---|---|
+| `spur-dev test` | spur unit tests with a coverage report for `modules/spur/app/src` (at least 80 % of lines) |
+| `spur-dev upstream web` | Overleaf's web unit suite |
+| `spur-dev upstream frontend` | Overleaf's frontend suite, including the tests under `modules/spur/test/frontend` |
+| `spur-dev upstream du` | Unit and acceptance tests of the document-updater |
+| `spur-dev upstream alle` | All three suites in turn |
+| `spur-dev upstream vergleich` | The same suites on `main` (Overleaf), `ext-ce` (overleaf-cep) and the current state; rewrites the list of known failures |
+| `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` | Resets the E2E data; `make e2e` also does this itself before the first feature |
 
-```sh
-claude plugin marketplace add ahlerjam/spur
-claude plugin install spur@spur --config server_url=https://ihre-spur-adresse/spur/mcp --config token=<Token>
-```
+The `upstream` commands run in a separate container with `NODE_ENV=test` and their own test database, and end with the line `bestanden, fehlgeschlagen, bekannt, neu`. They fail with exit 1 only on new failures, and with exit 2 if a given file is missing, excluded or contains no tests, or if no test runs at all. Failures that already occur in Overleaf or overleaf-cep are listed with origin and reason in `tools/tests/upstream-bekannt.json`. Test files that need Overleaf Server Pro modules are listed in `tools/tests/upstream-ausschluss.json`. An entry with origin `spur` is not allowed: whatever spur breaks gets fixed. Check single files with `spur-dev upstream web test/unit/src/…`. Every pull request runs the jobs `test` (stack, unit tests, E2E) and `upstream`.
 
-Die drei fertigen Workflows starten Sie im Claude-Panel unter „Workflows“ oder in Claude Code mit diesen Befehlen; Claude Code setzt für Prompts eines Plugins den Präfix `/plugin:spur:spur:` und zeigt sie im Menü mit „(MCP)“:
+## Claude and your data
 
-| Befehl | Workflow |
+Under Settings, "Connect Claude" ("Claude verbinden" in the German interface), spur creates a token and shows three steps that set up the `spur` plugin from this repository in Claude Code.
+
+1. Add spur to Claude Code. You only need this once per computer.
+
+   ```sh
+   claude plugin marketplace add ahlerjam/spur
+   ```
+
+2. Connect spur to your account. This command contains your personal token from the account settings. Keep it to yourself.
+
+   ```sh
+   claude plugin install spur@spur --config server_url=<your spur address>/spur/mcp --config token=<token>
+   ```
+
+3. Start Claude Code. Run this to start Claude Code in your terminal. Claude can then write in spur without asking at every step. You need this command each time you start Claude Code; it is also in the Claude panel of your project.
+
+   ```sh
+   claude --allowedTools "mcp__plugin_spur_spur__quote_mark mcp__plugin_spur_spur__doc_edit mcp__plugin_spur_spur__doc_create mcp__plugin_spur_spur__reply mcp__plugin_spur_spur__run_finish mcp__plugin_spur_spur__wait_for_event"
+   ```
+
+You start the four ready-made workflows in the Claude panel under "Workflows", or in Claude Code with these commands. For prompts of a plugin, Claude Code adds the prefix `/plugin:spur:spur:` and shows them in the menu with "(MCP)":
+
+| Command | Workflow |
 | --- | --- |
-| `/plugin:spur:spur:literaturueberblick` | Literaturüberblick |
-| `/plugin:spur:spur:methodenteil` | Methodenteil |
-| `/plugin:spur:spur:folien` | Folien aus Paper |
+| `/plugin:spur:spur:literaturueberblick` | Literature overview |
+| `/plugin:spur:spur:methodenteil` | Methods section |
+| `/plugin:spur:spur:folien` | Slides from a paper |
+| `/plugin:spur:spur:quellen_sammeln` | Collect sources (arguments: `thema`, `anzahl`) |
 
-Ein Admin passt die Texte unter `/spur/admin/workflows` an.
+An admin adjusts the texts under `/spur/admin/workflows`.
 
-Inhalte, die Claude liest, gehen an Anthropic. Dazu gehören Dokumente und Quellen, auch Interviews. Die Verantwortung dafür liegt bei Ihnen.
+Content that Claude reads goes to Anthropic. This includes documents and sources, interviews too. You are responsible for it.
 
-Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisieren Sie Interviews am besten vor dem Hochladen. spur zeigt diesen Hinweis beim Hochladen jeder VTT-Datei; weitere Regeln für Interviews gibt es nicht.
+Transcripts are sent to the AI provider when Claude reads them. Ideally, pseudonymise interviews before uploading them. spur shows this notice when you upload any VTT file; there are no further rules for interviews.
 
-## Herkunft
+## Origin
 
-spur baut auf [overleaf-cep](https://github.com/yu-i-i/overleaf-cep) auf, der Extended Community Edition von [Overleaf](https://www.overleaf.com). Von dort stammen unter anderem Track Changes und Kommentare, Sandbox-Compiles, LDAP-, SAML- und OpenID-Anmeldung, Git- und Zotero-Integration sowie die Admin-Werkzeuge. Ein wöchentlicher Job holt Änderungen von overleaf-cep als Pull Request.
+spur builds on [overleaf-cep](https://github.com/yu-i-i/overleaf-cep), the Extended Community Edition of [Overleaf](https://www.overleaf.com). Track changes and comments, sandbox compiles, LDAP, SAML and OpenID sign-in, Git and Zotero integration and the admin tools come from there, among other things. A weekly job fetches changes from overleaf-cep as a pull request.
 
 > [!CAUTION]
-> Ohne Sandbox-Compiles haben alle Nutzer beim Kompilieren vollen Zugriff auf den Container (Dateisystem, Netz, Umgebungsvariablen). Betreiben Sie spur ohne Sandbox nur, wenn Sie allen Nutzern vertrauen.
+> Without sandbox compiles, all users have full access to the container (file system, network, environment variables) while compiling. Run spur without the sandbox only if you trust all users.
 
-Overleaf® ist eine eingetragene Marke. spur ist kein Produkt von Overleaf und wird von Overleaf weder betrieben noch unterstützt.
+Overleaf® is a registered trademark. spur is not a product of Overleaf, and Overleaf neither operates nor endorses it.
 
 ## Authors
 
 [The Overleaf Team](https://www.overleaf.com/about)\
-[yu-i-i](https://github.com/yu-i-i), [davrot](https://github.com/davrot) — CE extensions; references to adapted code are listed in [`CREDITS`](CREDITS.md). See also the authors of individual commits.\
+[yu-i-i](https://github.com/yu-i-i), [davrot](https://github.com/davrot): CE extensions; references to adapted code are listed in [`CREDITS`](CREDITS.md). See also the authors of individual commits.\
 spur: [ahlerjam](https://github.com/ahlerjam).
 
 ## License

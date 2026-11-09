@@ -17,6 +17,7 @@ import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
 import * as Erwaehnung from '../erwaehnung/Erwaehnung.mjs'
+import { meldung } from '../meldungen.mjs'
 import * as Vorschlaege from '../vorschlaege/Vorschlaege.mjs'
 
 const SEITE = 50
@@ -34,7 +35,7 @@ async function pruefeRecht(menschId, projectId, erlaubt) {
   if (!erlaubt.includes(await rolleFuerClaude(menschId, projectId))) {
     throw new WerkzeugFehler(
       'keine_rechte',
-      'Die Projektrolle erlaubt das nicht. Bitte die Person um Zugriff bitten.'
+      'spur_fehler_projektrolle'
     )
   }
   return new ObjectId(projectId)
@@ -55,7 +56,7 @@ function blatt(liste, cursor) {
 async function docFinden(projectId, docId, pfad) {
   const docs = await PruefManager.dokumente(projectId)
   const doc = docs.find(d => d.docId === docId || d.pfad === pfad)
-  if (!doc) throw new WerkzeugFehler('doc_fehlt', 'Das Dokument gibt es nicht.')
+  if (!doc) throw new WerkzeugFehler('doc_fehlt', 'spur_fehler_doc_fehlt')
   return doc
 }
 
@@ -258,7 +259,7 @@ export const WERKZEUGE = {
           })
         },
       })
-      return ereignis ? { ereignis } : { ereignis: null, hinweis: 'Kein Auftrag. Bitte erneut aufrufen.' }
+      return ereignis ? { ereignis } : { ereignis: null, hinweis: meldung('spur_fehler_kein_auftrag') }
     },
   },
 
@@ -363,7 +364,7 @@ Object.assign(WERKZEUGE, {
     async ausfuehren({ project_id: pid, zusammenfassung }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, SCHREIBEN)
       const lauf = await LaufManager.offenerLauf(projectId, botId)
-      if (!lauf) throw new WerkzeugFehler('kein_lauf', 'Es gibt keinen offenen Lauf.')
+      if (!lauf) throw new WerkzeugFehler('kein_lauf', 'spur_fehler_kein_lauf')
       await LaufManager.beenden(lauf, zusammenfassung)
       await LaufAktionen.nachLaufende(projectId, lauf, menschId)
       return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
@@ -372,7 +373,7 @@ Object.assign(WERKZEUGE, {
 
   paper_search: {
     description:
-      'Sucht Paper über arXiv, OpenAlex, Crossref und Semantic Scholar. Treffer mit DOI, Titel, Autoren, Jahr, ' +
+      'Sucht Paper über arXiv, OpenAlex, Crossref und Semantic Scholar. Treffer mit DOI, Titel, Autoren, Jahr, Abstract, ' +
       'Diensten und Open-Access-Status; fehler nennt ausgefallene Dienste. Die Suche landet im Suchprotokoll des Projekts.',
     inputSchema: z.object({ project_id: id, anfrage: z.string().min(1).max(300), seite: z.number().int().min(0).max(50).optional() }),
     async ausfuehren({ project_id: pid, anfrage, seite = 0 }, { menschId }) {

@@ -54,7 +54,7 @@ describe('Vorschläge-Panel', function () {
     const argument = screen.getByLabelText('Belegloses Argument') as HTMLSelectElement
     expect(compile.selectedOptions[0].textContent).to.equal('Projekt: Aus')
     expect(argument.selectedOptions[0].textContent).to.equal('Projekt: Aus')
-    screen.getByText('Vorschläge sind aus. Stellen Sie oben einen Auslöser auf „Vorschlag“.')
+    screen.getByText('Vorschläge sind aus. Stell oben einen Auslöser auf „Vorschlag“.')
   })
 
   it('speichert die eigene Einstellung', async function () {
@@ -94,7 +94,7 @@ describe('Vorschläge-Panel', function () {
     await screen.findByRole('heading', { name: 'Beleg fehlt' })
     screen.getByText('Für die Verdopplung fehlt eine Quelle.')
     fireEvent.click(screen.getByRole('button', { name: 'Übernehmen' }))
-    await screen.findByText('Claude hat den Auftrag. Den Lauf sehen Sie im Claude-Panel.')
+    await screen.findByText('Claude hat den Auftrag. Den Lauf siehst du im Claude-Panel.')
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Beleg fehlt' })).to.equal(null))
     expect(document.activeElement?.textContent).to.equal('Offene Vorschläge (0)')
   })

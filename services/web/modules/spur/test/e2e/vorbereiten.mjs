@@ -371,6 +371,7 @@ Platzhalter.
   await quelleAusFixture(scanProjekt._id, a._id, 'scan.pdf')
   await neuAnlegen(a, 'E2E Web', { 'main.tex': APA, 'references.bib': BIB })
   await neuAnlegen(a, 'E2E Transkript', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Leer P5', { 'main.tex': LEER })
 
   // P3: zwei Menschen mit eigenem Claude in denselben Projekten.
   const p3a = await mitNamen('e2e-p3a@example.org', 'Ada', 'Autorin')
