@@ -97,6 +97,15 @@ Bilder im Scratchpad `.playwright-mcp/bilder/` (gitignoriert): Projektliste, Tok
 - Rot nachgewiesen (nachträglich, die Tests unverändert, nur der Code vorübergehend auf dem Basis-Commit 2ff9c66b34 bzw. ohne die Korrektur, danach `git checkout HEAD`): `meldungen.test.mjs` 6 rot (u. a. „keine Meldung steht als fester Text im Code“ mit der Liste aller festen Texte, „englische Installation“, „Platzhalter … 200“); `recherche.test.mjs` Abstracts 2 rot (`expected undefined to be 'Sleep supports memory.'`); `claude-panel.test.tsx` „Quellen sammeln fragt Thema und Anzahl ab …“ und „Startbefehl im Befehlskasten …“ rot; `claude-verbinden.test.tsx` drei Schritte, Englisch und „zeigt nach einem neuen Token wieder „Kopieren““ rot (Letzterer auch gegen HEAD mit dem alten Schlüssel `schritt.titel`: `expected <button …> to equal null`). Gegen HEAD alle grün.
 - Abweichungen (ursprüngliche Reihenfolge): Nicht vor dem Code rot ausgeführt wurden `meldungen.test.mjs` (f5 Schritt 1 verlangt „zuerst rot“; geschrieben vor dem Modul, aber erst nach der Umstellung ausgeführt), die Abstract-Tests, der Formular-Test und der Test zum Kopierknopf nach neuem Token. Offen bleibt die Entscheidung zu mehrwortigen Themen im Slash-Befehl (siehe unten).
 
+## Zweites /code-review medium auf dem Endstand (2ff9c66b34..aabaccdb61)
+- Umgesetzt mit Tests (a3ac6cd3b9): `navigator.clipboard` fehlt ohne TLS (Kopieren warf), numerische Entität über 0x10FFFF (RangeError nahm Crossref ganz heraus), Thema mit U+2028/U+0085/Steuerzeichen (jetzt `\p{Cc}` und U+2028/2029 verboten), `anzahl: null` (jetzt Standard 20), Kürzung an Zeichen statt UTF-16-Einheiten. Die Tests habe ich vor dem Code geschrieben, aber nicht rot laufen lassen.
+- Nicht umgesetzt (wie oben begründet): zwei `Zitate`-Instanzen, nur eine Sprachdatei, doppelte Client-Prüfung, zweiter Bildabruf im Fehlerfall.
+- Zweite Sicherheitsprüfung (Opus, nur lesend): „Keine Befunde mit Konfidenz ≥ 8.“
+- `spur-dev test` grün (Zeilen 94,67 %); Stack mit `spur-dev up` neu gebaut.
+
+## Endgültiger Gesamtlauf (a3ac6cd3b9)
+- 42/42 ok in 443 s, beim ersten Versuch.
+
 ## Needs decision
 - f7: Thema mit mehreren Wörtern im Slash-Befehl `/plugin:spur:spur:quellen_sammeln`
   Interim: Argumentbeschreibung bittet um Bindestriche („Schlaf-Gedächtnis“); im Claude-Panel sind Leerzeichen erlaubt.
