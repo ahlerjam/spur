@@ -80,6 +80,22 @@ Bilder im Scratchpad `.playwright-mcp/bilder/` (gitignoriert): Projektliste, Tok
 - Claude-Panel: Startbefehl ganz sichtbar, umgebrochen. Formular: Meldungen mit Symbol direkt am Feld. Bei 360 px überdeckt die klebende „Workflows“-Überschrift beim Rollen den Knopf darüber kurz; kein Überlauf, keine Änderung.
 - Stil: Overleaf-Komponenten und -Tokens (Knöpfe, Formulare, Farben); keine eigenen Farben außer `var(--…)`. Kein `DESIGN.md` im Repo; Vorschlag: Tokens für spur-Schriftzug (Größe, Gewicht) dort festhalten.
 
+## Nachprüfungen vor dem Abschluss
+- Standardbreite nach `/simplify` in frischem Browserkontext (ohne gespeichertes Layout): Quellen-Panel 308 px bei 1280 px, Leiste in einer Zeile (Mitten 98 bis 102 px). `defaultSize` am Rail-Element greift.
+- humanizer-de (sachlich) über die 109 Fehlertexte, die Formulartexte aus f7, „Erlaubte Werte: …“ und den Standardtext „Quellen sammeln“: Muster 0, Unicode 0. Register meldet gehäufte Partikel; es ist durchgehend „schon“ im Sinn von „bereits“ (Carve-out). Rhythmus: gleiche Satzanfänge, weil die Datei eine Liste einzelner Meldungen ist (Carve-out). Kein Siezen. Keine Änderung.
+- Weitere Ansichten bei 360 und 1280 px, alle ohne seitliches Rollen: Passwortseite abgemeldet (Schriftzug „spur“ statt „O“; der Knopf zeigt Overleafs rohen Schlüssel `reset_password_sentence_case`, eine der fehlenden deutschen Übersetzungen aus dem Backlog), `/spur/admin/workflows` mit „Quellen sammeln“ und Befehl, leeres Recherche-Panel, Vorschläge-Panel mit Du-Text, Hinweis „Diese Seite gibt es in der Quelle nicht.“ statt leerer Fläche.
+
+## Abgleich mit Spec und Feature-Schritten
+- f1: p5f1 (Text oben links in Liste, Einstellungen, Editor; kein `overleaf-o`-Abruf; Klick und Tab/Enter; Kontrast in hell und dunkel bei 360 und 1280 px).
+- f2: p5f2 (Überschrift, kein Rollbalken, unterste Zeile, Fußzeilen-Link, Stichwort anlegen, zuordnen, filtern, löschen, 360 px) und Overleafs `tags-list.test.tsx`.
+- f3: p5f3 (Texte, drei Kästen, genaue Befehle, Zwischenablage, 360 px, Claude-Panel) und `claude-verbinden.test.tsx` auf Englisch.
+- f4: `sprachdateien.test.mjs` (zuerst rot, 19 Treffer), p5f4 (Einstellungen, leere Quellen, leere Zitate, Recherche, Vorschläge, 360/1280 px).
+- f5: `meldungen.test.mjs` und `sprachdateien.test.mjs`, p5f5 (tipp-pause 404 `doc_fehlt`, Seite 999 als Hinweis, `doc_edit` mit Code `konflikt` und deutschem Text), englischer Server-Test mit Platzhalter 200.
+- f6: p5f6 (eine Zeile, Groß öffnen, Blättern, Zoom 75 bis 200 %, Zitat, Esc/Schließen mit Fokus, 360 px, Scan- und Webquelle) und `quelle-gross.test.tsx`.
+- f7: p5f7 (vier Workflows, Formular mit Fehlern am Feld, Auftrag mit Thema und 30, max, `prompts/list`/`get`, Paper-Fake mit Abstract, Aufnahme, Beschaffung, Duplikat, Admin-Seite) und Unit-Tests; README, MCP-Vertrag, Befehlsnamen-Test kennen vier Workflows.
+- f8: p5f8 (Installationsreihenfolge, vier Befehle, drei Schritte, keine Gedankenstriche, deutsche Wörter nur in Code/Zitaten, Backlog 35 mit Transformers, Tesseract, 1616), Linkprüfung, `spur-dev test`, Schluss-E2E und Overleafs Suiten.
+- Abweichungen: Nicht rot ausgeführt wurden `meldungen.test.mjs` (f5 Schritt 1 verlangt „zuerst rot“; geschrieben vor dem Modul, aber erst nach der Umstellung ausgeführt), die Abstract-Tests, der Formular-Test und der Test zum Kopierknopf nach neuem Token. Offen bleibt die Entscheidung zu mehrwortigen Themen im Slash-Befehl (siehe unten).
+
 ## Needs decision
 - f7: Thema mit mehreren Wörtern im Slash-Befehl `/plugin:spur:spur:quellen_sammeln`
   Interim: Argumentbeschreibung bittet um Bindestriche („Schlaf-Gedächtnis“); im Claude-Panel sind Leerzeichen erlaubt.
