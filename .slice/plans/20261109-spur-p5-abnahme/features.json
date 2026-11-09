@@ -112,7 +112,7 @@
     "Alle englischen Texte sind mit dem Skill humanizer geprüft (keine Gedankenstriche, keine „not X but Y“-Muster); das Ergebnis steht in progress.md",
     "`make test` und die vollständige E2E-Suite laufen grün; Overleafs Suiten bleiben grün bis auf die bekannte Upstream-Liste"
    ],
-   "passes": false
+   "passes": true
   }
  ]
 }
