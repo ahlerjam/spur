@@ -134,7 +134,7 @@
   "spur_fehler_rueckname_konflikt": "Konflikt in Zeile __zeile__: Der Text wurde nach der Annahme geändert. Es wurde nichts zurückgenommen.",
   "spur_fehler_sammlung_ungueltig": "Bitte eine Zotero-Sammlung aus der Liste wählen.",
   "spur_fehler_schalter": "Unbekannter Schalter. Erlaubt: __erlaubt__.",
-  "spur_fehler_schalter_wert": "Der Wert muss __erlaubt__ sein.",
+  "spur_fehler_schalter_wert": "Erlaubte Werte: __erlaubt__.",
   "spur_fehler_schon_beschafft": "Dieser Eintrag ist schon beschafft.",
   "spur_fehler_seite_fehlt": "Diese Seite gibt es in der Quelle nicht.",
   "spur_fehler_seite_nicht_erreichbar": "Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.",

@@ -28,6 +28,9 @@ function zusammenfuehren(sammlung, treffer) {
   }
 }
 
+const ABSTRACT_MAX = 600
+const kuerzen = text => (text.length > ABSTRACT_MAX ? `${text.slice(0, ABSTRACT_MAX)}…` : text)
+
 // Fasst die Antworten paralleler Dienstaufrufe zusammen. Ein Ausfall nimmt nur diesen Dienst heraus.
 export function auswerten(dienste, ergebnisse) {
   const sammlung = new Map()
@@ -50,8 +53,8 @@ export function auswerten(dienste, ergebnisse) {
     gesamt.push({ dienst, anzahl })
     for (const t of treffer) zusammenfuehren(sammlung, t)
   })
-  // Ohne Abstract in allen Diensten bleibt das Feld leer statt null.
-  const treffer = [...sammlung.values()].map(t => ({ ...t, abstract: t.abstract ?? '' }))
+  // Ohne Abstract bleibt das Feld leer statt null. Gekürzt, damit eine Seite paper_search unter 10.000 Tokens bleibt.
+  const treffer = [...sammlung.values()].map(t => ({ ...t, abstract: kuerzen(t.abstract ?? '') }))
   return { treffer, fehler, gesamt }
 }
 

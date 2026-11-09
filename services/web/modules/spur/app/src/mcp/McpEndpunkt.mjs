@@ -25,7 +25,11 @@ const PROMPT_ARGUMENTE = {
     fokus: z.string().regex(/^\S{1,60}$/).optional().describe('Ein Wort, auf das der Workflow den Schwerpunkt legt'),
   }),
   quellen_sammeln: z.object({
-    thema: z.string().min(1).max(300).describe('Thema, zu dem Claude Literatur sammelt'),
+    thema: z
+      .string()
+      .min(1)
+      .max(300)
+      .describe('Thema, zu dem Claude Literatur sammelt; im Slash-Befehl mehrere Wörter mit Bindestrich verbinden'),
     anzahl: z.string().max(6).optional().describe('Wie viele Paper aufgenommen werden: Zahl ab 1 oder „max“ (Standard 20)'),
   }),
 }

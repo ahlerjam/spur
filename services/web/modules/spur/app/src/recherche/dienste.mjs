@@ -26,7 +26,16 @@ const doiKlein = doi => doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').toLow
 const arxivDoi = id => `10.48550/arxiv.${id.replace(/v\d+$/, '')}`
 const leerzeichen = text => text?.replace(/\s+/g, ' ').trim() ?? null
 const xmlText = wert => (typeof wert === 'string' ? wert : wert?._)
-const ohneTags = text => leerzeichen(text?.replace(/<[^>]+>/g, ' ').replace(/\s+([.,;:])/g, '$1')) || null
+const ENTITAETEN = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
+const entitaeten = text =>
+  text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (ganz, e) =>
+    e[0] !== '#' ? (ENTITAETEN[e.toLowerCase()] ?? ganz) : String.fromCodePoint(Number(e[1] === 'x' ? `0${e.slice(1)}` : e.slice(1)))
+  )
+// Crossref liefert JATS; die Überschrift „Abstract“ gehört nicht zum Text.
+const ohneTags = text =>
+  leerzeichen(
+    entitaeten(text?.replace(/<jats:title>[^<]*<\/jats:title>/g, '').replace(/<[^>]+>/g, ' ') ?? '').replace(/\s+([.,;:])/g, '$1')
+  ) || null
 
 // OpenAlex liefert Abstracts als Wort → Positionen.
 function ausIndex(index) {

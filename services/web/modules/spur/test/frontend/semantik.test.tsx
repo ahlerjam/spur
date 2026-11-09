@@ -45,6 +45,6 @@ describe('Sinngemäße Suche', function () {
     fireEvent.click(screen.getByRole('button', { name: 'Suchen' }))
     await screen.findByText('smith2024.pdf')
     screen.getByText('S. 347')
-    screen.getByText('Sie belegen kein Zitat.', { exact: false })
+    screen.getByText('Ein Zitat belegen sie nicht.', { exact: false })
   })
 })

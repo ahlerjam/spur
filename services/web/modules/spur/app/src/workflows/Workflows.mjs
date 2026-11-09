@@ -31,12 +31,17 @@ export async function text(name) {
 // Werte der Eingaben als Zeilen unter dem Text; der Text selbst bleibt so, wie Admins ihn pflegen.
 function eingabenZeilen(name, { fokus, thema, anzahl = '20' }) {
   if (!STANDARD[name].eingaben) return fokus ? [`Fokus: ${fokus}`] : []
-  if (!thema?.trim()) throw new Problem(422, 'thema', 'spur_fehler_thema_fehlt')
-  const wert = String(anzahl).trim()
-  if (!/^(max|[1-9]\d{0,4})$/.test(wert)) throw new Problem(422, 'anzahl', 'spur_fehler_anzahl')
+  // Eine Zeile: Ein Umbruch im Thema könnte sonst eigene Zeilen wie „Anzahl: …“ in den Auftrag schreiben.
+  if (typeof thema !== 'string' || !/^[^\r\n]{1,300}$/.test(thema.trim())) {
+    throw new Problem(422, 'thema', 'spur_fehler_thema_fehlt')
+  }
+  const wert = typeof anzahl === 'number' ? String(anzahl) : anzahl
+  if (typeof wert !== 'string' || !/^(max|[1-9]\d{0,4})$/.test(wert.trim())) {
+    throw new Problem(422, 'anzahl', 'spur_fehler_anzahl')
+  }
   return [
     `Thema: ${thema.trim()}`,
-    wert === 'max' ? 'Anzahl: max. Es gibt keine Obergrenze; arbeite in Etappen.' : `Anzahl: ${wert}`,
+    wert.trim() === 'max' ? 'Anzahl: max. Es gibt keine Obergrenze; arbeite in Etappen.' : `Anzahl: ${wert.trim()}`,
   ]
 }
 

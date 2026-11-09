@@ -19,7 +19,7 @@ function artPruefen(art) {
 }
 
 function wertPruefen(wert) {
-  if (!WERTE.includes(wert)) throw new Problem(422, 'schalter_wert', 'spur_fehler_schalter_wert', { erlaubt: WERTE.join(' oder ') })
+  if (!WERTE.includes(wert)) throw new Problem(422, 'schalter_wert', 'spur_fehler_schalter_wert', { erlaubt: WERTE.join(', ') })
 }
 
 const nachArt = quelle => Object.fromEntries(ARTEN.map(art => [art, quelle?.[art] ?? null]))

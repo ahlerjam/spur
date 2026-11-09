@@ -86,6 +86,22 @@ describe('Claude verbinden', function () {
     expect(geschrieben).to.deep.equal([befehle[1]])
     expect(screen.getAllByRole('button', { name: 'Kopieren' })).to.have.length(2)
   })
+
+  it('zeigt nach einem neuen Token wieder „Kopieren“', async function () {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true })
+    let nr = 0
+    fetchMock.removeRoutes()
+    fetchMock.get('/spur/claude/tokens', { tokens: [] })
+    fetchMock.post('/spur/claude/tokens', () => ({ token: `token-${++nr}` }))
+    render(<ClaudeVerbinden />)
+    fireEvent.click(screen.getByRole('button', { name: 'Token erzeugen' }))
+    await screen.findByText(/token=token-1/)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Kopieren' })[1])
+    await screen.findByRole('button', { name: 'Kopiert' })
+    fireEvent.click(screen.getByRole('button', { name: 'Token erzeugen' }))
+    await screen.findByText(/token=token-2/)
+    expect(screen.queryByRole('button', { name: 'Kopiert' })).to.equal(null)
+  })
 })
 
 describe('Claude verbinden auf Englisch', function () {

@@ -135,7 +135,7 @@
   "spur_fehler_rueckname_konflikt": "Conflict in line __zeile__: the text changed after it was accepted. Nothing was reverted.",
   "spur_fehler_sammlung_ungueltig": "Choose a Zotero collection from the list.",
   "spur_fehler_schalter": "Unknown switch. Allowed: __erlaubt__.",
-  "spur_fehler_schalter_wert": "The value must be __erlaubt__.",
+  "spur_fehler_schalter_wert": "Allowed values: __erlaubt__.",
   "spur_fehler_schon_beschafft": "This entry has already been obtained.",
   "spur_fehler_seite_fehlt": "This page does not exist in the source.",
   "spur_fehler_seite_nicht_erreichbar": "The page cannot be reached. Check the address or try again later.",
