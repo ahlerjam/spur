@@ -8,6 +8,8 @@ async page => {
   const FIXTURES =
     globalThis.SPUR_FIXTURES || 'services/web/modules/spur/test/fixtures'
   const nur = new URL(page.url()).hash.slice(1).split(',').filter(Boolean)
+  // Die Schritte gehen von 1280 px aus; ein Fenster aus einem früheren Lauf kann schmaler sein.
+  await page.setViewportSize({ width: 1280, height: 720 })
   const konsolenFehler = []
   const beiFehler = e => konsolenFehler.push(e.message)
   page.on('pageerror', beiFehler)
