@@ -14,7 +14,8 @@ permissions:
 jobs:
   smoke:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-24.04
+    # MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13 (SERVER-121912); daher wie in ci.yml dieser Runner.
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -25,6 +26,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Kernel
+        run: uname -r
       - name: make start
         run: make start
       - name: Status prüfen
@@ -39,3 +42,6 @@ jobs:
         run: grep -q '^OVERLEAF_INVITE_TOKEN_SECRET=.' .env
       - name: APA-Compile prüfen
         run: docker compose exec -T sharelatex bash -lc 'cd /overleaf/services/web && node modules/spur/scripts/smoke-compile.mjs'
+      - name: Protokolle bei Fehler
+        if: failure()
+        run: docker compose ps -a; docker compose logs --tail 100
