@@ -108,6 +108,16 @@ Bilder im Scratchpad `.playwright-mcp/bilder/` (gitignoriert): Projektliste, Tok
 ## Endgültiger Gesamtlauf (a3ac6cd3b9)
 - 42/42 ok in 443 s, beim ersten Versuch.
 
+## Nach der unabhängigen Abnahme (f3 wieder offen)
+- Befund: Im dunklen Editor-Design war der Startbefehl im Claude-Panel unsichtbar (Text und Kasten rgb(244,245,246), 1:1). Ursache: spur.scss nutzte feste helle Farben (`--bg-light-secondary`, `--content-primary`, `--border-divider`), Overleafs Rail ist im Standard-Design dunkel. Meine Tests prüften Kontrast nur am Schriftzug, nicht in den Panels.
+- Rot zuerst: p5f3 (neu: Kontrast des Befehlskastens in beiden Designs) `Startbefehl im Design „dunkel“: Kontrast 1.00`; p5f4 (neu: alle Panels mit `unlesbar`) `Quellen bei 1280 px schlecht lesbar: Notiz zur Quelle (2.06) | Gespeicherte Zitate (1.00) | …`; p5f7 (neu: Formular mit Fehlern im dunklen Design) `error (2.81) | Gib ein Thema an. (2.81) | /plugin:spur:spur:… (2.06)`.
+- Behoben: spur.scss nutzt durchgehend Overleafs Theme-Tokens (`--*-themed`, so wie Overleaf selbst in Figure-Modal, Labs und Dateibaum); `.spur-panel` setzt Text, Überschriften, Feldbeschriftungen, Hilfetexte, Fehler am Feld und `code` themenabhängig. Ein erster Versuch mit `.text-warning` für alles verschlechterte das Abzeichen „Claude nicht verbunden“ (2.61); jetzt nur `.form-text.text-*`.
+- Danach grün: p5f3, p5f4, p5f7; im dunklen Design kleinster Kontrast je Ansicht 5,42 (Claude-Panel) bis 13,18 (Bilder `dunkel-*` bei 360 und 1280 px).
+- /simplify (vier Prüfagenten): ein Kontrast-Helfer `unlesbar` statt zweier, `mitDesign` für Designwechsel (dreimal kopiert), p5f3 ohne zweites Projektöffnen, Formularregel ohne `:not`. Nicht umgesetzt: `!important` bleibt (ohne waren Fehlertexte 2,81); Hilfetext an deaktivierten Feldern (gibt es im spur-Formular nicht).
+- /code-review medium (Plan-Diff): mit roten Tests behoben: `&#X41;` (großes X), Tab im Thema (jetzt ein Leerzeichen statt „Thema fehlt“), JATS-Inline-Tags (H<sub>2</sub>O wurde „H 2 O“), in der großen Ansicht zweite Zitatliste mit doppelten IDs und „Einfügen“ hinter dem Dialog, „Kopiert“ blieb bei Schritt 1 und 3 nach neuem Token. Nicht umgesetzt: Rückmeldung bei gesperrter Zwischenablage (Befehl bleibt markierbar), zweiter Bildabruf im Fehlerfall, generisches Formular für weitere Workflows, `abstract` leer statt null (verlangt die Spec).
+- Sicherheitsprüfung der Nachkorrektur: „Keine Befunde mit Konfidenz ≥ 8.“
+- `spur-dev test` grün (Zeilen 94,75 %). Vollständiger E2E-Lauf auf 6f7f6db32c: 42/42 ok in 451 s.
+
 ## Needs decision
 - f7: Thema mit mehreren Wörtern im Slash-Befehl `/plugin:spur:spur:quellen_sammeln`
   Interim: Argumentbeschreibung bittet um Bindestriche („Schlaf-Gedächtnis“); im Claude-Panel sind Leerzeichen erlaubt.
