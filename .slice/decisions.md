@@ -33,3 +33,9 @@
   Interim: Kein Merge; Gate auf dem Run-Branch grün (531 Tests).
   Options: A (empfohlen) Default-Branch von Hand klären, ob `agent` und `main` getrennte Geschichten haben sollen | B ignorieren
   Resolved 2026-11-09 (owner session): option B. Lokal haben `main` und `agent` eine gemeinsame Basis (`git merge-base` findet sie); der Abbruch kam vom flachen Klon in der Cloud. Nichts zu tun.
+- D6 (plan 20261109-spur-p5-abnahme) f7: Thema mit mehreren Wörtern im Slash-Befehl `/plugin:spur:spur:quellen_sammeln`
+  Interim: Argumentbeschreibung bittet um Bindestriche („Schlaf-Gedächtnis“); im Claude-Panel sind Leerzeichen erlaubt.
+  Options: A (empfohlen) so lassen und nach dem Merge in Claude Code testen, ob Anführungszeichen ein Argument zusammenhalten | B Anzahl zuerst, Thema als Rest der Zeile | C nur ein Argument „thema“, Anzahl im Text
+- D7 (plan 20261109-spur-p5-abnahme) f6: Zweite unabhängige Abnahme: „Zurück“ in der Blätterleiste des Panels sitzt bei 1280 px 4–5 px höher als Vorherige/Nächste Seite (`spur.scss`, `margin-top` auf `.spur-blaettern`); optisch eine Zeile, „dieselbe obere Kante“ wörtlich nicht erfüllt.
+  Interim: so gelassen.
+  Options: A (empfohlen) kleiner Nachbesserungsplan vor dem Merge | B so lassen

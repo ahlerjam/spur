@@ -1,8 +1,9 @@
 {
- "state": "running",
+ "state": "done",
  "builderModel": "opus",
  "builderAdvisor": "opus",
  "runBranch": "slice/run-20261109-spur-p5-abnahme",
  "sessionId": "2a3f6492-bb6f-495c-8ad2-ca1cf497ec13",
- "started": "2026-11-09T11:59:21Z"
+ "started": "2026-11-09T11:59:21Z",
+ "finished": "2026-11-09T16:45:00Z"
 }
