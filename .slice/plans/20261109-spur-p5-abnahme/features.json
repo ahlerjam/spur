@@ -82,7 +82,7 @@
     "Esc schließt die Ansicht, der Fokus steht danach auf „Groß öffnen“; ebenso der Knopf „Schließen“",
     "Bei 360 px füllt die große Ansicht den Bildschirm, alle Knöpfe bleiben erreichbar (mindestens 24 × 24 px); Web- und Scan-Quellen öffnen ebenfalls groß; keine Konsolenfehler"
    ],
-   "passes": false
+   "passes": true
   },
   {
    "id": "f7",
