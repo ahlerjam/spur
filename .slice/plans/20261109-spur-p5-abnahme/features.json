@@ -53,7 +53,7 @@
     "Alle geänderten deutschen Texte sind mit humanizer-de (Modus sachlich) geprüft; das Ergebnis steht in progress.md",
     "Alle Panels bei 360 und 1280 px ohne Überlauf und ohne Konsolenfehler"
    ],
-   "passes": false
+   "passes": true
   },
   {
    "id": "f5",
