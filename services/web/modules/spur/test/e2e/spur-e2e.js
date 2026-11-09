@@ -2573,26 +2573,19 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok(masse[0] <= masse[1], `${wo}: Seite rollt seitlich (${masse})`)
   }
 
-  // Kontrast nach WCAG zwischen Textfarbe und dem ersten nicht durchsichtigen Hintergrund darunter.
-  async function kontrast(locator) {
-    return await locator.evaluate(el => {
-      const rgb = s => s.match(/[\d.]+/g).slice(0, 3).map(Number)
-      const kanal = c => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
-      const hell = ([r, g, b]) => 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b)
-      let hinten = 'rgb(255, 255, 255)'
-      for (let e = el; e; e = e.parentElement) {
-        const farbe = getComputedStyle(e).backgroundColor
-        if (!/^rgba\(.*, 0\)$|transparent/.test(farbe)) {
-          hinten = farbe
-          break
-        }
-      }
-      const [a, b] = [hell(rgb(getComputedStyle(el).color)), hell(rgb(hinten))]
-      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
-    })
+  // Führt `schritte` im Editor-Design `thema` aus ('' dunkel, 'light-' hell) und stellt danach das vorige Design her.
+  async function mitDesign(thema, schritte) {
+    const vorher = await page.evaluate(() => JSON.parse(document.querySelector('meta[name="ol-userSettings"]').content).overallTheme)
+    await seitenPost('/user/settings', { overallTheme: thema })
+    try {
+      return await schritte()
+    } finally {
+      await seitenPost('/user/settings', { overallTheme: vorher })
+    }
   }
 
-  // Alle sichtbaren, bedienbaren Texte eines Bereichs mit Kontrast unter 4,5:1.
+  // Alle sichtbaren, bedienbaren Texte eines Bereichs mit Kontrast unter 4,5:1 (WCAG, gegen den ersten
+  // nicht durchsichtigen Hintergrund darunter).
   async function unlesbar(bereich) {
     return await bereich.evaluate(wurzel => {
       const rgb = s => s.match(/[\d.]+/g).slice(0, 3).map(Number)
@@ -2632,23 +2625,19 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       ok((await page.locator('.navbar-logo').count()) === 0, 'Einstellungen zeigen .navbar-logo')
 
       await projektOeffnen('E2E APA')
-      const vorher = await page.evaluate(() => JSON.parse(document.querySelector('meta[name="ol-userSettings"]').content).overallTheme)
-      try {
-        for (const thema of ['light-', '']) {
-          await seitenPost('/user/settings', { overallTheme: thema })
+      for (const thema of ['light-', '']) {
+        await mitDesign(thema, async () => {
           for (const px of [1280, 360]) {
             await breite(px)
             await projektOeffnen('E2E APA')
             const link = page.getByRole('link', { name: 'spur, zur Projektliste' })
             ok((await link.innerText()).trim() === 'spur', `Editor: ${await link.innerText()}`)
-            const k = await kontrast(link.locator('.toolbar-spur-schriftzug'))
-            ok(k >= 4.5, `Kontrast ${k.toFixed(2)} bei ${px} px, Thema „${thema}“`)
+            const schlecht = await unlesbar(link)
+            ok(schlecht.length === 0, `Schriftzug bei ${px} px, Thema „${thema}“: ${schlecht}`)
             ok(await link.evaluate(a => a.scrollWidth <= a.clientWidth && a.getBoundingClientRect().right <= innerWidth), `Schriftzug läuft über bei ${px} px`)
             await ohneSeitlichesRollen(`Editor ${px} px`)
           }
-        }
-      } finally {
-        await seitenPost('/user/settings', { overallTheme: vorher })
+        })
       }
       await breite(1280)
       await projektOeffnen('E2E APA')
@@ -2790,19 +2779,16 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await kasten.getByRole('button', { name: 'Kopiert' }).waitFor()
     ok((await page.evaluate(() => navigator.clipboard.readText())) === START, 'Panel kopiert nicht den Startbefehl')
     // Der Befehl muss in beiden Designs des Editors lesbar sein (Abnahme: im dunklen Design 1:1).
-    const vorher = await page.evaluate(() => JSON.parse(document.querySelector('meta[name="ol-userSettings"]').content).overallTheme)
-    try {
-      for (const thema of ['', 'light-']) {
-        await seitenPost('/user/settings', { overallTheme: thema })
-        await projektOeffnen('Demo')
+    for (const thema of ['', 'light-']) {
+      await mitDesign(thema, async () => {
+        await page.reload()
+        await page.locator('.cm-content').first().waitFor()
         await panelOeffnen('Claude')
-        const pre = claudePanel().locator('.spur-befehl-kasten pre')
-        await pre.waitFor()
-        const k = await kontrast(pre)
-        ok(k >= 4.5, `Startbefehl im Design „${thema || 'dunkel'}“: Kontrast ${k.toFixed(2)}`)
-      }
-    } finally {
-      await seitenPost('/user/settings', { overallTheme: vorher })
+        const kasten = claudePanel().locator('.spur-befehl-kasten')
+        await kasten.waitFor()
+        const schlecht = await unlesbar(kasten)
+        ok(schlecht.length === 0, `Startbefehl im Design „${thema || 'dunkel'}“: ${schlecht}`)
+      })
     }
   }
 
@@ -3029,10 +3015,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
     await breite(1280)
     // Formular samt Fehlern und Befehlsliste im dunklen Design lesbar (die Abnahme fand dort Kontrast 1:1).
-    const design = await page.evaluate(() => JSON.parse(document.querySelector('meta[name="ol-userSettings"]').content).overallTheme)
     await page.evaluate(() => window.__spur.abbruch.abort())
-    try {
-      await seitenPost('/user/settings', { overallTheme: '' })
+    await mitDesign('', async () => {
       await page.reload()
       await page.locator('.cm-content').first().waitFor()
       await panelOeffnen('Claude')
@@ -3046,12 +3030,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       const schlecht = await unlesbar(claudePanel())
       ok(schlecht.length === 0, `Formular im dunklen Design schlecht lesbar: ${schlecht.join(' | ')}`)
       await page.evaluate(() => window.__spur.abbruch.abort())
-    } finally {
-      await seitenPost('/user/settings', { overallTheme: design })
-      await page.reload()
-      await page.locator('.cm-content').first().waitFor()
-      await panelOeffnen('Claude')
-    }
+    })
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Claude')
     await verbinden(ADA)
     await claudePanel().getByText('Workflows', { exact: true }).click()
     await claudePanel().getByRole('button', { name: 'Quellen sammeln', exact: true }).click()
