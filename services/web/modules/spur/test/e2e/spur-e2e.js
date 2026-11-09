@@ -2592,6 +2592,31 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     })
   }
 
+  // Alle sichtbaren, bedienbaren Texte eines Bereichs mit Kontrast unter 4,5:1.
+  async function unlesbar(bereich) {
+    return await bereich.evaluate(wurzel => {
+      const rgb = s => s.match(/[\d.]+/g).slice(0, 3).map(Number)
+      const kanal = c => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+      const hell = ([r, g, b]) => 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b)
+      const hinten = el => {
+        for (let e = el; e; e = e.parentElement) {
+          const farbe = getComputedStyle(e).backgroundColor
+          if (!/^rgba\(.*, 0\)$|transparent/.test(farbe)) return farbe
+        }
+        return 'rgb(255, 255, 255)'
+      }
+      const schlecht = []
+      for (const el of wurzel.querySelectorAll('*')) {
+        if (!el.offsetParent || el.closest('[disabled], .disabled, [aria-disabled=true]')) continue
+        if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue
+        const [a, b] = [hell(rgb(getComputedStyle(el).color)), hell(rgb(hinten(el)))]
+        const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+        if (k < 4.5) schlecht.push(`${el.textContent.trim().slice(0, 40)} (${k.toFixed(2)})`)
+      }
+      return [...new Set(schlecht)]
+    })
+  }
+
   features.p5f1 = async () => {
     const logos = []
     const merken = r => /overleaf-o[-.]/.test(r.url()) && logos.push(r.url())
@@ -2764,6 +2789,21 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await kasten.getByRole('button', { name: 'Kopieren' }).click()
     await kasten.getByRole('button', { name: 'Kopiert' }).waitFor()
     ok((await page.evaluate(() => navigator.clipboard.readText())) === START, 'Panel kopiert nicht den Startbefehl')
+    // Der Befehl muss in beiden Designs des Editors lesbar sein (Abnahme: im dunklen Design 1:1).
+    const vorher = await page.evaluate(() => JSON.parse(document.querySelector('meta[name="ol-userSettings"]').content).overallTheme)
+    try {
+      for (const thema of ['', 'light-']) {
+        await seitenPost('/user/settings', { overallTheme: thema })
+        await projektOeffnen('Demo')
+        await panelOeffnen('Claude')
+        const pre = claudePanel().locator('.spur-befehl-kasten pre')
+        await pre.waitFor()
+        const k = await kontrast(pre)
+        ok(k >= 4.5, `Startbefehl im Design „${thema || 'dunkel'}“: Kontrast ${k.toFixed(2)}`)
+      }
+    } finally {
+      await seitenPost('/user/settings', { overallTheme: vorher })
+    }
   }
 
   features.p5f4 = async () => {
@@ -2794,6 +2834,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
           await panelSichern(name, panel)
           ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth), `${name} läuft über bei ${px} px`)
           ok(!/\b(Sie|Ihr|Ihre|Ihnen)\b/.test(await panel.innerText()), `${name} siezt: ${await panel.innerText()}`)
+          const schlecht = await unlesbar(panel)
+          ok(schlecht.length === 0, `${name} bei ${px} px schlecht lesbar: ${schlecht.join(' | ')}`)
         }
         await ohneSeitlichesRollen(`Editor ${px} px`)
       }
@@ -2985,6 +3027,35 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       await ohneSeitlichesRollen(`Formular ${px} px`)
       ok(await claudePanel().evaluate(el => el.scrollWidth <= el.clientWidth), `Claude-Panel läuft über bei ${px} px`)
     }
+    await breite(1280)
+    // Formular samt Fehlern und Befehlsliste im dunklen Design lesbar (die Abnahme fand dort Kontrast 1:1).
+    const design = await page.evaluate(() => JSON.parse(document.querySelector('meta[name="ol-userSettings"]').content).overallTheme)
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    try {
+      await seitenPost('/user/settings', { overallTheme: '' })
+      await page.reload()
+      await page.locator('.cm-content').first().waitFor()
+      await panelOeffnen('Claude')
+      await verbinden(ADA)
+      const workflows = claudePanel().locator('details.spur-workflows')
+      if (!(await workflows.evaluate(el => el.open))) await workflows.locator('summary').click()
+      await claudePanel().getByRole('button', { name: 'Quellen sammeln', exact: true }).click()
+      await claudePanel().getByLabel('Anzahl').fill('abc')
+      await claudePanel().getByRole('button', { name: 'Sammeln starten' }).click()
+      await claudePanel().getByText('Gib ein Thema an.').waitFor()
+      const schlecht = await unlesbar(claudePanel())
+      ok(schlecht.length === 0, `Formular im dunklen Design schlecht lesbar: ${schlecht.join(' | ')}`)
+      await page.evaluate(() => window.__spur.abbruch.abort())
+    } finally {
+      await seitenPost('/user/settings', { overallTheme: design })
+      await page.reload()
+      await page.locator('.cm-content').first().waitFor()
+      await panelOeffnen('Claude')
+    }
+    await verbinden(ADA)
+    await claudePanel().getByText('Workflows', { exact: true }).click()
+    await claudePanel().getByRole('button', { name: 'Quellen sammeln', exact: true }).click()
+    await thema.fill('Schlaf und Gedächtnis')
     await anzahl.fill('30')
     await starten.click()
     await page.waitForFunction(() => window.__spur.log.some(e => e.msg?.result), null, { timeout: 5000 })
