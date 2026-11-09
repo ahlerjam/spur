@@ -67,7 +67,7 @@
     "Ein Server-Test mit Installationssprache Englisch liefert für denselben Fall `detail` auf Englisch („The document does not exist (anymore).“ oder sinngemäß) mit unverändertem `title` `doc_fehlt`; eine Meldung mit Platzhalter (Fassung länger als 200 Zeichen) setzt die Zahl 200 in beiden Sprachen ein",
     "Über MCP liefert `doc_edit` mit falschem Alttext einen Werkzeugfehler mit unverändertem Fehlercode und Text in der Installationssprache"
    ],
-   "passes": false
+   "passes": true
   },
   {
    "id": "f6",
