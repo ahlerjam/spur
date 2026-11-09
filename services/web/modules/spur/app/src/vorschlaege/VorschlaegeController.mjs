@@ -1,3 +1,5 @@
+import Errors from '../../../../../app/src/Features/Errors/Errors.js'
+import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
 import { menschId, projektId } from '../anfrage.mjs'
 import { Problem, mitProblemen } from '../probleme.mjs'
 import * as Vorschlaege from './Vorschlaege.mjs'
@@ -35,6 +37,13 @@ export const tippPause = mitProblemen(async (req, res) => {
   const docId = req.body.doc_id
   if (typeof docId !== 'string' || !/^[0-9a-f]{24}$/.test(docId)) {
     throw new Problem(422, 'doc_id', 'doc_id muss die ID eines Dokuments sein.')
+  }
+  // Eine erfundene ID darf keinen Auslöser anlegen und so das Tageslimit verbrauchen (D4).
+  try {
+    await ProjectLocator.promises.findElement({ project_id: projektId(req), element_id: docId, type: 'doc' })
+  } catch (error) {
+    if (error instanceof Errors.NotFoundError) throw new Problem(404, 'doc_fehlt', 'Das Dokument gibt es nicht (mehr).')
+    throw error
   }
   res.json(
     await Vorschlaege.ausloesen({

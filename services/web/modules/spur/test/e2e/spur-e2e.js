@@ -2429,6 +2429,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       `Auslöser mit Limit 2: ${JSON.stringify(antworten)}`
     )
     ok((await ereignisseVon(ADA, 'suggest_trigger')).length === vorLimit + 2, 'Dritter Auslöser erzeugte ein Ereignis')
+    // Eine erfundene Dokument-ID lehnt der Server ab, bevor er zählt (D4).
+    const fremd = await seitenPost(`/spur/project/${pid}/vorschlaege/tipp-pause`, { doc_id: 'a'.repeat(24) })
+    ok(fremd.status === 404 && fremd.daten?.title === 'doc_fehlt', `Tipp-Pause mit unbekanntem Dokument: ${JSON.stringify(fremd)}`)
     await vorschlaegePanel().getByLabel('Tageslimit, für alle Projekte').fill('50')
     await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().getByRole('button', { name: 'Limit speichern' }).click())
     await vorschlaegePanel().getByText('Tageslimit erreicht').waitFor({ state: 'detached', timeout: 10000 })

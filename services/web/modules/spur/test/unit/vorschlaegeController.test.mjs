@@ -4,6 +4,7 @@ import { ObjectId } from './hilfen/datenbank.mjs'
 
 let C
 let m
+let docsImProjekt
 const projekt = new ObjectId()
 const ada = new ObjectId()
 
@@ -26,8 +27,23 @@ beforeEach(async () => {
       ausloesen: vi.fn(async ({ daten }) => ({ ausgeloest: true, daten: daten() })),
     },
   }
+  docsImProjekt = new Set()
   vi.resetModules()
   vi.doMock('../../app/src/vorschlaege/Vorschlaege.mjs', () => m.Vorschlaege)
+  vi.doMock('../../../../app/src/Features/Project/ProjectLocator.mjs', () => ({
+    default: {
+      promises: {
+        findElement: async ({ project_id: projektId, element_id: id, type }) => {
+          if (String(projektId) === String(projekt) && type === 'doc' && docsImProjekt.has(String(id))) {
+            return { element: { _id: id }, path: { fileSystem: '/kapitel.tex' } }
+          }
+          if (String(id) === 'f'.repeat(24)) throw new Error('Mongo weg')
+          const { default: Errors } = await import('../../../../app/src/Features/Errors/Errors.js')
+          throw new Errors.NotFoundError('weg')
+        },
+      },
+    },
+  }))
   vi.doMock('../../../../app/src/Features/Authentication/SessionManager.mjs', () => ({
     default: { getLoggedInUserId: () => String(ada) },
   }))
@@ -72,11 +88,26 @@ describe('Vorschläge-Panel', () => {
 
   it('löst nach einer Tipp-Pause „belegloses Argument“ für das Dokument aus', async () => {
     const docId = String(new ObjectId())
+    docsImProjekt.add(docId)
     const res = await ausfuehren(C.tippPause, req({ body: { doc_id: docId } }))
     expect(res.body).toEqual({ ausgeloest: true, daten: { doc_id: docId } })
     expect(m.Vorschlaege.ausloesen).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: projekt, menschId: ada, art: 'belegloses_argument' })
     )
     expect((await ausfuehren(C.tippPause, req({ body: { doc_id: '../x' } }))).statusCode).toBe(422)
+  })
+
+  it('lehnt die Tipp-Pause für ein Dokument ab, das es im Projekt nicht gibt, ohne auszulösen', async () => {
+    const res = await ausfuehren(C.tippPause, req({ body: { doc_id: String(new ObjectId()) } }))
+    expect(res.statusCode).toBe(404)
+    expect(res.body).toMatchObject({ title: 'doc_fehlt' })
+    expect(m.Vorschlaege.ausloesen).not.toHaveBeenCalled()
+  })
+
+  it('reicht unerwartete Fehler der Dokumentsuche weiter', async () => {
+    const next = vi.fn()
+    await C.tippPause(req({ body: { doc_id: 'f'.repeat(24) } }), new Antwort(), next)
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Mongo weg' }))
+    expect(m.Vorschlaege.ausloesen).not.toHaveBeenCalled()
   })
 })

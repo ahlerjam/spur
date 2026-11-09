@@ -46,9 +46,11 @@ async function laden({ dev = false } = {}) {
   }))
   vi.doMock('../../../../app/src/infrastructure/RateLimiter.mjs', () => ({ RateLimiter: class { constructor(name) { this.name = name } } }))
   vi.doMock('../../app/src/schalter.mjs', () => ({ IST_DEV: dev }))
-  vi.doMock('../../app/src/SpurController.mjs', () =>
+  // Controller als Handler mit Namen; ihre echten Abhängigkeiten (Overleafs Modelle) braucht der Routentest nicht.
+  const handlerAttrappe = () =>
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
-  )
+  vi.doMock('../../app/src/SpurController.mjs', handlerAttrappe)
+  vi.doMock('../../app/src/vorschlaege/VorschlaegeController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
   vi.doMock('../../app/src/dev/DevSchalter.mjs', () => ({
     testseite: Object.assign(() => {}, { handler: 'testseite' }),
