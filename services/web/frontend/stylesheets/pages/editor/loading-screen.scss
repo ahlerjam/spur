@@ -1,5 +1,3 @@
-@use 'sass:math';
-
 @mixin loading-screen-dark {
   --loading-screen-bg-color: var(--bg-dark-primary);
   --loading-screen-brand-color: var(--content-primary-dark);

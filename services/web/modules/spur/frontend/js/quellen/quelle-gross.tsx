@@ -12,7 +12,7 @@ import {
 } from '@/shared/components/ol/ol-modal'
 import { projektPfad } from '../api'
 import { useSeite } from './seite'
-import { Seitenangabe, SeitenBlaettern } from './seiten-blaettern'
+import SeitenBlaettern from './seiten-blaettern'
 import Seitenbild from './seitenbild'
 import Zitate from './zitate'
 import { anzeigename, type Quelle } from './typen'
@@ -46,9 +46,7 @@ export default function QuelleGross({
       </OLModalHeader>
       <div className="spur-gross-werkzeuge">
         {!quelle.web && (
-          <SeitenBlaettern quelle={quelle} nummer={nummer} setNummer={setNummer}>
-            <Seitenangabe quelle={quelle} nummer={nummer} seite={seite} />
-          </SeitenBlaettern>
+          <SeitenBlaettern quelle={quelle} nummer={nummer} seite={seite} setNummer={setNummer} />
         )}
         {mitBild && (
           <div className="spur-zoom" role="group" aria-label={t('spur_zoom')}>

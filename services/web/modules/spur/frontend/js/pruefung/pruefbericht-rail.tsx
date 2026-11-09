@@ -4,6 +4,8 @@ import PruefberichtPanel from './pruefbericht-panel'
 
 const eintrag = {
   key: 'spur-pruefbericht',
+  // Seitenbilder, Befehle und Formulare brauchen mehr Platz als Overleafs 15 %.
+  defaultSize: 25,
   icon: 'check_circle',
   get title() {
     return i18n.t('spur_pruefbericht')

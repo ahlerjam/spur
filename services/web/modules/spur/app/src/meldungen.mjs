@@ -1,10 +1,10 @@
 // Meldungen des spur-Servers in der Sprache der Installation (OVERLEAF_SITE_LANGUAGE), nicht des Browsers:
 // Problems entstehen oft ohne Anfrage, und Claude sieht dieselben Texte über MCP.
 import Settings from '@overleaf/settings'
-import de from '../../../../locales/de.json' with { type: 'json' }
-import en from '../../../../locales/en.json' with { type: 'json' }
 
-const texte = Settings.i18n?.defaultLng === 'de' ? de : en
+// Nur die Sprache der Installation laden; andere Sprachen fallen auf Englisch zurück.
+const sprache = Settings.i18n?.defaultLng === 'de' ? 'de' : 'en'
+const { default: texte } = await import(`../../../../locales/${sprache}.json`, { with: { type: 'json' } })
 
 export function meldung(schluessel, werte = {}) {
   const text = texte[schluessel]

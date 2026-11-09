@@ -15,10 +15,10 @@ export default function BefehlKasten({ befehl }: { befehl: string }) {
         variant="secondary"
         size="sm"
         aria-describedby={id}
-        onClick={async () => {
-          await navigator.clipboard.writeText(befehl)
-          setKopiert(true)
-        }}
+        onClick={() =>
+          // Gesperrte Zwischenablage: Der Knopf bleibt auf „Kopieren“, der Befehl steht markierbar im Kasten.
+          navigator.clipboard.writeText(befehl).then(() => setKopiert(true), () => {})
+        }
       >
         {kopiert ? t('spur_kopiert') : t('spur_kopieren')}
       </OLButton>

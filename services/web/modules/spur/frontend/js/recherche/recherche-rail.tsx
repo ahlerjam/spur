@@ -4,6 +4,8 @@ import RecherchePanel from './recherche-panel'
 
 const eintrag = {
   key: 'spur-recherche',
+  // Seitenbilder, Befehle und Formulare brauchen mehr Platz als Overleafs 15 %.
+  defaultSize: 25,
   icon: 'find_in_page',
   get title() {
     return i18n.t('spur_recherche')

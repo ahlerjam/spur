@@ -1,10 +1,9 @@
-import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLIconButton from '@/shared/components/ol/ol-icon-button'
 import type { Seite } from './seite'
 import type { Quelle } from './typen'
 
-export function Seitenangabe({
+function Seitenangabe({
   quelle,
   nummer,
   seite,
@@ -23,21 +22,21 @@ export function Seitenangabe({
   )
 }
 
-export function SeitenBlaettern({
+export default function SeitenBlaettern({
   quelle,
   nummer,
+  seite,
   setNummer,
-  children,
 }: {
   quelle: Quelle
   nummer: number
+  seite: Seite | null
   setNummer: (nummer: number) => void
-  children: ReactNode
 }) {
   const { t } = useTranslation()
   return (
     <div className="spur-blaettern">
-      {children}
+      <Seitenangabe quelle={quelle} nummer={nummer} seite={seite} />
       <OLIconButton
         variant="ghost"
         size="sm"

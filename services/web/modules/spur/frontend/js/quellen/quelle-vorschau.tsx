@@ -12,7 +12,7 @@ import { jsonAnfrage, projektPfad } from '../api'
 import QuelleGross from './quelle-gross'
 import QuelleLoeschenModal from './quelle-loeschen-modal'
 import { useSeite } from './seite'
-import { Seitenangabe, SeitenBlaettern } from './seiten-blaettern'
+import SeitenBlaettern from './seiten-blaettern'
 import SeitenzahlBestaetigen from './seitenzahl-bestaetigen'
 import Seitenbild from './seitenbild'
 import Zitate from './zitate'
@@ -65,9 +65,7 @@ export default function QuelleVorschau({
             {t('spur_abgerufen_am', { datum: datumLang(quelle.web.abgerufenAm, i18n.language) })}
           </span>
         ) : (
-          <SeitenBlaettern quelle={quelle} nummer={nummer} setNummer={setNummer}>
-            <Seitenangabe quelle={quelle} nummer={nummer} seite={seite} />
-          </SeitenBlaettern>
+          <SeitenBlaettern quelle={quelle} nummer={nummer} seite={seite} setNummer={setNummer} />
         )}
       </div>
       <div className="spur-panel-inhalt">
