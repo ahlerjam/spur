@@ -3,6 +3,7 @@ import express from 'express'
 import * as z from 'zod/v4'
 import logger from '@overleaf/logger'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let server
 let basis
@@ -145,7 +146,7 @@ describe('Begrenzung', () => {
     expect(antwort.status).toBe(429)
     expect(antwort.headers.get('retry-after')).toBe('13')
     expect(daten.type).toBe('urn:spur:problem:zu_viele_anfragen')
-    expect(daten.detail).toContain('13 Sekunden')
+    expect(daten.detail).toBe(meldung('spur_fehler_zu_viele_anfragen', { sekunden: 13 }))
   })
 
   it('wartet mindestens eine Sekunde', async () => {
@@ -195,13 +196,13 @@ describe('Werkzeugaufrufe', () => {
     expect(ergebnis.isError).toBe(true)
     expect(JSON.parse(ergebnis.content[0].text)).toEqual({
       fehler: 'keine_rechte',
-      detail: 'Die Projektrolle erlaubt das nicht. Bitte die Person um Zugriff bitten.',
+      detail: meldung('spur_fehler_projektrolle'),
     })
   })
 
   it('gibt Probleme der Manager mit ihrem Typ als Code zurück', async () => {
     const ergebnis = ergebnisVon(await aufruf('problem'))
-    expect(JSON.parse(ergebnis.content[0].text)).toEqual({ fehler: 'quelle_fehlt', detail: 'Diese Quelle gibt es nicht mehr. Bitte die Liste neu laden.' })
+    expect(JSON.parse(ergebnis.content[0].text)).toEqual({ fehler: 'quelle_fehlt', detail: meldung('spur_fehler_quelle_fehlt') })
   })
 
   it('verbirgt unerwartete Fehler hinter interner_fehler und protokolliert sie', async () => {

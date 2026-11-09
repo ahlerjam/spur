@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { berechtigung } from './hilfen/berechtigung.mjs'
 import { ObjectId, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
 let WERKZEUGE
@@ -362,7 +363,7 @@ describe('Ereignisse', () => {
   it('wait_for_event bittet ohne Auftrag um erneuten Aufruf, standardmäßig nach 30 Minuten', async () => {
     m.Inbox.warteAufEreignis.mockResolvedValue(null)
     const ergebnis = await aufruf('wait_for_event', {}, kontext, { mcpReq: { signal: null, _meta: {} } })
-    expect(ergebnis).toEqual({ ereignis: null, hinweis: 'Kein Auftrag. Bitte erneut aufrufen.' })
+    expect(ergebnis).toEqual({ ereignis: null, hinweis: meldung('spur_fehler_kein_auftrag') })
     expect(m.Inbox.warteAufEreignis.mock.calls[0][1].maxMs).toBe(1800000)
   })
 

@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 import { crossrefAttrappe, fixture } from './hilfen/quellen.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
 let Quellen
@@ -102,7 +103,7 @@ describe('webAufnehmen', () => {
     await aufnehmen(`${basis}/testseite`)
     const fehler = await fehlerVon(aufnehmen(`${basis}/testseite`))
     expect(fehler).toMatchObject({ status: 409, typ: 'quelle_vorhanden' })
-    expect(fehler.message).toBe('Diese Webseite ist schon als Quelle vorhanden („Schlafhygiene im Schichtdienst“).')
+    expect(fehler.message).toBe(meldung('spur_fehler_webseite_vorhanden', { name: 'Schlafhygiene im Schichtdienst' }))
   })
 
   it('zählt den Schlüssel hoch, wenn eine andere Seite gleich heißt', async () => {

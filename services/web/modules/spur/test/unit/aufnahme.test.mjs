@@ -2,6 +2,7 @@ import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let Aufnahme
 let m
@@ -101,20 +102,20 @@ describe('perDoi', () => {
   it('meldet „Bereits vorhanden“, wenn die DOI schon eine Quelle hat', async () => {
     vorhandene = [{ doi: '10.1371/journal.pone.0099999', key: 'keller2014' }]
     const fehler = await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))
-    expect(fehler).toMatchObject({ status: 409, typ: 'quelle_vorhanden', message: 'Bereits vorhanden' })
+    expect(fehler).toMatchObject({ status: 409, typ: 'quelle_vorhanden', message: meldung('spur_fehler_quelle_vorhanden') })
     expect(holen).not.toHaveBeenCalled()
   })
 
   it('meldet „DOI nicht gefunden“ für eine unbekannte DOI', async () => {
     m.Crossref.werk.mockResolvedValue({ gefunden: false })
     const fehler = await fehlerVon(aufnehmen('10.9999/gibt.es.nicht'))
-    expect(fehler).toMatchObject({ status: 404, typ: 'doi_nicht_gefunden', message: 'DOI nicht gefunden' })
+    expect(fehler).toMatchObject({ status: 404, typ: 'doi_nicht_gefunden', message: meldung('spur_fehler_doi_nicht_gefunden') })
   })
 
   it('nennt Crossref, wenn der Dienst nicht antwortet', async () => {
     m.Crossref.werk.mockResolvedValue(null)
     const fehler = await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))
-    expect(fehler).toMatchObject({ status: 502, message: expect.stringContaining('Crossref nicht erreichbar') })
+    expect(fehler).toMatchObject({ status: 502, message: meldung('spur_fehler_crossref_nicht_erreichbar') })
   })
 
   it('verweist ohne freien Volltext auf die Beschaffungsliste', async () => {

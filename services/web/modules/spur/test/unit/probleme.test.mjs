@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Problem, mitProblemen, problemSenden } from '../../app/src/probleme.mjs'
 import { Antwort } from './hilfen/express.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 describe('problemSenden', () => {
   it('antwortet nach RFC 9457 als application/problem+json', () => {
@@ -12,7 +13,7 @@ describe('problemSenden', () => {
       type: 'urn:spur:problem:zitat_text',
       title: 'zitat_text',
       status: 422,
-      detail: 'Bitte eine Textstelle mit 1 bis 2000 Zeichen markieren.',
+      detail: meldung('spur_fehler_zitat_text', { max: 2000 }),
     })
   })
 })

@@ -49,6 +49,32 @@
 - Thema mit mehreren Wörtern im Slash-Befehl: Claude Code trennt Argumente an Leerzeichen (P3). Die Argumentbeschreibung sagt jetzt „mehrere Wörter mit Bindestrich verbinden“; im Panel gibt es die Einschränkung nicht. Siehe Needs decision.
 - Nicht umgesetzt: Sprache folgt der Installation, nicht dem Browser (so entschieden); `Problem` wirft bei unbekanntem Schlüssel (gewollt, `meldungen.test.mjs` prüft alle Aufrufe); zwei `Zitate`-Instanzen (jede hört nur auf Auswahl in ihrem eigenen Seitentext, die Vorschau lädt per Live-Ereignis nach, p5f6 belegt das); getrennter Seitenzustand von Vorschau und großer Ansicht (gewollt: die große Ansicht blättert für sich).
 
+## /security-review (2ff9c66b34..HEAD, ohne Doku, Sprachdateien, Tests)
+- Keine Befunde mit Konfidenz ≥ 8. Geprüft: Platzhalter in Fehlermeldungen landen nur als JSON-`detail` oder MCP-Text (kein HTML-Sink, keine Pug-Vorlage); dekodierte Abstracts gehen nur an Claude; die Workflow-Route ist nicht neu (Leserecht, Name gegen feste Liste, Thema/Anzahl geprüft, keine Datenbankabfrage); `Seitenbild` zeigt Fehlertext als React-Text; Pug gibt `appName` escaped aus.
+
+## Gesamtlauf nach der letzten Codeänderung (7b14aa10b6)
+- Stack mit `spur-dev up` neu gebaut (`spur-dev reload` brach dreimal ohne Meldung im Webpack ab, `up` mit frischem Container lief durch).
+- E2E vollständig: 42/42 ok in 440 s (`f1`–`f15`, `p2f1`–`p2f10`, `p4f1`–`p4f4`, `p3f1`–`p3f5`, `p5f1`–`p5f8`).
+- `spur-dev test`: alle Unit-Tests grün, Zeilen 94,66 %.
+
+## Overleafs Suiten
+- `spur-dev upstream web` am Stück brach auf diesem Rechner zweimal ohne Ergebnis ab (Protokoll endet mitten in der Punktreihe, keine `web.json`; vermutlich Speicher im Container). Deshalb in vier Teilen über Pfadargumente:
+  - Teil 1 (Analytics bis Exports): bestanden 1641, fehlgeschlagen 1, bekannt 1, neu 0
+  - Teil 2 (Features bis Security): bestanden 1400, fehlgeschlagen 133, bekannt 133, neu 0
+  - Teil 3 (ServerAdmin bis Tutorial, ohne Settings, dessen einzige Datei ausgeschlossen ist): bestanden 1171, fehlgeschlagen 20, bekannt 20, neu 0
+  - Teil 4 (Uploads, User, UserMembership, util, Modul-Tests launchpad, spur, user-activate): bestanden 1587, fehlgeschlagen 19, bekannt 19, neu 0
+- `frontend`: bestanden 1726, fehlgeschlagen 14, bekannt 14, neu 0. `du`: bestanden 784, neu 0.
+- Gefunden und behoben: 22 spur-Unit-Tests verglichen feste deutsche Meldungen. Overleafs Lauf hat `OVERLEAF_CONFIG` leer und damit `defaultLng: 'en'`, `spur-dev test` die Server-CE-Settings mit Deutsch. Die Tests erwarten jetzt `meldung(schluessel, werte)` (24 Erwartungen in 10 Dateien), die Sprachen selbst prüft `meldungen.test.mjs`. Danach `modules/spur/test/unit` im Upstream-Lauf: bestanden 734, neu 0.
+- Dazu war `inbox.test.mjs › beendet den älteren Aufruf …` (aus P3) unter der Last des Gesamtlaufs instabil (4 s Wartezeit für den zweiten Aufruf); jetzt 15 s, endet sofort beim Auftrag.
+
+## Abnahme der Ansichten (taste, 360 und 1280 px)
+Bilder im Scratchpad `.playwright-mcp/bilder/` (gitignoriert): Projektliste, Token-Anleitung, Editor mit Quelle, große Ansicht, Claude-Panel mit Startbefehl, Workflow-Formular mit Fehlern. In allen: kein seitliches Rollen (`scrollWidth - clientWidth = 0`).
+- Projektliste: „spur“ oben links als Text, „Stichwörter“, „OVERLEAF CE+ · SPUR“ unten (Overleafs Großschreibung per CSS), Seitenmenü ohne Rollbalken. „3 minutes ago“ bleibt englisch (Overleafs fehlende Übersetzung, Backlog).
+- Token-Anleitung: drei nummerierte Schritte, Kästen brechen auch bei 360 px sauber um, Kopierknopf je Schritt. Die Liste alter Tokens ist Testdatenbestand.
+- Quelle im Panel (25 %): Zurück, Seitenangabe, Vorherige, Nächste in einer Zeile; „Groß öffnen“ darüber. Große Ansicht: Bild links, Text, Notizen und Zitate rechts; bei 360 px untereinander; Zoom und Blättern in einer Leiste.
+- Claude-Panel: Startbefehl ganz sichtbar, umgebrochen. Formular: Meldungen mit Symbol direkt am Feld. Bei 360 px überdeckt die klebende „Workflows“-Überschrift beim Rollen den Knopf darüber kurz; kein Überlauf, keine Änderung.
+- Stil: Overleaf-Komponenten und -Tokens (Knöpfe, Formulare, Farben); keine eigenen Farben außer `var(--…)`. Kein `DESIGN.md` im Repo; Vorschlag: Tokens für spur-Schriftzug (Größe, Gewicht) dort festhalten.
+
 ## Needs decision
 - f7: Thema mit mehreren Wörtern im Slash-Befehl `/plugin:spur:spur:quellen_sammeln`
   Interim: Argumentbeschreibung bittet um Bindestriche („Schlaf-Gedächtnis“); im Claude-Panel sind Leerzeichen erlaubt.

@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let Recherche
 let Abruf
@@ -192,7 +193,7 @@ describe('suchen', () => {
     ausfall.add('s2')
     const ergebnis = await suchen('sleep memory consolidation')
     expect(ergebnis.fehler).toEqual([
-      { dienst: 's2', art: 'nicht_erreichbar', text: 'Semantic Scholar nicht erreichbar' },
+      { dienst: 's2', art: 'nicht_erreichbar', text: meldung('spur_fehler_dienst_nicht_erreichbar', { dienst: 'Semantic Scholar' }) },
     ])
     expect(ergebnis.treffer.map(t => t.doi)).toContain('10.1038/nrn2762')
   })
@@ -212,8 +213,8 @@ describe('suchen', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}), text: async () => '<feed/>' })))
     const ergebnis = await suchen('sleep')
     expect(ergebnis.hinweise).toEqual([
-      'OpenAlex ist aus: Der Betreiber hat keinen API-Key hinterlegt (OPENALEX_API_KEY).',
-      'Semantic Scholar ist aus: Der Betreiber hat keinen API-Key hinterlegt (SEMANTIC_SCHOLAR_API_KEY).',
+      meldung('spur_fehler_suchdienst_aus', { dienst: 'OpenAlex', variable: 'OPENALEX_API_KEY' }),
+      meldung('spur_fehler_suchdienst_aus', { dienst: 'Semantic Scholar', variable: 'SEMANTIC_SCHOLAR_API_KEY' }),
     ])
     const hosts = fetch.mock.calls.map(([url]) => new URL(url).host)
     expect(hosts.sort()).toEqual(['api.crossref.org', 'export.arxiv.org'])
@@ -267,7 +268,7 @@ describe('platzHolen', () => {
     const vorher = (await datenbank.db.collection('spurDrossel').findOne({ _id: 's2' })).naechster
     expect(await fehlerVon(Abruf.platzHolen(dienst))).toMatchObject({
       art: 'limit',
-      message: 'Semantic Scholar: Limit erreicht. Bitte in einigen Minuten erneut suchen.',
+      message: meldung('spur_fehler_dienst_limit', { dienst: 'Semantic Scholar' }),
     })
     expect((await datenbank.db.collection('spurDrossel').findOne({ _id: 's2' })).naechster).toBe(vorher)
   })
@@ -320,7 +321,7 @@ describe('zitationen', () => {
   it('meldet einen ausgefallenen Dienst und liefert die übrigen Zitationen', async () => {
     ausfall.add('openalex')
     const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
-    expect(ergebnis.fehler.map(f => f.text)).toEqual(['OpenAlex nicht erreichbar'])
+    expect(ergebnis.fehler.map(f => f.text)).toEqual([meldung('spur_fehler_dienst_nicht_erreichbar', { dienst: 'OpenAlex' })])
     expect(ergebnis.treffer).toHaveLength(2)
   })
 

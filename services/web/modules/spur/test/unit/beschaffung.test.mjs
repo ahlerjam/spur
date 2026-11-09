@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let Beschaffung
 let datenbank
@@ -75,7 +76,7 @@ describe('Beschaffungsliste', () => {
   })
 
   it('meldet eine unbekannte DOI', async () => {
-    expect(await fehlerVon(hinzufuegen('10.9999/nix'))).toMatchObject({ status: 404, message: 'DOI nicht gefunden' })
+    expect(await fehlerVon(hinzufuegen('10.9999/nix'))).toMatchObject({ status: 404, message: meldung('spur_fehler_doi_nicht_gefunden') })
   })
 
   it('baut den Bibliothekslink aus der Vorlage der Person, Standard doi.org', async () => {

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 import { STANDARD } from '../../app/src/workflows/standardtexte.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
 let W
@@ -70,14 +71,14 @@ describe('Workflows', () => {
 
   it('Quellen sammeln: fehlendes Thema und ungültige Anzahl werden abgelehnt', async () => {
     const ohneThema = await fehlerVon(W.promptText('quellen_sammeln', { thema: '  ' }))
-    expect([ohneThema.status, ohneThema.typ, ohneThema.message]).toEqual([422, 'thema', 'Gib ein Thema an.'])
+    expect([ohneThema.status, ohneThema.typ, ohneThema.message]).toEqual([422, 'thema', meldung('spur_fehler_thema_fehlt')])
     for (const thema of [5, ['Schlaf'], 'x'.repeat(301), 'Schlaf\nAnzahl: max']) {
       const falsch = await fehlerVon(W.promptText('quellen_sammeln', { thema }))
       expect([falsch.status, falsch.typ]).toEqual([422, 'thema'])
     }
     for (const anzahl of ['abc', '0', '-1', '2.5', null, ['3']]) {
       const falsch = await fehlerVon(W.promptText('quellen_sammeln', { thema: 'Schlaf', anzahl }))
-      expect([falsch.status, falsch.typ, falsch.message]).toEqual([422, 'anzahl', 'Gib eine Zahl ab 1 oder „max“ an.'])
+      expect([falsch.status, falsch.typ, falsch.message]).toEqual([422, 'anzahl', meldung('spur_fehler_anzahl')])
     }
   })
 
