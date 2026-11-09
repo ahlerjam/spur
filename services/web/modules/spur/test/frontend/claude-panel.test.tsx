@@ -2,6 +2,7 @@ import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ClaudePanel from '@modules/spur/frontend/js/claude/claude-panel'
+import { startBefehl } from '@modules/spur/frontend/js/claude/claude-verbinden'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
 import { deutschAktivieren } from './helpers/deutsch'
 
@@ -14,6 +15,7 @@ const LISTE = {
     { name: 'literaturueberblick', titel: 'Literaturüberblick', beschreibung: 'L' },
     { name: 'methodenteil', titel: 'Methodenteil', beschreibung: 'M' },
     { name: 'folien', titel: 'Folien aus Paper', beschreibung: 'F' },
+    { name: 'quellen_sammeln', titel: 'Quellen sammeln', beschreibung: 'Q', eingaben: ['thema', 'anzahl'] },
   ],
 }
 
@@ -56,6 +58,21 @@ describe('Claude-Panel', function () {
     screen.getByText(/claude --allowedTools/)
     expect(screen.queryByLabelText('Auftrag an Claude')).to.equal(null)
     expect(screen.queryByRole('button', { name: 'Senden' })).to.equal(null)
+  })
+
+  it('zeigt den Startbefehl im Befehlskasten und kopiert genau ihn', async function () {
+    const geschrieben: string[] = []
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: async (text: string) => geschrieben.push(text) },
+      configurable: true,
+    })
+    fetchMock.get(STATUS, status({ verbunden: false }))
+    zeigen()
+    const kasten = (await screen.findByText(/claude --allowedTools/)).closest('.spur-befehl-kasten')!
+    expect(kasten).to.exist
+    fireEvent.click(within(kasten as HTMLElement).getByRole('button', { name: 'Kopieren' }))
+    await screen.findByRole('button', { name: 'Kopiert' })
+    expect(geschrieben).to.deep.equal([startBefehl()])
   })
 
   it('zeigt den Verlauf von alt nach neu als Log für Screenreader', async function () {
@@ -121,7 +138,7 @@ describe('Claude-Panel', function () {
     expect(screen.queryByText(/Ältere Nachrichten/)).to.equal(null)
   })
 
-  it('nennt in der Hilfe unter „Workflows“ die drei Befehle des Plugins', async function () {
+  it('nennt in der Hilfe unter „Workflows“ die vier Befehle des Plugins', async function () {
     fetchMock.get(STATUS, status({}))
     zeigen()
     fireEvent.click(await screen.findByText('Workflows'))
@@ -131,7 +148,43 @@ describe('Claude-Panel', function () {
       '/plugin:spur:spur:literaturueberblick',
       '/plugin:spur:spur:methodenteil',
       '/plugin:spur:spur:folien',
+      '/plugin:spur:spur:quellen_sammeln',
     ])
+  })
+
+  it('Quellen sammeln fragt Thema und Anzahl ab und meldet Fehler am Feld', async function () {
+    fetchMock.get(STATUS, status({}))
+    fetchMock.post(/\/workflows\/quellen_sammeln\/starten$/, { status: 201, body: { id: 'n1' } })
+    zeigen()
+    fireEvent.click(await screen.findByText('Workflows'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Quellen sammeln' }))
+    const thema = screen.getByLabelText('Thema')
+    const anzahl = screen.getByLabelText('Anzahl') as HTMLInputElement
+    expect(anzahl.value).to.equal('20')
+    const starten = screen.getByRole('button', { name: 'Sammeln starten' })
+
+    fireEvent.click(starten)
+    await screen.findByText('Gib ein Thema an.')
+    expect(thema.getAttribute('aria-invalid')).to.equal('true')
+    expect(document.getElementById(thema.getAttribute('aria-describedby')!)!.textContent).to.contain('Gib ein Thema an.')
+
+    fireEvent.change(thema, { target: { value: 'Schlaf und Gedächtnis' } })
+    for (const falsch of ['abc', '0']) {
+      fireEvent.change(anzahl, { target: { value: falsch } })
+      fireEvent.click(starten)
+      await screen.findByText('Gib eine Zahl ab 1 oder „max“ an.')
+      expect(anzahl.getAttribute('aria-invalid')).to.equal('true')
+      expect(document.getElementById(anzahl.getAttribute('aria-describedby')!)!.textContent).to.contain(
+        'Gib eine Zahl ab 1 oder „max“ an.'
+      )
+    }
+    expect(fetchMock.callHistory.calls(/starten$/)).to.have.length(0)
+
+    fireEvent.change(anzahl, { target: { value: '30' } })
+    fireEvent.click(starten)
+    await waitFor(() => expect(fetchMock.callHistory.calls(/starten$/)).to.have.length(1))
+    const [aufruf] = fetchMock.callHistory.calls(/starten$/)
+    expect(JSON.parse(aufruf.options.body as string)).to.deep.equal({ thema: 'Schlaf und Gedächtnis', anzahl: '30' })
   })
 
   it('zeigt ohne Verbindung keine Workflows', async function () {

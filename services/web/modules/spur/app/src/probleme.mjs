@@ -1,7 +1,9 @@
-// Fehler nach RFC 9457. Der Typ bleibt je Fehlerklasse stabil.
+import { meldung } from './meldungen.mjs'
+
+// Fehler nach RFC 9457. Der Typ bleibt je Fehlerklasse stabil; der Text kommt aus den Sprachdateien.
 export class Problem extends Error {
-  constructor(status, typ, detail) {
-    super(detail)
+  constructor(status, typ, schluessel, werte) {
+    super(meldung(schluessel, werte))
     this.status = status
     this.typ = typ
   }

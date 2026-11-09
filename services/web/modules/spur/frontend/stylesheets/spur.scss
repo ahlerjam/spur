@@ -102,6 +102,97 @@
   font-size: var(--font-size-02);
 }
 
+.spur-blaettern,
+.spur-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-02);
+}
+
+.spur-gross-oeffnen {
+  margin-bottom: var(--spacing-03);
+}
+
+.spur-gross {
+  .modal-dialog {
+    max-width: none;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+  }
+
+  .modal-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .modal-header {
+    gap: var(--spacing-04);
+
+    .modal-title {
+      flex: 1;
+      min-width: 0;
+      font-size: var(--font-size-05);
+      overflow-wrap: anywhere;
+    }
+  }
+}
+
+.spur-gross-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-03) var(--spacing-07);
+  padding: var(--spacing-03) var(--spacing-06);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.spur-zoom-wert {
+  min-width: 4ch;
+  text-align: center;
+  font-size: var(--font-size-02);
+  font-variant-numeric: tabular-nums;
+}
+
+.spur-gross-inhalt.modal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--spacing-06);
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.spur-gross-bild,
+.spur-gross-text {
+  min-height: 0;
+  overflow: auto;
+}
+
+.spur-gross-bild .spur-seitenbild {
+  max-width: none;
+  margin: 0 auto;
+}
+
+@media (max-width: 767px) {
+  .spur-gross-inhalt.modal-body {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: auto;
+  }
+
+  .spur-gross-bild,
+  .spur-gross-text {
+    overflow: visible;
+  }
+
+  .spur-gross-bild {
+    overflow-x: auto;
+  }
+}
+
 .spur-seitenbild {
   display: block;
   width: 100%;
@@ -206,9 +297,43 @@
   }
 }
 
+.spur-befehl-kasten {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-02);
+  margin: var(--spacing-02) 0 var(--spacing-04);
+  min-width: 0;
+}
+
 .spur-befehl {
+  align-self: stretch;
+  margin: 0;
+  padding: var(--spacing-03);
+  font-size: var(--font-size-01);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  background: var(--bg-light-secondary);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-base);
+}
+
+.spur-schritte {
+  padding-left: var(--spacing-06);
+  margin: var(--spacing-04) 0 0;
+
+  > li::marker {
+    font-weight: 600;
+  }
+
+  h6 {
+    margin: 0 0 var(--spacing-01);
+    font-size: var(--font-size-03);
+  }
+
+  p {
+    margin: 0;
+  }
 }
 
 .spur-claude-status {
@@ -286,17 +411,6 @@
   textarea {
     width: 100%;
   }
-}
-
-// Im schmalen Panel: eine Zeile mit Scrollbalken statt einer Spalte aus Wortfetzen.
-.spur-befehl-kompakt {
-  white-space: pre;
-  overflow-x: auto;
-  font-size: var(--font-size-01);
-  padding: var(--spacing-02);
-  margin: var(--spacing-02) 0;
-  background: var(--bg-light-secondary);
-  border-radius: var(--border-radius-base);
 }
 
 .spur-nachricht-text {
@@ -653,6 +767,22 @@
 
 .spur-workflow {
   padding: var(--spacing-02) 0;
+}
+
+.spur-workflow-formular {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-03);
+  margin-top: var(--spacing-03);
+  padding: var(--spacing-04);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-base);
+
+  .form-group {
+    align-self: stretch;
+    margin: 0;
+  }
 }
 
 .spur-workflows-hilfe {

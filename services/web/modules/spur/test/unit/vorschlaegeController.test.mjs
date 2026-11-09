@@ -22,7 +22,7 @@ beforeEach(async () => {
       verwerfen: vi.fn(async () => {
         // Erst beim Aufruf laden: nach resetModules ist das die Klasse, die der Controller kennt.
         const { Problem } = await import('../../app/src/probleme.mjs')
-        throw new Problem(404, 'vorschlag_fehlt', 'weg')
+        throw new Problem(404, 'vorschlag_fehlt', 'spur_fehler_vorschlag_fehlt')
       }),
       ausloesen: vi.fn(async ({ daten }) => ({ ausgeloest: true, daten: daten() })),
     },

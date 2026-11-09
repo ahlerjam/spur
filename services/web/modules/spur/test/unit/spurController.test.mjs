@@ -189,7 +189,7 @@ describe('Hochladen', () => {
 
   it('quelleHochladen räumt die Temp-Datei auch bei einem Fehler weg', async () => {
     const pfad = datei()
-    m.Quellen.aufnehmen.mockRejectedValue(new Problem(415, 'dateityp', 'nein'))
+    m.Quellen.aufnehmen.mockRejectedValue(new Problem(415, 'dateityp', 'spur_fehler_dateityp'))
     const { res } = await ausfuehren(C.quelleHochladen, req({ file: { originalname: 'a.docx', path: pfad, size: 3 } }))
     expect(res.statusCode).toBe(415)
     expect(existsSync(pfad)).toBe(false)
@@ -224,7 +224,7 @@ describe('Seiten, Bilder und Dateien', () => {
   })
 
   it('quelleBild meldet eine unbekannte Seite, bevor es rendert', async () => {
-    m.Quellen.seite.mockRejectedValue(new Problem(404, 'seite_fehlt', 'weg'))
+    m.Quellen.seite.mockRejectedValue(new Problem(404, 'seite_fehlt', 'spur_fehler_seite_fehlt'))
     const { res } = await ausfuehren(C.quelleBild, mitQuelle())
     expect(res.statusCode).toBe(404)
     expect(m.Quellen.bild).not.toHaveBeenCalled()
@@ -455,7 +455,7 @@ describe('Zitate und Prüfbericht', () => {
   })
 
   it('Problem-Fehler der Manager werden zu Problem-Antworten', async () => {
-    m.Quellen.holen.mockRejectedValue(new Problem(404, 'quelle_fehlt', 'weg'))
+    m.Quellen.holen.mockRejectedValue(new Problem(404, 'quelle_fehlt', 'spur_fehler_quelle_fehlt'))
     const { res, next } = await ausfuehren(C.zitate, mitQuelle())
     expect(res.statusCode).toBe(404)
     expect(next).not.toHaveBeenCalled()
@@ -502,14 +502,25 @@ describe('Claude-Zugang und Läufe', () => {
 
   it('workflows liefert Name, Titel und Beschreibung', async () => {
     const { res } = await ausfuehren(C.workflows, req())
-    expect(res.body).toEqual({ workflows: [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B' }] })
+    expect(res.body).toEqual({ workflows: [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B', eingaben: [] }] })
   })
 
   it('workflowStarten legt den Workflow als Auftrag für den eigenen Bot an', async () => {
     const { res } = await ausfuehren(C.workflowStarten, req({ params: { project_id: String(projekt), name: 'folien' } }))
-    expect(m.Workflows.starten).toHaveBeenCalledWith({ projectId: projekt, botId: 'bot1', name: 'folien' })
+    expect(m.Workflows.starten).toHaveBeenCalledWith({
+      projectId: projekt,
+      botId: 'bot1',
+      name: 'folien',
+      argumente: { thema: undefined, anzahl: undefined },
+    })
     expect(res.statusCode).toBe(201)
     expect(res.body).toEqual({ id: 'n9' })
+  })
+
+  it('workflowStarten reicht Thema und Anzahl aus dem Body weiter', async () => {
+    const body = { thema: 'Schlaf', anzahl: 'max' }
+    await ausfuehren(C.workflowStarten, req({ params: { project_id: String(projekt), name: 'quellen_sammeln' }, body }))
+    expect(m.Workflows.starten).toHaveBeenCalledWith(expect.objectContaining({ name: 'quellen_sammeln', argumente: body }))
   })
 
   it('claudeAuftrag legt den getrimmten Auftrag für den Bot an', async () => {

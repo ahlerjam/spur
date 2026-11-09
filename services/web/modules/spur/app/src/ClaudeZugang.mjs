@@ -79,7 +79,7 @@ export async function widerrufen(menschId, tokenId) {
 }
 
 function tokenFehlt() {
-  return new Problem(404, 'token_fehlt', 'Dieses Token gibt es nicht mehr.')
+  return new Problem(404, 'token_fehlt', 'spur_fehler_token_fehlt')
 }
 
 export async function pruefen(token) {

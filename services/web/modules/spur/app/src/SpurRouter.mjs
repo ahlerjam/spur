@@ -48,13 +48,13 @@ function hochladenMitGrenze(req, res, next) {
     if (error?.code === 'LIMIT_FILE_SIZE') {
       problemSenden(
         res,
-        new Problem(413, 'zu_gross', 'Datei ist größer als 50 MB. Bitte verkleinern.')
+        new Problem(413, 'zu_gross', 'spur_fehler_datei_zu_gross')
       )
     } else if (error?.name === 'MulterError' || error?.message?.startsWith('Multipart')) {
       // Falsches Feld, kaputtes Multipart: Fehler des Aufrufers, kein 500.
       problemSenden(
         res,
-        new Problem(400, 'datei_fehlt', 'Es kam keine Datei im Feld „datei“ an. Bitte erneut hochladen.')
+        new Problem(400, 'datei_fehlt', 'spur_fehler_datei_feld_fehlt')
       )
     } else {
       next(error)

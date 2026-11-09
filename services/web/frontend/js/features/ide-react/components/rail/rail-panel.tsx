@@ -8,6 +8,10 @@ import { Tab } from 'react-bootstrap'
 import { RailElement } from '@/features/ide-react/util/rail-types'
 import { shouldIncludeElement } from '@/features/ide-react/util/rail-utils'
 
+// spur: Panels des Moduls zeigen Seitenbilder, Befehle und Formulare und starten breiter.
+const standardBreite = (tab: string) =>
+  tab === 'workbench' ? 20 : tab.startsWith('spur-') ? 25 : 15
+
 export default function RailPanel({
   isReviewPanelOpen,
   isHistoryView,
@@ -39,7 +43,7 @@ export default function RailPanel({
       id={`ide-redesign-sidebar-panel-${isHistoryView ? 'file-tree' : selectedTab}`}
       className={classNames({ hidden: isReviewPanelOpen || focusMode })}
       order={1}
-      defaultSize={selectedTab === 'workbench' ? 20 : 15}
+      defaultSize={standardBreite(selectedTab)}
       minSize={5}
       maxSize={80}
       ref={panelRef}

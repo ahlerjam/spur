@@ -2,6 +2,7 @@ import logger from '@overleaf/logger'
 import { csv } from '../csv.mjs'
 import { doiNormal } from '../pruefung/bib.mjs'
 import { Problem } from '../probleme.mjs'
+import { meldung } from '../meldungen.mjs'
 import { suchprotokoll } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { DienstFehler } from './abruf.mjs'
@@ -41,7 +42,7 @@ export function auswerten(dienste, ergebnisse) {
       fehler.push({
         dienst: dienst.name,
         art: ergebnis.reason?.art ?? 'nicht_erreichbar',
-        text: ergebnis.reason instanceof DienstFehler ? ergebnis.reason.message : `${dienst.anzeige} nicht erreichbar`,
+        text: ergebnis.reason instanceof DienstFehler ? ergebnis.reason.message : meldung('spur_fehler_dienst_nicht_erreichbar', { dienst: dienst.anzeige }),
       })
       return
     }
@@ -49,15 +50,17 @@ export function auswerten(dienste, ergebnisse) {
     gesamt.push({ dienst, anzahl })
     for (const t of treffer) zusammenfuehren(sammlung, t)
   })
-  return { treffer: [...sammlung.values()], fehler, gesamt }
+  // Ohne Abstract in allen Diensten bleibt das Feld leer statt null.
+  const treffer = [...sammlung.values()].map(t => ({ ...t, abstract: t.abstract ?? '' }))
+  return { treffer, fehler, gesamt }
 }
 
 export async function suchen({ projectId, userId, anfrage, seite = 0 }) {
   const begriff = anfrage?.trim()
-  if (!begriff) throw new Problem(400, 'anfrage_fehlt', 'Bitte einen Suchbegriff eingeben.')
+  if (!begriff) throw new Problem(400, 'anfrage_fehlt', 'spur_fehler_suchbegriff_fehlt')
   const dienste = SUCHDIENSTE.filter(aktiv)
   const hinweise = SUCHDIENSTE.filter(d => !aktiv(d)).map(
-    d => `${d.anzeige} ist aus: Der Betreiber hat keinen API-Key hinterlegt (${d.keyVariable}).`
+    d => meldung('spur_fehler_suchdienst_aus', { dienst: d.anzeige, variable: d.keyVariable })
   )
   const ergebnisse = await Promise.allSettled(dienste.map(d => d.suchen(begriff, seite)))
   const { treffer, fehler, gesamt } = auswerten(dienste, ergebnisse)
@@ -101,7 +104,7 @@ export async function protokoll(projectId, { seite = 0 } = {}) {
 export function doiPruefen(doi) {
   const wert = doiNormal(doi ?? '')?.toLowerCase()
   if (!DOI_MUSTER.test(wert ?? '')) {
-    throw new Problem(400, 'doi_ungueltig', 'Das ist keine DOI. Bitte eine DOI wie 10.1038/nrn2762 angeben.')
+    throw new Problem(400, 'doi_ungueltig', 'spur_fehler_doi_ungueltig')
   }
   return wert
 }
@@ -109,7 +112,7 @@ export function doiPruefen(doi) {
 // richtung: 'zitiert_von' (Arbeiten, die dieses Paper zitieren) oder 'zitiert' (seine Referenzen).
 export async function zitationen(doi, richtung) {
   if (!RICHTUNGEN.includes(richtung)) {
-    throw new Problem(400, 'richtung_ungueltig', 'Die Richtung ist „zitiert_von“ oder „zitiert“.')
+    throw new Problem(400, 'richtung_ungueltig', 'spur_fehler_richtung_ungueltig')
   }
   const wert = doiPruefen(doi)
   const dienste = ZITATIONSDIENSTE.filter(aktiv)

@@ -15,21 +15,21 @@ const SEITE = 50
 const STANDARD_VORLAGE = 'https://doi.org/{doi}'
 
 const fehlt = () =>
-  new Problem(404, 'beschaffung_fehlt', 'Diesen Eintrag gibt es nicht mehr. Bitte die Liste neu laden.')
+  new Problem(404, 'beschaffung_fehlt', 'spur_fehler_beschaffung_fehlt')
 
 export async function hinzufuegen({ projectId, userId, doi }) {
   const wert = Aufnahme.doiNormal(doi)
   if ((await QuellenManager.alle(projectId)).some(q => q.doi?.toLowerCase() === wert)) {
-    throw new Problem(409, 'quelle_vorhanden', 'Bereits als Quelle vorhanden')
+    throw new Problem(409, 'quelle_vorhanden', 'spur_fehler_doi_als_quelle_vorhanden')
   }
   const { meta } = await Aufnahme.metadaten(wert)
-  if (!meta.gefunden) throw new Problem(404, 'doi_nicht_gefunden', 'DOI nicht gefunden')
+  if (!meta.gefunden) throw new Problem(404, 'doi_nicht_gefunden', 'spur_fehler_doi_nicht_gefunden')
   const eintrag = { _id: new ObjectId(), projectId, doi: wert, meta, status: 'offen', angelegtVon: userId, angelegtAm: jetzt() }
   try {
     await (await beschaffungen()).insertOne(eintrag)
   } catch (error) {
     if (error.code === 11000) {
-      throw new Problem(409, 'beschaffung_vorhanden', 'Steht schon auf der Beschaffungsliste')
+      throw new Problem(409, 'beschaffung_vorhanden', 'spur_fehler_beschaffung_vorhanden')
     }
     throw error
   }
@@ -61,7 +61,7 @@ export async function vorlageSetzen(userId, wert) {
     throw new Problem(
       400,
       'vorlage_ungueltig',
-      'Die Vorlage braucht eine http- oder https-Adresse mit {doi}, etwa https://bibliothek.example/?doi={doi}.'
+      'spur_fehler_vorlage_ungueltig'
     )
   }
   await (await einstellungen()).updateOne({ projectId: null, userId }, { $set: { bibliothek: text } }, { upsert: true })
@@ -109,13 +109,13 @@ export async function exportieren(projectId, format) {
     ])
     return { dateiname: datei, typ: 'text/csv', inhalt: csv(['DOI', 'Titel', 'Autoren', 'Jahr', 'Status'], zeilen) }
   }
-  throw new Problem(400, 'format_ungueltig', 'Exportformate: bib, ris oder csv.')
+  throw new Problem(400, 'format_ungueltig', 'spur_fehler_format_ungueltig')
 }
 
 // Erst Quelle und .bib, dann der Status: Scheitert ein Schritt, bleibt der Eintrag offen und wiederholbar.
 async function beschaffen(projectId, eintrag, quelle, userId) {
   if (quelle.doi && quelle.doi.toLowerCase() !== eintrag.doi) {
-    throw new Problem(409, 'andere_doi', `„${quelle.dateiname}“ trägt schon die DOI ${quelle.doi}. Bitte das passende PDF wählen.`)
+    throw new Problem(409, 'andere_doi', 'spur_fehler_andere_doi', { dateiname: quelle.dateiname, doi: quelle.doi })
   }
   const mitDoi = { ...quelle, doi: eintrag.doi, meta: eintrag.meta }
   await (await quellen()).updateOne({ _id: quelle._id }, { $set: { doi: eintrag.doi, meta: eintrag.meta } })
@@ -125,7 +125,7 @@ async function beschaffen(projectId, eintrag, quelle, userId) {
     { $set: { status: 'beschafft', quelleId: quelle._id, beschafftAm: jetzt() } },
     { returnDocument: 'after' }
   )
-  if (!ergebnis) throw new Problem(409, 'schon_beschafft', 'Dieser Eintrag ist schon beschafft.')
+  if (!ergebnis) throw new Problem(409, 'schon_beschafft', 'spur_fehler_schon_beschafft')
   return ergebnis
 }
 
@@ -140,7 +140,7 @@ export async function zuordnen(projectId, eintragId, quelleId, userId) {
   if (!ObjectId.isValid(eintragId)) throw fehlt()
   const eintrag = await (await beschaffungen()).findOne({ _id: new ObjectId(eintragId), projectId })
   if (!eintrag) throw fehlt()
-  if (eintrag.status !== 'offen') throw new Problem(409, 'schon_beschafft', 'Dieser Eintrag ist schon beschafft.')
+  if (eintrag.status !== 'offen') throw new Problem(409, 'schon_beschafft', 'spur_fehler_schon_beschafft')
   const quelle = await QuellenManager.holen(projectId, quelleId)
   return await beschaffen(projectId, eintrag, quelle, userId)
 }

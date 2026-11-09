@@ -29,14 +29,14 @@ const werkzeuge = () => ({
     description: 'Wirft einen Werkzeugfehler.',
     inputSchema: z.object({}),
     ausfuehren: async () => {
-      throw new WerkzeugFehler('keine_rechte', 'Die Projektrolle erlaubt das nicht.')
+      throw new WerkzeugFehler('keine_rechte', 'spur_fehler_projektrolle')
     },
   },
   problem: {
     description: 'Wirft ein Problem.',
     inputSchema: z.object({}),
     ausfuehren: async () => {
-      throw new Problem(404, 'quelle_fehlt', 'Diese Quelle gibt es nicht mehr.')
+      throw new Problem(404, 'quelle_fehlt', 'spur_fehler_quelle_fehlt')
     },
   },
   abstuerzen: {
@@ -66,8 +66,9 @@ beforeAll(async () => {
   }))
   vi.doMock('../../app/src/mcp/werkzeuge.mjs', () => ({ WERKZEUGE }))
   vi.doMock('../../app/src/workflows/Workflows.mjs', () => ({
-    NAMEN: ['literaturueberblick', 'methodenteil', 'folien'],
-    promptText: async (name, fokus) => workflowTexte[name] + (fokus ? ` Fokus: ${fokus}` : ''),
+    NAMEN: ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln'],
+    promptText: async (name, argumente) =>
+      workflowTexte[name] + Object.entries(argumente ?? {}).map(([k, v]) => ` ${k}: ${v}`).join(''),
   }))
   const { mcpAnfrage, mcpJson } = await import('../../app/src/mcp/McpEndpunkt.mjs')
   const app = express()
@@ -80,7 +81,7 @@ beforeAll(async () => {
 afterAll(() => new Promise(fertig => server.close(fertig)))
 
 beforeEach(() => {
-  workflowTexte = { literaturueberblick: 'Text L', methodenteil: 'Text M', folien: 'Text F' }
+  workflowTexte = { literaturueberblick: 'Text L', methodenteil: 'Text M', folien: 'Text F', quellen_sammeln: 'Text Q' }
   aufgerufen = []
   verbrauchen.mockReset()
   verbrauchen.mockResolvedValue(undefined)
@@ -194,13 +195,13 @@ describe('Werkzeugaufrufe', () => {
     expect(ergebnis.isError).toBe(true)
     expect(JSON.parse(ergebnis.content[0].text)).toEqual({
       fehler: 'keine_rechte',
-      detail: 'Die Projektrolle erlaubt das nicht.',
+      detail: 'Die Projektrolle erlaubt das nicht. Bitte die Person um Zugriff bitten.',
     })
   })
 
   it('gibt Probleme der Manager mit ihrem Typ als Code zurück', async () => {
     const ergebnis = ergebnisVon(await aufruf('problem'))
-    expect(JSON.parse(ergebnis.content[0].text)).toEqual({ fehler: 'quelle_fehlt', detail: 'Diese Quelle gibt es nicht mehr.' })
+    expect(JSON.parse(ergebnis.content[0].text)).toEqual({ fehler: 'quelle_fehlt', detail: 'Diese Quelle gibt es nicht mehr. Bitte die Liste neu laden.' })
   })
 
   it('verbirgt unerwartete Fehler hinter interner_fehler und protokolliert sie', async () => {
@@ -221,11 +222,22 @@ describe('Werkzeugaufrufe', () => {
 })
 
 describe('Workflows als MCP-Prompts', () => {
-  it('listet literaturueberblick, methodenteil und folien mit Titel und einem optionalen Fokuswort', async () => {
+  it('listet die vier Workflows mit Titel und ihren Argumenten', async () => {
     const { prompts } = ergebnisVon(await senden({ method: 'prompts/list' }))
-    expect(prompts.map(p => p.name)).toEqual(['literaturueberblick', 'methodenteil', 'folien'])
-    expect(prompts.map(p => p.title)).toEqual(['Literaturüberblick', 'Methodenteil', 'Folien aus Paper'])
+    expect(prompts.map(p => p.name)).toEqual(['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln'])
+    expect(prompts.map(p => p.title)).toEqual(['Literaturüberblick', 'Methodenteil', 'Folien aus Paper', 'Quellen sammeln'])
     expect(prompts[0].arguments).toEqual([expect.objectContaining({ name: 'fokus', required: false })])
+    expect(prompts[3].arguments).toEqual([
+      expect.objectContaining({ name: 'thema', required: true }),
+      expect.objectContaining({ name: 'anzahl', required: false }),
+    ])
+  })
+
+  it('prompts/get für Quellen sammeln reicht Thema und Anzahl weiter', async () => {
+    const antwort = ergebnisVon(
+      await senden({ method: 'prompts/get', params: { name: 'quellen_sammeln', arguments: { thema: 'Schlaf', anzahl: '30' } } })
+    )
+    expect(antwort.messages[0].content.text).toBe('Text Q thema: Schlaf anzahl: 30')
   })
 
   it('prompts/get liefert den aktuellen Text, auch direkt nach einer Änderung', async () => {
@@ -234,7 +246,7 @@ describe('Workflows als MCP-Prompts', () => {
     expect(await holen({})).toBe('Text F')
     workflowTexte.folien = 'Neuer Text F'
     expect(await holen({})).toBe('Neuer Text F')
-    expect(await holen({ fokus: 'Ergebnisse' })).toBe('Neuer Text F Fokus: Ergebnisse')
+    expect(await holen({ fokus: 'Ergebnisse' })).toBe('Neuer Text F fokus: Ergebnisse')
   })
 
   it('nimmt als Argument nur ein einzelnes Wort', async () => {

@@ -3,9 +3,11 @@
   top: var(--spacing-06);
   left: var(--spacing-06);
 
-  img {
-    height: 40px;
-  }
+  color: var(--content-primary);
+  font-size: var(--font-size-07);
+  font-weight: 600;
+  line-height: 40px;
+  text-decoration: none;
 }
 
 .auth-aux-container {

@@ -27,7 +27,7 @@ export async function markieren(quelle, { seite, text }, userId) {
     throw new Problem(
       422,
       'zitat_text',
-      `Bitte eine Textstelle mit 1 bis ${MAX_ZITAT} Zeichen markieren.`
+      'spur_fehler_zitat_text', { max: MAX_ZITAT }
     )
   }
   const eintrag = await QuellenManager.seite(quelle, seite)
@@ -35,7 +35,7 @@ export async function markieren(quelle, { seite, text }, userId) {
     throw new Problem(
       422,
       'zitat_nicht_in_quelle',
-      'Der markierte Text steht nicht auf dieser Seite. Bitte erneut markieren.'
+      'spur_fehler_zitat_nicht_in_quelle'
     )
   }
   const zitat = {
@@ -55,7 +55,7 @@ export async function markieren(quelle, { seite, text }, userId) {
 
 async function zuweisungPruefen(projectId, zuweisen) {
   if (typeof zuweisen !== 'string' || !(await mitgliederIds(projectId)).includes(zuweisen)) {
-    throw new Problem(422, 'zuweisung', 'Zuweisen geht nur an Mitglieder dieses Projekts.')
+    throw new Problem(422, 'zuweisung', 'spur_fehler_zuweisen_nur_mitglieder')
   }
   return new ObjectId(zuweisen)
 }
@@ -67,7 +67,7 @@ export async function kommentieren(quelle, zitatId, { text, zuweisen }, userId) 
     throw new Problem(
       422,
       'kommentar_text',
-      `Bitte einen Kommentar mit 1 bis ${MAX_KOMMENTAR} Zeichen schreiben.`
+      'spur_fehler_kommentar_text', { max: MAX_KOMMENTAR }
     )
   }
   const am = jetzt()
@@ -118,7 +118,7 @@ export async function holen(quelle, zitatId) {
       quelleId: quelle._id,
     }))
   if (!zitat) {
-    throw new Problem(404, 'zitat_fehlt', 'Dieses Zitat gibt es nicht mehr.')
+    throw new Problem(404, 'zitat_fehlt', 'spur_fehler_zitat_fehlt')
   }
   return zitat
 }

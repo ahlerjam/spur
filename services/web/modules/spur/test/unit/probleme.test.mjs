@@ -5,14 +5,14 @@ import { Antwort } from './hilfen/express.mjs'
 describe('problemSenden', () => {
   it('antwortet nach RFC 9457 als application/problem+json', () => {
     const res = new Antwort()
-    problemSenden(res, new Problem(422, 'zitat_text', 'Bitte eine Textstelle markieren.'))
+    problemSenden(res, new Problem(422, 'zitat_text', 'spur_fehler_zitat_text', { max: 2000 }))
     expect(res.statusCode).toBe(422)
     expect(res.kopfzeilen['Content-Type']).toBe('application/problem+json')
     expect(res.body).toEqual({
       type: 'urn:spur:problem:zitat_text',
       title: 'zitat_text',
       status: 422,
-      detail: 'Bitte eine Textstelle markieren.',
+      detail: 'Bitte eine Textstelle mit 1 bis 2000 Zeichen markieren.',
     })
   })
 })
@@ -22,7 +22,7 @@ describe('mitProblemen', () => {
     const res = new Antwort()
     const next = vi.fn()
     await mitProblemen(async () => {
-      throw new Problem(404, 'quelle_fehlt', 'weg')
+      throw new Problem(404, 'quelle_fehlt', 'spur_fehler_quelle_fehlt')
     })({}, res, next)
     expect(res.statusCode).toBe(404)
     expect(next).not.toHaveBeenCalled()

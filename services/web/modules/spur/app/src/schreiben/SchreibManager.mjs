@@ -27,14 +27,14 @@ function pruefePfad(pfad) {
   if (!SafePath.isCleanPath(pfad) || !teile.every(EditorHttpController._nameIsAcceptableLength)) {
     throw new WerkzeugFehler(
       'pfad_ungueltig',
-      'Dieser Pfad ist nicht erlaubt: keine Teile wie „..“, keine verbotenen Zeichen, jeder Ordner- und Dateiname unter 150 Zeichen.'
+      'spur_fehler_pfad_ungueltig'
     )
   }
 }
 
 async function docAufloesen(projectId, docId, pfad) {
   if (!docId && !pfad) {
-    throw new WerkzeugFehler('doc_fehlt', 'Bitte doc_id oder pfad angeben. doc_list nennt beide.')
+    throw new WerkzeugFehler('doc_fehlt', 'spur_fehler_doc_angabe_fehlt')
   }
   try {
     if (docId) {
@@ -54,7 +54,7 @@ async function docAufloesen(projectId, docId, pfad) {
   } catch (error) {
     if (!(error instanceof Errors.NotFoundError)) throw error
   }
-  throw new WerkzeugFehler('doc_fehlt', 'Das Dokument gibt es nicht (mehr). Bitte doc_list aufrufen.')
+  throw new WerkzeugFehler('doc_fehlt', 'spur_fehler_doc_fehlt_liste')
 }
 
 function vorkommen(text, teil) {
@@ -72,13 +72,13 @@ async function pruefSperre(projectId, neuerText, von, bis) {
     if (z.wortlaut === 'abweichend') {
       throw new WerkzeugFehler(
         'zitat_abweichend',
-        `Der Wortlaut von „${z.auszug}“ steht nicht in der Quelle ${z.key}. Bitte mit source_search prüfen.`
+        'spur_fehler_zitat_abweichend', { auszug: z.auszug, key: z.key }
       )
     }
     if (z.wortlaut === 'quelle_fehlt') {
       throw new WerkzeugFehler(
         'quelle_fehlt',
-        `Zu ${z.key} gibt es keine Quelle mit Text. Bitte nur aus vorhandenen Quellen zitieren.`
+        'spur_fehler_zitat_ohne_quelle', { key: z.key }
       )
     }
     // Nicht prüfbar (unbekannte Form oder Quelle ohne lesbaren Wortlaut): annehmen, aber rot,
@@ -98,22 +98,22 @@ const fingerabdruck = inhalt => createHash('sha256').update(JSON.stringify(inhal
 function frueheresErgebnis(frueher, projectId, inhalt) {
   if (!frueher) {
     // Der erste Aufruf ist zwischen Reservierung und Nachsehen gescheitert: einfach wiederholen.
-    throw new WerkzeugFehler('konflikt', 'Ein Aufruf mit diesem Idempotenz-Schlüssel ist gerade gescheitert. Bitte erneut versuchen.')
+    throw new WerkzeugFehler('konflikt', 'spur_fehler_idempotenz_gescheitert')
   }
   if (String(frueher.projectId) !== String(projectId)) {
     throw new WerkzeugFehler(
       'konflikt',
-      'Dieser Idempotenz-Schlüssel gehört zu einem anderen Projekt. Bitte einen neuen Schlüssel nehmen.'
+      'spur_fehler_idempotenz_anderes_projekt'
     )
   }
   if (frueher.inhalt && frueher.inhalt !== inhalt) {
     throw new WerkzeugFehler(
       'konflikt',
-      'Dieser Idempotenz-Schlüssel wurde schon für eine andere Änderung benutzt. Bitte einen neuen Schlüssel nehmen.'
+      'spur_fehler_idempotenz_andere_aenderung'
     )
   }
   if (!frueher.ergebnis) {
-    throw new WerkzeugFehler('konflikt', 'Ein Aufruf mit diesem Idempotenz-Schlüssel läuft noch.')
+    throw new WerkzeugFehler('konflikt', 'spur_fehler_idempotenz_laeuft')
   }
   return { ...frueher.ergebnis, wiederholt: true }
 }
@@ -168,21 +168,15 @@ async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
   if ((ranges?.changes?.length ?? 0) >= GRENZE_CHANGES) {
     throw new WerkzeugFehler(
       'grenze_changes',
-      'Das Dokument hat fast 2000 offene Änderungen. Bitte erst annehmen oder ablehnen lassen.'
+      'spur_fehler_zu_viele_changes'
     )
   }
   const text = lines.join('\n')
   let start = text.length
   if (alt) {
     const treffer = vorkommen(text, alt)
-    if (treffer.length !== 1) {
-      throw new WerkzeugFehler(
-        'konflikt',
-        treffer.length
-          ? 'Der erwartete Alttext kommt mehrfach vor. Bitte mehr Kontext angeben.'
-          : 'Der erwartete Alttext steht nicht im Dokument. Bitte neu lesen.'
-      )
-    }
+    if (treffer.length > 1) throw new WerkzeugFehler('konflikt', 'spur_fehler_alttext_mehrfach')
+    if (treffer.length === 0) throw new WerkzeugFehler('konflikt', 'spur_fehler_alttext_fehlt')
     start = treffer[0]
   }
   const neuerText = text.slice(0, start) + neu + text.slice(start + alt.length)
@@ -230,7 +224,7 @@ export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) 
     if (await pfadBelegt(projectId, ziel)) {
       throw new WerkzeugFehler(
         'konflikt',
-        'Unter diesem Pfad gibt es schon eine Datei. Bitte doc_edit nehmen oder einen anderen Pfad wählen.'
+        'spur_fehler_pfad_belegt'
       )
     }
     let doc
@@ -238,7 +232,7 @@ export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) 
       ;({ doc } = await EditorController.promises.upsertDocWithPath(projectId, ziel, [''], 'spur', botId))
     } catch (error) {
       if (!(error instanceof Errors.InvalidNameError)) throw error
-      throw new WerkzeugFehler('pfad_ungueltig', 'Dieser Dateiname ist nicht erlaubt. Bitte einen anderen Pfad wählen.')
+      throw new WerkzeugFehler('pfad_ungueltig', 'spur_fehler_dateiname_ungueltig')
     }
     try {
       return await bearbeiten({ projectId, botId, docId: String(doc._id), alt: '', neu: inhalt })

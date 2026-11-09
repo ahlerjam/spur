@@ -39,7 +39,7 @@ async function fakeAbruf(pfad, text = false) {
 
 const zoteroFehler = error => {
   logger.warn({ err: error }, 'Zotero nicht erreichbar')
-  return new Problem(502, 'zotero_nicht_erreichbar', 'Zotero nicht erreichbar. Bitte später erneut versuchen.')
+  return new Problem(502, 'zotero_nicht_erreichbar', 'spur_fehler_zotero_nicht_erreichbar')
 }
 
 export async function zoteroSammlungen(userId) {
@@ -52,14 +52,14 @@ export async function zoteroSammlungen(userId) {
     throw zoteroFehler(error)
   }
   if (!sammlungen) {
-    throw new Problem(409, 'zotero_fehlt', 'Zotero ist nicht verbunden. Bitte Zotero in den Kontoeinstellungen verbinden.')
+    throw new Problem(409, 'zotero_fehlt', 'spur_fehler_zotero_fehlt')
   }
   return sammlungen.map(({ key, name }) => ({ key, name }))
 }
 
 export async function zoteroImportieren({ projectId, userId, sammlung }) {
   if (!SAMMLUNG.test(sammlung ?? '')) {
-    throw new Problem(400, 'sammlung_ungueltig', 'Bitte eine Zotero-Sammlung aus der Liste wählen.')
+    throw new Problem(400, 'sammlung_ungueltig', 'spur_fehler_sammlung_ungueltig')
   }
   let bibtex
   try {

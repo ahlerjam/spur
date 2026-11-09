@@ -39,6 +39,7 @@ Stand: Entwurf vor Lauf 0. Änderungen an Namen und Fehlercodes gelten als Bruch
 | Prompt | Plan | Zweck |
 |---|---|---|
 | `literaturueberblick`, `methodenteil`, `folien` | P3 | Fertige Workflows; derselbe Text liegt beim Klick auf „Workflows“ im Panel im Auftrag. Optionales Argument `fokus`, ein einzelnes Wort |
+| `quellen_sammeln` | P5 | Befehl `/plugin:spur:spur:quellen_sammeln`. Sucht Literatur zu `thema` (Pflicht), bewertet die Abstracts und nimmt bis zu `anzahl` Paper auf (Zahl ab 1 oder `max`, Standard 20). Ungültige Werte: Fehler `thema` oder `anzahl` |
 
 ## Fehlercodes von `doc_edit`
 
@@ -68,6 +69,8 @@ Unerkannte Zitatformen und nicht auflösbare DOIs werden angenommen, aber rot ma
 | `spalte_fehlt` | `matrix_suggest`: Die Spalte gibt es in der Matrix nicht |
 | `kommentar_fehlt` | `reply` mit `kommentar_id`: Den Kommentar-Thread gibt es im Projekt nicht |
 | `vorschlaege_voll` | `suggest`: Im Panel liegen schon 100 offene Vorschläge |
+
+Jeder Treffer von `paper_search` trägt `abstract` (aus dem ersten Dienst, der eines liefert; sonst leer).
 
 `paper_search` und `paper_citations` scheitern nicht an einem einzelnen Dienst: `fehler` nennt ausgefallene Dienste mit Namen, die übrigen Treffer kommen trotzdem.
 

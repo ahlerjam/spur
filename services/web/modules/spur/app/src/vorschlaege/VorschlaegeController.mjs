@@ -36,13 +36,13 @@ export const verwerfen = mitProblemen(async (req, res) => {
 export const tippPause = mitProblemen(async (req, res) => {
   const docId = req.body.doc_id
   if (typeof docId !== 'string' || !/^[0-9a-f]{24}$/.test(docId)) {
-    throw new Problem(422, 'doc_id', 'doc_id muss die ID eines Dokuments sein.')
+    throw new Problem(422, 'doc_id', 'spur_fehler_doc_id')
   }
   // Eine erfundene ID darf keinen Auslöser anlegen und so das Tageslimit verbrauchen (D4).
   try {
     await ProjectLocator.promises.findElement({ project_id: projektId(req), element_id: docId, type: 'doc' })
   } catch (error) {
-    if (error instanceof Errors.NotFoundError) throw new Problem(404, 'doc_fehlt', 'Das Dokument gibt es nicht (mehr).')
+    if (error instanceof Errors.NotFoundError) throw new Problem(404, 'doc_fehlt', 'spur_fehler_doc_fehlt')
     throw error
   }
   res.json(

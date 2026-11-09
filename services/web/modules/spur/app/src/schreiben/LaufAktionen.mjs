@@ -67,7 +67,7 @@ export function fuerKarte(liste) {
 }
 
 export async function laufHolen(projectId, laufId, botId) {
-  const fehlt = () => new Problem(404, 'lauf_fehlt', 'Diesen Lauf gibt es nicht.')
+  const fehlt = () => new Problem(404, 'lauf_fehlt', 'spur_fehler_lauf_fehlt')
   if (!ObjectId.isValid(laufId)) throw fehlt()
   const filter = { _id: new ObjectId(laufId), projectId }
   if (botId) filter.botId = botId
@@ -79,7 +79,7 @@ export async function laufHolen(projectId, laufId, botId) {
 // Abgeschlossene Läufe (etwa aus einem veralteten Tab) dürfen ihren Status nicht mehr wechseln.
 function mussOffenSein(lauf) {
   if (lauf.status !== 'offen' && lauf.status !== 'fertig') {
-    throw new Problem(409, 'lauf_abgeschlossen', 'Dieser Lauf ist schon abgeschlossen. Bitte neu laden.')
+    throw new Problem(409, 'lauf_abgeschlossen', 'spur_fehler_lauf_abgeschlossen')
   }
 }
 
@@ -141,14 +141,14 @@ function konflikt(text, p) {
   return new Problem(
     409,
     'konflikt',
-    `Konflikt in Zeile ${zeile}: Der Text wurde nach der Annahme geändert. Es wurde nichts zurückgenommen.`
+    'spur_fehler_rueckname_konflikt', { zeile }
   )
 }
 
 // Rücknahme eines angenommenen Laufs als neue Track Changes; bei Überschneidung nichts ändern.
 export async function zuruecknehmen(projectId, lauf, userId) {
   if (lauf.status !== 'angenommen') {
-    throw new Problem(409, 'nicht_angenommen', 'Nur angenommene Läufe lassen sich zurücknehmen.')
+    throw new Problem(409, 'nicht_angenommen', 'spur_fehler_nicht_angenommen')
   }
   const plan = []
   for (const docId of [...new Set(lauf.angenommen.map(a => a.docId))]) {

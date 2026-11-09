@@ -77,7 +77,7 @@ export async function kommentarGesendet({ projectId, threadId, menschId, text },
 export async function imThreadAntworten({ projectId, threadId, botId, text }) {
   const threads = await ChatApiHandler.promises.getThreads(String(projectId))
   if (!threads[threadId]) {
-    throw new WerkzeugFehler('kommentar_fehlt', 'Diesen Kommentar gibt es im Projekt nicht.')
+    throw new WerkzeugFehler('kommentar_fehlt', 'spur_fehler_kommentar_fehlt')
   }
   const nachricht = await ChatApiHandler.promises.sendComment(projectId, threadId, botId, text)
   nachricht.user = UserInfoController.formatPersonalInfo(await UserInfoManager.promises.getPersonalInfo(botId))

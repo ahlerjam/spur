@@ -61,10 +61,10 @@ const pdfFehlt = () =>
   new Problem(
     502,
     'pdf_fehlt',
-    'Der freie Volltext ließ sich nicht laden. Bitte später erneut versuchen oder das PDF selbst hochladen.'
+    'spur_fehler_volltext_laden'
   )
 
-const zuGross = () => new Problem(413, 'zu_gross', 'Der Volltext ist größer als 50 MB. Bitte selbst beschaffen.')
+const zuGross = () => new Problem(413, 'zu_gross', 'spur_fehler_volltext_zu_gross')
 
 async function pdfLaden(url, ziel) {
   let antwort
@@ -111,7 +111,7 @@ export async function metadaten(doi) {
   const arxiv = ARXIV_DOI.exec(doi)?.[1]
   const meta = await Crossref.werk(doi)
   if (meta === null) {
-    throw new Problem(502, 'dienst_fehlt', 'Crossref nicht erreichbar. Bitte später erneut versuchen.')
+    throw new Problem(502, 'dienst_fehlt', 'spur_fehler_crossref_nicht_erreichbar')
   }
   if (meta.gefunden || !arxiv) return { meta, arxiv: null }
   return { meta: await arxivMetadaten(arxiv), arxiv }
@@ -121,20 +121,20 @@ export async function perDoi({ projectId, userId, doi }) {
   const wert = doiNormal(doi)
   const quellen = await QuellenManager.alle(projectId)
   if (quellen.some(q => q.doi?.toLowerCase() === wert)) {
-    throw new Problem(409, 'quelle_vorhanden', 'Bereits vorhanden')
+    throw new Problem(409, 'quelle_vorhanden', 'spur_fehler_quelle_vorhanden')
   }
   const { meta, arxiv } = await metadaten(wert)
-  if (!meta.gefunden) throw new Problem(404, 'doi_nicht_gefunden', 'DOI nicht gefunden')
+  if (!meta.gefunden) throw new Problem(404, 'doi_nicht_gefunden', 'spur_fehler_doi_nicht_gefunden')
   if (!arxiv && !process.env.UNPAYWALL_EMAIL && !paperApiBasis()) {
     throw new Problem(
       503,
       'unpaywall_aus',
-      'Unpaywall ist auf dieser Installation nicht eingerichtet (UNPAYWALL_EMAIL fehlt). Bitte den Betreiber fragen oder das PDF selbst hochladen.'
+      'spur_fehler_unpaywall_aus'
     )
   }
   const zugang = arxiv ? { frei: true, pdf: meta.pdf, lizenz: null } : await unpaywall.status(wert)
   if (!zugang?.frei || !zugang.pdf) {
-    throw new Problem(409, 'nicht_frei', 'Kein freier Volltext gefunden. Bitte auf die Beschaffungsliste setzen.')
+    throw new Problem(409, 'nicht_frei', 'spur_fehler_nicht_frei')
   }
   const docs = await PruefManager.dokumente(projectId)
   const belegt = new Set(quellen.map(q => q.key))

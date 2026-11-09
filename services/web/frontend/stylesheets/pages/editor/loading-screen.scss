@@ -1,17 +1,15 @@
 @use 'sass:math';
 
 @mixin loading-screen-dark {
-  --loading-screen-ol-logo-empty-url: url(../../../../public/img/ol-brand/overleaf-o-grey.svg);
-  --loading-screen-ol-logo-full-url: url(../../../../public/img/ol-brand/overleaf-o-white.svg);
   --loading-screen-bg-color: var(--bg-dark-primary);
+  --loading-screen-brand-color: var(--content-primary-dark);
   --loading-screen-color: var(--content-secondary-dark);
   --loading-screen-danger-color: var(--content-danger-dark);
 }
 
 @mixin loading-screen-light {
-  --loading-screen-ol-logo-empty-url: url(../../../../public/img/ol-brand/overleaf-o-grey.svg);
-  --loading-screen-ol-logo-full-url: url(../../../../public/img/ol-brand/overleaf-o.svg);
   --loading-screen-bg-color: var(--bg-light-primary);
+  --loading-screen-brand-color: var(--content-primary);
   --loading-screen-color: var(--content-secondary);
   --loading-screen-danger-color: var(--content-danger);
 }
@@ -65,22 +63,36 @@
 
   .loading-screen-brand-container {
     min-width: 200px;
+    display: flex;
+    justify-content: center;
   }
 
+  // Schriftzug statt Overleaf-Logo; die Füllung von unten zeigt den Ladefortschritt (Höhe inline).
   .loading-screen-brand {
     position: relative;
-    padding-top: math.percentage(math.div(150, 130)); // dimensions of the SVG
-    height: 0;
-    background: var(--loading-screen-ol-logo-empty-url) no-repeat bottom / 100%;
+    font-size: 96px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.02em;
+
+    &::before {
+      content: 'spur';
+      display: block;
+      color: var(--loading-screen-brand-color);
+      opacity: 0.2;
+    }
 
     &::after {
-      content: '';
+      content: 'spur';
       position: absolute;
       height: inherit;
       right: 0;
       bottom: 0;
       left: 0;
-      background: var(--loading-screen-ol-logo-full-url) no-repeat bottom / 100%;
+      display: flex;
+      align-items: flex-end;
+      overflow: hidden;
+      color: var(--loading-screen-brand-color);
       transition: height 0.5s;
     }
   }

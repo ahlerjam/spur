@@ -18,6 +18,8 @@ const ATOM = `<?xml version="1.0"?>
     <published>2024-01-03T00:00:00Z</published>
     <title>Sleep-like replay
       improves memory</title>
+    <summary>  Replay during
+      sleep-like phases.  </summary>
     <author><name>Alice Smith</name></author>
     <link title="pdf" href="http://arxiv.org/pdf/2401.01234v2" rel="related"/>
   </entry>
@@ -35,6 +37,7 @@ const ANTWORTEN = {
           authorships: [{ author: { display_name: 'Susanne Diekelmann' } }],
           publication_year: 2010,
           open_access: { is_oa: false },
+          abstract_inverted_index: { Sleep: [0], supports: [1], 'memory.': [2] },
         },
       ],
     },
@@ -142,6 +145,38 @@ describe('suchen', () => {
       jahr: 2024,
     })
     expect(ergebnis.treffer).toHaveLength(2)
+  })
+
+  it('liefert je Treffer das Abstract aus dem ersten Dienst, der eines hat', async () => {
+    const { treffer } = await suchen('sleep memory consolidation')
+    expect(treffer.find(t => t.doi === '10.1038/nrn2762').abstract).toBe('Sleep supports memory.')
+    expect(treffer.find(t => t.doi === '10.48550/arxiv.2401.01234').abstract).toBe('Replay during sleep-like phases.')
+  })
+
+  it('nimmt Abstracts aus Crossref und Semantic Scholar und lässt fehlende leer', async () => {
+    ausfall.add('arxiv')
+    sonder = url => {
+      if (url.includes('/fake/openalex')) {
+        return { meta: { count: 1 }, results: [{ doi: 'https://doi.org/10.1/ohne', display_name: 'Ohne Abstract' }] }
+      }
+      if (url.includes('/fake/s2')) {
+        return { total: 1, data: [{ title: 'Sleep-like replay', externalIds: { ArXiv: '2401.01234' }, abstract: 'Aus S2.' }] }
+      }
+      if (url.includes('/fake/works')) {
+        return {
+          message: {
+            'total-results': 1,
+            items: [{ DOI: '10.1038/nrn2762', title: ['The memory function'], abstract: '<jats:p>Aus <jats:italic>Crossref</jats:italic>.</jats:p>' }],
+          },
+        }
+      }
+      return null
+    }
+    const { treffer } = await suchen('sleep memory consolidation')
+    const abstract = doi => treffer.find(t => t.doi === doi).abstract
+    expect(abstract('10.1038/nrn2762')).toBe('Aus Crossref.')
+    expect(abstract('10.48550/arxiv.2401.01234')).toBe('Aus S2.')
+    expect(abstract('10.1/ohne')).toBe('')
   })
 
   it('meldet einen ausgefallenen Dienst mit Namen und zeigt die übrigen Treffer', async () => {

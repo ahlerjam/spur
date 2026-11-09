@@ -1,5 +1,4 @@
 import OLTooltip from '@/shared/components/ol/ol-tooltip'
-import MaterialIcon from '@/shared/components/material-icon'
 import { useTranslation } from 'react-i18next'
 import { Cobranding } from '../../../../../../types/cobranding'
 
@@ -18,9 +17,14 @@ export const ToolbarLogos = ({ cobranding }: ToolbarLogosProps) => {
         overlayProps={{ delay: 0, placement: 'bottom' }}
       >
         <div className="ide-redesign-toolbar-home-button">
-          <a href="/project" className="ide-redesign-toolbar-home-link">
-            <span className="toolbar-ol-logo" aria-label={t('overleaf_logo')} />
-            <MaterialIcon type="home" className="toolbar-ol-home-button" />
+          <a
+            href="/project"
+            className="ide-redesign-toolbar-home-link"
+            aria-label={t('spur_zur_projektliste')}
+          >
+            <span className="toolbar-spur-schriftzug" aria-hidden="true">
+              spur
+            </span>
           </a>
         </div>
       </OLTooltip>

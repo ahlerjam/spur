@@ -7,6 +7,7 @@ import CompileManager from '../../../../../app/src/Features/Compile/CompileManag
 import { getOutputFileURL } from '../../../../../app/src/Features/Compile/ClsiURLHelpers.mjs'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
+import { meldung } from '../meldungen.mjs'
 import { seitenBild as bildRendern, seitenzahl } from '../pdf.mjs'
 import { jobs } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
@@ -39,7 +40,7 @@ export function fehlerAusLog(log) {
   return fehler
 }
 
-const jobFehlt = () => new WerkzeugFehler('job_fehlt', 'Diesen Job gibt es nicht.')
+const jobFehlt = () => new WerkzeugFehler('job_fehlt', 'spur_fehler_job_fehlt')
 
 function jobFuerClient(job) {
   return { job_id: job._id, art: job.art, status: job.status, ergebnis: job.ergebnis ?? null, fehler: job.fehler ?? null }
@@ -70,7 +71,7 @@ export async function starten({ projectId, menschId, botId }) {
       logger.warn({ err: error, projectId }, 'spur: Compile fehlgeschlagen')
       return sammlung.updateOne(
         { _id: job._id },
-        { $set: { status: 'fehlgeschlagen', fertigAm: jetzt(), fehler: 'Der Compile ist fehlgeschlagen. Bitte erneut starten.' } }
+        { $set: { status: 'fehlgeschlagen', fertigAm: jetzt(), fehler: meldung('spur_fehler_compile_fehlgeschlagen') } }
       )
     })
     .catch(error => logger.error({ err: error }, 'spur: Job-Stand nicht gespeichert'))
@@ -90,7 +91,7 @@ async function letzterCompile(projectId, botId) {
     .sort({ fertigAm: -1 })
     .limit(1)
     .toArray()
-  if (!job) throw new WerkzeugFehler('kein_compile', 'Es gibt noch keinen fertigen Compile. Bitte zuerst compile aufrufen.')
+  if (!job) throw new WerkzeugFehler('kein_compile', 'spur_fehler_kein_compile')
   return job
 }
 
@@ -99,7 +100,7 @@ async function ausgabe({ projectId, menschId, buildId, clsiServerId }, datei) {
   const url = getOutputFileURL(projectId, compileUser, buildId, datei, clsiServerId ?? undefined)
   const antwort = await fetch(url, { signal: AbortSignal.timeout(30000) })
   if (!antwort.ok) {
-    throw new WerkzeugFehler('ausgabe_fehlt', `${datei} fehlt im letzten Compile. Bitte neu kompilieren.`)
+    throw new WerkzeugFehler('ausgabe_fehlt', 'spur_fehler_ausgabe_fehlt', { datei })
   }
   return Buffer.from(await antwort.arrayBuffer())
 }
@@ -123,7 +124,7 @@ export async function seitenBild({ projectId, botId, seite }) {
     await fs.writeFile(pdf, await ausgabe(job, 'output.pdf'))
     const anzahl = await seitenzahl(pdf)
     if (seite > anzahl) {
-      throw new WerkzeugFehler('seite_fehlt', `Das PDF hat ${anzahl} Seiten.`)
+      throw new WerkzeugFehler('seite_fehlt', 'spur_fehler_pdf_seiten', { anzahl })
     }
     return await fs.readFile(await bildRendern(pdf, seite, Path.join(ordner, 'seite')))
   } finally {

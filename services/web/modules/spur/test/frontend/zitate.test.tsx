@@ -76,7 +76,7 @@ describe('Zitate einer Quelle im Team', function () {
     fetchMock.get(ZITATE, { zitate: [eigenes, fremdes] })
     zeigen()
     await screen.findByText(/von Ben Berater/)
-    screen.getByText(/von Ihnen/)
+    screen.getByText(/von dir/)
     fireEvent.click(screen.getByLabelText('Von mir'))
     await waitFor(() => expect(screen.queryByText('„Fremder Satz.“')).to.not.exist)
     screen.getByText('„Eigener Satz.“')
@@ -89,7 +89,7 @@ describe('Zitate einer Quelle im Team', function () {
     zeigen()
     await screen.findByText(/von Ben Berater/)
     fireEvent.click(screen.getByLabelText('Von mir'))
-    await screen.findByText('Sie haben in dieser Quelle noch keine Zitate markiert.')
+    await screen.findByText('Du hast in dieser Quelle noch keine Zitate markiert.')
   })
 
   it('kommentiert ein Zitat und weist es zu', async function () {
@@ -128,7 +128,7 @@ describe('Zitate einer Quelle im Team', function () {
     let abrufe = 0
     fetchMock.get(ZITATE, () => (++abrufe === 1 ? { zitate: [] } : { zitate: [fremdes] }))
     zeigen('owner', socket as unknown as Socket)
-    await screen.findByText('Markieren Sie oben Text und speichern Sie ihn als Zitat.')
+    await screen.findByText('Markiere oben Text und speichere ihn als Zitat.')
     socket.emitToClient('spur:zitate', { quelleId: 'andere' })
     socket.emitToClient('spur:zitate', { quelleId: 'q1' })
     await screen.findByText(/von Ben Berater/)

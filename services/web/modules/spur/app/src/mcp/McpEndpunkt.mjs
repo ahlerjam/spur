@@ -7,6 +7,7 @@ import Settings from '@overleaf/settings'
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
 import { RateLimiter } from '../../../../../app/src/infrastructure/RateLimiter.mjs'
 import * as ClaudeZugang from '../ClaudeZugang.mjs'
+import { meldung } from '../meldungen.mjs'
 import { Problem, problemSenden } from '../probleme.mjs'
 import { WerkzeugFehler } from './fehler.mjs'
 import { WERKZEUGE } from './werkzeuge.mjs'
@@ -18,9 +19,16 @@ const ANWEISUNGEN =
   'Nach jedem Auftrag rufst du wait_for_event erneut auf.'
 
 // Argumente sind einzelne Wörter: Claude Code trennt die Eingabe nach dem Slash-Befehl an Leerzeichen.
-const PROMPT_ARGUMENTE = z.object({
-  fokus: z.string().regex(/^\S{1,60}$/).optional().describe('Ein Wort, auf das der Workflow den Schwerpunkt legt'),
-})
+// Thema darf mehrere Wörter haben, wenn ein Client die Argumente einzeln übergibt; die Werte prüft Workflows.
+const PROMPT_ARGUMENTE = {
+  standard: z.object({
+    fokus: z.string().regex(/^\S{1,60}$/).optional().describe('Ein Wort, auf das der Workflow den Schwerpunkt legt'),
+  }),
+  quellen_sammeln: z.object({
+    thema: z.string().min(1).max(300).describe('Thema, zu dem Claude Literatur sammelt'),
+    anzahl: z.string().max(6).optional().describe('Wie viele Paper aufgenommen werden: Zahl ab 1 oder „max“ (Standard 20)'),
+  }),
+}
 
 const begrenzer = new RateLimiter('spur-mcp', { points: 600, duration: 60 })
 
@@ -54,7 +62,7 @@ function serverBauen({ authInfo }) {
           if (error instanceof WerkzeugFehler) return fehlerVon(error.code, error.message)
           if (error instanceof Problem) return fehlerVon(error.typ, error.message)
           logger.error({ err: error, werkzeug: name }, 'spur-MCP-Werkzeug fehlgeschlagen')
-          return fehlerVon('interner_fehler', 'Das Werkzeug ist fehlgeschlagen. Bitte später erneut versuchen.')
+          return fehlerVon('interner_fehler', meldung('spur_fehler_werkzeug_fehlgeschlagen'))
         }
       }
     )
@@ -62,9 +70,13 @@ function serverBauen({ authInfo }) {
   for (const name of Workflows.NAMEN) {
     server.registerPrompt(
       name,
-      { title: STANDARD[name].titel, description: STANDARD[name].beschreibung, argsSchema: PROMPT_ARGUMENTE },
-      async ({ fokus }) => ({
-        messages: [{ role: 'user', content: { type: 'text', text: await Workflows.promptText(name, fokus) } }],
+      {
+        title: STANDARD[name].titel,
+        description: STANDARD[name].beschreibung,
+        argsSchema: PROMPT_ARGUMENTE[name] ?? PROMPT_ARGUMENTE.standard,
+      },
+      async argumente => ({
+        messages: [{ role: 'user', content: { type: 'text', text: await Workflows.promptText(name, argumente) } }],
       })
     )
   }
@@ -94,7 +106,7 @@ export async function mcpAnfrage(req, res) {
   try {
     const origin = req.headers.origin
     if (origin && origin !== erlaubterOrigin) {
-      throw new Problem(403, 'origin', 'Dieser Origin darf spur nicht aufrufen.')
+      throw new Problem(403, 'origin', 'spur_fehler_origin')
     }
     const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1]
     const zugang = await ClaudeZugang.pruefen(token)
@@ -103,7 +115,7 @@ export async function mcpAnfrage(req, res) {
       throw new Problem(
         401,
         'token',
-        'Das Token fehlt, ist widerrufen oder abgelaufen. Bitte in spur unter Einstellungen ein neues erzeugen.'
+        'spur_fehler_token_ungueltig'
       )
     }
     try {
@@ -113,7 +125,7 @@ export async function mcpAnfrage(req, res) {
       if (error instanceof Error) throw error
       const sekunden = Math.max(1, Math.ceil((error?.msBeforeNext ?? 60000) / 1000))
       res.setHeader('Retry-After', String(sekunden))
-      throw new Problem(429, 'zu_viele_anfragen', `Zu viele Aufrufe. Bitte ${sekunden} Sekunden warten.`)
+      throw new Problem(429, 'zu_viele_anfragen', 'spur_fehler_zu_viele_anfragen', { sekunden })
     }
     const antwort = await handler.fetch(anfrageAus(req, res), {
       authInfo: {
@@ -139,7 +151,7 @@ export async function mcpAnfrage(req, res) {
     if (error instanceof Problem) return problemSenden(res, error)
     logger.error({ err: error }, 'spur-MCP-Anfrage fehlgeschlagen')
     if (!res.headersSent) {
-      problemSenden(res, new Problem(500, 'intern', 'spur konnte die Anfrage nicht bearbeiten.'))
+      problemSenden(res, new Problem(500, 'intern', 'spur_fehler_anfrage_intern'))
     }
   }
 }
@@ -152,8 +164,8 @@ export function mcpJson(req, res, next) {
     if (!error) return next()
     const problem =
       error.status === 413
-        ? new Problem(413, 'zu_gross', 'Die Anfrage ist zu groß.')
-        : new Problem(400, 'json_kaputt', 'Der Body ist kein gültiges JSON. Bitte eine JSON-RPC-Nachricht senden.')
+        ? new Problem(413, 'zu_gross', 'spur_fehler_anfrage_zu_gross')
+        : new Problem(400, 'json_kaputt', 'spur_fehler_json_kaputt')
     problemSenden(res, problem)
   })
 }
