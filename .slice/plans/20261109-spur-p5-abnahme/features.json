@@ -24,7 +24,7 @@
     "Die Fußzeile der Kontoeinstellungen zeigt rechts den Link „spur @ GitHub“ auf https://github.com/ahlerjam/spur; „spur auf GitHub“ kommt nicht mehr vor",
     "Mit Stichwort: „Neues Stichwort“ anlegen mit Namen „Diss“, Projekt „E2E APA“ zuordnen, Klick auf „Diss“ zeigt nur dieses Projekt; danach Stichwort löschen. Bei 360 px kein horizontales Rollen der Seite, keine Konsolenfehler"
    ],
-   "passes": false
+   "passes": true
   },
   {
    "id": "f3",
