@@ -29,13 +29,13 @@ export async function text(name) {
 }
 
 // Werte der Eingaben als Zeilen unter dem Text; der Text selbst bleibt so, wie Admins ihn pflegen.
-function eingabenZeilen(name, { fokus, thema, anzahl = '20' }) {
+function eingabenZeilen(name, { fokus, thema, anzahl }) {
   if (!STANDARD[name].eingaben) return fokus ? [`Fokus: ${fokus}`] : []
   // Eine Zeile: Ein Umbruch im Thema könnte sonst eigene Zeilen wie „Anzahl: …“ in den Auftrag schreiben.
-  if (typeof thema !== 'string' || !/^[^\r\n]{1,300}$/.test(thema.trim())) {
+  if (typeof thema !== 'string' || !/^[^\p{Cc}\u2028\u2029]{1,300}$/u.test(thema.trim())) {
     throw new Problem(422, 'thema', 'spur_fehler_thema_fehlt')
   }
-  const wert = typeof anzahl === 'number' ? String(anzahl) : anzahl
+  const wert = typeof anzahl === 'number' ? String(anzahl) : (anzahl ?? '20')
   if (typeof wert !== 'string' || !/^(max|[1-9]\d{0,4})$/.test(wert.trim())) {
     throw new Problem(422, 'anzahl', 'spur_fehler_anzahl')
   }

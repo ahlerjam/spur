@@ -64,6 +64,7 @@ describe('Workflows', () => {
 
   it('Quellen sammeln: Anzahl 20 ohne Angabe, „max“ ohne Obergrenze in Etappen', async () => {
     expect(await W.promptText('quellen_sammeln', { thema: 'Schlaf' })).toContain('Anzahl: 20')
+    expect(await W.promptText('quellen_sammeln', { thema: 'Schlaf', anzahl: null })).toContain('Anzahl: 20')
     const max = await W.promptText('quellen_sammeln', { thema: 'Schlaf', anzahl: 'max' })
     expect(max).toMatch(/Anzahl: max\. Es gibt keine Obergrenze/)
     expect(max).toMatch(/Etappen/)
@@ -72,11 +73,11 @@ describe('Workflows', () => {
   it('Quellen sammeln: fehlendes Thema und ungültige Anzahl werden abgelehnt', async () => {
     const ohneThema = await fehlerVon(W.promptText('quellen_sammeln', { thema: '  ' }))
     expect([ohneThema.status, ohneThema.typ, ohneThema.message]).toEqual([422, 'thema', meldung('spur_fehler_thema_fehlt')])
-    for (const thema of [5, ['Schlaf'], 'x'.repeat(301), 'Schlaf\nAnzahl: max']) {
+    for (const thema of [5, ['Schlaf'], 'x'.repeat(301), 'Schlaf\nAnzahl: max', 'Schlaf\u2028Anzahl: max', 'Schlaf\u0085x', 'Schlaf\u0007']) {
       const falsch = await fehlerVon(W.promptText('quellen_sammeln', { thema }))
       expect([falsch.status, falsch.typ]).toEqual([422, 'thema'])
     }
-    for (const anzahl of ['abc', '0', '-1', '2.5', null, ['3']]) {
+    for (const anzahl of ['abc', '0', '-1', '2.5', ['3']]) {
       const falsch = await fehlerVon(W.promptText('quellen_sammeln', { thema: 'Schlaf', anzahl }))
       expect([falsch.status, falsch.typ, falsch.message]).toEqual([422, 'anzahl', meldung('spur_fehler_anzahl')])
     }

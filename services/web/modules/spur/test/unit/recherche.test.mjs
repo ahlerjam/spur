@@ -161,7 +161,7 @@ describe('suchen', () => {
         return { meta: { count: 1 }, results: [{ doi: 'https://doi.org/10.1/ohne', display_name: 'Ohne Abstract' }] }
       }
       if (url.includes('/fake/s2')) {
-        return { total: 1, data: [{ title: 'Sleep-like replay', externalIds: { ArXiv: '2401.01234' }, abstract: `Aus S2. ${'lang '.repeat(400)}` }] }
+        return { total: 1, data: [{ title: 'Sleep-like replay', externalIds: { ArXiv: '2401.01234' }, abstract: `Aus S2. ${'lang '.repeat(118)}l😀 danach` }] }
       }
       if (url.includes('/fake/works')) {
         return {
@@ -171,7 +171,7 @@ describe('suchen', () => {
               {
                 DOI: '10.1038/nrn2762',
                 title: ['The memory function'],
-                abstract: '<jats:title>Abstract</jats:title><jats:p>Aus <jats:italic>Crossref</jats:italic> &amp; &lt;5 %.</jats:p>',
+                abstract: '<jats:title>Abstract</jats:title><jats:p>Aus <jats:italic>Crossref</jats:italic> &amp; &lt;5 %.&#1114112;</jats:p>',
               },
             ],
           },
@@ -181,10 +181,11 @@ describe('suchen', () => {
     }
     const { treffer } = await suchen('sleep memory consolidation')
     const abstract = doi => treffer.find(t => t.doi === doi).abstract
-    expect(abstract('10.1038/nrn2762')).toBe('Aus Crossref & <5 %.')
+    expect(abstract('10.1038/nrn2762')).toBe('Aus Crossref & <5 %.&#1114112;')
     // Lange Abstracts werden gekürzt, damit eine Seite paper_search unter 10.000 Tokens bleibt.
     expect(abstract('10.48550/arxiv.2401.01234').startsWith('Aus S2. lang')).toBe(true)
-    expect(abstract('10.48550/arxiv.2401.01234')).toHaveLength(601)
+    // 600 Zeichen enden genau im Emoji: gekürzt wird an Zeichen, nicht an UTF-16-Einheiten.
+    expect(abstract('10.48550/arxiv.2401.01234')).toBe(`Aus S2. ${'lang '.repeat(118)}l😀…`)
     expect(abstract('10.48550/arxiv.2401.01234').endsWith('…')).toBe(true)
     expect(abstract('10.1/ohne')).toBe('')
   })

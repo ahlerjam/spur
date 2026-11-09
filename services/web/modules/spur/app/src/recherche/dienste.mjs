@@ -28,9 +28,11 @@ const leerzeichen = text => text?.replace(/\s+/g, ' ').trim() ?? null
 const xmlText = wert => (typeof wert === 'string' ? wert : wert?._)
 const ENTITAETEN = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
 const entitaeten = text =>
-  text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (ganz, e) =>
-    e[0] !== '#' ? (ENTITAETEN[e.toLowerCase()] ?? ganz) : String.fromCodePoint(Number(e[1] === 'x' ? `0${e.slice(1)}` : e.slice(1)))
-  )
+  text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (ganz, e) => {
+    if (e[0] !== '#') return ENTITAETEN[e.toLowerCase()] ?? ganz
+    const zahl = Number(e[1] === 'x' ? `0${e.slice(1)}` : e.slice(1))
+    return zahl <= 0x10ffff ? String.fromCodePoint(zahl) : ganz
+  })
 // Crossref liefert JATS; die Überschrift „Abstract“ gehört nicht zum Text.
 const ohneTags = text =>
   leerzeichen(

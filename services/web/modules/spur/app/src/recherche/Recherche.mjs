@@ -29,7 +29,11 @@ function zusammenfuehren(sammlung, treffer) {
 }
 
 const ABSTRACT_MAX = 600
-const kuerzen = text => (text.length > ABSTRACT_MAX ? `${text.slice(0, ABSTRACT_MAX)}…` : text)
+// An Zeichen kürzen, nicht an UTF-16-Einheiten: ein halbes Emoji wäre ungültiges JSON-Unicode.
+const kuerzen = text => {
+  const zeichen = [...text]
+  return zeichen.length > ABSTRACT_MAX ? `${zeichen.slice(0, ABSTRACT_MAX).join('')}…` : text
+}
 
 // Fasst die Antworten paralleler Dienstaufrufe zusammen. Ein Ausfall nimmt nur diesen Dienst heraus.
 export function auswerten(dienste, ergebnisse) {
