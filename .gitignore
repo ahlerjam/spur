@@ -4,3 +4,10 @@
 # user defined files
 .env
 docker-compose.override.yml
+
+# slice
+.claude/slice-run.json
+.playwright-mcp/
+
+# spur Testschalter
+services/web/modules/spur/dev-schalter.json

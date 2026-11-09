@@ -1,0 +1,13 @@
+# Sandbox für Compiles. Für öffentlichen Betrieb Pflicht:
+# docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+# SPUR_DATA_DIR muss als absoluter Pfad auf dem Host existieren.
+services:
+  sharelatex:
+    volumes:
+      - ${SPUR_DATA_DIR:?SPUR_DATA_DIR setzen}:/var/lib/overleaf
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      SANDBOXED_COMPILES: "true"
+      SANDBOXED_COMPILES_HOST_DIR_COMPILES: ${SPUR_DATA_DIR}/data/compiles
+      SANDBOXED_COMPILES_HOST_DIR_OUTPUT: ${SPUR_DATA_DIR}/data/output
+      DOCKER_RUNNER: "true"

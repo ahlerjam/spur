@@ -3,6 +3,7 @@ const { parseReq, z, zz } = require('@overleaf/validation-tools')
 const editorCoreSchemas = require('overleaf-editor-core/lib/schemas')
 const rangesSchemas = require('@overleaf/ranges-tracker/schemas')
 const DocumentManager = require('./DocumentManager')
+const UpdateManager = require('./UpdateManager')
 const HistoryManager = require('./HistoryManager')
 const ProjectManager = require('./ProjectManager')
 const RedisManager = require('./RedisManager')
@@ -335,6 +336,52 @@ async function appendToDoc(req, res) {
     'appending to doc via http'
   )
   res.json(result)
+}
+
+const spurUpdateSchema = z.object({
+  params: docParamsSchema,
+  body: z.object({
+    op: z
+      .array(
+        z.union([
+          z.strictObject({ p: z.number().int().min(0), i: z.string(), u: z.boolean().optional() }),
+          z.strictObject({ p: z.number().int().min(0), d: z.string(), u: z.boolean().optional() }),
+        ])
+      )
+      .min(1),
+    v: z.number().int().min(0),
+    meta: z.object({
+      user_id: zz.objectId(),
+      tc: z.string().regex(/^[0-9a-f]{18}$/).optional(),
+      source: z.string(),
+    }),
+  }),
+})
+
+// spur: Änderung eines Bots als Track Change über den normalen Apply-Pfad, mit OT gegen
+// parallele Eingaben.
+async function spurUpdate(req, res) {
+  const { params, body } = parseReq(req, spurUpdateSchema)
+  const { project_id: projectId, doc_id: docId } = params
+  const update = { doc: docId, op: body.op, v: body.v, meta: body.meta }
+  try {
+    await UpdateManager.promises.lockUpdatesAndDo(
+      UpdateManager.promises.applyUpdate,
+      projectId,
+      docId,
+      update
+    )
+  } catch (error) {
+    if (error instanceof Errors.NotFoundError) return res.sendStatus(404)
+    // sharejs meldet Versionsfehler als nackte Strings.
+    const versionsFehler =
+      typeof error === 'string' && /^Op (too old|at future version)/.test(error)
+    if (error instanceof Errors.DeleteMismatchError || versionsFehler) {
+      return res.status(409).json({ fehler: String(error.message ?? error) })
+    }
+    throw error
+  }
+  res.sendStatus(204)
 }
 
 const docOnlySchema = z.object({
@@ -861,6 +908,7 @@ module.exports = {
   getProjectRanges: expressify(getProjectRanges),
   clearProjectState: expressify(clearProjectState),
   appendToDoc: expressify(appendToDoc),
+  spurUpdate: expressify(spurUpdate),
   setDoc: expressify(setDoc),
   flushDocIfLoaded: expressify(flushDocIfLoaded),
   deleteDoc: expressify(deleteDoc),

@@ -1,0 +1,1313 @@
+{
+ "tests": [
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Collaborators/CollaboratorsInviteController.test.mjs",
+   "test": "CollaboratorsInviteController › viewInvite › when not logged in › should redirect to the register page",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep leitet nicht angemeldete Eingeladene ohne Registrierungsseite nach /login statt nach /register."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/LinkedFiles/LinkedFilesController.test.mjs",
+   "test": "(Datei lädt nicht)",
+   "herkunft": "overleaf-cep",
+   "grund": "Die Testdatei hat in overleaf-cep eine überzählige schließende Klammer und lädt deshalb nicht."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should render the project/ide-react page",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should request compile-with-checkpoint split test assignment",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should add user",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should sanitize refProviders",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should add on userSettings",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should add isRestrictedTokenMember",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should set isRestrictedTokenMember when appropriate",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should invoke the session maintenance for logged in user",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should invoke the session maintenance for anonymous user",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should not render the page if the project can not be accessed",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should call reactivateProjectIfRequired",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should mark user as active",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should mark project as opened",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should call the brand variations handler for branded projects",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should not call the brand variations handler for unbranded projects",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should expose the brand variation details as locals for branded projects",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › flushes the project to TPDS if a flush is pending",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › should refresh the user features if the epoch is outdated",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › should set the custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a normal user › should set the normal custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a normal user › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a normal user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a normal user › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a beta user › should set the beta wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a beta user › should inc metric load-editor-ws-beta",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a beta user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › beta program › for a beta user › with ws=fallback › should inc metric load-editor-ws-beta-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (0) › should set the normal custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (0) › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (0) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (0) › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (42) › should set the normal custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (42) › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (42) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › when the projectId does not match (42) › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › for a beta user › should set the beta wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › for a beta user › should inc metric load-editor-ws-beta",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › for a beta user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 0 › for a beta user › with ws=fallback › should inc metric load-editor-ws-beta-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › should set the v2 wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › should inc metric load-editor-ws-v2",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › with ws=fallback › should inc metric load-editor-ws-v2-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › for a beta user › should set the beta wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › for a beta user › should inc metric load-editor-ws-beta",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › for a beta user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId matches (0) › for a beta user › with ws=fallback › should inc metric load-editor-ws-beta-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › should set the normal custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › for a beta user › should set the beta wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › for a beta user › should inc metric load-editor-ws-beta",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › for a beta user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (1) › for a beta user › with ws=fallback › should inc metric load-editor-ws-beta-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (42) › should set the normal custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (42) › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (42) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 1 › when the projectId does not match (42) › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (0) › should set the v2 wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (0) › should inc metric load-editor-ws-v2",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (0) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (0) › with ws=fallback › should inc metric load-editor-ws-v2-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › should set the v2 wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › should inc metric load-editor-ws-v2",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › with ws=fallback › should inc metric load-editor-ws-v2-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › for a beta user › should set the beta wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › for a beta user › should inc metric load-editor-ws-beta",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › for a beta user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId matches (9) › for a beta user › with ws=fallback › should inc metric load-editor-ws-beta-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (10) › should set the normal custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (10) › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (10) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (10) › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › should set the normal custom wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › should inc metric load-editor-ws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › with ws=fallback › should inc metric load-editor-ws-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › for a beta user › should set the beta wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › for a beta user › should inc metric load-editor-ws-beta",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › for a beta user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 10 › when the projectId does not match (42) › for a beta user › with ws=fallback › should inc metric load-editor-ws-beta-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › should set the v2 wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › should inc metric load-editor-ws-v2",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › with ws=fallback › should inc metric load-editor-ws-v2-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › for a beta user › should set the beta wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › for a beta user › should inc metric load-editor-ws-beta",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › for a beta user › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (0) › for a beta user › with ws=fallback › should inc metric load-editor-ws-beta-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (10) › should set the v2 wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (10) › should inc metric load-editor-ws-v2",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (10) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (10) › with ws=fallback › should inc metric load-editor-ws-v2-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (42) › should set the v2 wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (42) › should inc metric load-editor-ws-v2",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (42) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (42) › with ws=fallback › should inc metric load-editor-ws-v2-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (99) › should set the v2 wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (99) › should inc metric load-editor-ws-v2",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (99) › with ws=fallback › should unset the wsUrl",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › wsUrl › v2-rollout › when the roll out percentage is 100 › when the projectId matches (99) › with ws=fallback › should inc metric load-editor-ws-v2-fallback",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › should not show without the saas feature",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › should show for a user without a subscription or only non-paid affiliations",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › should not show for a user with a personal subscription",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › should not show for a user who is a member of a group subscription",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › should not show for a user with an affiliated paid university",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › when user is a read write token member (and not already a named editor) › should redirect to the sharing-updates page",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › when user is a read write token member but also a named editor › should not redirect to the sharing-updates page, and should load the editor",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › upgrade prompt (on header and share project modal) › should call the collaborator limit enforcement check",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › capabilitySet › should be passed as an array when loading the editor",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeatures to true when the user has the use-ai permission",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeatures to false when the user lacks the use-ai permission",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeatures to false when the user has disabled ai features",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeatures to false when the permission check throws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeatures to false when the project owner permission check throws",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeatures to false when the user has read-only access",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeatures to false when the user can use ai but the project disallows it",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeaturesDisabled to false when the user can use ai and the project allows it",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeaturesDisabled to false when the user lacks the use-ai permission",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › should set showAiFeaturesDisabled to false when the user has disabled ai features",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › when the 'ai-disabled-collaborators' variant is enabled › should set showAiFeatures to true and showAiFeaturesDisabled to true when the user can use ai but the project disallows it",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › when the 'ai-disabled-collaborators' variant is enabled › should set showAiFeatures to true and showAiFeaturesDisabled to false when the user can use ai and the project allows it",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › when the 'ai-disabled-collaborators' variant is enabled › should set showAiFeatures to false and showAiFeaturesDisabled to false when the user lacks the use-ai permission",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › when the 'ai-disabled-collaborators' variant is enabled › should set showAiFeatures to false and showAiFeaturesDisabled to false when the user has disabled ai features",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectController.test.mjs",
+   "test": "ProjectController › loadEditor › AI features availability › when the 'ai-disabled-collaborators' variant is enabled › should set showAiFeatures to false and showAiFeaturesDisabled to false when the user has read-only access",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep ruft in loadEditor EditorController.setImageName auf, das der Test nicht stubbt; die Folgetests laufen in Timeouts."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Project/ProjectOptionsHandler.test.mjs",
+   "test": "ProjectOptionsHandler › Setting the imageName › should perform and update on mongo",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep speichert den Image-Namen ohne vorangestelltes imageRoot, der Test erwartet Overleafs vollen Pfad."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › finding users subscription › should send the users features",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › finding users subscription › should error if not found",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › finding users subscription › should take a user id rather than the user object",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › getUserSubscriptionStatus › should return active personal subscription",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › getUserSubscriptionStatus › should return active group subscription when member of a group plan",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › getUserSubscriptionStatus › should return active group subscription when owner of a group plan",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › getUserSubscriptionStatus › should return active personal and group subscription when has personal subscription and member of a group",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › getUserActiveProfessionalGroupSubscriptions › returns only the professional group subscriptions",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Subscription/SubscriptionLocator.test.mjs",
+   "test": "Subscription Locator Tests › getUserActiveProfessionalGroupSubscriptions › always requests `planCode` and `groupPlan` so professional status can be determined",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main) mit derselben Assertion: Test und Code des SubscriptionLocator passen dort nicht zusammen."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesController.test.mjs",
+   "test": "TemplatesController › createProjectFromV1Template › on success › should call TemplatesManager",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep hat das Anlegen aus Vorlagen umgebaut; die Tests prüfen Overleafs alten V1-Ablauf."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesController.test.mjs",
+   "test": "TemplatesController › createProjectFromV1Template › on success › should redirect to project",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep hat das Anlegen aus Vorlagen umgebaut; die Tests prüfen Overleafs alten V1-Ablauf."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesController.test.mjs",
+   "test": "TemplatesController › createProjectFromV1Template › on success › should delete session",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep hat das Anlegen aus Vorlagen umgebaut; die Tests prüfen Overleafs alten V1-Ablauf."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesController.test.mjs",
+   "test": "TemplatesController › getV1Template › should render the template page for valid ids",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep hat das Anlegen aus Vorlagen umgebaut; die Tests prüfen Overleafs alten V1-Ablauf."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesManager.test.mjs",
+   "test": "TemplatesManager › createProjectFromV1Template › when all options passed › should fetch zip from v1 based on template id",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep lädt Vorlagen aus dem Filestore (settings.apis.filestore.url), den der Test nicht konfiguriert."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesManager.test.mjs",
+   "test": "TemplatesManager › createProjectFromV1Template › when all options passed › should save temporary file",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep lädt Vorlagen aus dem Filestore (settings.apis.filestore.url), den der Test nicht konfiguriert."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesManager.test.mjs",
+   "test": "TemplatesManager › createProjectFromV1Template › when all options passed › should create project",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep lädt Vorlagen aus dem Filestore (settings.apis.filestore.url), den der Test nicht konfiguriert."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesManager.test.mjs",
+   "test": "TemplatesManager › createProjectFromV1Template › when all options passed › should unlink file",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep lädt Vorlagen aus dem Filestore (settings.apis.filestore.url), den der Test nicht konfiguriert."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesManager.test.mjs",
+   "test": "TemplatesManager › createProjectFromV1Template › when all options passed › should set project rootDoc when passed",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep lädt Vorlagen aus dem Filestore (settings.apis.filestore.url), den der Test nicht konfiguriert."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesManager.test.mjs",
+   "test": "TemplatesManager › createProjectFromV1Template › when some options not set › should create project",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep lädt Vorlagen aus dem Filestore (settings.apis.filestore.url), den der Test nicht konfiguriert."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Templates/TemplatesManager.test.mjs",
+   "test": "TemplatesManager › createProjectFromV1Template › when some options not set › should not set missing project options",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep lädt Vorlagen aus dem Filestore (settings.apis.filestore.url), den der Test nicht konfiguriert."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/Uploads/ArchiveManager.test.mjs",
+   "test": "ArchiveManager › _isZipTooLarge › should return true with large bytes",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep berechnet die Größengrenze für ZIP-Dateien aus maxUploadSize statt fest 300 MB."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/infrastructure/Features.test.mjs",
+   "test": "Features › hasFeature › without any settings › should return true",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep knüpft Features (Registrierung, Vorlagen) an eigene Einstellungen, die der Test nicht setzt."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserAuditLogHandler.test.mjs",
+   "test": "UserAuditLogHandler › addEntry › success › includes managedSubscriptionId for managed group user events ",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Test erwartet eine Abfrage verwalteter Gruppen, die der Code dort nicht auslöst."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should render user/settings",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should send user",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should set 'shouldAllowEditingDetails' to true",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should restructure thirdPartyIdentifiers data for template use",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should set and clear 'projectSyncSuccessMessage'",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should set and clear 'projectSyncErrorMessage'",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should leave 'projectSyncErrorMessage' undefined when not set on the session",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should cast refProviders to booleans",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should send the correct managed user admin email",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › should send info for groups with SSO enabled",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › when ldap.updateUserDetailsOnLogin is true › should set \"shouldAllowEditingDetails\" to false",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › when saml.updateUserDetailsOnLogin is true › should set \"shouldAllowEditingDetails\" to false",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › request validation › should still process the request in log mode",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserPagesController.test.mjs",
+   "test": "UserPagesController › settingsPage › with an oauth-complete query param › accepts any string value",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep liest req.user.externalAuth, die Tests setzen kein req.user."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserRegistrationHandler.test.mjs",
+   "test": "UserRegistrationHandler › validate Register Request › failing email validation › does not allow through",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep wirft bei ungültiger E-Mail oder ungültigem Passwort einen Fehler, wo der Test eine stille Ablehnung erwartet."
+  },
+  {
+   "suite": "web",
+   "datei": "test/unit/src/User/UserRegistrationHandler.test.mjs",
+   "test": "UserRegistrationHandler › validate Register Request › failing password validation › does not allow through",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep wirft bei ungültiger E-Mail oder ungültigem Passwort einen Fehler, wo der Test eine stille Ablehnung erwartet."
+  },
+  {
+   "suite": "web",
+   "datei": "modules/launchpad/test/unit/src/LaunchpadController.test.mjs",
+   "test": "LaunchpadController › registerExternalAuthAdmin › when all goes well › should have updated the user to make them an admin",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep setzt beim ersten Admin zusätzlich confirmedAt und entfernt hashedPassword; der Test erwartet Overleafs Update."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/file-view/components/file-view-refresh-error.test.tsx",
+   "test": "<FileViewRefreshError /> shows correct error message",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep zeigt bei Zugriffsfehlern eine andere Meldung als Overleafs „Access Denied“."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/ide-settings/settings-modal.test.tsx",
+   "test": "<SettingsModal /> Shows all settings options",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): die erwarteten Einträge (Referenzsuche, Writefull) kommen aus Modulen, die nur in Overleafs SaaS stecken."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/ide-settings/settings-modal.test.tsx",
+   "test": "<SettingsModal /> when a user has Writefull enabled shows the AI assistance section in the Editor tab",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): die erwarteten Einträge (Referenzsuche, Writefull) kommen aus Modulen, die nur in Overleafs SaaS stecken."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/ide-settings/settings-modal.test.tsx",
+   "test": "<SettingsModal /> when a user has Writefull enabled shows the Language Suggestions section in the Spelling and language tab",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): die erwarteten Einträge (Referenzsuche, Writefull) kommen aus Modulen, die nur in Overleafs SaaS stecken."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/project-list/components/sidebar/sidebar-ds-nav.test.tsx",
+   "test": "<SidebarDsNav /> marks trash as the current page and not the library link",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Library-Link kommt aus einem Modul (dsNavLibraryLink), das nur in Overleafs SaaS steckt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/project-list/components/sidebar/sidebar-ds-nav.test.tsx",
+   "test": "<SidebarDsNav /> marks the library link as the current page on the library view",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Library-Link kommt aus einem Modul (dsNavLibraryLink), das nur in Overleafs SaaS steckt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/project-list/components/sidebar/sidebar-ds-nav.test.tsx",
+   "test": "<SidebarDsNav /> ignores the project trash filter on the library view",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Library-Link kommt aus einem Modul (dsNavLibraryLink), das nur in Overleafs SaaS steckt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/project-list/components/sidebar/sidebar-ds-nav.test.tsx",
+   "test": "<SidebarDsNav /> library \"New\" badge shows the badge on the projects page when the tutorial is active",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Library-Link kommt aus einem Modul (dsNavLibraryLink), das nur in Overleafs SaaS steckt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/project-list/components/sidebar/sidebar-ds-nav.test.tsx",
+   "test": "<SidebarDsNav /> library \"New\" badge hides the badge once the tutorial has been dismissed",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Library-Link kommt aus einem Modul (dsNavLibraryLink), das nur in Overleafs SaaS steckt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/project-list/components/sidebar/sidebar-ds-nav.test.tsx",
+   "test": "<SidebarDsNav /> library \"New\" badge hides the badge on the library page itself",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Library-Link kommt aus einem Modul (dsNavLibraryLink), das nur in Overleafs SaaS steckt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/project-list/components/sidebar/sidebar-ds-nav.test.tsx",
+   "test": "<SidebarDsNav /> library \"New\" badge hides the badge in the library trash",
+   "herkunft": "overleaf",
+   "grund": "Scheitert schon in Overleaf (main): der Library-Link kommt aus einem Modul (dsNavLibraryLink), das nur in Overleafs SaaS steckt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/features/settings/components/password-section.test.tsx",
+   "test": "<PasswordSection /> shows message when user cannot use password log in",
+   "herkunft": "overleaf-cep",
+   "grund": "overleaf-cep zeigt bei externer Anmeldung einen anderen Hinweis ohne den Link „single sign-on (SSO)“."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/shared/components/footer.test.tsx",
+   "test": "<ThinFooter /> renders raw HTML image tags in footer items without a URL",
+   "herkunft": "overleaf-cep",
+   "grund": "Der Test nutzt in overleaf-cep die Cypress-API (cy), die es unter mocha nicht gibt."
+  },
+  {
+   "suite": "frontend",
+   "datei": "test/frontend/shared/components/footer.test.tsx",
+   "test": "<ThinFooter /> renders raw HTML inside a footer link when URL is provided",
+   "herkunft": "overleaf-cep",
+   "grund": "Der Test nutzt in overleaf-cep die Cypress-API (cy), die es unter mocha nicht gibt."
+  }
+ ]
+}

@@ -1,0 +1,93 @@
+# Prüft jeden Pull Request auf spur: Stack aus dem Dev-Image, Unit-Tests und die E2E-Suite.
+name: CI
+
+on:
+  pull_request:
+    branches: [spur]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13 (SERVER-121912); daher dieser Runner.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: spur-dev einrichten
+        run: |
+          uname -r
+          tools/spur-dev/spur-dev install
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
+      - name: Stack starten
+        run: spur-dev up
+      - name: Werkzeuge im Container prüfen
+        run: |
+          docker exec spur-dev-web bash -lc 'set -e; qpdf --version | head -1; pdftotext -v 2>&1 | head -1; cd /overleaf/services/web/modules/spur/test/fixtures && qpdf smith2024.pdf --json --json-key=pagelabels | tr -d " \n"; echo; pdftotext -raw smith2024.pdf - | head -3'
+      - name: Unit-Tests
+        run: spur-dev test
+      - name: Playwright einrichten
+        working-directory: ${{ runner.temp }}
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.64.1
+          npx playwright install --with-deps chromium
+          cat > e2e.mjs <<'EOF'
+          import { readFileSync } from 'node:fs'
+          import { chromium } from 'playwright'
+          const quelle = readFileSync(process.argv[2], 'utf8')
+          const browser = await chromium.launch()
+          const page = await browser.newPage()
+          globalThis.SPUR_URL = 'http://localhost:8080'
+          const ergebnis = await eval(`(${quelle})`)(page)
+          await browser.close()
+          console.log(ergebnis)
+          process.exit(/FEHLER/.test(ergebnis) ? 1 : 0)
+          EOF
+      - name: E2E
+        run: |
+          spur-dev run modules/spur/test/e2e/vorbereiten.mjs | tail -1
+          node "$RUNNER_TEMP/e2e.mjs" services/web/modules/spur/test/e2e/spur-e2e.js
+      - name: Logs bei Fehler
+        if: failure()
+        run: |
+          for c in spur-dev-mongo spur-dev-redis spur-dev-web; do echo "== $c"; docker logs --tail 80 "$c" 2>&1 || true; done
+          spur-dev logs web 200 || true
+
+  # Overleafs eigene Suiten (web-Unit, Frontend, document-updater). Rot nur bei Fehlern, die nicht in
+  # tools/tests/upstream-bekannt.json stehen; bekannte Tests, die grün werden, erscheinen als Hinweis.
+  upstream:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+      - name: Auswertung testen
+        run: node --test tools/tests/upstream-auswertung.test.mjs tools/tests/befehlsnamen.test.mjs
+      - name: spur-dev einrichten
+        run: |
+          tools/spur-dev/spur-dev install
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
+      - name: web-Unit
+        run: spur-dev upstream web
+      - name: Frontend
+        if: ${{ !cancelled() }}
+        run: spur-dev upstream frontend
+      - name: document-updater
+        if: ${{ !cancelled() }}
+        run: spur-dev upstream du
+      - name: Laufzeit
+        if: always()
+        run: |
+          echo "Laufzeit des Jobs: $(( ($(date +%s) - START) / 60 )) min $(( ($(date +%s) - START) % 60 )) s (Grenze 30 min)"
+      - name: Protokolle bei Fehler
+        if: failure() || cancelled()
+        run: tail -n 60 ~/.cache/spur-dev/upstream/aktuell/*.log

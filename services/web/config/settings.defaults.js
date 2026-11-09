@@ -5,6 +5,9 @@ const {
   DEFAULT_EDITABLE_FILENAMES,
 } = require('overleaf-editor-core/lib/text_file_defaults')
 
+// Muss vor /etc/overleaf/settings.js gesetzt sein; das liest den Wert beim Laden.
+process.env.OVERLEAF_SITE_LANGUAGE ||= 'de'
+
 let defaultFeatures, siteUrl
 
 // Make time interval config easier.
@@ -786,7 +789,7 @@ module.exports = {
     userId: process.env.SMOKE_TEST_USER_ID,
   },
 
-  appName: process.env.APP_NAME || 'Overleaf (Community Edition)',
+  appName: process.env.APP_NAME || 'spur',
 
   adminEmail: process.env.ADMIN_EMAIL || 'placeholder@example.com',
   adminDomains: process.env.ADMIN_DOMAINS
@@ -794,14 +797,14 @@ module.exports = {
     : undefined,
 
   nav: {
-    title: process.env.APP_NAME || 'Overleaf Community Edition',
+    title: process.env.APP_NAME || 'spur',
 
     hide_powered_by: process.env.NAV_HIDE_POWERED_BY === 'true',
     left_footer: [],
 
     right_footer: [
       {
-        text: '<a href="https://github.com/overleaf/overleaf">Fork on GitHub!</a>',
+        text: '<a href="https://github.com/ahlerjam/spur">spur @ GitHub</a>',
       },
     ],
 
@@ -1037,6 +1040,11 @@ module.exports = {
         __dirname,
         '../modules/bib-editor/frontend/js/extensions/bib-editor-extension.ts'
       ),
+      Path.resolve(
+        __dirname,
+        '../modules/spur/frontend/js/pruefung/pruef-markierung.ts'
+      ),
+      Path.resolve(__dirname, '../modules/spur/frontend/js/vorschlaege/tipp-pause.ts'),
     ],
     sourceEditorVisualExtensions: [],
     sourceEditorComponents: [],
@@ -1079,7 +1087,9 @@ module.exports = {
         '../modules/python-runner/frontend/js/components/layout/python-editor-split'
       ),
     ],
-    langFeedbackLinkingWidgets: [],
+    langFeedbackLinkingWidgets: [
+      Path.resolve(__dirname, '../modules/spur/frontend/js/claude/claude-verbinden.tsx'),
+    ],
     labsExperiments: [],
     integrationLinkingWidgets: [
       Path.resolve(
@@ -1197,7 +1207,16 @@ module.exports = {
         '../modules/reference-picker/frontend/js/reference-index/advanced-reference-index.ts'
       ),
     ],
-    railEntries: [],
+    railEntries: [
+      Path.resolve(__dirname, '../modules/spur/frontend/js/quellen/quellen-rail.tsx'),
+      Path.resolve(
+        __dirname,
+        '../modules/spur/frontend/js/pruefung/pruefbericht-rail.tsx'
+      ),
+      Path.resolve(__dirname, '../modules/spur/frontend/js/claude/claude-rail.tsx'),
+      Path.resolve(__dirname, '../modules/spur/frontend/js/recherche/recherche-rail.tsx'),
+      Path.resolve(__dirname, '../modules/spur/frontend/js/vorschlaege/vorschlaege-rail.tsx'),
+    ],
     railPopovers: [],
     railActions: [],
     railModals: [],
@@ -1221,6 +1240,7 @@ module.exports = {
     'github-sync',
     'zotero',
     'bib-editor',
+    'spur',
   ],
   viewIncludes: {},
 

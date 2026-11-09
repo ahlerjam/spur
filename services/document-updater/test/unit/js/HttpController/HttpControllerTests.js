@@ -57,6 +57,13 @@ describe('HttpController', function () {
 
     this.DeleteQueueManager = {}
 
+    this.UpdateManager = {
+      promises: {
+        lockUpdatesAndDo: sinon.stub().resolves(),
+        applyUpdate: sinon.stub(),
+      },
+    }
+
     this.RedisManager = {
       DOC_OPS_TTL: 42,
     }
@@ -81,6 +88,7 @@ describe('HttpController', function () {
         './ProjectHistoryRedisManager': this.ProjectHistoryRedisManager,
         './ProjectManager': this.ProjectManager,
         './DeleteQueueManager': this.DeleteQueueManager,
+        './UpdateManager': this.UpdateManager,
         './RedisManager': this.RedisManager,
         './Metrics': this.Metrics,
         './Errors': Errors,
@@ -88,6 +96,44 @@ describe('HttpController', function () {
         './HistoryConversions': this.HistoryConversions,
         '@overleaf/settings': { max_doc_length: 2 * 1024 * 1024 },
       },
+    })
+  })
+
+  describe('spurUpdate', function () {
+    beforeEach(function () {
+      this.req = {
+        params: { project_id: this.project_id, doc_id: this.doc_id },
+        query: {},
+        body: {
+          op: [{ p: 3, i: 'neu' }],
+          v: 7,
+          meta: { user_id: this.comment_id, source: 'spur', tc: 'aaaaaaaaaaaaaaaaaa' },
+        },
+      }
+    })
+
+    it('wendet das Update unter Sperre an und antwortet 204', async function () {
+      await this.HttpController.spurUpdate(this.req, this.res, this.next)
+      this.UpdateManager.promises.lockUpdatesAndDo.should.have.been.calledWith(
+        this.UpdateManager.promises.applyUpdate,
+        this.project_id,
+        this.doc_id,
+        { doc: this.doc_id, op: this.req.body.op, v: 7, meta: this.req.body.meta }
+      )
+      this.res.sendStatus.should.have.been.calledWith(204)
+    })
+
+    it('meldet einen Versionsfehler von sharejs als 409', async function () {
+      // sharejs wirft hier einen nackten String, kein Error-Objekt.
+      this.UpdateManager.promises.lockUpdatesAndDo = sinon.stub().callsFake(() => Promise.reject('Op at future version'))
+      await this.HttpController.spurUpdate(this.req, this.res, this.next)
+      this.res.status.should.have.been.calledWith(409)
+    })
+
+    it('meldet ein fehlendes Dokument als 404', async function () {
+      this.UpdateManager.promises.lockUpdatesAndDo = sinon.stub().rejects(new Errors.NotFoundError('weg'))
+      await this.HttpController.spurUpdate(this.req, this.res, this.next)
+      this.res.sendStatus.should.have.been.calledWith(404)
     })
   })
 

@@ -217,6 +217,11 @@ async function duplicate(
     await prepareClsiCacheInBackground
   } catch {}
 
+  await Modules.promises.hooks.fire('projectDuplicated', {
+    originalProjectId,
+    newProjectId: newProject._id,
+  })
+
   return newProject
 }
 

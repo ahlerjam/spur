@@ -25,6 +25,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       unattended-upgrades \
       build-essential wget net-tools unzip time poppler-utils optipng strace nginx git python3 python-is-python3 zlib1g-dev libpcre3-dev gettext-base libwww-perl ca-certificates curl gnupg \
       qpdf \
+      tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
 # upgrade base-image, batch all the upgrades together, rather than installing them on-by-one (which is slow!)
 &&  unattended-upgrade --verbose --no-minimal-upgrade-steps \
 # install Node.js https://github.com/nodesource/distributions#nodejs
@@ -76,6 +77,13 @@ RUN mkdir /install-tl-unx \
       synctex \
       etoolbox \
       xetex \
+      biblatex \
+      biber \
+      biblatex-apa \
+      csquotes \
+      natbib \
+      beamer \
+      latexdiff \
 &&  tlmgr path add \
 &&  rm -rf /install-tl-unx
 

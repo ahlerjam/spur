@@ -1,0 +1,597 @@
+import { createReadStream } from 'node:fs'
+import { rm } from 'node:fs/promises'
+import { pipeline } from 'node:stream/promises'
+import logger from '@overleaf/logger'
+import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
+import CollaboratorsGetter from '../../../../app/src/Features/Collaborators/CollaboratorsGetter.mjs'
+import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
+import * as PruefManager from './pruefung/PruefManager.mjs'
+import * as QuellenManager from './QuellenManager.mjs'
+import * as ZitatManager from './ZitatManager.mjs'
+import * as Team from './Team.mjs'
+import * as ClaudeZugang from './ClaudeZugang.mjs'
+import * as Inbox from './Inbox.mjs'
+import * as LaufAktionen from './schreiben/LaufAktionen.mjs'
+import * as LaufManager from './schreiben/LaufManager.mjs'
+import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
+import { Problem, mitProblemen } from './probleme.mjs'
+import * as Recherche from './recherche/Recherche.mjs'
+import * as Aufnahme from './recherche/Aufnahme.mjs'
+import * as Beschaffung from './recherche/Beschaffung.mjs'
+import * as Import from './recherche/Import.mjs'
+import * as Literatur from './literatur/Literatur.mjs'
+import * as Offenlegung from './offenlegung/Offenlegung.mjs'
+import * as Semantik from './semantik/Semantik.mjs'
+import * as Workflows from './workflows/Workflows.mjs'
+
+// Bricht der Browser ab, darf das den Prozess nicht beenden.
+async function dateiSenden(pfad, res) {
+  if (res.destroyed) return
+  await pipeline(createReadStream(pfad), res).catch(error => {
+    if (error.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+      logger.warn({ err: error, pfad }, 'Quelldatei nicht lesbar')
+    }
+  })
+}
+
+const projektId = req => new ObjectId(req.params.project_id)
+const nutzerId = req => SessionManager.getLoggedInUserId(req.session)
+
+function quelleFuerClient(q) {
+  return {
+    id: q._id,
+    dateiname: q.dateiname,
+    key: q.key,
+    art: q.art,
+    seitenzahl: q.seitenzahl,
+    status: q.status,
+    doi: q.doi,
+    titel: q.meta?.titel ?? null,
+    fassung: q.fassung,
+    versatz: q.versatz,
+    versatzQuelle: q.versatzQuelle,
+    nurProjekt: q.nurProjekt === true,
+    ocr: QuellenManager.ocrZustand(q),
+    web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
+  }
+}
+
+async function nurMitglieder(req) {
+  const mitglied = await CollaboratorsGetter.promises.isUserInvitedMemberOfProject(
+    nutzerId(req),
+    req.params.project_id
+  )
+  if (!mitglied) {
+    throw new Problem(
+      403,
+      'nur_mitglieder',
+      'spur_fehler_download_nur_mitglieder'
+    )
+  }
+}
+
+export const quellenListe = mitProblemen(async (req, res) => {
+  const seite = Math.max(0, Number.parseInt(req.query.seite, 10) || 0)
+  const ergebnis = await QuellenManager.liste(projektId(req), { seite })
+  res.json({ ...ergebnis, quellen: ergebnis.quellen.map(quelleFuerClient) })
+})
+
+async function hochgeladeneQuelle(req) {
+  if (!req.file) {
+    throw new Problem(400, 'datei_fehlt', 'spur_fehler_datei_fehlt')
+  }
+  try {
+    return await QuellenManager.aufnehmen({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      dateiname: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
+      tempPfad: req.file.path,
+      groesse: req.file.size,
+    })
+  } finally {
+    await rm(req.file.path, { force: true })
+  }
+}
+
+export const quelleHochladen = mitProblemen(async (req, res) => {
+  res.status(201).json(quelleFuerClient(await hochgeladeneQuelle(req)))
+})
+
+export const webQuelleAufnehmen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.webAufnehmen({
+    projectId: projektId(req),
+    userId: new ObjectId(nutzerId(req)),
+    url: req.body.url,
+  })
+  res.status(201).json(quelleFuerClient(quelle))
+})
+
+export const quellenSuche = mitProblemen(async (req, res) => {
+  const begriff = String(req.query.q ?? '').trim()
+  if (!begriff) return res.json({ treffer: [] })
+  const [namen, imText] = await Promise.all([
+    QuellenManager.dateinamenSuchen(projektId(req), begriff),
+    QuellenManager.suchen(projektId(req), begriff),
+  ])
+  // Treffer im Dateinamen bringen die Quelle mit: Sie steht nicht unbedingt in der geladenen Liste.
+  const imNamen = namen.map(q => ({
+    quelleId: q._id,
+    dateiname: q.dateiname,
+    art: q.art,
+    seite: 1,
+    label: null,
+    auszug: '',
+    imDateinamen: true,
+    quelle: quelleFuerClient(q),
+  }))
+  res.json({ treffer: [...imNamen, ...imText] })
+})
+
+export const quelleSeite = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const nummer = Number.parseInt(req.params.seite, 10)
+  const { text, label, seite, ocrKonfidenz = null } = await QuellenManager.seite(quelle, nummer)
+  res.json({ text, label, seite, seitenzahl: quelle.seitenzahl, art: quelle.art, ocrKonfidenz })
+})
+
+export const quelleBild = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const nummer = Number.parseInt(req.params.seite, 10)
+  await QuellenManager.seite(quelle, nummer)
+  if (quelle.art !== 'pdf') {
+    throw new Problem(404, 'kein_bild', 'spur_fehler_kein_seitenbild')
+  }
+  const pfad = await QuellenManager.bild(quelle, nummer)
+  res.type('png')
+  await dateiSenden(pfad, res)
+})
+
+export const quelleDatei = mitProblemen(async (req, res) => {
+  await nurMitglieder(req)
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  res.attachment(quelle.dateiname)
+  await dateiSenden(QuellenManager.dateiPfad(quelle), res)
+})
+
+export const quelleAendern = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const { fassung, versatz } = req.body
+  if (fassung !== undefined && (typeof fassung !== 'string' || fassung.length > 200)) {
+    throw new Problem(422, 'fassung', 'spur_fehler_fassung_zu_lang', { max: 200 })
+  }
+  if (versatz !== undefined && quelle.art !== 'pdf') {
+    throw new Problem(422, 'versatz', 'spur_fehler_versatz_nur_pdf')
+  }
+  // Gedruckte Seitenzahlen liegen in Zeitschriften weit über der PDF-Seite, aber nie über 100000.
+  if (versatz !== undefined && versatz !== null && !(Number.isInteger(versatz) && Math.abs(versatz) <= 100000)) {
+    throw new Problem(422, 'versatz', 'spur_fehler_versatz_ungueltig')
+  }
+  res.json(quelleFuerClient(await QuellenManager.aendern(quelle, { fassung, versatz })))
+})
+
+export const quelleLoeschen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  await QuellenManager.loeschen(quelle)
+  res.sendStatus(204)
+})
+
+export const quellenExport = mitProblemen(async (req, res) => {
+  await nurMitglieder(req)
+  res.attachment('quellen.zip')
+  await QuellenManager.zipSchreiben(projektId(req), res)
+})
+
+export const andereProjekte = mitProblemen(async (req, res) => {
+  res.json({
+    projekte: await QuellenManager.projekteMitQuellen(
+      new ObjectId(nutzerId(req)),
+      projektId(req)
+    ),
+    klonVon: await QuellenManager.klonHinweis(projektId(req)),
+  })
+})
+
+export const quellenHolen = mitProblemen(async (req, res) => {
+  const { projekt } = req.body
+  if (!ObjectId.isValid(projekt)) {
+    throw new Problem(422, 'projekt', 'spur_fehler_projekt_fehlt')
+  }
+  const darf = await CollaboratorsGetter.promises.isUserInvitedMemberOfProject(
+    nutzerId(req),
+    projekt
+  )
+  if (!darf) {
+    throw new Problem(
+      403,
+      'nur_mitglieder',
+      'spur_fehler_uebernahme_nur_mitglieder'
+    )
+  }
+  const anzahl = await QuellenManager.uebernehmen(
+    projektId(req),
+    new ObjectId(projekt),
+    new ObjectId(nutzerId(req))
+  )
+  res.json({ anzahl })
+})
+
+async function zitateFuerClient(liste) {
+  const ids = liste.flatMap(z => [
+    z.angelegtVon,
+    ...(z.kommentare ?? []).map(k => k.von),
+    ...(z.zugewiesen ? [z.zugewiesen.an, z.zugewiesen.von] : []),
+    z.bestaetigt?.von,
+  ])
+  const namen = await Team.namen(ids.filter(Boolean))
+  const person = id => ({ id, name: Team.nameAus(namen, id) })
+  return liste.map(z => ({
+    id: z._id,
+    seite: z.seite,
+    label: z.label,
+    text: z.text,
+    von: person(z.angelegtVon),
+    kommentare: (z.kommentare ?? []).map(k => ({ id: k._id, von: person(k.von), text: k.text, am: k.am })),
+    zugewiesen: z.zugewiesen
+      ? { an: person(z.zugewiesen.an), von: person(z.zugewiesen.von), am: z.zugewiesen.am }
+      : null,
+    bestaetigt: z.bestaetigt ? { von: person(z.bestaetigt.von), am: z.bestaetigt.am } : null,
+  }))
+}
+
+const zitatFuerClient = async zitat => (await zitateFuerClient([zitat]))[0]
+
+export const zitate = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  res.json({ zitate: await zitateFuerClient(await ZitatManager.liste(quelle)) })
+})
+
+export const zitatMarkieren = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const seite = Number.parseInt(req.body.seite, 10)
+  const zitat = await ZitatManager.markieren(
+    quelle,
+    { seite, text: req.body.text },
+    new ObjectId(nutzerId(req))
+  )
+  res.status(201).json(await zitatFuerClient(zitat))
+})
+
+export const zitatKommentieren = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const { text, zuweisen } = req.body
+  const zitat = await ZitatManager.kommentieren(
+    quelle,
+    req.params.zitat_id,
+    { text, zuweisen },
+    new ObjectId(nutzerId(req))
+  )
+  res.status(201).json(await zitatFuerClient(zitat))
+})
+
+export const zitatBestaetigen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitat = await ZitatManager.bestaetigen(quelle, req.params.zitat_id, new ObjectId(nutzerId(req)))
+  res.json(await zitatFuerClient(zitat))
+})
+
+export const ocrStarten = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const { quelle: neu } = await QuellenManager.ocrStarten(quelle)
+  res.status(202).json(quelleFuerClient(neu))
+})
+
+export const zuweisungLoesen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  await ZitatManager.zuweisungLoesen(quelle, req.params.zitat_id)
+  res.sendStatus(204)
+})
+
+export const team = mitProblemen(async (req, res) => {
+  res.json({ mitglieder: await Team.mitglieder(projektId(req)) })
+})
+
+export const zugewiesen = mitProblemen(async (req, res) => {
+  const liste = await ZitatManager.zugewiesenAn(projektId(req), new ObjectId(nutzerId(req)))
+  const [fuerClient, quellen] = await Promise.all([
+    zitateFuerClient(liste),
+    QuellenManager.vonIds(projektId(req), liste.map(z => z.quelleId)),
+  ])
+  const nachId = new Map(quellen.map(q => [String(q._id), q]))
+  res.json({
+    zitate: fuerClient.map((z, i) => ({
+      ...z,
+      quelle: quelleFuerClient(nachId.get(String(liste[i].quelleId))),
+    })),
+  })
+})
+
+export const zitatEinfuegen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitat = await ZitatManager.holen(quelle, req.params.zitat_id)
+  res.json(
+    await ZitatManager.einfuegen(
+      projektId(req),
+      quelle,
+      zitat,
+      new ObjectId(nutzerId(req))
+    )
+  )
+})
+
+export const pruefbericht = mitProblemen(async (req, res) => {
+  res.json(await PruefManager.bericht(projektId(req)))
+})
+
+export const claudeTokens = mitProblemen(async (req, res) => {
+  res.json({ tokens: await ClaudeZugang.tokens(nutzerId(req)) })
+})
+
+export const claudeTokenErzeugen = mitProblemen(async (req, res) => {
+  res.status(201).json(await ClaudeZugang.tokenErzeugen(nutzerId(req)))
+})
+
+export const claudeTokenWiderrufen = mitProblemen(async (req, res) => {
+  await ClaudeZugang.widerrufen(nutzerId(req), req.params.token_id)
+  res.sendStatus(204)
+})
+
+async function botDesNutzers(req) {
+  const mensch = await db.users.findOne({ _id: new ObjectId(nutzerId(req)) })
+  return await ClaudeZugang.botFuer(mensch)
+}
+
+export const claudeStatus = mitProblemen(async (req, res) => {
+  const bot = await botDesNutzers(req)
+  const [{ nachrichten, aeltere }, lauf, verbunden, automatik] = await Promise.all([
+    Inbox.verlauf(projektId(req), bot._id),
+    LaufManager.letzterLauf(projektId(req), bot._id),
+    Inbox.verbunden(bot._id),
+    LaufAktionen.automatik(projektId(req), new ObjectId(nutzerId(req))),
+  ])
+  res.json({
+    verbunden,
+    nachrichten: nachrichten.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
+    aeltere,
+    automatik,
+    ...(await LaufAktionen.laufDaten(projektId(req), lauf)),
+  })
+})
+
+export const claudeAuftrag = mitProblemen(async (req, res) => {
+  const text = typeof req.body.text === 'string' ? req.body.text.trim() : ''
+  if (!text || text.length > 20000) {
+    throw new Problem(422, 'auftrag', 'spur_fehler_auftrag_text')
+  }
+  const bot = await botDesNutzers(req)
+  const nachricht = await Inbox.auftragAnlegen({ projectId: projektId(req), botId: bot._id, text })
+  res.status(201).json({ id: nachricht._id })
+})
+
+export const workflows = mitProblemen(async (req, res) => {
+  const liste = await Workflows.liste()
+  // Den Text holt workflowStarten selbst; das Panel braucht Name, Titel, Beschreibung und die Eingaben.
+  res.json({
+    workflows: liste.map(({ name, titel, beschreibung, eingaben = [] }) => ({ name, titel, beschreibung, eingaben })),
+  })
+})
+
+export const workflowStarten = mitProblemen(async (req, res) => {
+  const bot = await botDesNutzers(req)
+  const { thema, anzahl } = req.body ?? {}
+  const nachricht = await Workflows.starten({
+    projectId: projektId(req),
+    botId: bot._id,
+    name: req.params.name,
+    argumente: { thema, anzahl },
+  })
+  res.status(201).json({ id: nachricht._id })
+})
+
+const changeIds = req => {
+  const ids = req.body?.change_ids
+  if (ids === undefined) return undefined
+  if (!Array.isArray(ids) || !ids.every(id => typeof id === 'string')) {
+    throw new Problem(422, 'change_ids', 'spur_fehler_change_ids')
+  }
+  return ids
+}
+
+export const laufAnnehmen = mitProblemen(async (req, res) => {
+  const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id)
+  res.json(
+    await LaufAktionen.annehmen(projektId(req), lauf, new ObjectId(nutzerId(req)), changeIds(req))
+  )
+})
+
+// review darf nur Changes des eigenen Bots ablehnen.
+export const laufAblehnen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const stufe = await AuthorizationManager.promises.getPrivilegeLevelForProject(
+    userId,
+    req.params.project_id,
+    null
+  )
+  const nurBot = stufe === 'review' ? (await botDesNutzers(req))._id : undefined
+  const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id, nurBot)
+  res.json(await LaufAktionen.ablehnen(projektId(req), lauf, userId, changeIds(req)))
+})
+
+export const laufZuruecknehmen = mitProblemen(async (req, res) => {
+  const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id)
+  await LaufAktionen.zuruecknehmen(projektId(req), lauf, new ObjectId(nutzerId(req)))
+  res.sendStatus(204)
+})
+
+export const automatikSetzen = mitProblemen(async (req, res) => {
+  if (typeof req.body.an !== 'boolean') {
+    throw new Problem(422, 'automatik', 'spur_fehler_automatik_wert')
+  }
+  await LaufAktionen.automatikSetzen(projektId(req), new ObjectId(nutzerId(req)), req.body.an)
+  res.sendStatus(204)
+})
+
+const seiteAus = wert => Math.max(0, Number.parseInt(wert ?? '0', 10) || 0)
+
+export const rechercheSuchen = mitProblemen(async (req, res) => {
+  res.json(
+    await Recherche.suchen({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      anfrage: String(req.query.anfrage ?? ''),
+      seite: Math.min(50, seiteAus(req.query.seite)),
+    })
+  )
+})
+
+export const rechercheZitationen = mitProblemen(async (req, res) => {
+  res.json(await Recherche.zitationen(String(req.query.doi ?? ''), String(req.query.richtung ?? '')))
+})
+
+export const suchprotokoll = mitProblemen(async (req, res) => {
+  res.json(await Recherche.protokoll(projektId(req), { seite: seiteAus(req.query.seite) }))
+})
+
+export const suchprotokollExport = mitProblemen(async (req, res) => {
+  res.attachment('suchprotokoll.csv').type('text/csv; charset=utf-8')
+  res.send(await Recherche.protokollCsv(projektId(req)))
+})
+
+export const perDoiAufnehmen = mitProblemen(async (req, res) => {
+  const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
+  const quelle = await Aufnahme.perDoi({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
+  res.status(201).json(quelleFuerClient(quelle))
+})
+
+function beschaffungFuerClient(eintrag, vorlage) {
+  return {
+    id: eintrag._id,
+    doi: eintrag.doi,
+    titel: eintrag.meta.titel,
+    autoren: (eintrag.meta.autoren ?? []).map(a => [a.given, a.family].filter(Boolean).join(' ')),
+    jahr: eintrag.meta.jahr,
+    status: eintrag.status,
+    quelleId: eintrag.quelleId ?? null,
+    link: Beschaffung.link(vorlage, eintrag.doi),
+  }
+}
+
+export const beschaffungsliste = mitProblemen(async (req, res) => {
+  const [liste, vorlage] = await Promise.all([
+    Beschaffung.liste(projektId(req), { seite: seiteAus(req.query.seite) }),
+    Beschaffung.vorlage(new ObjectId(nutzerId(req))),
+  ])
+  res.json({ ...liste, vorlage, eintraege: liste.eintraege.map(e => beschaffungFuerClient(e, vorlage)) })
+})
+
+export const beschaffungHinzufuegen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
+  const eintrag = await Beschaffung.hinzufuegen({ projectId: projektId(req), userId, doi })
+  res.status(201).json(beschaffungFuerClient(eintrag, await Beschaffung.vorlage(userId)))
+})
+
+export const beschaffungExport = mitProblemen(async (req, res) => {
+  const { dateiname, typ, inhalt } = await Beschaffung.exportieren(projektId(req), req.params.format)
+  res.attachment(dateiname).type(`${typ}; charset=utf-8`).send(inhalt)
+})
+
+export const beschaffungHochladen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const quelle = await hochgeladeneQuelle(req)
+  const eintrag = await Beschaffung.perDoiZuordnen(projektId(req), quelle, userId)
+  res.status(201).json({ quelle: quelleFuerClient(quelle), zugeordnet: eintrag ? String(eintrag._id) : null })
+})
+
+export const beschaffungZuordnen = mitProblemen(async (req, res) => {
+  const userId = new ObjectId(nutzerId(req))
+  const eintrag = await Beschaffung.zuordnen(projektId(req), req.params.eintrag_id, String(req.body?.quelle_id ?? ''), userId)
+  res.json(beschaffungFuerClient(eintrag, await Beschaffung.vorlage(userId)))
+})
+
+export const bibliotheksvorlageSetzen = mitProblemen(async (req, res) => {
+  res.json({ vorlage: await Beschaffung.vorlageSetzen(new ObjectId(nutzerId(req)), req.body?.vorlage) })
+})
+
+export const zoteroSammlungen = mitProblemen(async (req, res) => {
+  res.json({ sammlungen: await Import.zoteroSammlungen(new ObjectId(nutzerId(req))) })
+})
+
+export const zoteroImportieren = mitProblemen(async (req, res) => {
+  res.json(
+    await Import.zoteroImportieren({
+      projectId: projektId(req),
+      userId: new ObjectId(nutzerId(req)),
+      sammlung: String(req.body?.sammlung ?? ''),
+    })
+  )
+})
+
+export const notizen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  res.json({ notizen: await Literatur.notizen(quelle) })
+})
+
+export const notizSetzen = mitProblemen(async (req, res) => {
+  const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
+  const zitatId = req.body?.zitat_id ? String(req.body.zitat_id) : null
+  if (zitatId) await ZitatManager.holen(quelle, zitatId)
+  await Literatur.notizSetzen(projektId(req), quelle, {
+    zitatId,
+    text: req.body?.text,
+    userId: new ObjectId(nutzerId(req)),
+  })
+  res.sendStatus(204)
+})
+
+export const matrix = mitProblemen(async (req, res) => {
+  res.json(await Literatur.matrix(projektId(req), { seite: Math.max(1, seiteAus(req.query.seite)) }))
+})
+
+export const matrixExport = mitProblemen(async (req, res) => {
+  res.attachment('literaturmatrix.csv').type('text/csv; charset=utf-8')
+  res.send(await Literatur.matrixCsv(projektId(req)))
+})
+
+export const matrixSpalte = mitProblemen(async (req, res) => {
+  res.status(201).json(await Literatur.spalteAnlegen(projektId(req), req.body?.name))
+})
+
+const zellAdresse = req => ({ quelleId: String(req.body?.quelle_id ?? ''), spalteId: String(req.body?.spalte_id ?? '') })
+
+export const matrixZelle = mitProblemen(async (req, res) => {
+  await Literatur.zelleSetzen(projektId(req), { ...zellAdresse(req), text: req.body?.text })
+  res.sendStatus(204)
+})
+
+export const matrixBestaetigen = mitProblemen(async (req, res) => {
+  await Literatur.vorschlagBestaetigen(projektId(req), zellAdresse(req))
+  res.sendStatus(204)
+})
+
+export const matrixVerwerfen = mitProblemen(async (req, res) => {
+  await Literatur.vorschlagVerwerfen(projektId(req), zellAdresse(req))
+  res.sendStatus(204)
+})
+
+const modellAus = wert => String(wert ?? '').slice(0, 200)
+
+export const offenlegung = mitProblemen(async (req, res) => {
+  res.json(await Offenlegung.text(projektId(req), { modell: modellAus(req.query.modell) }))
+})
+
+export const offenlegungTex = mitProblemen(async (req, res) => {
+  res.json(await Offenlegung.alsTex(projektId(req), new ObjectId(nutzerId(req)), { modell: modellAus(req.body?.modell) }))
+})
+
+export const semantikStand = mitProblemen(async (req, res) => {
+  res.json(await Semantik.stand(projektId(req)))
+})
+
+export const semantikIndexieren = mitProblemen(async (req, res) => {
+  const { job_id: jobId } = await Semantik.indexieren(projektId(req))
+  res.status(202).json({ job_id: jobId })
+})
+
+export const semantikSuchen = mitProblemen(async (req, res) => {
+  res.json({ treffer: await Semantik.suchen(projektId(req), req.query.q) })
+})

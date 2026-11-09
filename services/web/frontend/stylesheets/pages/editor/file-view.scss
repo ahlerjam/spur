@@ -97,9 +97,13 @@
     @extend .full-size;
 
     left: 20px;
-    content: '';
-    background: url(../../../../public/img/ol-brand/overleaf-o-grey.svg)
-      center / 200px no-repeat;
+    content: 'spur';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 120px;
+    font-weight: 600;
+    color: var(--content-disabled);
     opacity: 0.2;
     pointer-events: none;
   }

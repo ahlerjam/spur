@@ -1,0 +1,80 @@
+{
+  "werke": [
+    {
+      "doi": "10.1038/nrn2762",
+      "openalex": "W2101234567",
+      "s2": "a1b2c3d4e5",
+      "titel": "The memory function of sleep",
+      "abstract": "Sleep has been identified as a state that optimizes the consolidation of newly acquired information in memory.",
+      "autoren": [["Susanne", "Diekelmann"], ["Jan", "Born"]],
+      "jahr": 2010,
+      "journal": "Nature Reviews Neuroscience",
+      "seiten": "114-126",
+      "frei": false,
+      "dienste": ["openalex", "crossref", "s2"],
+      "zitiertVon": ["10.1371/journal.pone.0099999", "10.48550/arxiv.2401.01234", "10.5555/spur.2024.001"],
+      "zitiert": ["10.5555/spur.2024.001"]
+    },
+    {
+      "doi": "10.1371/journal.pone.0099999",
+      "openalex": "W2202345678",
+      "s2": "b2c3d4e5f6",
+      "titel": "Sleep spindles predict overnight memory consolidation",
+      "abstract": "Sleep spindle density during the night predicted how much of a learned word list participants retained the next morning.",
+      "autoren": [["Maria", "Keller"], ["Tom", "Ruiz"]],
+      "jahr": 2014,
+      "journal": "PLOS ONE",
+      "seiten": "e99999",
+      "frei": true,
+      "pdf": "keller2014.pdf",
+      "lizenz": "cc-by",
+      "dienste": ["openalex", "crossref", "s2"],
+      "zitiertVon": [],
+      "zitiert": ["10.1038/nrn2762"]
+    },
+    {
+      "doi": "10.48550/arxiv.2401.01234",
+      "arxiv": "2401.01234",
+      "s2": "c3d4e5f6a7",
+      "titel": "Sleep-like replay improves memory consolidation in artificial neural networks",
+      "abstract": "We add an offline replay phase modelled on sleep to artificial neural networks and show that it reduces catastrophic forgetting.",
+      "autoren": [["Alice", "Smith"], ["Ben", "Lee"]],
+      "jahr": 2024,
+      "journal": "arXiv",
+      "frei": true,
+      "pdf": "arxiv2401.01234.pdf",
+      "lizenz": null,
+      "dienste": ["arxiv", "s2"],
+      "zitiertVon": [],
+      "zitiert": ["10.1038/nrn2762"]
+    },
+    {
+      "doi": "10.5555/spur.2024.001",
+      "openalex": "W2303456789",
+      "titel": "Sleep and Memory",
+      "autoren": [["Alice", "Smith"]],
+      "jahr": 2024,
+      "journal": "Journal of Sleep Research",
+      "seiten": "345-352",
+      "frei": false,
+      "dienste": ["openalex", "crossref"],
+      "zitiertVon": [],
+      "zitiert": ["10.1038/nrn2762"]
+    }
+  ],
+  "serie": {
+    "anzahl": 24,
+    "doi": "10.5555/spur.serie.{n}",
+    "openalex": "W24000000{n}",
+    "titel": "Memory consolidation during sleep: cohort study {n}",
+    "autoren": [["Lena", "Vogt"]],
+    "journal": "Sleep Medicine",
+    "dienste": ["openalex"]
+  },
+  "zotero": {
+    "sammlungen": [{ "key": "ABCD2345", "name": "Schlaf und Gedächtnis" }],
+    "bibtex": {
+      "ABCD2345": "@article{diekelmann_memory_2010,\n  title = {The memory function of sleep},\n  author = {Diekelmann, Susanne and Born, Jan},\n  journal = {Nature Reviews Neuroscience},\n  year = {2010},\n  doi = {10.1038/nrn2762}\n}\n\n@article{keller_spindles_2014,\n  title = {Sleep spindles predict overnight memory consolidation},\n  author = {Keller, Maria and Ruiz, Tom},\n  journal = {PLOS ONE},\n  year = {2014},\n  doi = {10.1371/journal.pone.0099999}\n}\n"
+    }
+  }
+}

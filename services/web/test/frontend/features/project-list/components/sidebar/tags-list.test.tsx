@@ -45,7 +45,7 @@ describe('<TagsList />', function () {
 
   it('displays the tags list', async function () {
     const header = await screen.findByTestId('organize-projects')
-    expect(header.textContent).to.equal('Organize Tags')
+    expect(header.textContent).to.equal('Tags')
 
     await screen.findByRole('button', {
       name: 'New tag',
