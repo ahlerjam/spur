@@ -3,7 +3,7 @@ import CollaboratorsGetter from '../../../../app/src/Features/Collaborators/Coll
 import CollaboratorsHandler from '../../../../app/src/Features/Collaborators/CollaboratorsHandler.mjs'
 import Errors from '../../../../app/src/Features/Errors/Errors.js'
 
-// Namen der Rollen nach docs/mcp-vertrag.md statt Overleafs interner Stufen.
+// Namen der Rollen nach docs/mcp-contract.md statt Overleafs interner Stufen.
 const IM_VERTRAG = { readOnly: 'read', review: 'review', readAndWrite: 'write', owner: 'owner' }
 export const rolleImVertrag = stufe => IM_VERTRAG[stufe] ?? null
 

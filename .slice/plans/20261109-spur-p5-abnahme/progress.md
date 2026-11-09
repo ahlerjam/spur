@@ -32,4 +32,12 @@
 ## Englische Texte (humanizer)
 - Audit aller 131 neuen oder geänderten Einträge in `en.json` (f2, f3, f5, f6, f7): keine Gedankenstriche, keine „not X but Y“-Muster, keine Werbe- oder Füllwörter, keine Chat-Reste. Geändert: „a number from 1 or “max”“ → „a number of 1 or more, or “max”“ (zweimal), „The direction is …“ → „The direction must be …“, „Open large“ → „Open in large view“. Gerade und typografische Anführungszeichen bleiben wie in Overleafs `en.json` gemischt (laut Skill allein kein Befund).
 
+## f8 Doku auf Englisch
+- Umbenannt: `docs/mcp-vertrag.md` → `docs/mcp-contract.md`; ADRs → `0001-module-in-web-service.md`, `0002-single-write-path.md`, `0003-own-claude-integration.md`, `0004-check-on-plain-latex.md`, `0005-sources-outside-project-tree.md`. Pfadverweise in `rechte.mjs` und `spur-e2e.js` angepasst; `git grep` nach den alten Namen außerhalb von `.slice/` ist leer.
+- Linkprüfung (Skript im Scratchpad über alle relativen Markdown-Links in README.md, CLAUDE.md, docs/**): `checked 3 links; missing: []`.
+- Backlog: 34 Spiegelstriche vorher, 35 nachher (neu: 1616 Schlüssel fehlen in Overleafs `de.json` gegenüber `en.json`; gezählt über die Schlüsselmengen, die reine Differenz der Anzahlen ist 1615, weil ein Schlüssel nur in `de.json` steht).
+- humanizer (Englisch): Gedankenstriche durch Doppelpunkt, Komma oder Punkt ersetzt (auch einer in der vorhandenen Authors-Zeile), keine „not X but Y“-Muster; ein verbleibender Satz mit „but“ in `docs/mcp-contract.md` trägt zwei Informationen („accepted, but marked red and never accepted automatically“). Deutsche Wörter nur in UI-Zitaten („Nicht frei“, „DOI nicht gefunden“, „Quellen wurden nicht mitkopiert“, „nicht prüfbar“).
+- README-Installation in der verlangten Reihenfolge. Das Repo hat keinen Backup-Befehl; die README nennt deshalb die Volumes `spur_data` und `spur_mongo` (bzw. `SPUR_DATA_DIR` mit Sandbox) und sagt, dass `spur-dev dump/restore` nur für die Entwicklung sind. Vorschlag: ein `make backup`.
+- p4f4 prüft jetzt den englischen Hinweis im README-Abschnitt „Claude and your data“ (`README_HINWEIS`); der UI-Schritt bleibt auf Deutsch, weil die E2E-Instanz deutsch läuft.
+
 ## Needs decision

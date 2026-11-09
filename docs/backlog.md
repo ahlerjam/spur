@@ -1,55 +1,58 @@
 # Backlog
 
-Zurückgestellt, nicht verworfen. Vor neuen Plänen hier nachsehen.
+Deferred, not discarded. Check here before new plans.
 
-## Claude-Anbindung
-- Connector für claude.ai, Desktop und Mobile; braucht OAuth und öffentliche Erreichbarkeit
-- Knopf startet Cloud-Session über Scheduled Task mit API-Trigger
-- Serverseitiger Agent mit eigenem API-Key
-- Andere LLMs über MCP
+## Claude integration
+- Connector for claude.ai, desktop and mobile; needs OAuth and public reachability
+- Button starts a cloud session through a scheduled task with an API trigger
+- Server-side agent with its own API key
+- Other LLMs through MCP
 
-## Proaktivität
-- Weitere fünf Schalter: Paper-Vorschläge, Zitate vormarkieren, Stil, PDF-Optik, Paraphrasen
-- Stufe Auto für proaktive Funktionen
-- Obergrenze pro Projekt
+## Proactivity
+- Five more switches: paper suggestions, pre-marking citations, style, PDF look, paraphrases
+- Auto level for proactive functions
+- Cap per project
 
-## Versionierung
-- Echte Agent-Branches mit Git-Fenster
-- Gezieltes Direktschreiben ohne Track Change
+## Versioning
+- Real agent branches with a Git window
+- Targeted direct writing without a track change
 
-## Forschung und Daten
-- Peer-Review-Antwort: Gutachterpunkte, Antwortbrief, Vergleich zur eingereichten Fassung
-- Betreuerzugang, Gliederung mit zugeordneten Quellen
-- Abgabecheck vor der Einreichung
-- Codebuch mit Intercoder-Übereinstimmung
-- Pseudonymisierung und Datenschutz-Schalter pro Quelle
-- Audio- und Videotranskription
-- Literatur-Alerts, systematischer Review
-- Skriptausführung auf dem Server
+## Research and data
+- Peer review response: reviewer points, response letter, comparison with the submitted version
+- Supervisor access, outline with assigned sources
+- Submission check before filing
+- Codebook with intercoder agreement
+- Pseudonymization and a privacy switch per source
+- Audio and video transcription
+- Literature alerts, systematic review
+- Script execution on the server
 
 ## Tests
-- Cypress-Tests von Overleaf (`server-ce/test`) im Dev-Stack und in der CI
-- Acceptance-Tests des web-Dienstes (`services/web/test/acceptance`)
-- P1-Frontend-Test „Prüfbericht-Panel blendet mit ‚Nur Probleme‘ grüne Zeilen aus“ schwankt im Gesamtlauf; auf `findBy…` umstellen
-- Sinngemäße Suche mit echtem Modell (`multilingual-e5-small`) automatisch prüfen, heute nur von Hand
+- Overleaf's Cypress tests (`server-ce/test`) in the dev stack and in CI
+- Acceptance tests of the web service (`services/web/test/acceptance`)
+- P1 frontend test "check report panel hides green rows with 'Nur Probleme'" is flaky in the full run; switch it to `findBy…`
+- Check semantic search with the real model (`multilingual-e5-small`) automatically; today it is only checked by hand
 
-## Betrieb
-- Semantische Suche über Postgres mit pgvector, falls Brute Force nicht mehr reicht
-- Kurze Tokens mit OAuth
-- Ratenlimits für Webseiten-Aufnahme und Kommentare; OCR-Grenze je Projekt und Seitenobergrenze
-- SSRF-Schutz (`netz.mjs`) auch für `linked-url-proxy` nutzen und `Settings.blockedNetworks` beachten
+## Operations
+- Semantic search over Postgres with pgvector, if brute force is no longer enough
+- Short-lived tokens with OAuth
+- Rate limits for web page capture and comments; OCR limit per project and page cap
+- Use SSRF protection (`netz.mjs`) for `linked-url-proxy` as well and respect `Settings.blockedNetworks`
 
-## Oberfläche
-- Abzeichen „Nicht frei“ in der Recherche hat zu wenig Kontrast
-- Schmales Recherche-Panel: Suchfeld abgeschnitten, Reiter untereinander
-- Gemischte Menüsprache im Editor (File, Insert, View neben Bearbeiten, Hilfe)
-- Markierungen auch im Seitentext der Quellen-Vorschau hervorheben
+## Interface
+- The "Nicht frei" badge in research has too little contrast
+- Narrow research panel: search field cut off, tabs stacked
+- Mixed menu languages in the editor (File, Insert, View next to Bearbeiten, Hilfe)
+- Also highlight markings in the page text of the source preview
 
-## Vor dem jeweiligen Plan ins Image
-- P2: `@huggingface/transformers` für die semantische Suche
-- P4: `tesseract-ocr` mit Sprachdaten
+## Before the respective plan, into the image
+- P2: `@huggingface/transformers` for semantic search
+- P4: `tesseract-ocr` with language data
 
-## Ungeklärt
-- Link-Resolver für TIB und LUH
-- Marken- und Logo-Regeln von Overleaf für Forks; rechtlich prüfen lassen
-- Consumer Terms Abschnitt 11 für EWR-Nutzer in der Hochschulforschung
+## Open questions
+- Link resolver for TIB and LUH
+- Overleaf's brand and logo rules for forks; have a lawyer review them
+- Consumer Terms section 11 for EEA users in university research
+
+## Translations
+- Overleaf's German language file lacks 1616 keys that the English one has (`services/web/locales/de.json` has 2445 keys, `en.json` has 4060; one key exists only in `de.json`)

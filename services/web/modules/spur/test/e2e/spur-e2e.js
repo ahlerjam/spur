@@ -768,7 +768,7 @@ async page => {
         'quote_mark', 'check_report', 'bib_list', 'doc_edit', 'doc_create', 'run_status',
         'run_finish', 'wait_for_event', 'events_since', 'reply',
       ]
-      // P2 ergänzt laut docs/mcp-vertrag.md Recherche, Aufnahme, Matrix und Compile.
+      // P2 ergänzt laut docs/mcp-contract.md Recherche, Aufnahme, Matrix und Compile.
       const P2 = [
         'paper_search', 'paper_citations', 'source_add', 'acquisition_add', 'matrix_suggest',
         'compile', 'job_status', 'compile_log', 'page_image',
@@ -2085,6 +2085,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   features.p4f4 = async () => {
     const HINWEIS =
       'Transkripte gehen beim Lesen durch Claude an den KI-Anbieter. Pseudonymisiere Interviews am besten vor dem Hochladen.'
+    // Die README ist englisch (spur_transkript_hinweis in en.json); die Oberfläche der E2E-Instanz bleibt deutsch.
+    const README_HINWEIS =
+      'Transcripts are sent to the AI provider when Claude reads them. Ideally, pseudonymise interviews before uploading them.'
     await anmelden('e2e-a@example.org')
     await projektOeffnen('E2E Transkript')
     await panelOeffnen('Quellen')
@@ -2102,8 +2105,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await hinweis.waitFor({ state: 'detached' })
 
     const readme = await repoDatei(`${FIXTURES}/../../../../../../README.md`)
-    const abschnitt = readme.split('\n## ').find(teil => teil.startsWith('Claude und Ihre Daten'))
-    ok(abschnitt?.includes(HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude und Ihre Daten“')
+    const abschnitt = readme.split('\n## ').find(teil => teil.startsWith('Claude and your data'))
+    ok(abschnitt?.includes(README_HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude and your data“')
   }
 
   // P3: Ada (e2e-p3a) und Bo (e2e-p3b) haben je ein festes Test-Token aus vorbereiten.mjs.
@@ -3036,6 +3039,31 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       })
     }
     ok((await promptText('quellen_sammeln', { thema: 'Schlaf' })) === viaMcp, 'Standardtext nicht wiederhergestellt')
+  }
+
+  features.p5f8 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const teile = ['### Prerequisites', 'make start', '### First admin account', '/launchpad', '### Settings', 'SPUR_URL', 'SPUR_PORT', 'SPUR_IMAGE', 'OVERLEAF_SITE_LANGUAGE', '### Public operation', 'docker-compose.sandbox.yml', '#### HTTPS', 'reverse_proxy', '### Backup']
+    const stellen = teile.map(t => readme.indexOf(t))
+    ok(stellen.every((x, i) => x > 0 && (i === 0 || x > stellen[i - 1])), `Installation in falscher Reihenfolge: ${JSON.stringify(teile.map((t, i) => [t, stellen[i]]))}`)
+    ok(/MongoDB 8/.test(readme) && readme.includes('git clone'), 'Voraussetzungen oder git clone fehlen')
+    for (const name of ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln']) {
+      ok(readme.includes(`/plugin:spur:spur:${name}`), `README ohne /plugin:spur:spur:${name}`)
+    }
+    for (const befehl of ['claude plugin marketplace add ahlerjam/spur', 'claude plugin install spur@spur', START]) {
+      ok(readme.includes(befehl), `README ohne Schritt: ${befehl.slice(0, 40)}`)
+    }
+    for (const datei of ['README.md', 'CLAUDE.md', 'docs/backlog.md', 'docs/mcp-contract.md', 'plugins/spur/skills/spur/SKILL.md']) {
+      const text = await repoDatei(`${REPO}/${datei}`)
+      ok(!/[–—]/.test(text), `${datei} enthält Gedankenstriche`)
+      const deutsch = (text.replace(/`[^`]*`|„[^“]*“|"[^"]*"/g, '').match(/\b(und|nicht|oder|wird|werden|Sie)\b/g) ?? []).length
+      ok(deutsch === 0, `${datei}: ${deutsch} deutsche Wörter außerhalb von Code und Zitaten`)
+    }
+    const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
+    const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
+    ok(eintraege === 35, `Backlog hat ${eintraege} Einträge statt 35`)
+    ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /1616/.test(backlog), 'Backlog ohne Transformers, Tesseract oder 1616 Übersetzungen')
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

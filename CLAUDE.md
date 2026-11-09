@@ -1,29 +1,29 @@
 # spur
 
-Agentische Schreibumgebung für wissenschaftliche Arbeiten auf Basis von Overleaf.
+Agentic writing environment for academic papers, built on Overleaf.
 
-## Befehle
+## Commands
 
-- Stack starten: `spur-dev up`, stoppen: `spur-dev down`, zurücksetzen: `spur-dev reset`
-- Nach Änderungen am Frontend: `spur-dev reload` (Webpack ohne Netz, dann Neustart)
-- Nach Änderungen am Backend: `spur-dev restart`
-- Unit-Tests: `spur-dev test` (mit Abdeckungsbericht, Schwelle 80 % der Zeilen)
-- Overleafs Suiten: `spur-dev upstream web|frontend|du|alle`, einzelne Dateien als weitere Argumente (Pfad relativ zum Dienst). Ausgabe endet mit „bestanden, fehlgeschlagen, bekannt, neu“; Exit 1 nur bei neuen Fehlern, Exit 2, wenn eine angegebene Datei fehlt, ausgeschlossen ist oder keine Tests enthält, oder wenn gar kein Test läuft
-- Dreier-Vergleich `main`, `ext-ce`, aktueller Stand: `spur-dev upstream vergleich` schreibt `tools/tests/upstream-bekannt.json` neu (etwa 40 Minuten). Ausschlüsse mit Grund in `tools/tests/upstream-ausschluss.json`
-- Tests der Auswertung: `node --test tools/tests/upstream-auswertung.test.mjs`
-- Testkonto: `spur-dev user mail@example.org` liefert den Aktivierungslink. Das Konto ist Admin; Rechteprüfungen brauchen Konten ohne Admin.
-- E2E: alle Features in einem Lauf. Die Suite setzt ihre Daten vorher selbst zurück (Dev-Route `POST /spur/dev/e2e/vorbereiten`, nur mit `SPUR_DEV`); `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` tut dasselbe von außen. `spur-dev up` legt `services/web/modules/spur/dev-schalter.json` mit dem Crossref-Fake an, falls sie fehlt
-- Skript im Container: `spur-dev run modules/spur/test/skript.mjs` (Pfad relativ zu `services/web`)
-- Mongo: `spur-dev mongo 'db.users.countDocuments()'`, Sicherung: `spur-dev dump`, `spur-dev restore`
-- Migrationen: `spur-dev migrate migrate -t server-ce`, zurück: `spur-dev migrate rollback -t server-ce <name>`
-- Logs: `spur-dev logs web 100`, andere Dienste wie `clsi` oder `document-updater`
+- Start the stack: `spur-dev up`, stop it: `spur-dev down`, reset it: `spur-dev reset`
+- After changes to the frontend: `spur-dev reload` (Webpack without network, then restart)
+- After changes to the backend: `spur-dev restart`
+- Unit tests: `spur-dev test` (with coverage report, threshold 80 % of lines)
+- Overleaf's suites: `spur-dev upstream web|frontend|du|alle`, single files as further arguments (path relative to the service). The output ends with "bestanden, fehlgeschlagen, bekannt, neu"; exit 1 only on new failures, exit 2 if a given file is missing, excluded or contains no tests, or if no test runs at all
+- Three-way comparison `main`, `ext-ce`, current state: `spur-dev upstream vergleich` rewrites `tools/tests/upstream-bekannt.json` (about 40 minutes). Exclusions with reasons are in `tools/tests/upstream-ausschluss.json`
+- Tests of the evaluation: `node --test tools/tests/upstream-auswertung.test.mjs`
+- Test account: `spur-dev user mail@example.org` returns the activation link. The account is an admin; permission checks need accounts without admin rights.
+- E2E: all features in one run. The suite resets its data beforehand itself (dev route `POST /spur/dev/e2e/vorbereiten`, only with `SPUR_DEV`); `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` does the same from outside. `spur-dev up` creates `services/web/modules/spur/dev-schalter.json` with the Crossref fake if it is missing
+- Script in the container: `spur-dev run modules/spur/test/skript.mjs` (path relative to `services/web`)
+- Mongo: `spur-dev mongo 'db.users.countDocuments()'`, backup: `spur-dev dump`, `spur-dev restore`
+- Migrations: `spur-dev migrate migrate -t server-ce`, roll back: `spur-dev migrate rollback -t server-ce <name>`
+- Logs: `spur-dev logs web 100`, other services such as `clsi` or `document-updater`
 
-Die Quelle von `spur-dev` liegt in `tools/spur-dev/`. Ein Mensch installiert sie mit `tools/spur-dev/spur-dev install` als feste Kopie außerhalb des Repos; Änderungen an der Quelle wirken erst nach erneutem `install`. `spur-dev` hängt den aktuellen Worktree in das Image `ghcr.io/ahlerjam/spur-dev` ein. Es läuft als einziger Befehl außerhalb der Sandbox, und nur als alleinstehender Aufruf: Mit `;`, `&&`, Pipe oder Umleitung bleibt er in der Sandbox und erreicht Docker nicht. Freies `docker` ist gesperrt.
+The source of `spur-dev` is in `tools/spur-dev/`. A human installs it with `tools/spur-dev/spur-dev install` as a fixed copy outside the repo; changes to the source only take effect after running `install` again. `spur-dev` mounts the current worktree into the image `ghcr.io/ahlerjam/spur-dev`. It is the only command that runs outside the sandbox, and only as a standalone call: with `;`, `&&`, a pipe or a redirect it stays in the sandbox and does not reach Docker. Plain `docker` is blocked.
 
-Neue npm-Pakete brauchen einen neuen Lauf des Workflows `Dev image`. In einem Builder-Lauf sind sie ein Stoppgrund.
+New npm packages need a new run of the workflow `Dev image`. In a builder run they are a reason to stop.
 
 ## Tests (TDD)
 
-Test zuerst: Neue oder geänderte Server-Logik beginnt mit einem roten Unit-Test unter `services/web/modules/spur/test/unit`, jeder behobene Fehler mit einem Test, der ihn nachstellt. Neue Oberflächen bekommen Frontend-Tests und Schritte in der E2E-Suite. Overleafs eigene Suiten bleiben grün bis auf die Liste bekannter Upstream-Fehler (`tools/tests/upstream-bekannt.json`); ein Eintrag mit Herkunft `spur` ist nicht erlaubt.
+Test first: new or changed server logic starts with a red unit test under `services/web/modules/spur/test/unit`, and every fixed bug with a test that reproduces it. New interfaces get frontend tests and steps in the E2E suite. Overleaf's own suites stay green except for the list of known upstream failures (`tools/tests/upstream-bekannt.json`); an entry with origin `spur` is not allowed.
 
-Testartefakte, Screenshots und Hilfsskripte gehören nicht ins Repo.
+Test artifacts, screenshots and helper scripts do not belong in the repo.
