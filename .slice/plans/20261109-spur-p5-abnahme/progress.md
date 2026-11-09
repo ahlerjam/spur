@@ -29,4 +29,7 @@
 - Test `test/unit/sprachdateien.test.mjs` zuerst rot: 19 siezende `spur_`-Schlüssel (darunter `spur_du: Sie` und `spur_von_ihnen: von Ihnen` für Absender im Chat und an Zitaten), die Spec schätzte 20.
 - humanizer-de, Modus sachlich, Sammelcheck über alle neuen und geänderten deutschen Texte (f1, f3, f4): Muster 0, Register 0 (keine gemischte Anrede), Unicode 0. Zwei Rhythmus-Treiber (`subject_initial_ratio` 0,884, gleich lange Absätze) entstehen, weil die Prüfdatei eine Liste einzelner UI-Sätze ist; laut Carve-out kein Befund. Eine Änderung aus der Prüfung: „Sie belegen kein Zitat“ (dritte Person, aber wie Anrede gelesen) heißt jetzt „Ein Zitat belegen sie nicht.“
 
+## Englische Texte (humanizer)
+- Audit aller 131 neuen oder geänderten Einträge in `en.json` (f2, f3, f5, f6, f7): keine Gedankenstriche, keine „not X but Y“-Muster, keine Werbe- oder Füllwörter, keine Chat-Reste. Geändert: „a number from 1 or “max”“ → „a number of 1 or more, or “max”“ (zweimal), „The direction is …“ → „The direction must be …“, „Open large“ → „Open in large view“. Gerade und typografische Anführungszeichen bleiben wie in Overleafs `en.json` gemischt (laut Skill allein kein Befund).
+
 ## Needs decision
