@@ -30,13 +30,19 @@ const ENTITAETEN = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
 const entitaeten = text =>
   text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (ganz, e) => {
     if (e[0] !== '#') return ENTITAETEN[e.toLowerCase()] ?? ganz
-    const zahl = Number(e[1] === 'x' ? `0${e.slice(1)}` : e.slice(1))
+    const zahl = Number(e[1].toLowerCase() === 'x' ? `0x${e.slice(2)}` : e.slice(1))
     return zahl <= 0x10ffff ? String.fromCodePoint(zahl) : ganz
   })
 // Crossref liefert JATS; die Überschrift „Abstract“ gehört nicht zum Text.
 const ohneTags = text =>
   leerzeichen(
-    entitaeten(text?.replace(/<jats:title>[^<]*<\/jats:title>/g, '').replace(/<[^>]+>/g, ' ') ?? '').replace(/\s+([.,;:])/g, '$1')
+    entitaeten(
+      text
+        ?.replace(/<jats:title>[^<]*<\/jats:title>/g, '')
+        // Inline-Auszeichnung (H<sub>2</sub>O, kursiv) gehört zum Wort, Absätze trennen.
+        .replace(/<\/?(?:jats:)?(?:sub|sup|italic|bold|sc|underline|monospace)\b[^>]*>/g, '')
+        .replace(/<[^>]+>/g, ' ') ?? ''
+    ).replace(/\s+([.,;:])/g, '$1')
   ) || null
 
 // OpenAlex liefert Abstracts als Wort → Positionen.

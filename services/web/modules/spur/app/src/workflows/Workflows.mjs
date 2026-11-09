@@ -32,7 +32,9 @@ export async function text(name) {
 function eingabenZeilen(name, { fokus, thema, anzahl }) {
   if (!STANDARD[name].eingaben) return fokus ? [`Fokus: ${fokus}`] : []
   // Eine Zeile: Ein Umbruch im Thema könnte sonst eigene Zeilen wie „Anzahl: …“ in den Auftrag schreiben.
-  if (typeof thema !== 'string' || !/^[^\p{Cc}\u2028\u2029]{1,300}$/u.test(thema.trim())) {
+  // Tabs und mehrfache Leerzeichen (aus Tabellen kopiert) werden zu einem Leerzeichen; Zeilentrenner bleiben verboten.
+  const text = typeof thema === 'string' ? thema.replace(/[\t ]+/g, ' ').trim() : ''
+  if (!/^[^\p{Cc}\u2028\u2029]{1,300}$/u.test(text)) {
     throw new Problem(422, 'thema', 'spur_fehler_thema_fehlt')
   }
   const wert = typeof anzahl === 'number' ? String(anzahl) : (anzahl ?? '20')
@@ -40,7 +42,7 @@ function eingabenZeilen(name, { fokus, thema, anzahl }) {
     throw new Problem(422, 'anzahl', 'spur_fehler_anzahl')
   }
   return [
-    `Thema: ${thema.trim()}`,
+    `Thema: ${text}`,
     wert.trim() === 'max' ? 'Anzahl: max. Es gibt keine Obergrenze; arbeite in Etappen.' : `Anzahl: ${wert.trim()}`,
   ]
 }

@@ -95,8 +95,8 @@ export default function ClaudeVerbinden() {
             <p className="small">{t('spur_token_einmalig')}</p>
             <ol className="spur-schritte">
               {schritte(neu).map(schritt => (
-                // Neuer Befehl (neues Token): neuer Kasten, der Knopf zeigt wieder „Kopieren“.
-                <li key={schritt.befehl}>
+                // Neues Token: alle drei Kästen neu, jeder Knopf zeigt wieder „Kopieren“.
+                <li key={`${neu}-${schritt.titel}`}>
                   <h6>{t(schritt.titel)}</h6>
                   <p className="small">{t(schritt.text)}</p>
                   <BefehlKasten befehl={schritt.befehl} />

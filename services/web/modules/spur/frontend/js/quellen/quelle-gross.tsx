@@ -92,7 +92,7 @@ export default function QuelleGross({
               <pre className="spur-seitentext" ref={setTextElement}>
                 {seite.text}
               </pre>
-              <Zitate quelle={quelle} seite={nummer} textElement={textElement} />
+              <Zitate quelle={quelle} seite={nummer} textElement={textElement} ohneEinfuegen />
             </>
           ) : (
             seite && <p className="spur-leer">{t('spur_kein_text')}</p>

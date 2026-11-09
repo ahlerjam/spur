@@ -36,10 +36,13 @@ export default function Zitate({
   quelle,
   seite,
   textElement,
+  ohneEinfuegen = false,
 }: {
   quelle: Quelle
   seite: number
   textElement: HTMLElement | null
+  // In der großen Ansicht läge der Editor hinter dem Dialog.
+  ohneEinfuegen?: boolean
 }) {
   const { t } = useTranslation()
   const {
@@ -56,7 +59,7 @@ export default function Zitate({
   const [notizen, setNotizen] = useState<Notizen>({})
   const auswahl = useAuswahlIn(textElement)
   const basis = `/quellen/${quelle.id}/zitate`
-  const kannEinfuegen = darfSchreiben && Boolean(view)
+  const kannEinfuegen = darfSchreiben && Boolean(view) && !ohneEinfuegen
 
   const laden = useCallback(async () => {
     const antwort = await anfrage<{ zitate: Zitat[] }>(projektPfad(basis))

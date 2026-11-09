@@ -65,6 +65,7 @@ describe('Workflows', () => {
   it('Quellen sammeln: Anzahl 20 ohne Angabe, „max“ ohne Obergrenze in Etappen', async () => {
     expect(await W.promptText('quellen_sammeln', { thema: 'Schlaf' })).toContain('Anzahl: 20')
     expect(await W.promptText('quellen_sammeln', { thema: 'Schlaf', anzahl: null })).toContain('Anzahl: 20')
+    expect(await W.promptText('quellen_sammeln', { thema: 'Schlaf\tund  Gedächtnis' })).toContain('Thema: Schlaf und Gedächtnis')
     const max = await W.promptText('quellen_sammeln', { thema: 'Schlaf', anzahl: 'max' })
     expect(max).toMatch(/Anzahl: max\. Es gibt keine Obergrenze/)
     expect(max).toMatch(/Etappen/)

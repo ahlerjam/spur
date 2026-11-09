@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ClaudeVerbinden, {
   startBefehl,
 } from '@modules/spur/frontend/js/claude/claude-verbinden'
@@ -110,8 +110,9 @@ describe('Claude verbinden', function () {
     render(<ClaudeVerbinden />)
     fireEvent.click(screen.getByRole('button', { name: 'Token erzeugen' }))
     await screen.findByText(/token=token-1/)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Kopieren' })[0])
     fireEvent.click(screen.getAllByRole('button', { name: 'Kopieren' })[1])
-    await screen.findByRole('button', { name: 'Kopiert' })
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Kopiert' })).to.have.length(2))
     fireEvent.click(screen.getByRole('button', { name: 'Token erzeugen' }))
     await screen.findByText(/token=token-2/)
     expect(screen.queryByRole('button', { name: 'Kopiert' })).to.equal(null)

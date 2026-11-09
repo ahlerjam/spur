@@ -111,7 +111,8 @@ export default function QuelleVorschau({
         ) : (
           seite && <p className="spur-leer">{t('spur_kein_text')}</p>
         )}
-        {seite?.text.trim() && (
+        {/* Solange die große Ansicht offen ist, arbeitet nur deren Zitatliste (sonst doppelte IDs und Zustände). */}
+        {seite?.text.trim() && !gross && (
           <Zitate quelle={quelle} seite={nummer} textElement={textElement} />
         )}
         {darfSchreiben && seite && quelle.art === 'pdf' && seite.text.trim() && (

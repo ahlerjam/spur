@@ -58,6 +58,10 @@ describe('Quelle groß öffnen', function () {
     const dialog = await screen.findByRole('dialog')
     const im = within(dialog)
     im.getByRole('heading', { name: 'smith2024.pdf' })
+    // Nur eine Zitatliste: die der Vorschau ruht, solange die große Ansicht offen ist.
+    await im.findByText('Text der Seite 1.')
+    expect(screen.getAllByText('Gespeicherte Zitate')).to.have.length(1)
+    expect(im.queryByRole('button', { name: 'Einfügen' })).to.equal(null)
     await im.findByText('Seite 1 von 3')
     await im.findByText('Text der Seite 1.')
     expect(im.getByRole('button', { name: 'Vorherige Seite' })).to.have.property('disabled', true)

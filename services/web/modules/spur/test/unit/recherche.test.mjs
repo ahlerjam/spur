@@ -171,7 +171,7 @@ describe('suchen', () => {
               {
                 DOI: '10.1038/nrn2762',
                 title: ['The memory function'],
-                abstract: '<jats:title>Abstract</jats:title><jats:p>Aus <jats:italic>Crossref</jats:italic> &amp; &lt;5 %.&#1114112;</jats:p>',
+                abstract: '<jats:title>Abstract</jats:title><jats:p>Aus <jats:italic>Crossref</jats:italic> &amp; &lt;5 %.&#1114112; H<jats:sub>2</jats:sub>O &#X41;</jats:p><jats:p>Zweiter.</jats:p>',
               },
             ],
           },
@@ -181,7 +181,7 @@ describe('suchen', () => {
     }
     const { treffer } = await suchen('sleep memory consolidation')
     const abstract = doi => treffer.find(t => t.doi === doi).abstract
-    expect(abstract('10.1038/nrn2762')).toBe('Aus Crossref & <5 %.&#1114112;')
+    expect(abstract('10.1038/nrn2762')).toBe('Aus Crossref & <5 %.&#1114112; H2O A Zweiter.')
     // Lange Abstracts werden gekürzt, damit eine Seite paper_search unter 10.000 Tokens bleibt.
     expect(abstract('10.48550/arxiv.2401.01234').startsWith('Aus S2. lang')).toBe(true)
     // 600 Zeichen enden genau im Emoji: gekürzt wird an Zeichen, nicht an UTF-16-Einheiten.
