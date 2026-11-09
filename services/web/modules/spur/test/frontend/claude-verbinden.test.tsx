@@ -87,6 +87,20 @@ describe('Claude verbinden', function () {
     expect(screen.getAllByRole('button', { name: 'Kopieren' })).to.have.length(2)
   })
 
+  it('bleibt ohne Zwischenablage (HTTP ohne TLS) bedienbar', async function () {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
+    const fehler: unknown[] = []
+    const merken = (e: PromiseRejectionEvent | ErrorEvent) => fehler.push(e)
+    window.addEventListener('error', merken)
+    render(<ClaudeVerbinden />)
+    fireEvent.click(screen.getByRole('button', { name: 'Token erzeugen' }))
+    await screen.findByText('So verbindest du Claude Code')
+    expect(() => fireEvent.click(screen.getAllByRole('button', { name: 'Kopieren' })[0])).not.to.throw()
+    window.removeEventListener('error', merken)
+    expect(fehler).to.deep.equal([])
+    expect(screen.getAllByRole('button', { name: 'Kopieren' })).to.have.length(3)
+  })
+
   it('zeigt nach einem neuen Token wieder „Kopieren“', async function () {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true })
     let nr = 0

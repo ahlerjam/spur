@@ -103,6 +103,8 @@ Bilder im Scratchpad `.playwright-mcp/bilder/` (gitignoriert): Projektliste, Tok
 - Zweite Sicherheitsprüfung (Opus, nur lesend): „Keine Befunde mit Konfidenz ≥ 8.“
 - `spur-dev test` grün (Zeilen 94,67 %); Stack mit `spur-dev up` neu gebaut.
 
+- Rot-Beleg der zweiten Runde (Tests unverändert, Code vorübergehend auf b550d85368): `workflows.test.mjs` 2 rot („Es wurde kein Fehler geworfen“ für U+2028/Steuerzeichen; `anzahl: null` → „Enter a number …“), `recherche.test.mjs` 1 rot (`Cannot read properties of undefined (reading 'abstract')`: der RangeError nahm Crossref heraus), neuer Frontend-Test „bleibt ohne Zwischenablage bedienbar“ rot (`expected [ …(2) ] to deeply equal []`). Gegen den Endstand: web 26/0 neu, frontend 5/0 neu.
+
 ## Endgültiger Gesamtlauf (a3ac6cd3b9)
 - 42/42 ok in 443 s, beim ersten Versuch.
 
