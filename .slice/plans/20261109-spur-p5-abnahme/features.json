@@ -98,7 +98,7 @@
     "Die Admin-Seite `/spur/admin/workflows` (e2e-admin@example.org) zeigt den vierten Text und lässt ihn ändern und zurücksetzen wie die anderen; README und MCP-Vertrag nennen `/plugin:spur:spur:quellen_sammeln`; der Befehlsnamen-Test kennt vier Workflows",
     "Panel und Formular bei 360 und 1280 px ohne Überlauf und ohne Konsolenfehler"
    ],
-   "passes": false
+   "passes": true
   },
   {
    "id": "f8",
