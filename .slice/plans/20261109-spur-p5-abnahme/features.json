@@ -1,0 +1,118 @@
+{
+ "features": [
+  {
+   "id": "f1",
+   "title": "spur ist überall als „spur“ zu erkennen, ohne Overleaf-Logo",
+   "ui": true,
+   "steps": [
+    "Angemeldet als e2e-a@example.org zeigt die Projektliste oben links den Text „spur“ und kein Bild mit dem Overleaf-Logo (kein Element `.navbar-logo`, kein `overleaf`-SVG im Kopf)",
+    "In den Kontoeinstellungen (`/user/settings`) steht oben links ebenfalls „spur“",
+    "Im Editor des Projekts „E2E APA“ steht oben links der Schriftzug „spur“ statt des Overleaf-„O“; im Kopfbereich lädt keine Datei `overleaf-o-*.svg`",
+    "Klick auf den Schriftzug im Editor führt zur Projektliste `/project`; per Tastatur (Tab bis zum Schriftzug, Enter) ebenso; der zugängliche Name lautet „spur, zur Projektliste“",
+    "Bei 360 und 1280 px Breite, hellem und dunklem Design ist der Schriftzug lesbar (Kontrast mindestens 4,5:1), ohne Überlauf und ohne Konsolenfehler"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f2",
+   "title": "Seitenmenü und Fußzeile sind kurz und eindeutig beschriftet",
+   "ui": true,
+   "steps": [
+    "In der Projektliste (1280 × 690 px) heißt die Überschrift über den Stichwörtern „Stichwörter“; der Text „Stichwörter organisieren“ kommt nirgends mehr vor",
+    "Das Element `.project-list-sidebar-scroll` hat bei 1280 px keine horizontale Rollleiste: `scrollWidth` ist höchstens `clientWidth`; unten im Seitenmenü erscheint kein Balken zum Ziehen",
+    "Die unterste Zeile des Seitenmenüs lautet „Overleaf CE+ · spur“",
+    "Die Fußzeile der Kontoeinstellungen zeigt rechts den Link „spur @ GitHub“ auf https://github.com/ahlerjam/spur; „spur auf GitHub“ kommt nicht mehr vor",
+    "Mit Stichwort: „Neues Stichwort“ anlegen mit Namen „Diss“, Projekt „E2E APA“ zuordnen, Klick auf „Diss“ zeigt nur dieses Projekt; danach Stichwort löschen. Bei 360 px kein horizontales Rollen der Seite, keine Konsolenfehler"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f3",
+   "title": "Claude Code verbinden mit einer Anleitung in drei Schritten",
+   "ui": true,
+   "steps": [
+    "Kontoeinstellungen, „Token erzeugen“: Es erscheint die Überschrift „So verbindest du Claude Code“ und darunter „Deinen Schlüssel siehst du nur jetzt. Kopiere die Befehle, bevor du die Seite verlässt.“",
+    "Darunter stehen drei nummerierte Schritte mit den Titeln „spur bei Claude Code bekannt machen“, „spur mit deinem Konto verbinden“ und „Claude Code starten“, jeweils mit dem festgelegten Erklärtext, einem eigenen Befehlskasten und einem Knopf „Kopieren“",
+    "Schritt 1 enthält genau `claude plugin marketplace add ahlerjam/spur`; Schritt 2 genau `claude plugin install spur@spur --config server_url=http://localhost:8080/spur/mcp --config token=<neues Token>`; Schritt 3 genau den Startbefehl `claude --allowedTools \"…\"` mit den sechs Schreibwerkzeugen",
+    "Klick auf „Kopieren“ in Schritt 2 legt genau diesen einen Befehl in die Zwischenablage (per `navigator.clipboard.readText()` geprüft, mit dem Token); der Knopf zeigt danach „Kopiert“, die anderen beiden Knöpfe weiter „Kopieren“",
+    "Bei 360 px Breite brechen alle drei Befehle im Kasten um: kein Kasten ist breiter als sein Container, kein Text wird abgeschnitten, die Seite rollt nicht seitlich",
+    "Im Claude-Panel eines Projekts ohne Verbindung steht der Startbefehl im selben Kasten mit Knopf „Kopieren“; bei Standardbreite des Panels ist der ganze Befehl sichtbar (umgebrochen, nicht abgeschnitten); Kopieren liefert genau den Startbefehl",
+    "Mit Sprache Englisch (Frontend-Test mit en.json) erscheinen die englischen Texte der Anleitung; kein deutscher Text bleibt stehen"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f4",
+   "title": "spur duzt durchgehend wie Overleaf",
+   "ui": true,
+   "steps": [
+    "Ein Test über alle `spur_`-Schlüssel in `de.json` findet kein „Sie“, „Ihr“, „Ihre“, „Ihren“, „Ihrem“ oder „Ihnen“ als Anrede; der Test ist zuerst rot (20 Treffer heute) und danach grün",
+    "In den Kontoeinstellungen lautet der Text bei „Claude verbinden“ in Du-Form, beginnend mit „Verbinde dein eigenes Claude Code.“",
+    "Leeres Quellen-Panel eines neuen Projekts und leere Zitatliste einer Quelle zeigen Du-Texte (zum Beispiel „Markiere oben Text und speichere ihn als Zitat.“)",
+    "Recherche-Panel leer zeigt „Suche nach einem Thema, einem Titel oder einer DOI.“; Vorschläge-Panel mit ausgeschalteten Auslösern zeigt den Du-Text",
+    "Alle geänderten deutschen Texte sind mit humanizer-de (Modus sachlich) geprüft; das Ergebnis steht in progress.md",
+    "Alle Panels bei 360 und 1280 px ohne Überlauf und ohne Konsolenfehler"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f5",
+   "title": "Fehlermeldungen von spur kommen in der Sprache der Installation",
+   "ui": true,
+   "steps": [
+    "Ein Test findet im Modul-Code keine `Problem`-Meldung mehr als festen Text: jede der heute 88 Stellen nutzt einen eigenen Sprachschlüssel; der Test ist zuerst rot und danach grün",
+    "Ein Test prüft, dass jeder `spur_`-Schlüssel in `de.json` und in `en.json` steht und Platzhalter in beiden Sprachen gleich sind",
+    "Am laufenden deutschen System: `POST /spur/project/<E2E Chat>/vorschlaege/tipp-pause` mit `doc_id` `aaaaaaaaaaaaaaaaaaaaaaaa` antwortet 404 mit `title` `doc_fehlt` und `detail` „Das Dokument gibt es nicht (mehr).“ (oder dem neuen Du-Text)",
+    "Im Browser: Eine Quelle mit Seitenbild aufrufen, deren Seite es nicht gibt (Seite 999), zeigt die deutsche Meldung im Panel als Hinweis, nicht als leere Fläche",
+    "Ein Server-Test mit Installationssprache Englisch liefert für denselben Fall `detail` auf Englisch („The document does not exist (anymore).“ oder sinngemäß) mit unverändertem `title` `doc_fehlt`; eine Meldung mit Platzhalter (Fassung länger als 200 Zeichen) setzt die Zahl 200 in beiden Sprachen ein",
+    "Über MCP liefert `doc_edit` mit falschem Alttext einen Werkzeugfehler mit unverändertem Fehlercode und Text in der Installationssprache"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f6",
+   "title": "Eine Quelle groß öffnen und darin arbeiten",
+   "ui": true,
+   "steps": [
+    "Im Projekt „E2E APA“ Quellen-Panel öffnen, PDF-Quelle öffnen: Bei 1280 px und Standardbreite des Panels stehen Zurück, Seitenangabe, Vorherige und Nächste Seite in einer Zeile (alle Knöpfe haben dieselbe obere Kante)",
+    "Über der Seite steht der Knopf „Groß öffnen“; Klick öffnet eine große Ansicht über dem Editor mit Titel der Quelle, Seitenangabe „Seite 1 von N“ und dem Seitenbild mindestens doppelt so breit wie im Panel",
+    "In der großen Ansicht: „Nächste Seite“ zeigt Seite 2, „Vorherige Seite“ wieder Seite 1; auf Seite 1 ist „Vorherige Seite“ deaktiviert",
+    "Zoom: Start 100 %; „Vergrößern“ zeigt 125 %, noch einmal 150 %; „Verkleinern“ zurück auf 125 %; bei 200 % ist „Vergrößern“ deaktiviert, bei 75 % „Verkleinern“; bei Zoom über 100 % lässt sich die Seite innerhalb der Ansicht rollen, die Seite selbst rollt nicht seitlich",
+    "Im Seitentext der großen Ansicht einen Satz markieren und als Zitat speichern: Das Zitat erscheint in der Zitatliste der großen Ansicht und nach dem Schließen auch im Panel",
+    "Esc schließt die Ansicht, der Fokus steht danach auf „Groß öffnen“; ebenso der Knopf „Schließen“",
+    "Bei 360 px füllt die große Ansicht den Bildschirm, alle Knöpfe bleiben erreichbar (mindestens 24 × 24 px); Web- und Scan-Quellen öffnen ebenfalls groß; keine Konsolenfehler"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f7",
+   "title": "Claude sammelt mit dem Workflow „Quellen sammeln“ Literatur zu einem Thema",
+   "ui": true,
+   "steps": [
+    "Im Claude-Panel des Projekts „E2E Workflows“ (e2e-p3a@example.org) listet „Workflows“ vier Einträge: Literaturüberblick, Methodenteil, Folien aus Paper und „Quellen sammeln“ mit Befehl `/plugin:spur:spur:quellen_sammeln`",
+    "„Quellen sammeln“ fragt nach Thema und Anzahl (Feld vorbelegt mit 20); ohne Thema meldet das Formular „Gib ein Thema an.“; Anzahl „abc“ oder „0“ meldet „Gib eine Zahl ab 1 oder „max“ an.“; beide Meldungen stehen am Feld und sind per Screenreader verknüpft",
+    "Mit Thema „Schlaf und Gedächtnis“ und Anzahl „30“ erhält der Fake-Client per `events_since` ein `task_created` mit `workflow` `quellen_sammeln`; der Text enthält das Thema, die Zahl 30 und die fünf Schritte (Suche mit Zitationen, Vorauswahl nach Relevanz und Zitationen ohne Duplikate, Abstract bewerten mit Begründung, aufnehmen oder Beschaffungsliste, Zusammenfassung mit Zahlen)",
+    "Mit Anzahl „max“ sagt der Text, dass es keine Obergrenze gibt und Claude in Etappen arbeitet",
+    "MCP `prompts/list` enthält `quellen_sammeln` mit den Argumenten `thema` (Pflicht) und `anzahl`; `prompts/get` mit `thema=Schlaf` liefert denselben Text wie das Panel",
+    "Fake-Client führt den Ablauf mit dem Paper-Fake aus: `paper_search` liefert je Treffer ein Abstract (Feld `abstract`, bei fehlendem Abstract leer); ein freies wichtiges Paper per `source_add` erscheint im Quellen-Panel, ein nicht freies per `acquisition_add` auf der Beschaffungsliste; ein schon vorhandenes Paper wird nicht doppelt aufgenommen (Antwort nennt es als vorhanden)",
+    "Die Admin-Seite `/spur/admin/workflows` (e2e-admin@example.org) zeigt den vierten Text und lässt ihn ändern und zurücksetzen wie die anderen; README und MCP-Vertrag nennen `/plugin:spur:spur:quellen_sammeln`; der Befehlsnamen-Test kennt vier Workflows",
+    "Panel und Formular bei 360 und 1280 px ohne Überlauf und ohne Konsolenfehler"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f8",
+   "title": "README und Doku sind auf Englisch und erklären die Installation",
+   "steps": [
+    "README.md, CLAUDE.md, alle Dateien unter `docs/` und `plugins/spur/skills/spur/SKILL.md` sind auf Englisch; `grep` nach typisch deutschen Wörtern („und“, „der“, „nicht“, „Sie“) in diesen Dateien findet nur Eigennamen, Code oder UI-Zitate",
+    "Die README beschreibt die Installation in dieser Reihenfolge: Voraussetzungen (Docker mit Compose, make, Kernel-Hinweis zu MongoDB 8), `git clone` und `make start`, erstes Admin-Konto unter `/launchpad`, Einstellungen (`SPUR_URL`, `SPUR_PORT`, `SPUR_IMAGE`, `OVERLEAF_SITE_LANGUAGE`), öffentlicher Betrieb mit Sandbox und HTTPS (Caddy-Beispiel bleibt), Backup",
+    "Die README nennt die vier Workflow-Befehle und die Claude-Anbindung in drei Schritten wie im Token-Dialog",
+    "Doku-Dateien mit deutschen Namen haben englische Namen; jeder relative Link in README, CLAUDE.md und `docs/` zeigt auf eine vorhandene Datei (Linkprüfung per Skript, Ausgabe in progress.md)",
+    "`docs/backlog.md` enthält alle bisherigen Einträge (gleiche Anzahl Spiegelstriche wie vorher, inklusive der Einträge zu Transformers und Tesseract), dazu den neuen Eintrag zu den 1616 fehlenden Overleaf-Übersetzungen",
+    "Alle englischen Texte sind mit dem Skill humanizer geprüft (keine Gedankenstriche, keine „not X but Y“-Muster); das Ergebnis steht in progress.md",
+    "`make test` und die vollständige E2E-Suite laufen grün; Overleafs Suiten bleiben grün bis auf die bekannte Upstream-Liste"
+   ],
+   "passes": false
+  }
+ ]
+}
