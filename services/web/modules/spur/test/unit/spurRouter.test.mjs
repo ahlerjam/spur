@@ -46,13 +46,16 @@ async function laden({ dev = false } = {}) {
   }))
   vi.doMock('../../../../app/src/infrastructure/RateLimiter.mjs', () => ({ RateLimiter: class { constructor(name) { this.name = name } } }))
   vi.doMock('../../app/src/schalter.mjs', () => ({ IST_DEV: dev }))
-  vi.doMock('../../app/src/SpurController.mjs', () =>
+  // Controller als Handler mit Namen; ihre echten Abhängigkeiten (Overleafs Modelle) braucht der Routentest nicht.
+  const handlerAttrappe = () =>
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
-  )
+  vi.doMock('../../app/src/SpurController.mjs', handlerAttrappe)
+  vi.doMock('../../app/src/vorschlaege/VorschlaegeController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
   vi.doMock('../../app/src/dev/DevSchalter.mjs', () => ({
     testseite: Object.assign(() => {}, { handler: 'testseite' }),
     zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
+    e2eVorbereiten: Object.assign(() => {}, { handler: 'e2eVorbereiten' }),
   }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
@@ -151,11 +154,12 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit) nur in der Dev-Umgebung', async () => {
+  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit, E2E-Daten) nur in der Dev-Umgebung', async () => {
     const dev = [
       ['use', '/spur/dev/crossref', 'paperFake'],
       ['get', '/spur/dev/web/testseite', 'testseite'],
       ['post', '/spur/dev/zeit', 'zeitSetzen'],
+      ['post', '/spur/dev/e2e/vorbereiten', 'e2eVorbereiten'],
     ]
     for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()
     await laden({ dev: true })

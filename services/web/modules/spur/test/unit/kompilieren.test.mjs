@@ -128,6 +128,12 @@ describe('Compile-Jobs', () => {
     expect(log.compile).toBe('success')
   })
 
+  it('liest die Fehler eines Compiles aus dem Editor über dessen Build', async () => {
+    const fehler = await Kompilieren.fehlerDesCompiles({ projectId, menschId: mensch, buildId: 'b-editor' })
+    expect(fehler.map(f => f.zeile)).toEqual([5, 9])
+    expect(String(fetch.mock.calls[0][0])).toContain('/build/b-editor/output/output.log')
+  })
+
   it('rendert eine Seite des letzten PDFs als PNG', async () => {
     await fertig((await Kompilieren.starten({ projectId, menschId: mensch, botId: bot })).job_id)
     const bild = await Kompilieren.seitenBild({ projectId, botId: bot, seite: 2 })

@@ -44,6 +44,8 @@ beforeEach(async () => {
       status: vi.fn(),
     },
     Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
+    Erwaehnung: { imThreadAntworten: vi.fn(async () => ({ nachricht_id: 'm1' })) },
+    Vorschlaege: { ARTEN: ['compile_fehler', 'belegloses_argument'], vorschlagen: vi.fn(async () => ({ vorschlag_id: 'v1' })) },
     Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
   }
   vi.resetModules()
@@ -62,6 +64,8 @@ beforeEach(async () => {
   vi.doMock('../../app/src/kompilieren/Kompilieren.mjs', () => m.Kompilieren)
   vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
   vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
+  vi.doMock('../../app/src/erwaehnung/Erwaehnung.mjs', () => m.Erwaehnung)
+  vi.doMock('../../app/src/vorschlaege/Vorschlaege.mjs', () => m.Vorschlaege)
   ;({ WERKZEUGE } = await import('../../app/src/mcp/werkzeuge.mjs'))
   recht.vergeben(anna, projekt, { stufe: 'owner' })
 })
@@ -79,6 +83,7 @@ describe('Rechte der Werkzeuge', () => {
     ['check_report', {}],
     ['bib_list', {}],
     ['reply', { text: 'Hallo' }],
+    ['suggest', { art: 'compile_fehler', titel: 'Fehler in Zeile 4', text: 'x' }],
     ['run_status', {}],
     ['paper_search', { anfrage: 'sleep' }],
     ['compile', {}],
@@ -306,6 +311,26 @@ describe('Schreiben', () => {
   it('reply speichert die Antwort für den Bot', async () => {
     expect(await aufruf('reply', { project_id: projekt, text: 'Erledigt' })).toEqual({ nachricht_id: 'n1' })
     expect(m.Inbox.antwortSpeichern).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), botId: bot, text: 'Erledigt' })
+  })
+
+  it('reply mit kommentar_id antwortet im Kommentar-Thread statt im Panel', async () => {
+    const thread = 'aaaaaaaaaaaaaaaaaaaaaaaa'
+    expect(await aufruf('reply', { project_id: projekt, text: 'Nicht belegt.', kommentar_id: thread })).toEqual({ nachricht_id: 'm1' })
+    expect(m.Erwaehnung.imThreadAntworten).toHaveBeenCalledWith({
+      projectId: new ObjectId(projekt),
+      threadId: thread,
+      botId: bot,
+      text: 'Nicht belegt.',
+    })
+    expect(m.Inbox.antwortSpeichern).not.toHaveBeenCalled()
+  })
+
+  it('suggest legt einen Vorschlag des Bots ins Panel, auch mit Leserecht', async () => {
+    mitStufe('readOnly')
+    const args = { art: 'belegloses_argument', titel: 'Beleg fehlt', text: 'Quelle ergänzen.', pfad: 'main.tex' }
+    expect(await aufruf('suggest', { project_id: projekt, ...args })).toEqual({ vorschlag_id: 'v1' })
+    expect(m.Vorschlaege.vorschlagen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), botId: bot, ...args })
+    expect(m.SchreibManager.docEdit).not.toHaveBeenCalled()
   })
 
   it('run_status zeigt den letzten Lauf', async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLBadge from '@/shared/components/ol/ol-badge'
@@ -7,68 +7,28 @@ import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormText from '@/shared/components/ol/ol-form-text'
 import Notification from '@/shared/components/notification'
+import { useAbfrage } from '../abfrage'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
 import { startBefehl } from './claude-verbinden'
 import LaufKarte, { type Aenderung, type Lauf } from './lauf-karte'
 import OffenlegungModal from './offenlegung-modal'
+import { WORKFLOW_PRAEFIX } from './workflow-befehl'
 
 type Nachricht = { id: string; von: 'mensch' | 'claude'; text: string; am: string }
+type Workflow = { name: string; titel: string; beschreibung: string }
 type Status = {
   verbunden: boolean
   nachrichten: Nachricht[]
+  aeltere?: boolean
   automatik: boolean
   lauf: Lauf | null
   aenderungen: Aenderung[]
 }
 
-const ABFRAGE_MS = 5000
-
 export default function ClaudePanel() {
   const { t } = useTranslation()
-  const [status, setStatus] = useState<Status | null>(null)
-  const [fehler, setFehler] = useState<string | null>(null)
+  const { daten: status, fehler, setFehler, laden } = useAbfrage<Status>(projektPfad('/claude'))
   const [offenlegung, setOffenlegung] = useState(false)
-  const [text, setText] = useState('')
-  const [sendet, setSendet] = useState(false)
-  const [leer, setLeer] = useState(false)
-  const [kopiert, setKopiert] = useState(false)
-  const feld = useRef<HTMLTextAreaElement>(null)
-
-  const laden = useCallback(async () => {
-    try {
-      setStatus(await anfrage<Status>(projektPfad('/claude')))
-    } catch (error) {
-      setFehler((error as Error).message)
-    }
-  }, [])
-
-  useEffect(() => {
-    laden()
-    const takt = setInterval(() => {
-      if (!document.hidden) laden()
-    }, ABFRAGE_MS)
-    return () => clearInterval(takt)
-  }, [laden])
-
-  const senden = async () => {
-    if (!text.trim()) {
-      setLeer(true)
-      feld.current?.focus()
-      return
-    }
-    setSendet(true)
-    setFehler(null)
-    try {
-      await jsonAnfrage('POST', projektPfad('/claude/auftrag'), { text })
-      setText('')
-      await laden()
-    } catch (error) {
-      setFehler((error as Error).message)
-    } finally {
-      setSendet(false)
-      feld.current?.focus()
-    }
-  }
 
   return (
     <div className="spur-panel">
@@ -79,86 +39,243 @@ export default function ClaudePanel() {
         </OLButton>
       </div>
       {offenlegung && <OffenlegungModal schliessen={() => setOffenlegung(false)} />}
-      <div className="spur-panel-inhalt">
-        {fehler && <Notification type="error" content={fehler} />}
-        {status && (
-          <div className="spur-claude-status" aria-live="polite">
-            <OLBadge bg={status.verbunden ? 'success' : 'warning'}>
-              {status.verbunden ? t('spur_claude_verbunden') : t('spur_claude_nicht_verbunden')}
-            </OLBadge>
-            {!status.verbunden && (
-              <>
-                <p className="spur-zeile-meta">{t('spur_claude_starten')}</p>
-                <pre className="spur-befehl spur-befehl-kompakt">{startBefehl()}</pre>
-                <OLButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(startBefehl())
-                    setKopiert(true)
-                  }}
-                >
-                  {kopiert ? t('spur_kopiert') : t('spur_befehl_kopieren')}
-                </OLButton>
-              </>
-            )}
-          </div>
-        )}
-        {status?.lauf && (
-          <LaufKarte
-            lauf={status.lauf}
-            aenderungen={status.aenderungen}
-            automatik={status.automatik}
-            neuLaden={laden}
-          />
-        )}
-        <form
-          className="spur-fassung"
-          onSubmit={e => {
-            e.preventDefault()
-            senden()
-          }}
-        >
-          <OLFormLabel htmlFor="spur-auftrag">{t('spur_auftrag')}</OLFormLabel>
-          <OLFormControl
-            as="textarea"
-            id="spur-auftrag"
-            ref={feld}
-            rows={3}
-            value={text}
-            isInvalid={leer}
-            aria-invalid={leer || undefined}
-            aria-describedby={leer ? 'spur-auftrag-leer' : undefined}
-            onChange={e => {
-              setText(e.target.value)
-              setLeer(false)
-            }}
-          />
-          {/* Unter dem Feld: Eine Meldung oben im Panel läge nach dem Fokus außer Sicht. */}
-          {leer && (
-            <OLFormText type="error" id="spur-auftrag-leer" role="alert">
-              {t('spur_auftrag_leer')}
-            </OLFormText>
+      {fehler && (
+        <div className="spur-chat-meldung">
+          <Notification type="error" content={fehler} />
+        </div>
+      )}
+      {status && (
+        <>
+          <Verbindung verbunden={status.verbunden} />
+          <Verlauf status={status} neuLaden={laden} />
+          {status.verbunden && (
+            <>
+              <Workflows gestartet={laden} fehler={setFehler} />
+              <Eingabe gesendet={laden} fehler={setFehler} />
+            </>
           )}
-          <OLButton type="submit" variant="primary" size="sm" isLoading={sendet}>
-            {t('spur_senden')}
+        </>
+      )}
+    </div>
+  )
+}
+
+function Verbindung({ verbunden }: { verbunden: boolean }) {
+  const { t } = useTranslation()
+  const [kopiert, setKopiert] = useState(false)
+  return (
+    <div className="spur-claude-status" aria-live="polite">
+      <OLBadge bg={verbunden ? 'success' : 'warning'}>
+        {verbunden ? t('spur_claude_verbunden') : t('spur_claude_nicht_verbunden')}
+      </OLBadge>
+      {!verbunden && (
+        <>
+          <p className="spur-zeile-meta">{t('spur_claude_starten')}</p>
+          <pre className="spur-befehl spur-befehl-kompakt">{startBefehl()}</pre>
+          <OLButton
+            variant="secondary"
+            size="sm"
+            onClick={async () => {
+              await navigator.clipboard.writeText(startBefehl())
+              setKopiert(true)
+            }}
+          >
+            {kopiert ? t('spur_kopiert') : t('spur_befehl_kopieren')}
           </OLButton>
-        </form>
-        {status?.nachrichten.length === 0 && (
+        </>
+      )}
+    </div>
+  )
+}
+
+function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise<void> }) {
+  const { t, i18n } = useTranslation()
+  const nachrichten = status.nachrichten
+  const wartet = status.verbunden && nachrichten.at(-1)?.von === 'mensch'
+  // Die Lauf-Karte steht dort im Verlauf, wo der Lauf begann; spätere Antworten folgen darunter.
+  const { lauf } = status
+  const laufBei = lauf
+    ? nachrichten.filter(n => new Date(n.am) <= new Date(lauf.gestartet)).length
+    : -1
+  const laufKarte = lauf && (
+    <li className="spur-chat-lauf" key="lauf">
+      <LaufKarte
+        lauf={lauf}
+        aenderungen={status.aenderungen}
+        automatik={status.automatik}
+        neuLaden={neuLaden}
+      />
+    </li>
+  )
+
+  // column-reverse im CSS hält den Verlauf unten, ohne das Zurücklesen zu stören.
+  return (
+    <div className="spur-chat-verlauf">
+      <div>
+        {nachrichten.length === 0 && !status.lauf && (
           <p className="spur-leer">{t('spur_keine_nachrichten')}</p>
         )}
-        <ul className="spur-liste">
-          {status?.nachrichten.map(n => (
-            <li className={`spur-zeile spur-nachricht-${n.von}`} key={n.id}>
+        {status.aeltere && (
+          <p className="spur-zeile-meta spur-chat-aeltere">
+            {t('spur_chat_aeltere', { anzahl: nachrichten.length })}
+          </p>
+        )}
+        <ol className="spur-chat" role="log" aria-label={t('spur_unterhaltung')}>
+          {nachrichten.map((n, i) => [
+            i === laufBei && laufKarte,
+            <li className={`spur-chat-nachricht spur-nachricht-${n.von}`} key={n.id}>
               <p className="spur-zeile-meta">
                 {n.von === 'claude' ? 'Claude' : t('spur_du')} ·{' '}
-                {new Date(n.am).toLocaleTimeString()}
+                <time dateTime={n.am}>
+                  {new Date(n.am).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
+                </time>
               </p>
               <p className="spur-nachricht-text">{n.text}</p>
-            </li>
-          ))}
-        </ul>
+            </li>,
+          ])}
+          {laufBei === nachrichten.length && laufKarte}
+          {wartet && <li className="spur-chat-wartet">{t('spur_claude_arbeitet')}</li>}
+        </ol>
       </div>
     </div>
+  )
+}
+
+// Claude kann MCP-Prompts nicht selbst aufrufen; der Knopf legt den vollen Workflow-Text als Auftrag ab.
+function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehler: (f: string | null) => void }) {
+  const { t } = useTranslation()
+  const [liste, setListe] = useState<Workflow[]>([])
+  const [laeuft, setLaeuft] = useState<string | null>(null)
+
+  useEffect(() => {
+    anfrage<{ workflows: Workflow[] }>(projektPfad('/workflows'))
+      .then(antwort => setListe(antwort.workflows))
+      .catch(error => fehler((error as Error).message))
+  }, [fehler])
+
+  const starten = async (name: string) => {
+    setLaeuft(name)
+    fehler(null)
+    try {
+      await jsonAnfrage('POST', projektPfad(`/workflows/${name}/starten`))
+      await gestartet()
+    } catch (error) {
+      fehler((error as Error).message)
+    } finally {
+      setLaeuft(null)
+    }
+  }
+
+  return (
+    <details className="spur-workflows">
+      <summary>{t('spur_workflows')}</summary>
+      <ul className="spur-liste">
+        {liste.map(w => (
+          <li className="spur-workflow" key={w.name}>
+            <OLButton
+              variant="secondary"
+              size="sm"
+              isLoading={laeuft === w.name}
+              aria-describedby={`spur-workflow-${w.name}`}
+              onClick={() => starten(w.name)}
+            >
+              {w.titel}
+            </OLButton>
+            <p className="spur-zeile-meta" id={`spur-workflow-${w.name}`}>
+              {w.beschreibung}
+            </p>
+          </li>
+        ))}
+      </ul>
+      {liste.length > 0 && (
+        <div className="spur-workflows-hilfe">
+          <p className="spur-zeile-meta" id="spur-workflows-befehle">
+            {t('spur_workflows_befehle')}
+          </p>
+          <ul className="spur-liste" aria-labelledby="spur-workflows-befehle">
+            {liste.map(w => (
+              <li key={w.name}>
+                <code>
+                  {WORKFLOW_PRAEFIX}
+                  <wbr />
+                  {w.name}
+                </code>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </details>
+  )
+}
+
+function Eingabe({ gesendet, fehler }: { gesendet: () => Promise<void>; fehler: (f: string | null) => void }) {
+  const { t } = useTranslation()
+  const [text, setText] = useState('')
+  const [sendet, setSendet] = useState(false)
+  const [leer, setLeer] = useState(false)
+  const feld = useRef<HTMLTextAreaElement>(null)
+
+  const senden = async () => {
+    if (!text.trim()) {
+      setLeer(true)
+      feld.current?.focus()
+      return
+    }
+    setSendet(true)
+    fehler(null)
+    try {
+      await jsonAnfrage('POST', projektPfad('/claude/auftrag'), { text })
+      setText('')
+      await gesendet()
+    } catch (error) {
+      fehler((error as Error).message)
+    } finally {
+      setSendet(false)
+      feld.current?.focus()
+    }
+  }
+
+  return (
+    <form
+      className="spur-chat-eingabe"
+      onSubmit={e => {
+        e.preventDefault()
+        senden()
+      }}
+    >
+      <OLFormLabel htmlFor="spur-auftrag">{t('spur_auftrag')}</OLFormLabel>
+      <OLFormControl
+        as="textarea"
+        id="spur-auftrag"
+        ref={feld}
+        rows={3}
+        value={text}
+        isInvalid={leer}
+        aria-invalid={leer || undefined}
+        aria-describedby={leer ? 'spur-auftrag-leer' : 'spur-auftrag-hinweis'}
+        onChange={e => {
+          setText(e.target.value)
+          setLeer(false)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            senden()
+          }
+        }}
+      />
+      {/* Unter dem Feld: Eine Meldung oben im Panel läge nach dem Fokus außer Sicht. */}
+      {leer ? (
+        <OLFormText type="error" id="spur-auftrag-leer" role="alert">
+          {t('spur_auftrag_leer')}
+        </OLFormText>
+      ) : (
+        <OLFormText id="spur-auftrag-hinweis">{t('spur_strg_enter')}</OLFormText>
+      )}
+      <OLButton type="submit" variant="primary" size="sm" isLoading={sendet}>
+        {t('spur_senden')}
+      </OLButton>
+    </form>
   )
 }

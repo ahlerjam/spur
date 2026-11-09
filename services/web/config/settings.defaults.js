@@ -1044,6 +1044,7 @@ module.exports = {
         __dirname,
         '../modules/spur/frontend/js/pruefung/pruef-markierung.ts'
       ),
+      Path.resolve(__dirname, '../modules/spur/frontend/js/vorschlaege/tipp-pause.ts'),
     ],
     sourceEditorVisualExtensions: [],
     sourceEditorComponents: [],
@@ -1214,6 +1215,7 @@ module.exports = {
       ),
       Path.resolve(__dirname, '../modules/spur/frontend/js/claude/claude-rail.tsx'),
       Path.resolve(__dirname, '../modules/spur/frontend/js/recherche/recherche-rail.tsx'),
+      Path.resolve(__dirname, '../modules/spur/frontend/js/vorschlaege/vorschlaege-rail.tsx'),
     ],
     railPopovers: [],
     railActions: [],

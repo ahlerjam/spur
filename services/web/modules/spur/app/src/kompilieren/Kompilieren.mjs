@@ -94,9 +94,9 @@ async function letzterCompile(projectId, botId) {
   return job
 }
 
-async function ausgabe(job, datei) {
-  const compileUser = Settings.disablePerUserCompiles ? null : job.menschId
-  const url = getOutputFileURL(job.projectId, compileUser, job.buildId, datei, job.clsiServerId ?? undefined)
+async function ausgabe({ projectId, menschId, buildId, clsiServerId }, datei) {
+  const compileUser = Settings.disablePerUserCompiles ? null : menschId
+  const url = getOutputFileURL(projectId, compileUser, buildId, datei, clsiServerId ?? undefined)
   const antwort = await fetch(url, { signal: AbortSignal.timeout(30000) })
   if (!antwort.ok) {
     throw new WerkzeugFehler('ausgabe_fehlt', `${datei} fehlt im letzten Compile. Bitte neu kompilieren.`)
@@ -108,6 +108,11 @@ export async function log({ projectId, botId }) {
   const job = await letzterCompile(projectId, botId)
   const text = (await ausgabe(job, 'output.log')).toString('utf8')
   return { job_id: job._id, compile: job.ergebnis.compile, fehler: fehlerAusLog(text), ende: text.slice(-MAX_LOG) }
+}
+
+// Für Compiles per Knopf im Editor: Build-ID und Server kommen aus deren Antwort.
+export async function fehlerDesCompiles(compile) {
+  return fehlerAusLog((await ausgabe(compile, 'output.log')).toString('utf8'))
 }
 
 export async function seitenBild({ projectId, botId, seite }) {

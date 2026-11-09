@@ -1,5 +1,6 @@
 // Alle E2E-Schritte. Läuft mit dem run-code-Werkzeug von Playwright oder per `make e2e`.
-// Vorher: spur-dev run modules/spur/test/e2e/vorbereiten.mjs
+// Die Suite setzt ihre Daten vor dem ersten Feature selbst zurück (POST /spur/dev/e2e/vorbereiten, nur mit
+// SPUR_DEV); spur-dev run modules/spur/test/e2e/vorbereiten.mjs macht dasselbe von außen.
 // Einzelne Features: Seite vorher auf about:blank#f3,f4 stellen.
 async page => {
   const BASE = globalThis.SPUR_URL || 'http://localhost:8080'
@@ -68,10 +69,27 @@ async page => {
   const DATEIBAUM = /^(Dateibaum|File tree)$/
   const railTab = name => page.getByRole('tab', { name, exact: true })
 
+  // Overleaf stellt nach dem Laden das zuletzt offene Panel wieder her, auf langsamen Rechnern erst nach Sekunden,
+  // und überschreibt damit einen frühen Klick; manchmal bleibt die Leiste eingeklappt. Darum den Tab wählen, bis
+  // `bereit` sichtbar ist. Ein schon gewählter Tab wird nur bei eingeklappter Leiste und erst nach 3 s erneut
+  // geklickt; bei offener Leiste schlösse der Klick das Panel.
+  async function panelSichern(tab, bereit, timeout = 30000) {
+    const ende = Date.now() + timeout
+    let geklickt = Date.now()
+    while (!(await bereit.isVisible())) {
+      ok(Date.now() < ende, `Panel ${tab}: nicht sichtbar nach ${timeout / 1000} s`)
+      const gewaehlt = (await railTab(tab).getAttribute('aria-selected')) === 'true'
+      const eingeklappt = !(await page.locator('.rail-panel-title').first().isVisible())
+      if (!gewaehlt || (eingeklappt && Date.now() - geklickt > 3000)) {
+        await railTab(tab).click()
+        geklickt = Date.now()
+      }
+      await page.waitForTimeout(250)
+    }
+  }
+
   async function panelOeffnen(name) {
-    const titel = page.locator('.rail-panel-title', { hasText: name })
-    if (!(await titel.first().isVisible())) await railTab(name).click()
-    await titel.first().waitFor()
+    await panelSichern(name, page.locator('.rail-panel-title', { hasText: name }).first())
   }
 
   async function sichtbar(text, timeout = 20000) {
@@ -121,7 +139,7 @@ async page => {
 
   async function bibText(name) {
     const eintrag = page.locator('.file-tree').getByRole('treeitem', { name })
-    if (!(await eintrag.isVisible())) await railTab(DATEIBAUM).click()
+    await panelSichern(DATEIBAUM, eintrag)
     await eintrag.click()
     await page.locator('.cm-content', { hasText: '@article{' }).waitFor()
     return await page.evaluate(() =>
@@ -131,8 +149,7 @@ async page => {
 
   async function texErsetzen(datei) {
     const name = datei.split('/').pop()
-    const eintrag = page.locator('.file-tree').getByRole('treeitem', { name })
-    if (!(await eintrag.isVisible())) await railTab(DATEIBAUM).click()
+    await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name }))
     await page.locator('.file-tree').getByRole('button', { name: /Hochladen|Upload/ }).first().click()
     await page.locator('.modal input[type=file]').first().setInputFiles(`${FIXTURES}/${datei}`)
     await page.locator('.modal').getByRole('button', { name: /Overwrite|Überschreiben/ }).click()
@@ -159,7 +176,8 @@ async page => {
   }
 
   async function werkzeug(token, name, args = {}) {
-    const { daten } = await mcp(token, 'tools/call', { name, arguments: args })
+    const { status, daten } = await mcp(token, 'tools/call', { name, arguments: args })
+    ok(daten?.result, `${name}: HTTP ${status} ${JSON.stringify(daten).slice(0, 200)}`)
     return {
       fehler: daten.result.isError === true,
       inhalt: JSON.parse(daten.result.content[0].text),
@@ -755,7 +773,9 @@ async page => {
         'paper_search', 'paper_citations', 'source_add', 'acquisition_add', 'matrix_suggest',
         'compile', 'job_status', 'compile_log', 'page_image',
       ]
-      const erwartet = [...P1, ...P2].sort()
+      // P3: Vorschläge ins Panel.
+      const P3 = ['suggest']
+      const erwartet = [...P1, ...P2, ...P3].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
@@ -827,6 +847,12 @@ async page => {
     await panelOeffnen('Claude')
     await sichtbar('Claude nicht verbunden')
     await sichtbar('claude --allowedTools')
+    const zahl = await seitenPost(`/spur/project/${demo}/claude/auftrag`, { text: 123 })
+    ok(zahl.status === 422, `Auftrag mit Zahl: ${zahl.status}`)
+
+    // Das Eingabefeld gibt es erst mit Verbindung (P3).
+    await warteStarten(token)
+    await sichtbar('Claude verbunden', 20000)
     await page.getByRole('button', { name: 'Senden' }).click()
     await sichtbar('Bitte zuerst einen Auftrag schreiben.')
     ok(
@@ -840,11 +866,6 @@ async page => {
       (await page.getByLabel('Auftrag an Claude').getAttribute('aria-invalid')) === 'true',
       'Leeres Auftragsfeld nicht als ungültig markiert'
     )
-    const zahl = await seitenPost(`/spur/project/${demo}/claude/auftrag`, { text: 123 })
-    ok(zahl.status === 422, `Auftrag mit Zahl: ${zahl.status}`)
-
-    await warteStarten(token)
-    await sichtbar('Claude verbunden', 20000)
     await page.evaluate(() => window.__spur.abbruch.abort())
     const abgebrochen = Date.now()
     await sichtbar('Claude nicht verbunden', 65000)
@@ -920,7 +941,7 @@ async page => {
     await imEditor('Ergänzt von Claude.')
     ok((await page.locator('.modal').count()) === 0, 'Modal erschienen')
     // Ohne Neuladen: Das Review-Panel nennt Claude, nicht „Deleted user“ (Bot ist kein Mitglied).
-    await railTab('Review panel').click()
+    await panelSichern('Review panel', page.locator('.review-panel-entry-user').first())
     await page
       .locator('.review-panel-entry-user', { hasText: 'Claude (e2e-a)' })
       .first()
@@ -1439,8 +1460,13 @@ async page => {
     await page.getByLabel('Link zur Bibliothek').fill('https://bibliothek.example/?doi={doi}')
     await page.getByRole('button', { name: 'Speichern' }).click()
     await sichtbar('Link zur Bibliothek gespeichert')
+    // Die Liste lädt nach der Meldung neu; bis dahin zeigt der Link noch auf doi.org.
     const link = eintrag('Sleep and Memory').getByRole('link', { name: 'In der Bibliothek holen' })
-    ok((await link.getAttribute('href')) === 'https://bibliothek.example/?doi=10.5555/spur.2024.001', `Link: ${await link.getAttribute('href')}`)
+    const BIB_LINK = 'https://bibliothek.example/?doi=10.5555/spur.2024.001'
+    await link
+      .and(page.locator(`[href="${BIB_LINK}"]`))
+      .waitFor({ timeout: 10000 })
+      .catch(async () => fail(`Link: ${await link.getAttribute('href')}`))
 
     const dois = text => [...text.matchAll(/10\.\d{4,9}\/[^\s},"]+/g)].map(t => t[0]).sort().join()
     const erwartet = '10.1038/nrn2762,10.5555/spur.2024.001'
@@ -2080,6 +2106,448 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok(abschnitt?.includes(HINWEIS), 'README nennt den Hinweis nicht im Abschnitt „Claude und Ihre Daten“')
   }
 
+  // P3: Ada (e2e-p3a) und Bo (e2e-p3b) haben je ein festes Test-Token aus vorbereiten.mjs.
+  const ADA = 'spur_e2e_p3a'
+  const BO = 'spur_e2e_p3b'
+  const claudePanel = () => page.getByRole('tabpanel', { name: 'Claude' })
+  const chatLog = () => claudePanel().getByRole('log', { name: 'Unterhaltung mit Claude' })
+
+  async function verbinden(token) {
+    // Wie eine Session, die ihre Inbox abgearbeitet hat: Offene Ereignisse früherer Schritte zuerst abholen.
+    while ((await werkzeug(token, 'wait_for_event', { max_sekunden: 1 })).inhalt.ereignis);
+    await warteStarten(token)
+    await claudePanel().getByText('Claude verbunden').waitFor({ timeout: 20000 })
+  }
+
+  features.p3f1 = async () => {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Chat')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    await claudePanel().getByText('Claude nicht verbunden').waitFor()
+    await claudePanel().getByText(/claude --allowedTools/).waitFor()
+    ok((await claudePanel().getByLabel('Auftrag an Claude').count()) === 0, 'Eingabefeld ohne Verbindung')
+
+    await verbinden(ADA)
+    const feld = claudePanel().getByLabel('Auftrag an Claude')
+    await feld.fill('Fasse Abschnitt 2 zusammen')
+    await feld.press('Control+Enter')
+    await page.waitForFunction(() => window.__spur.log.some(e => e.msg?.result), null, { timeout: 5000 })
+    await chatLog().getByText('Claude arbeitet …').waitFor()
+    const seit = await ereignisseVon(ADA)
+    ok(
+      seit.some(e => e.project_id === pid && e.daten.text === 'Fasse Abschnitt 2 zusammen'),
+      `events_since: ${JSON.stringify(seit).slice(0, 500)}`
+    )
+
+    const edit = await werkzeug(ADA, 'doc_edit', {
+      project_id: pid,
+      pfad: 'main.tex',
+      alt: 'Zweiter Abschnitt über Schlaf und Gedächtnis.',
+      neu: 'Zweiter Abschnitt über Schlaf und Gedächtnis, kurz gefasst.',
+      idempotenz_schluessel: schluessel(),
+    })
+    ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
+    await chatLog().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
+    await werkzeug(ADA, 'reply', { project_id: pid, text: 'Abschnitt 2: Schlaf stärkt das Gedächtnis.' })
+    await chatLog().getByText('Abschnitt 2: Schlaf stärkt das Gedächtnis.').waitFor({ timeout: 10000 })
+    const reihenfolge = await chatLog().locator('.spur-chat-nachricht .spur-nachricht-text').allInnerTexts()
+    ok(
+      reihenfolge.indexOf('Fasse Abschnitt 2 zusammen') < reihenfolge.indexOf('Abschnitt 2: Schlaf stärkt das Gedächtnis.'),
+      `Reihenfolge: ${reihenfolge}`
+    )
+    await chatLog().getByText('Claude arbeitet …').waitFor({ state: 'detached' })
+
+    // Lange Unterhaltung: 100 weitere Antworten, dann neu laden.
+    for (let i = 0; i < 100; i += 20) {
+      await Promise.all(
+        Array.from({ length: 20 }, (_, j) =>
+          werkzeug(ADA, 'reply', { project_id: pid, text: `Antwort ${String(i + j + 1).padStart(3, '0')}` })
+        )
+      )
+    }
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Claude')
+    const geladen = Date.now()
+    await chatLog().getByText('Antwort 100').waitFor({ timeout: 15000 })
+    const ladezeit = Date.now() - geladen
+    ok(ladezeit < 3000, `Verlauf mit 100 Nachrichten nach ${ladezeit} ms`)
+    // Vollständig: die erste Frage, ihre Antwort und alle 100 weiteren Antworten.
+    const anzahl = await chatLog().locator('.spur-chat-nachricht').count()
+    ok(anzahl === 102, `Nach dem Neuladen ${anzahl} statt 102 Nachrichten`)
+    await chatLog().getByText('Fasse Abschnitt 2 zusammen', { exact: true }).waitFor()
+    ok((await claudePanel().getByText(/Ältere Nachrichten/).count()) === 0, 'Hinweis auf ältere Nachrichten bei 102')
+    // Die 100 Antworten kommen je 20 parallel; die neueste ist die letzte im Verlauf, nicht unbedingt „Antwort 100“.
+    const neueste = chatLog().locator('.spur-chat-nachricht').last()
+    ok(
+      await neueste.evaluate(el => {
+        const r = el.getBoundingClientRect()
+        return r.bottom <= window.innerHeight && r.top >= 0
+      }),
+      `Neueste Nachricht nach dem Laden nicht sichtbar: ${await neueste.innerText()}`
+    )
+    await verbinden(ADA)
+    const tippen = Date.now()
+    await claudePanel().getByLabel('Auftrag an Claude').pressSequentially('Danke, weiter mit Abschnitt 3')
+    const tippzeit = Date.now() - tippen
+    ok(tippzeit < 3000, `Tippen bei 100 Nachrichten dauerte ${tippzeit} ms`)
+    await claudePanel().getByLabel('Auftrag an Claude').press('Control+Enter')
+    await chatLog().getByText('Danke, weiter mit Abschnitt 3').waitFor({ timeout: 10000 })
+    await page.evaluate(() => window.__spur.abbruch.abort())
+  }
+
+  const AUSSAGE = 'Schlaf verdoppelt die Gedächtnisleistung.'
+
+  // Mit der Maus wie ein Mensch: Overleafs Menü „Kommentar hinzufügen“ erscheint erst nach dem Loslassen.
+  async function zeileAuswaehlen(text) {
+    const zeile = page.locator('.cm-line', { hasText: text })
+    const box = await zeile.boundingBox()
+    const breite = await zeile.evaluate(el => {
+      const r = document.createRange()
+      r.selectNodeContents(el)
+      return r.getBoundingClientRect().width
+    })
+    await page.mouse.move(box.x + 1, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + breite + 10, box.y + box.height / 2, { steps: 5 })
+    await page.mouse.up()
+  }
+
+  // events_since liefert höchstens 100 Ereignisse je Seite; dem Cursor bis zum Ende folgen.
+  async function ereignisseVon(token, typ) {
+    const alle = []
+    for (let cursor; ; ) {
+      const { inhalt } = await werkzeug(token, 'events_since', cursor ? { cursor } : {})
+      alle.push(...inhalt.ereignisse)
+      if (inhalt.ereignisse.length < 100 || !inhalt.cursor || inhalt.cursor === cursor) break
+      cursor = inhalt.cursor
+    }
+    return alle.filter(e => !typ || e.typ === typ)
+  }
+
+  async function bisEreignisse(token, typ, anzahl, timeout = 20000) {
+    const ende = Date.now() + timeout
+    let liste = []
+    while (Date.now() < ende) {
+      liste = await ereignisseVon(token, typ)
+      if (liste.length >= anzahl) return liste
+      await page.waitForTimeout(500)
+    }
+    fail(`${typ}: ${liste.length} statt ${anzahl} Ereignisse`)
+  }
+
+  // Bei eingeklappter Leiste zeigt Overleaf den Eintrag nur als Marke am Rand (.review-panel-entry, ohne Text);
+  // bereit ist das Panel erst, wenn der Kommentartext selbst sichtbar ist.
+  async function reviewEintrag(text) {
+    const eintrag = page.locator('.review-panel-entry', { hasText: text })
+    await panelSichern('Review panel', eintrag.getByText(text).first())
+    return eintrag
+  }
+
+  features.p3f2 = async () => {
+    await anmelden('e2e-p3b@example.org')
+    await projektOeffnen('E2E Kommentar')
+    const pid = page.url().split('/').pop()
+    await zeileAuswaehlen(AUSSAGE)
+    await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
+    const eingabe = page.locator('.review-panel-add-comment-editor .cm-content').first()
+    await eingabe.waitFor()
+    await eingabe.click()
+    await page.keyboard.type('Bo meint: Das ist zu stark.')
+    const [gesendet] = await Promise.all([
+      page.waitForResponse(r => /\/thread\/[0-9a-f]{24}\/messages$/.test(r.url()) && r.request().method() === 'POST'),
+      page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click(),
+    ])
+    ok(gesendet.status() === 204, `Kommentar von Bo: ${gesendet.status()}`)
+    const thread = await reviewEintrag('Bo meint: Das ist zu stark.')
+
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Kommentar')
+    await reviewEintrag('Bo meint: Das ist zu stark.')
+    await thread.locator('.review-panel-comment-input .cm-content').click()
+    await page.keyboard.type('@claude prüfe diese Aussage')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await thread.getByText('@claude prüfe diese Aussage').waitFor()
+
+    const [erwaehnung] = await bisEreignisse(ADA, 'comment_mention', 1)
+    const d = erwaehnung.daten
+    ok(erwaehnung.project_id === pid, `Projekt: ${erwaehnung.project_id}`)
+    ok(
+      d.text === '@claude prüfe diese Aussage' && d.pfad === 'main.tex' && /^[0-9a-f]{24}$/.test(d.doc_id) &&
+        /^[0-9a-f]{24}$/.test(d.kommentar_id) && d.stelle?.zeile === 3 && d.stelle.markiert.startsWith('Schlaf verdoppelt die Gedächtnisleistung'),
+      `comment_mention: ${JSON.stringify(d)}`
+    )
+    ok(d.andere_nachrichten.length === 1, `Andere Nachrichten: ${JSON.stringify(d.andere_nachrichten)}`)
+    ok(!JSON.stringify(erwaehnung).includes('Bo meint'), 'Kommentartext von Bo im Ereignis')
+    const beiBo = await ereignisseVon(BO)
+    ok(beiBo.length === 0, `Bot von Bo erhielt: ${JSON.stringify(beiBo)}`)
+
+    const antwort = await werkzeug(ADA, 'reply', {
+      project_id: pid,
+      kommentar_id: d.kommentar_id,
+      text: 'Die Verdopplung ist in den Quellen nicht belegt.',
+    })
+    ok(!antwort.fehler, `reply: ${JSON.stringify(antwort.inhalt)}`)
+    await thread.getByText('Die Verdopplung ist in den Quellen nicht belegt.').waitFor({ timeout: 10000 })
+    await thread.locator('.review-panel-entry-user', { hasText: 'Claude (Ada)' }).first().waitFor()
+    const fremd = await werkzeug(ADA, 'reply', { project_id: pid, kommentar_id: 'ffffffffffffffffffffffff', text: 'x' })
+    ok(fremd.inhalt.fehler === 'kommentar_fehlt', `Fremder Thread: ${JSON.stringify(fremd.inhalt)}`)
+  }
+
+  const vorschlaegePanel = () => page.getByRole('tabpanel', { name: 'Vorschläge' })
+  const auswahlText = async label =>
+    await vorschlaegePanel().getByLabel(label, { exact: true }).evaluate(el => el.selectedOptions[0].textContent)
+
+  // Das Panel lädt nach dem Speichern neu; bis dahin zeigt die Auswahl noch den alten Stand.
+  async function auswahlIst(label, erwartet) {
+    try {
+      await page.waitForFunction(
+        ([id, text]) => document.getElementById(id)?.selectedOptions[0]?.textContent === text,
+        [label === 'Compile-Fehler' ? 'spur-schalter-compile_fehler' : 'spur-schalter-belegloses_argument', erwartet],
+        { timeout: 10000 }
+      )
+    } catch {
+      fail(`${label}: „${await auswahlText(label)}“ statt „${erwartet}“`)
+    }
+  }
+
+  async function aufAntwort(pfadEnde, handlung) {
+    await Promise.all([
+      page.waitForResponse(r => r.url().endsWith(pfadEnde) && r.request().method() !== 'GET'),
+      handlung(),
+    ])
+  }
+
+  async function fehlerKompilieren() {
+    await Promise.all([
+      page.waitForResponse(r => /\/compile\?/.test(r.url()) && r.request().method() === 'POST', { timeout: 120000 }),
+      page.getByRole('button', { name: KOMPILIEREN }).first().click(),
+    ])
+  }
+
+  features.p3f3 = async () => {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Vorschläge')
+    await panelOeffnen('Vorschläge')
+    await auswahlIst('Compile-Fehler', 'Projekt: Aus')
+    await auswahlIst('Belegloses Argument', 'Projekt: Aus')
+    await aufAntwort('/vorschlaege/projekt', () =>
+      vorschlaegePanel().getByLabel('Compile-Fehler (Projekt)').selectOption('vorschlag')
+    )
+
+    await anmelden('e2e-p3b@example.org')
+    await projektOeffnen('E2E Vorschläge')
+    await panelOeffnen('Vorschläge')
+    await auswahlIst('Compile-Fehler', 'Projekt: Vorschlag')
+    ok((await vorschlaegePanel().getByText('Projekt-Standard für alle Mitglieder').count()) === 1, 'Bo darf schreiben')
+    await aufAntwort('/vorschlaege/eigene', () => vorschlaegePanel().getByLabel('Compile-Fehler', { exact: true }).selectOption('aus'))
+    await auswahlIst('Compile-Fehler', 'Aus')
+
+    await fehlerKompilieren()
+    await page.waitForTimeout(4000)
+    const aus = await ereignisseVon(BO, 'suggest_trigger')
+    ok(aus.length === 0, `Mit Aus: ${JSON.stringify(aus)}`)
+
+    await aufAntwort('/vorschlaege/eigene', () =>
+      vorschlaegePanel().getByLabel('Compile-Fehler', { exact: true }).selectOption('vorschlag')
+    )
+    await auswahlIst('Compile-Fehler', 'Vorschlag')
+    await fehlerKompilieren()
+    const [ausgeloest] = await bisEreignisse(BO, 'suggest_trigger', 1)
+    await page.waitForTimeout(3000)
+    const alle = await ereignisseVon(BO, 'suggest_trigger')
+    ok(alle.length === 1, `Mit Vorschlag ${alle.length} Ereignisse`)
+    ok(
+      ausgeloest.daten.art === 'compile_fehler' && ausgeloest.daten.fehler.some(f => /Undefined control sequence/.test(f.meldung)),
+      `suggest_trigger: ${JSON.stringify(ausgeloest.daten)}`
+    )
+    ok((await ereignisseVon(ADA, 'suggest_trigger')).length === 0, 'Compile von Bo löste bei Ada aus')
+  }
+
+  features.p3f4 = async () => {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Vorschläge')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Vorschläge')
+    await aufAntwort('/vorschlaege/eigene', () =>
+      vorschlaegePanel().getByLabel('Belegloses Argument', { exact: true }).selectOption('vorschlag')
+    )
+    const vorher = (await werkzeug(ADA, 'doc_read', { project_id: pid, pfad: 'main.tex' })).inhalt.text
+    const BELEG = 'Für die Verdopplung der Gedächtnisleistung fehlt eine Quelle; Diekelmann und Born (2010) belegen nur eine Verbesserung.'
+    const s1 = await werkzeug(ADA, 'suggest', {
+      project_id: pid, art: 'belegloses_argument', titel: 'Beleg fehlt', text: BELEG, pfad: 'main.tex',
+    })
+    ok(!s1.fehler, `suggest: ${JSON.stringify(s1.inhalt)}`)
+    const karte = vorschlaegePanel().locator('.spur-vorschlag-karte', { hasText: 'Beleg fehlt' })
+    await karte.getByText(BELEG).waitFor({ timeout: 10000 })
+    const nachher = (await werkzeug(ADA, 'doc_read', { project_id: pid, pfad: 'main.tex' })).inhalt.text
+    ok(nachher === vorher, 'Vorschlag hat den Text verändert')
+
+    await werkzeug(ADA, 'suggest', {
+      project_id: pid, art: 'compile_fehler', titel: 'Makro unbekannt', text: '\\kaputtesmakro ist nicht definiert.',
+    })
+    const zweite = vorschlaegePanel().locator('.spur-vorschlag-karte', { hasText: 'Makro unbekannt' })
+    await zweite.waitFor({ timeout: 10000 })
+    await zweite.getByRole('button', { name: 'Verwerfen' }).click()
+    await zweite.waitFor({ state: 'detached' })
+
+    const vorAuftraegen = (await ereignisseVon(ADA, 'task_created')).length
+    await karte.getByRole('button', { name: 'Übernehmen' }).click()
+    await vorschlaegePanel().getByText('Claude hat den Auftrag. Den Lauf sehen Sie im Claude-Panel.').waitFor()
+    await karte.waitFor({ state: 'detached' })
+    const auftraege = await bisEreignisse(ADA, 'task_created', vorAuftraegen + 1)
+    ok(auftraege.at(-1).daten.text.includes(BELEG), `Auftrag: ${JSON.stringify(auftraege.at(-1).daten)}`)
+    const edit = await werkzeug(ADA, 'doc_edit', {
+      project_id: pid, pfad: 'main.tex', alt: AUSSAGE,
+      neu: 'Schlaf verbessert die Gedächtnisleistung \\autocite{diekelmann2010}.', idempotenz_schluessel: schluessel(),
+    })
+    ok(!edit.fehler, `doc_edit nach Übernehmen: ${JSON.stringify(edit.inhalt)}`)
+    await panelOeffnen('Claude')
+    await chatLog().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
+
+    // Tageslimit 2 an einem festen Tag: der dritte Auslöser erzeugt nichts.
+    await panelOeffnen('Vorschläge')
+    await vorschlaegePanel().getByLabel('Tageslimit, für alle Projekte').fill('2')
+    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().getByRole('button', { name: 'Limit speichern' }).click())
+    const docId = (await werkzeug(ADA, 'doc_list', { project_id: pid })).inhalt.eintraege.find(e => e.pfad === 'main.tex').id
+    const vorLimit = (await ereignisseVon(ADA, 'suggest_trigger')).length
+    await zeitSetzen('2026-11-20T09:00:00.000Z')
+    const antworten = []
+    try {
+      for (let i = 0; i < 3; i++) {
+        antworten.push((await seitenPost(`/spur/project/${pid}/vorschlaege/tipp-pause`, { doc_id: docId })).daten)
+      }
+      await vorschlaegePanel().getByText('Tageslimit erreicht').waitFor({ timeout: 10000 })
+    } finally {
+      await zeitSetzen(null)
+    }
+    ok(
+      JSON.stringify(antworten) ===
+        JSON.stringify([{ ausgeloest: true }, { ausgeloest: true }, { ausgeloest: false, grund: 'limit' }]),
+      `Auslöser mit Limit 2: ${JSON.stringify(antworten)}`
+    )
+    ok((await ereignisseVon(ADA, 'suggest_trigger')).length === vorLimit + 2, 'Dritter Auslöser erzeugte ein Ereignis')
+    // Eine erfundene Dokument-ID lehnt der Server ab, bevor er zählt (D4).
+    const fremd = await seitenPost(`/spur/project/${pid}/vorschlaege/tipp-pause`, { doc_id: 'a'.repeat(24) })
+    ok(fremd.status === 404 && fremd.daten?.title === 'doc_fehlt', `Tipp-Pause mit unbekanntem Dokument: ${JSON.stringify(fremd)}`)
+    await vorschlaegePanel().getByLabel('Tageslimit, für alle Projekte').fill('50')
+    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().getByRole('button', { name: 'Limit speichern' }).click())
+    await vorschlaegePanel().getByText('Tageslimit erreicht').waitFor({ state: 'detached', timeout: 10000 })
+
+    // 60 Sekunden Tipp-Pause: vorher nichts, danach genau ein Ereignis.
+    const vorPause = (await ereignisseVon(ADA, 'suggest_trigger')).length
+    for (const wort of [' Erstens', ' zweitens', ' drittens.']) {
+      await editorEinfuegen('\\kaputtesmakro', wort)
+      await page.waitForTimeout(1000)
+    }
+    const getippt = Date.now()
+    await page.waitForTimeout(50000)
+    ok((await ereignisseVon(ADA, 'suggest_trigger')).length === vorPause, 'Ereignis vor Ablauf der Minute')
+    const [, ...rest] = (await bisEreignisse(ADA, 'suggest_trigger', vorPause + 1, 25000)).slice(vorPause)
+    const nach = (Date.now() - getippt) / 1000
+    ok(nach >= 59, `Ereignis nach ${nach} s`)
+    await page.waitForTimeout(5000)
+    const pause = (await ereignisseVon(ADA, 'suggest_trigger')).slice(vorPause)
+    ok(pause.length === 1 && rest.length === 0, `Tipp-Pause: ${pause.length} Ereignisse`)
+    ok(pause[0].daten.art === 'belegloses_argument' && pause[0].daten.doc_id === docId, `Tipp-Pause: ${JSON.stringify(pause[0].daten)}`)
+  }
+
+  const WORKFLOWS = ['literaturueberblick', 'methodenteil', 'folien']
+  const promptText = async name =>
+    (await mcp(ADA, 'prompts/get', { name, arguments: {} })).daten.result.messages[0].content.text
+
+  // Klickt im Claude-Panel einen Workflow und liefert das Ereignis, das der wartende Fake-Client erhält.
+  async function workflowKlicken(projekt, titel) {
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen(projekt)
+    await panelOeffnen('Claude')
+    await verbinden(ADA)
+    await claudePanel().getByText('Workflows', { exact: true }).click()
+    await claudePanel().getByRole('button', { name: titel, exact: true }).click()
+    await page.waitForFunction(() => window.__spur.log.some(e => e.msg?.result), null, { timeout: 5000 })
+    await chatLog().getByText(`Workflow: ${titel}`).waitFor()
+    const { ereignis } = await page.evaluate(() =>
+      JSON.parse(window.__spur.log.find(e => e.msg?.result).msg.result.content[0].text)
+    )
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    return ereignis
+  }
+
+  async function adminWorkflowText(titel, aktion) {
+    await anmelden('e2e-admin@example.org')
+    await page.goto(`${BASE}/spur/admin/workflows`)
+    const abschnitt = page.locator('section', { has: page.getByRole('heading', { name: titel, exact: true }) })
+    await abschnitt.getByLabel(`Text für „${titel}“`).waitFor()
+    await aktion(abschnitt)
+  }
+
+  features.p3f5 = async () => {
+    const { daten } = await mcp(ADA, 'prompts/list')
+    const prompts = daten.result.prompts
+    ok(JSON.stringify(prompts.map(p => p.name)) === JSON.stringify(WORKFLOWS), `prompts/list: ${prompts.map(p => p.name)}`)
+    ok(prompts.every(p => p.arguments?.every(a => !a.required)), 'Prompt mit Pflichtargument')
+    const texte = {}
+    for (const name of WORKFLOWS) {
+      texte[name] = await promptText(name)
+      ok(texte[name].length > 300 && texte[name].includes('run_finish'), `prompts/get ${name}: ${texte[name].slice(0, 80)}`)
+    }
+    // Über ein Plugin heißen MCP-Prompts in Claude Code /plugin:<Plugin>:<Server>:<Prompt> (MCP);
+    // Plugin und Server heißen „spur“ (Entscheidung D3).
+    const plugin = `${FIXTURES}/../../../../../../plugins/spur`
+    const mcpJson = JSON.parse(await repoDatei(`${plugin}/.mcp.json`))
+    ok(Object.keys(mcpJson.mcpServers ?? mcpJson).includes('spur'), `Server im Plugin: ${JSON.stringify(mcpJson)}`)
+    const pluginJson = JSON.parse(await repoDatei(`${plugin}/.claude-plugin/plugin.json`))
+    ok(pluginJson.name === 'spur', `Plugin-Name: ${pluginJson.name}`)
+    const BEFEHLE = WORKFLOWS.map(n => `/plugin:${pluginJson.name}:spur:${n}`)
+
+    const titel = { literaturueberblick: 'Literaturüberblick', methodenteil: 'Methodenteil', folien: 'Folien aus Paper' }
+    await anmelden('e2e-p3a@example.org')
+    await projektOeffnen('E2E Workflows')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    await verbinden(ADA)
+    await claudePanel().getByText('Workflows', { exact: true }).click()
+    const knoepfe = await claudePanel().locator('.spur-workflow button').allInnerTexts()
+    ok(JSON.stringify(knoepfe) === JSON.stringify(WORKFLOWS.map(n => titel[n])), `Panel: ${knoepfe}`)
+    const hilfe = await claudePanel().getByRole('list', { name: 'Befehle in Claude Code' }).getByRole('listitem').allInnerTexts()
+    ok(JSON.stringify(hilfe) === JSON.stringify(BEFEHLE), `Hilfe im Panel: ${hilfe}`)
+    ok(!/(^|[^:])\/spur:\w/.test(await claudePanel().innerText()), 'Panel nennt noch /spur:<name>')
+    await page.evaluate(() => window.__spur.abbruch.abort())
+    const nichtAdmin = await page.request.get(`${BASE}/spur/admin/workflows.json`, { maxRedirects: 0 })
+    ok(nichtAdmin.status() !== 200, `Workflows-Admin ohne Admin-Recht: ${nichtAdmin.status()}`)
+
+    const auftrag = await workflowKlicken('E2E Workflows', 'Literaturüberblick')
+    ok(
+      auftrag?.typ === 'task_created' && auftrag.project_id === pid && auftrag.daten.workflow === 'literaturueberblick' &&
+        auftrag.daten.text === texte.literaturueberblick,
+      `Auftrag aus dem Panel: ${JSON.stringify(auftrag).slice(0, 300)}`
+    )
+
+    const NEU = 'Workflow „Methodenteil“ (angepasst): Schreibe den Methodenteil in höchstens 600 Wörtern und beende mit run_finish.'
+    await adminWorkflowText('Methodenteil', async abschnitt => {
+      await abschnitt.getByText(BEFEHLE[1], { exact: true }).waitFor()
+      await abschnitt.getByLabel('Text für „Methodenteil“').fill(NEU)
+      await abschnitt.getByRole('button', { name: 'Speichern' }).click()
+      await abschnitt.getByText('Gespeichert. Der neue Text gilt ab sofort.').waitFor()
+    })
+    try {
+      ok((await promptText('methodenteil')) === NEU, 'prompts/get liefert den alten Text')
+      const geaendert = await workflowKlicken('E2E Workflows', 'Methodenteil')
+      ok(geaendert?.daten.text === NEU, `Panel liefert: ${geaendert?.daten.text.slice(0, 80)}`)
+    } finally {
+      await adminWorkflowText('Methodenteil', async abschnitt => {
+        await abschnitt.getByRole('button', { name: 'Standard wiederherstellen' }).click()
+        await abschnitt.getByText('Standardtext wiederhergestellt.').waitFor()
+      })
+    }
+    ok((await promptText('methodenteil')) === texte.methodenteil, 'Standardtext nicht wiederhergestellt')
+  }
+
+  // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
+  const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
+  if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`
   const ergebnis = []
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue

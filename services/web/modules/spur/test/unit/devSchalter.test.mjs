@@ -3,11 +3,14 @@ import { Antwort, anfrage } from './hilfen/express.mjs'
 
 let Dev
 let gesetzt
+let vorbereitet
 
 beforeEach(async () => {
   gesetzt = []
+  vorbereitet = vi.fn(async () => {})
   vi.resetModules()
   vi.doMock('../../app/src/schalter.mjs', () => ({ zeitFestlegen: iso => gesetzt.push(iso) }))
+  vi.doMock('../../test/e2e/vorbereiten.mjs', () => ({ e2eDatenVorbereiten: vorbereitet }))
   Dev = await import('../../app/src/dev/DevSchalter.mjs')
 })
 
@@ -39,5 +42,24 @@ describe('testseite', () => {
     Dev.testseite(anfrage(), res)
     expect(res.kopfzeilen['Content-Type']).toBe('html')
     expect(gesendet).toContain('<title>Schlafhygiene im Schichtdienst</title>')
+  })
+})
+
+describe('e2eVorbereiten', () => {
+  it('setzt die E2E-Daten im laufenden Prozess zurück und meldet 204', async () => {
+    const res = new Antwort()
+    await Dev.e2eVorbereiten(anfrage(), res)
+    expect(vorbereitet).toHaveBeenCalledTimes(1)
+    expect(res.statusCode).toBe(204)
+  })
+
+  it('meldet einen Fehler beim Zurücksetzen mit 500 und Text', async () => {
+    vorbereitet.mockRejectedValueOnce(new Error('Mongo weg'))
+    const res = new Antwort()
+    let gesendet
+    res.send = inhalt => ((gesendet = inhalt), res)
+    await Dev.e2eVorbereiten(anfrage(), res)
+    expect(res.statusCode).toBe(500)
+    expect(gesendet).toContain('Mongo weg')
   })
 })

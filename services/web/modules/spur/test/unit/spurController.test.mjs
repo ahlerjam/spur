@@ -54,7 +54,7 @@ beforeEach(async () => {
       widerrufen: vi.fn(async () => {}),
       botFuer: vi.fn(async () => ({ _id: 'bot1' })),
     },
-    Inbox: { verlauf: vi.fn(async () => []), verbunden: vi.fn(async () => true), auftragAnlegen: vi.fn(async () => ({ _id: 'n1' })) },
+    Inbox: { verlauf: vi.fn(async () => ({ nachrichten: [], aeltere: false })), verbunden: vi.fn(async () => true), auftragAnlegen: vi.fn(async () => ({ _id: 'n1' })) },
     Aktionen: {
       automatik: vi.fn(async () => false),
       laufDaten: vi.fn(async () => ({ lauf: null, aenderungen: [] })),
@@ -65,6 +65,10 @@ beforeEach(async () => {
       automatikSetzen: vi.fn(async () => {}),
     },
     Lauf: { letzterLauf: vi.fn(async () => null) },
+    Workflows: {
+      liste: vi.fn(async () => [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B', text: 'T', angepasst: false }]),
+      starten: vi.fn(async () => ({ _id: 'n9' })),
+    },
     mitglied: true,
     stufe: 'readAndWrite',
   }
@@ -95,6 +99,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/Inbox.mjs', () => m.Inbox)
   vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => m.Aktionen)
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => m.Lauf)
+  vi.doMock('../../app/src/workflows/Workflows.mjs', () => m.Workflows)
   C = await import('../../app/src/SpurController.mjs')
 })
 
@@ -477,7 +482,10 @@ describe('Claude-Zugang und Läufe', () => {
   })
 
   it('claudeStatus zeigt Verlauf (älteste zuerst), Verbindung, Automatik und Lauf', async () => {
-    m.Inbox.verlauf.mockResolvedValue([{ _id: 'n2', von: 'claude', text: 'zwei', am: 2 }, { _id: 'n1', von: 'mensch', text: 'eins', am: 1 }])
+    m.Inbox.verlauf.mockResolvedValue({
+      nachrichten: [{ _id: 'n2', von: 'claude', text: 'zwei', am: 2 }, { _id: 'n1', von: 'mensch', text: 'eins', am: 1 }],
+      aeltere: true,
+    })
     m.Aktionen.automatik.mockResolvedValue(true)
     m.Aktionen.laufDaten.mockResolvedValue({ lauf: { id: 'l1' }, aenderungen: [] })
     const { res } = await ausfuehren(C.claudeStatus, req())
@@ -485,10 +493,23 @@ describe('Claude-Zugang und Läufe', () => {
     expect(res.body).toEqual({
       verbunden: true,
       nachrichten: [{ id: 'n1', von: 'mensch', text: 'eins', am: 1 }, { id: 'n2', von: 'claude', text: 'zwei', am: 2 }],
+      aeltere: true,
       automatik: true,
       lauf: { id: 'l1' },
       aenderungen: [],
     })
+  })
+
+  it('workflows liefert Name, Titel und Beschreibung', async () => {
+    const { res } = await ausfuehren(C.workflows, req())
+    expect(res.body).toEqual({ workflows: [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B' }] })
+  })
+
+  it('workflowStarten legt den Workflow als Auftrag für den eigenen Bot an', async () => {
+    const { res } = await ausfuehren(C.workflowStarten, req({ params: { project_id: String(projekt), name: 'folien' } }))
+    expect(m.Workflows.starten).toHaveBeenCalledWith({ projectId: projekt, botId: 'bot1', name: 'folien' })
+    expect(res.statusCode).toBe(201)
+    expect(res.body).toEqual({ id: 'n9' })
   })
 
   it('claudeAuftrag legt den getrimmten Auftrag für den Bot an', async () => {

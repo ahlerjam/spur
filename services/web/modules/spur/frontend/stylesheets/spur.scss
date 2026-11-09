@@ -213,6 +213,79 @@
 
 .spur-claude-status {
   margin: var(--spacing-03) 0;
+  padding: 0 var(--spacing-05);
+}
+
+.spur-chat-meldung {
+  padding: 0 var(--spacing-05);
+}
+
+.spur-chat-verlauf {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
+  padding: 0 var(--spacing-05);
+  border-top: 1px solid var(--border-divider);
+}
+
+.spur-chat {
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-04) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-04);
+}
+
+.spur-chat-nachricht {
+  max-width: 92%;
+  padding: var(--spacing-03) var(--spacing-04);
+  border-radius: var(--border-radius-large, 8px);
+
+  .spur-zeile-meta {
+    margin: 0;
+  }
+}
+
+.spur-nachricht-mensch {
+  align-self: flex-end;
+  background: var(--bg-light-secondary);
+}
+
+.spur-nachricht-claude,
+.spur-vorschlag-meldung {
+  border-left: 3px solid var(--green-50);
+}
+
+.spur-nachricht-claude {
+  align-self: flex-start;
+  border-radius: 0;
+  padding-left: var(--spacing-04);
+}
+
+.spur-chat-lauf .spur-lauf-karte {
+  margin: 0;
+}
+
+.spur-chat-wartet {
+  color: var(--content-secondary);
+  font-size: var(--font-size-02);
+  font-style: italic;
+}
+
+.spur-chat-eingabe {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-02);
+  padding: var(--spacing-04) var(--spacing-05);
+  border-top: 1px solid var(--border-divider);
+
+  textarea {
+    width: 100%;
+  }
 }
 
 // Im schmalen Panel: eine Zeile mit Scrollbalken statt einer Spalte aus Wortfetzen.
@@ -486,4 +559,134 @@
   font-size: var(--font-size-02);
   font-weight: 600;
   color: var(--content-primary);
+}
+
+.spur-abschnitt {
+  margin: var(--spacing-05) 0 var(--spacing-03);
+  font-size: var(--font-size-02);
+  font-weight: 600;
+}
+
+.spur-vorschlag-einstellungen {
+  padding-bottom: var(--spacing-04);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.spur-vorschlag-schalter {
+  margin-bottom: var(--spacing-03);
+
+  .form-label {
+    margin-bottom: var(--spacing-01);
+  }
+}
+
+.spur-vorschlag-projekt {
+  margin-top: var(--spacing-04);
+  padding-top: var(--spacing-01);
+  border-top: 1px dashed var(--border-divider);
+
+  legend {
+    float: none;
+    width: auto;
+  }
+}
+
+.spur-vorschlag-meldung {
+  margin: 0 0 var(--spacing-03);
+  padding-left: var(--spacing-03);
+  color: var(--content-positive-themed);
+}
+
+.spur-vorschlag-limit {
+  margin: var(--spacing-04) 0 var(--spacing-03);
+
+  .spur-limit-zeile {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-03);
+  }
+
+  .form-control {
+    width: 6rem;
+  }
+}
+
+.spur-vorschlaege > li + li {
+  margin-top: var(--spacing-04);
+}
+
+.spur-vorschlag-karte {
+  padding: var(--spacing-04);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--border-radius-base, 4px);
+  overflow-wrap: anywhere;
+
+  h4 {
+    margin: 0;
+    font-size: var(--font-size-02);
+    font-weight: 600;
+  }
+}
+
+.spur-vorschlag-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-03);
+  margin-top: var(--spacing-03);
+}
+
+.spur-workflows {
+  padding: var(--spacing-03) var(--spacing-05) 0;
+  border-top: 1px solid var(--border-divider);
+
+  summary {
+    font-weight: 600;
+    cursor: pointer;
+    min-height: 24px;
+  }
+
+  .spur-liste {
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+}
+
+.spur-workflow {
+  padding: var(--spacing-02) 0;
+}
+
+.spur-workflows-hilfe {
+  padding: var(--spacing-03) 0;
+  border-top: 1px solid var(--border-divider);
+
+  p {
+    margin: 0 0 var(--spacing-02);
+  }
+
+  code {
+    font-size: var(--font-size-01);
+    overflow-wrap: anywhere;
+  }
+}
+
+.spur-workflows-admin {
+  max-width: 900px;
+  margin: 0 auto;
+  padding-left: var(--spacing-05);
+  padding-right: var(--spacing-05);
+
+  textarea {
+    font-family: var(--font-monospace, monospace);
+    font-size: var(--font-size-02);
+  }
+}
+
+.spur-workflow-admin {
+  padding: var(--spacing-06) 0;
+  border-top: 1px solid var(--border-divider);
+
+  h2 {
+    font-size: var(--font-size-05);
+    margin: 0 0 var(--spacing-02);
+  }
 }

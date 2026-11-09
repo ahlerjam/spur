@@ -217,7 +217,7 @@ describe('kontoAufraeumen', () => {
     await Zugang.tokenErzeugen(ben._id)
     const botAnna = (await datenbank.db.collection('users').findOne({ 'spur.botFuer': anna._id }))._id
     const botBen = (await datenbank.db.collection('users').findOne({ 'spur.botFuer': ben._id }))._id
-    for (const name of ['spurEvents', 'spurMessages', 'spurRuns', 'spurEdits']) {
+    for (const name of ['spurEvents', 'spurMessages', 'spurRuns', 'spurEdits', 'spurSuggestions']) {
       await datenbank.db.collection(name).insertMany([
         { botId: botAnna, status: 'fertig', schluessel: 'a' },
         { botId: botBen, status: 'fertig', schluessel: 'b' },
@@ -231,7 +231,7 @@ describe('kontoAufraeumen', () => {
     expect(await datenbank.db.collection('users').findOne({ _id: botAnna })).toBeNull()
     expect(await datenbank.db.collection('users').findOne({ _id: botBen })).toBeTruthy()
     expect(await datenbank.db.collection('oauthAccessTokens').countDocuments()).toBe(1)
-    for (const name of ['spurEvents', 'spurMessages', 'spurRuns', 'spurEdits', 'spurHeartbeats', 'spurSettings']) {
+    for (const name of ['spurEvents', 'spurMessages', 'spurRuns', 'spurEdits', 'spurSuggestions', 'spurHeartbeats', 'spurSettings']) {
       expect(await datenbank.db.collection(name).countDocuments(), name).toBe(1)
     }
   })

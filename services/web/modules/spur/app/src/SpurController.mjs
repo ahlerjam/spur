@@ -22,6 +22,7 @@ import * as Import from './recherche/Import.mjs'
 import * as Literatur from './literatur/Literatur.mjs'
 import * as Offenlegung from './offenlegung/Offenlegung.mjs'
 import * as Semantik from './semantik/Semantik.mjs'
+import * as Workflows from './workflows/Workflows.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -341,15 +342,16 @@ async function botDesNutzers(req) {
 
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)
-  const liste = await Inbox.verlauf(projektId(req), bot._id)
-  const [lauf, verbunden, automatik] = await Promise.all([
+  const [{ nachrichten, aeltere }, lauf, verbunden, automatik] = await Promise.all([
+    Inbox.verlauf(projektId(req), bot._id),
     LaufManager.letzterLauf(projektId(req), bot._id),
     Inbox.verbunden(bot._id),
     LaufAktionen.automatik(projektId(req), new ObjectId(nutzerId(req))),
   ])
   res.json({
     verbunden,
-    nachrichten: liste.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
+    nachrichten: nachrichten.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
+    aeltere,
     automatik,
     ...(await LaufAktionen.laufDaten(projektId(req), lauf)),
   })
@@ -362,6 +364,18 @@ export const claudeAuftrag = mitProblemen(async (req, res) => {
   }
   const bot = await botDesNutzers(req)
   const nachricht = await Inbox.auftragAnlegen({ projectId: projektId(req), botId: bot._id, text })
+  res.status(201).json({ id: nachricht._id })
+})
+
+export const workflows = mitProblemen(async (req, res) => {
+  const liste = await Workflows.liste()
+  // Den Text holt workflowStarten selbst; das Panel braucht nur Name, Titel und Beschreibung.
+  res.json({ workflows: liste.map(({ name, titel, beschreibung }) => ({ name, titel, beschreibung })) })
+})
+
+export const workflowStarten = mitProblemen(async (req, res) => {
+  const bot = await botDesNutzers(req)
+  const nachricht = await Workflows.starten({ projectId: projektId(req), botId: bot._id, name: req.params.name })
   res.status(201).json({ id: nachricht._id })
 })
 

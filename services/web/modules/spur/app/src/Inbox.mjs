@@ -12,18 +12,21 @@ const HERZSCHLAG_MS = 5000
 const VERBUNDEN_MS = 45 * 1000
 const FORTSCHRITT_MS = 30 * 1000
 
-export async function auftragAnlegen({ projectId, botId, text }) {
-  const nachricht = { projectId, botId, von: 'mensch', text, am: jetzt() }
-  await (await nachrichten()).insertOne(nachricht)
-  await (await ereignisse()).insertOne({
-    botId,
-    projectId,
-    typ: 'task_created',
-    daten: { text, nachricht_id: nachricht._id },
-    am: jetzt(),
-    zugestellt: false,
-  })
+export async function ereignisAnlegen({ projectId, botId, typ, daten }) {
+  await (await ereignisse()).insertOne({ botId, projectId, typ, daten, am: jetzt(), zugestellt: false })
   wecker.emit(String(botId))
+}
+
+// `anzeige` ersetzt im Chat einen langen Auftragstext (etwa einen Workflow) durch eine kurze Zeile.
+export async function auftragAnlegen({ projectId, botId, text, anzeige = text, daten = {} }) {
+  const nachricht = { projectId, botId, von: 'mensch', text: anzeige, am: jetzt() }
+  await (await nachrichten()).insertOne(nachricht)
+  await ereignisAnlegen({
+    projectId,
+    botId,
+    typ: 'task_created',
+    daten: { ...daten, text, nachricht_id: nachricht._id },
+  })
   return nachricht
 }
 
@@ -33,12 +36,17 @@ export async function antwortSpeichern({ projectId, botId, text }) {
   return nachricht
 }
 
+const VERLAUF_GRENZE = 500
+
+// Neueste zuerst; `aeltere` sagt dem Panel, dass es frühere Nachrichten nicht zeigt.
 export async function verlauf(projectId, botId) {
-  return await (await nachrichten())
+  const liste = await (await nachrichten())
     .find({ projectId, botId })
-    .sort({ _id: -1 })
-    .limit(100)
+    // Nachrichten kommen aus web (Panel) und web-api (MCP); ObjectIds beider Prozesse sortieren nicht nach Zeit.
+    .sort({ am: -1, _id: -1 })
+    .limit(VERLAUF_GRENZE + 1)
     .toArray()
+  return { nachrichten: liste.slice(0, VERLAUF_GRENZE), aeltere: liste.length > VERLAUF_GRENZE }
 }
 
 const fuerClient = e => ({
