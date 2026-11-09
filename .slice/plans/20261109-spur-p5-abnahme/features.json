@@ -11,7 +11,7 @@
     "Klick auf den Schriftzug im Editor führt zur Projektliste `/project`; per Tastatur (Tab bis zum Schriftzug, Enter) ebenso; der zugängliche Name lautet „spur, zur Projektliste“",
     "Bei 360 und 1280 px Breite, hellem und dunklem Design ist der Schriftzug lesbar (Kontrast mindestens 4,5:1), ohne Überlauf und ohne Konsolenfehler"
    ],
-   "passes": false
+   "passes": true
   },
   {
    "id": "f2",
