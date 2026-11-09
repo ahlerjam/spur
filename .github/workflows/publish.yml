@@ -47,10 +47,23 @@ jobs:
             sleep 30
           done
           exit 1
+      # GHCR lehnte Pushes am 2026-11-09 zeitweise mit „unauthorized“ oder „write_package“ ab; daher neu anmelden
+      # und bis zu viermal versuchen.
       - name: Veröffentlichen
+        env:
+          TOKEN: ${{ github.token }}
         run: |
-          docker push "$BASE"
-          docker push "$IMAGE"
+          schieben() {
+            for try in 1 2 3 4; do
+              docker push "$1" && return 0
+              echo "Push von $1, Versuch $try fehlgeschlagen"
+              sleep $((try * 30))
+              echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            done
+            return 1
+          }
+          schieben "$BASE"
+          schieben "$IMAGE"
 
   manifest:
     needs: build
@@ -64,4 +77,10 @@ jobs:
       - name: Mehrarchitektur-Tag setzen
         env:
           REPO: ghcr.io/${{ github.repository_owner }}/spur
-        run: docker buildx imagetools create -t "$REPO:latest" "$REPO:latest-amd64" "$REPO:latest-arm64"
+        run: |
+          for try in 1 2 3 4; do
+            docker buildx imagetools create -t "$REPO:latest" "$REPO:latest-amd64" "$REPO:latest-arm64" && exit 0
+            echo "Versuch $try fehlgeschlagen"
+            sleep $((try * 30))
+          done
+          exit 1
