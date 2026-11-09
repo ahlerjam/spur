@@ -39,7 +39,7 @@
     "Im Claude-Panel eines Projekts ohne Verbindung steht der Startbefehl im selben Kasten mit Knopf „Kopieren“; bei Standardbreite des Panels ist der ganze Befehl sichtbar (umgebrochen, nicht abgeschnitten); Kopieren liefert genau den Startbefehl",
     "Mit Sprache Englisch (Frontend-Test mit en.json) erscheinen die englischen Texte der Anleitung; kein deutscher Text bleibt stehen"
    ],
-   "passes": false
+   "passes": true
   },
   {
    "id": "f4",
