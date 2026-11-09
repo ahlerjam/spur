@@ -57,6 +57,11 @@
 - E2E vollständig: 42/42 ok in 440 s (`f1`–`f15`, `p2f1`–`p2f10`, `p4f1`–`p4f4`, `p3f1`–`p3f5`, `p5f1`–`p5f8`).
 - `spur-dev test`: alle Unit-Tests grün, Zeilen 94,66 %.
 
+## Schlusslauf (Endstand 7144b62fd4, nach der letzten Änderung)
+- Ein Lauf direkt nach den Bildschirmfotos scheiterte in f2, f3, f8, p2f8, p3f2 und p3f3: Das Fenster stand noch auf 360 px, die älteren Features setzen keine Breite (Panel über dem Kompilierknopf, umgebrochene Zeile in p3f2). Die Suite setzt jetzt zu Beginn 1280 × 720.
+- Danach einmal 41/42 (f4: Projektliste lud nicht in 30 s; f3 und f4 zusammen danach grün, derselbe vorübergehende Fall wie vorher bei f8).
+- Schlusslauf: 42/42 ok in 495 s (`f1`–`f15`, `p2f1`–`p2f10`, `p4f1`–`p4f4`, `p3f1`–`p3f5`, `p5f1`–`p5f8`).
+
 ## Overleafs Suiten
 - `spur-dev upstream web` am Stück brach auf diesem Rechner zweimal ohne Ergebnis ab (Protokoll endet mitten in der Punktreihe, keine `web.json`; vermutlich Speicher im Container). Deshalb in vier Teilen über Pfadargumente:
   - Teil 1 (Analytics bis Exports): bestanden 1641, fehlgeschlagen 1, bekannt 1, neu 0
