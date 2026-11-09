@@ -28,6 +28,8 @@
 - D4 (plan 20261108-spur-p3-abnahme) f3: Die zweite unabhängige Abnahme fand: `tipp-pause` akzeptiert eine nicht vorhandene `doc_id` und legt dafür einen `suggest_trigger` an, der das Tageslimit verbraucht.
   Interim: Nicht behoben; alle vier Features stehen auf passes true, die Abnahme blieb für f3 rot, der Plan steht auf partial.
   Options: A (empfohlen) `doc_id` gegen das Projekt prüfen und bei unbekannter ID einen Fehler liefern, mit rotem Test zuerst | B so lassen, weil nur ein Claude-Client mit eigenem Token es aufrufen kann
+  Resolved 2026-11-09 (owner session): option A. `tippPause` sucht die `doc_id` per `ProjectLocator.findElement` im Projekt; unbekannt gibt 404 `doc_fehlt`, bevor `ausloesen` zählt; andere Fehler gehen an Express. Unit-Tests erst rot, dann grün; p3f4 prüft den 404 am laufenden System. Der Routentest ersetzt den Vorschläge-Controller jetzt durch eine Attrappe, weil der echte Overleafs Modelle lädt.
 - D5 (plan 20261108-spur-p3-abnahme): Der Merge des Default-Branches in `agent` brach mit „refusing to merge unrelated histories“ ab; der Lauf baut auf dem Stand von `agent` ohne diesen Merge.
   Interim: Kein Merge; Gate auf dem Run-Branch grün (531 Tests).
   Options: A (empfohlen) Default-Branch von Hand klären, ob `agent` und `main` getrennte Geschichten haben sollen | B ignorieren
+  Resolved 2026-11-09 (owner session): option B. Lokal haben `main` und `agent` eine gemeinsame Basis (`git merge-base` findet sie); der Abbruch kam vom flachen Klon in der Cloud. Nichts zu tun.
