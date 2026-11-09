@@ -70,7 +70,7 @@ jobs:
       - run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
       - name: Auswertung testen
-        run: node --test tools/tests/upstream-auswertung.test.mjs tools/tests/befehlsnamen.test.mjs
+        run: node --test tools/tests/upstream-auswertung.test.mjs tools/tests/befehlsnamen.test.mjs tools/tests/abhaengigkeiten.test.mjs
       - name: spur-dev einrichten
         run: |
           tools/spur-dev/spur-dev install

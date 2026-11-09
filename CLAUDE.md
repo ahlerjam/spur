@@ -10,7 +10,7 @@ Agentic writing environment for academic papers, built on Overleaf.
 - Unit tests: `spur-dev test` (with coverage report, threshold 80 % of lines)
 - Overleaf's suites: `spur-dev upstream web|frontend|du|alle`, single files as further arguments (path relative to the service). The output ends with "bestanden, fehlgeschlagen, bekannt, neu"; exit 1 only on new failures, exit 2 if a given file is missing, excluded or contains no tests, or if no test runs at all
 - Three-way comparison `main`, `ext-ce`, current state: `spur-dev upstream vergleich` rewrites `tools/tests/upstream-bekannt.json` (about 40 minutes). Exclusions with reasons are in `tools/tests/upstream-ausschluss.json`
-- Tests of the evaluation: `node --test tools/tests/upstream-auswertung.test.mjs`
+- Tests of the evaluation and the repo checks: `node --test tools/tests/*.test.mjs` (includes that the spur server code imports only runtime `dependencies`; the operator image has no `devDependencies`)
 - Test account: `spur-dev user mail@example.org` returns the activation link. The account is an admin; permission checks need accounts without admin rights.
 - E2E: all features in one run. The suite resets its data beforehand itself (dev route `POST /spur/dev/e2e/vorbereiten`, only with `SPUR_DEV`); `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` does the same from outside. `spur-dev up` creates `services/web/modules/spur/dev-schalter.json` with the Crossref fake if it is missing
 - Script in the container: `spur-dev run modules/spur/test/skript.mjs` (path relative to `services/web`)
