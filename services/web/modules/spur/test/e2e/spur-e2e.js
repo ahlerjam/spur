@@ -779,7 +779,9 @@ async page => {
       ]
       // P3: Vorschläge ins Panel.
       const P3 = ['suggest']
-      const erwartet = [...P1, ...P2, ...P3].sort()
+      // P7: Pakete pro Projekt.
+      const P7 = ['tex_package_add', 'source_upload_link']
+      const erwartet = [...P1, ...P2, ...P3, ...P7].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
@@ -3569,6 +3571,653 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       ok(b && b.width >= 24 && b.height >= 24, `Knopf ${i + 1} bei 360 px: ${JSON.stringify(b)}`)
     }
     await breite(1280)
+  }
+
+  // Der Ablauf selbst läuft in tools/tests/setup.test.mjs (Terminal-Fragen, .env, Rechte, zweiter Aufruf).
+  features.p7f3 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const make = await repoDatei(`${REPO}/Makefile`)
+    ok(/\nsetup:\n\t@\.\/tools\/setup\.sh\n/.test(make), 'make setup ruft tools/setup.sh nicht auf')
+    const skript = await repoDatei(`${REPO}/tools/setup.sh`)
+    ok(skript.includes('[ ! -t 0 ]') && skript.includes('read -r -s'), 'setup.sh ohne Terminal-Prüfung oder verdeckte Passworteingabe')
+    ok(skript.includes('umask 077'), 'setup.sh legt .env nicht mit Rechten 600 an')
+    const readme = await repoDatei(`${REPO}/README.md`)
+    ok(readme.includes('make setup'), 'README ohne make setup')
+  }
+
+  features.p7f4 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    const regel = skill.split('## Throttled or unreachable services\n')[1] ?? ''
+    for (const teil of ['gedrosselt', 'nicht_erreichbar', 'other services', 'right away', 'summary', 'stages']) {
+      ok(regel.includes(teil), `Regel in SKILL.md ohne „${teil}“`)
+    }
+    const texte = await repoDatei(`${REPO}/services/web/modules/spur/app/src/workflows/standardtexte.mjs`)
+    const sammeln = texte.split('Literatur zu einem Thema finden')[1] ?? ''
+    ok(sammeln.includes('Throttled or unreachable services'), 'Quellen sammeln verweist nicht auf die Regel')
+  }
+
+  // Die Pfadregeln selbst prüft tools/tests/ci-pfade.test.mjs; der PR-Lauf ist Handprüfung.
+  features.p7f6 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const ci = await repoDatei(`${REPO}/.github/workflows/ci.yml`)
+    ok(!/^on:[\s\S]*?^\s+paths:/m.test(ci.split('\njobs:')[0]), 'ci.yml filtert Pfade am Workflow; die Pflicht-Prüfung bliebe aus')
+    ok(ci.includes('node tools/ci/aenderungen.mjs'), 'ci.yml ruft die Pfadregeln nicht auf')
+    for (const job of ['test', 'upstream']) {
+      const block = ci.split(`\n  ${job}:\n`)[1]?.split(/\n  \S/)[0] ?? ''
+      ok(block.includes(`needs.changes.outputs.${job} == 'leicht'`) && block.includes('!cancelled()'), `Job ${job} ohne leichten Weg`)
+    }
+    const publish = await repoDatei(`${REPO}/.github/workflows/publish.yml`)
+    ok(/tags:\s*\[?\s*['"]?v\*/.test(publish) && publish.includes('workflow_dispatch'), 'publish.yml startet nicht bei v*-Tags und per Hand')
+    const readme = await repoDatei(`${REPO}/README.md`)
+    ok(/git tag v[\d.]+ && git push origin v[\d.]+/.test(readme), 'README ohne Release mit Tag')
+  }
+
+  const OHNE_MAIL = 'E-Mail ist nicht eingerichtet – gib den Link selbst weiter.'
+
+  async function mailFake(an) {
+    const r = await page.request.post(`${BASE}/spur/dev/mail`, { data: { an } })
+    ok(r.status() === 204, `Mail-Fake: ${r.status()}`)
+  }
+
+  async function mailsAn(adresse) {
+    const { mails } = await (await page.request.get(`${BASE}/spur/dev/mail`)).json()
+    return mails.filter(m => m.an.includes(adresse))
+  }
+
+  // Liest Link, Hinweis und Kopierknopf eines Einladungslinks in `bereich`.
+  async function einladungslink(bereich) {
+    const feld = bereich.getByLabel('Einladungslink').last()
+    await feld.waitFor()
+    const link = await feld.inputValue()
+    ok(link.startsWith(`${BASE}/user/activate?token=`), `Link: ${link}`)
+    await bereich.getByRole('button', { name: 'Kopieren' }).last().click()
+    await bereich.getByRole('button', { name: 'Kopiert' }).last().waitFor()
+    return link
+  }
+
+  async function kontoAnlegen(email) {
+    await page.goto(`${BASE}/admin/user`)
+    await page.getByRole('button', { name: 'Konto erstellen' }).click()
+    const dialog = page.locator('.modal')
+    const erstellen = dialog.getByRole('button', { name: 'Erstellen' })
+    // Während der Dialog einblendet, gehen Eingaben verloren; dann bleibt „Erstellen“ gesperrt.
+    for (let versuch = 0; versuch < 10; versuch++) {
+      await dialog.getByLabel(/^E-Mail/).fill(email)
+      await dialog.getByLabel('Vorname').fill('Neu')
+      await dialog.getByLabel('Nachname').fill('P7')
+      if (await erstellen.isEnabled()) break
+      await page.waitForTimeout(300)
+    }
+    await erstellen.click()
+    return dialog
+  }
+
+  async function nutzerZeile(email) {
+    await page.goto(`${BASE}/admin/user`)
+    await page.getByRole('searchbox').or(page.getByLabel('Suchen…')).first().fill(email)
+    const zeile = page.getByRole('row', { name: new RegExp(email.replace('.', '\\.')) })
+    await zeile.waitFor()
+    return zeile
+  }
+
+  features.p7f1 = async () => {
+    await mailFake(false)
+    await anmelden('e2e-admin@example.org')
+    const dialog = await kontoAnlegen('neu-p7@example.org')
+    await dialog.getByText(OHNE_MAIL).waitFor()
+    const link = await einladungslink(dialog)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+
+    const { seite, schliessen } = await zweiteSeite()
+    try {
+      await seite.goto(link)
+      await seite.getByLabel(/^(Neues Passwort|Passwort)/).first().fill('Test-Passwort-1234')
+      await seite.getByRole('button', { name: /Passwort (setzen|festlegen)|Aktivieren|Set password|Activate/i }).click()
+      await seite.waitForURL(/\/project/, { timeout: 20000 })
+      const angemeldet = await seite.evaluate(() => document.querySelector('meta[name="ol-usersEmail"]')?.content)
+      ok(angemeldet === 'neu-p7@example.org', `Angemeldet als ${angemeldet}`)
+    } finally {
+      await schliessen()
+    }
+
+    const zeile = await nutzerZeile('neu-p7@example.org')
+    await zeile.getByRole('button', { name: 'Neuen Einladungslink erzeugen' }).click()
+    const neuDialog = page.locator('.modal', { hasText: 'Neuen Einladungslink erzeugen' })
+    const neuerLink = await einladungslink(neuDialog)
+    ok(neuerLink !== link, 'Kein neuer Link')
+    await neuDialog.getByRole('button', { name: 'Schließen' }).click()
+
+    await page.goto(`${BASE}/project`)
+    await page.getByRole('menuitem', { name: 'Admin' }).click()
+    await page.getByRole('menuitem', { name: 'Register Users' }).click()
+    await page.waitForURL(`${BASE}/admin/register`)
+    await page.getByLabel('Emails to register new users').fill('zweit-p7@example.org')
+    await page.getByRole('button', { name: 'Register' }).click()
+    await sichtbar(OHNE_MAIL)
+    await einladungslink(page)
+
+    await anmelden('e2e-a@example.org')
+    // Overleaf leitet Nicht-Admins auf /restricted um, statt 403 zu senden.
+    const eigeneId = await page.evaluate(() => document.querySelector('meta[name="ol-user_id"]').content)
+    const csrf = await page.evaluate(() => document.querySelector('meta[name="ol-csrfToken"]').content)
+    for (const [methode, pfad] of [['get', '/admin/register'], ['post', `/admin/user/${eigeneId}/activation-link`]]) {
+      const r = await page.request[methode](`${BASE}${pfad}`, { maxRedirects: 0, headers: { 'X-Csrf-Token': csrf } })
+      const ziel = r.headers().location ?? ''
+      ok(r.status() === 403 || (r.status() === 302 && ziel.startsWith('/restricted')), `${pfad} für Nicht-Admin: ${r.status()} ${ziel}`)
+    }
+
+    await mailFake(true)
+    try {
+      await anmelden('e2e-admin@example.org')
+      const mitMail = await kontoAnlegen('dritt-p7@example.org')
+      await mitMail.getByText('Einladung per E-Mail verschickt').waitFor()
+      await einladungslink(mitMail)
+      ok((await mailsAn('dritt-p7@example.org')).length === 1, 'Fake-SMTP hat keine Einladung erhalten')
+    } finally {
+      await mailFake(false)
+    }
+  }
+
+  features.p7f2 = async () => {
+    await mailFake(false)
+    await anmelden('e2e-admin@example.org')
+    await page.goto(`${BASE}/launchpad`)
+    const testMail = async () => {
+      await page.getByLabel('Email', { exact: true }).fill('e2e-admin@example.org')
+      await page.getByRole('button', { name: 'Absenden' }).click()
+    }
+    await testMail()
+    await sichtbar('Keine E-Mail eingerichtet')
+    await sichtbar(/README/)
+    ok(!(await page.getByText(/E-Mail versendet|Email sent/i).isVisible()), 'Test-Mail meldet Versand ohne Einrichtung')
+
+    await page.goto('about:blank')
+    await page.context().clearCookies()
+    await page.goto(`${BASE}/user/password/reset`)
+    await page.getByLabel('E-Mail').fill('e2e-a@example.org')
+    await page.getByRole('button', { name: 'Passwort zurücksetzen' }).click()
+    await sichtbar('Bitte einen Admin, dir einen neuen Einladungslink zu erzeugen.')
+
+    await mailFake(true)
+    try {
+      await anmelden('e2e-admin@example.org')
+      await page.goto(`${BASE}/launchpad`)
+      await testMail()
+      await sichtbar(/E-Mail versendet|Email sent/i)
+      ok((await mailsAn('e2e-admin@example.org')).length === 1, 'Fake-SMTP hat die Test-Mail nicht erhalten')
+    } finally {
+      await mailFake(false)
+    }
+  }
+
+  features.p7f5 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Pakete')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const paket = name => werkzeug(token, 'tex_package_add', { project_id: pid, paket: name })
+    const pfade = async () => (await jsonVon(`/project/${pid}/entities`)).entities.map(e => e.path)
+    // Der Editor kompiliert beim Öffnen selbst; ein Compile direkt danach meldet „too-recently-compiled“.
+    const kompilieren = async () => {
+      for (let i = 0; i < 10; i++) {
+        const job = await kompiliertBeiClaude(token, pid)
+        if (job.ergebnis?.compile !== 'too-recently-compiled') return job
+        await page.waitForTimeout(1500)
+      }
+      fail('Compile bleibt „too-recently-compiled“')
+    }
+    const nichtGefunden = async () => {
+      const job = await kompilieren()
+      ok(job.ergebnis.compile !== 'success', `Compile ohne Theme: ${JSON.stringify(job.ergebnis)}`)
+      const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: pid })
+      ok(JSON.stringify(log).includes('beamerthemespurtest.sty') && /not found/.test(JSON.stringify(log)), `Log ohne „not found“: ${JSON.stringify(log).slice(0, 300)}`)
+    }
+    await nichtGefunden()
+
+    const theme = await paket('beamertheme-spurtest')
+    ok(!theme.fehler && theme.inhalt.dateien.includes('tex-pakete/beamertheme-spurtest/beamerthemespurtest.sty'), `Theme: ${JSON.stringify(theme.inhalt)}`)
+    ok(!theme.inhalt.dateien.some(d => d.endsWith('README.md')), 'Doku-Datei mit angelegt')
+    ok(JSON.stringify(theme.inhalt.fehlende_abhaengigkeiten) === '["spurfarben"]', `Abhängigkeiten: ${theme.inhalt.fehlende_abhaengigkeiten}`)
+    const farben = await paket('spurfarben')
+    ok(!farben.fehler && farben.inhalt.fehlende_abhaengigkeiten.length === 0, `spurfarben: ${JSON.stringify(farben.inhalt)}`)
+    const mitTheme = await kompilieren()
+    ok(mitTheme.ergebnis.compile === 'success', `Compile mit Theme: ${JSON.stringify(mitTheme.ergebnis)}`)
+
+    await panelOeffnen('Claude')
+    // Die latexmkrc bleibt: Pakete späterer Läufe brauchen sie auch.
+    for (const datei of ['tex-pakete/beamertheme-spurtest', 'tex-pakete/spurfarben']) {
+      await karte().getByText(datei, { exact: true }).waitFor({ timeout: 20000 })
+    }
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const nachher = await pfade()
+    ok(!nachher.some(p => p.startsWith('/tex-pakete')) && nachher.includes('/latexmkrc'), `Nach „Lauf rückgängig“: ${nachher}`)
+    await nichtGefunden()
+
+    const beamer = await paket('beamer')
+    ok(!beamer.fehler && beamer.inhalt.im_image === true && beamer.inhalt.dateien.length === 0, `beamer: ${JSON.stringify(beamer.inhalt)}`)
+    ok(beamer.inhalt.hinweis === 'schon im Image', `beamer: ${beamer.inhalt.hinweis}`)
+    for (const name of ['../x', 'zwei worte']) {
+      const falsch = await paket(name)
+      ok(falsch.fehler && falsch.inhalt.fehler === 'eingabe_ungueltig', `${name}: ${JSON.stringify(falsch.inhalt)}`)
+    }
+    const ausbruch = await paket('spurtest-ausbruch')
+    ok(ausbruch.fehler && ausbruch.inhalt.fehler === 'archiv_unsicher', `Ausbruch: ${JSON.stringify(ausbruch.inhalt)}`)
+    const riesig = await paket('spurtest-riesig')
+    ok(riesig.fehler && riesig.inhalt.fehler === 'paket_zu_gross' && riesig.inhalt.detail.includes('20 MB'), `Riesig: ${JSON.stringify(riesig.inhalt)}`)
+    const danach = await pfade()
+    ok(!danach.some(p => p.startsWith('/tex-pakete')), `Nach Fehlern angelegt: ${danach}`)
+
+    await fakeSteuern({ schalter: { SPUR_TEX_PAKETE: 'aus' } })
+    try {
+      const aus = await paket('spurfarben')
+      ok(aus.fehler && aus.inhalt.fehler === 'abgeschaltet' && aus.inhalt.detail.includes('Admin'), `Abgeschaltet: ${JSON.stringify(aus.inhalt)}`)
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+
+    const REPO = `${FIXTURES}/../../../../../..`
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    const ablauf = skill.split('## Missing LaTeX packages\n')[1]?.split('\n## ')[0] ?? ''
+    for (const teil of ['compile_log', 'not found', 'tex_package_add', 'compile', 'fehlende_abhaengigkeiten']) {
+      ok(ablauf.includes(teil), `SKILL.md: Ablauf ohne „${teil}“`)
+    }
+    for (const datei of ['README.md', 'docs/mcp-contract.md']) {
+      ok((await repoDatei(`${REPO}/${datei}`)).includes('tex_package_add'), `${datei} nennt tex_package_add nicht`)
+    }
+  }
+
+  // P7 Grenzen. Eigene Konten (e2e-grenze-a/-b/-c, ohne Admin-Rechte); jeder Schritt setzt seine Grenzen selbst.
+  const GRENZEN = `${BASE}/spur/admin/grenzen`
+  const PROJEKTE_VOLL = 'Du hast 3 von 3 Projekten. Lösche ein Projekt endgültig oder frag deinen Admin.'
+
+  async function seitenAnfrage(methode, pfad, body) {
+    return await page.evaluate(
+      async ([m, url, daten]) => {
+        const token = document.querySelector('meta[name="ol-csrfToken"]').content
+        const r = await fetch(url, {
+          method: m,
+          headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': token, Accept: 'application/json' },
+          body: daten === undefined ? undefined : JSON.stringify(daten),
+        })
+        return { status: r.status, daten: await r.json().catch(() => null) }
+      },
+      [methode, `${BASE}${pfad}`, body]
+    )
+  }
+
+  // Als Admin: Standard und Ausnahmen setzen (Werte wie im Formular, '' = unbegrenzt bzw. Standard).
+  async function grenzenSetzen(standard, ausnahmen = {}) {
+    await anmelden('e2e-admin@example.org')
+    const r = await seitenAnfrage('PUT', '/spur/admin/grenzen/standard', { texPaketeAus: false, ...standard })
+    ok(r.status === 204, `Standard setzen: ${r.status} ${JSON.stringify(r.daten)}`)
+    const { nutzer } = (await seitenAnfrage('GET', '/spur/admin/grenzen.json')).daten
+    for (const [email, werte] of Object.entries(ausnahmen)) {
+      const id = nutzer.find(n => n.email === email).id
+      const a = await seitenAnfrage('PUT', `/spur/admin/grenzen/nutzer/${id}`, werte)
+      ok(a.status === 204, `Ausnahme ${email}: ${a.status}`)
+    }
+  }
+
+  const standardBereich = () => page.locator('section', { has: page.getByRole('heading', { name: 'Standard für alle' }) })
+  const nutzerZeileGrenze = email => page.locator(`tr[data-email="${email}"]`)
+
+  features.p7f7 = async () => {
+    await grenzenSetzen({ projekte: '', speicherGb: '' })
+    await page.goto(`${BASE}/project`)
+    await page.getByRole('menuitem', { name: 'Admin' }).click()
+    await page.getByRole('menuitem', { name: 'Limits' }).click()
+    await page.waitForURL(GRENZEN)
+    const stand = () => standardBereich().locator('dl').innerText()
+    await standardBereich().locator('dl').waitFor()
+    ok(/Projekte je Nutzer:\s*unbegrenzt/.test(await stand()) && /Speicher je Projekt:\s*unbegrenzt/.test(await stand()), `Stand: ${await stand()}`)
+
+    await standardBereich().getByLabel('Projekte je Nutzer').fill('3')
+    await standardBereich().getByLabel('Speicher je Projekt (GB)').fill('0,01')
+    await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+    await standardBereich().getByText('Gespeichert').waitFor()
+    await page.reload()
+    await standardBereich().locator('dl').waitFor()
+    ok(/Projekte je Nutzer:\s*3/.test(await stand()) && /Speicher je Projekt:\s*0,01 GB/.test(await stand()), `Nach Neuladen: ${await stand()}`)
+    ok((await standardBereich().getByLabel('Projekte je Nutzer').inputValue()) === '3', 'Feld Projekte leer nach Neuladen')
+
+    const b = nutzerZeileGrenze('e2e-grenze-b@example.org')
+    await b.getByRole('button', { name: 'Ausnahme für e2e-grenze-b@example.org ändern' }).click()
+    await b.getByLabel('Projekte je Nutzer: Art').selectOption('zahl')
+    await b.getByLabel('Projekte je Nutzer', { exact: true }).fill('5')
+    await b.getByRole('button', { name: 'Speichern' }).click()
+    await b.getByText('Projekte: 5').waitFor()
+    await page.reload()
+    await b.getByText('Projekte: 5').waitFor()
+    ok((await b.innerText()).includes('3 / 5'), `Zeile e2e-grenze-b: ${await b.innerText()}`)
+
+    await standardBereich().getByLabel('Projekte je Nutzer').fill('-1')
+    await standardBereich().getByLabel('Speicher je Projekt (GB)').fill('abc')
+    await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+    await standardBereich().getByText('Gib eine ganze Zahl ab 0 ein oder lass das Feld leer.').waitFor()
+    await standardBereich().getByText('Gib eine Zahl ab 0 ein, etwa 0,5, oder lass das Feld leer.').waitFor()
+    ok((await standardBereich().getByLabel('Projekte je Nutzer').getAttribute('aria-invalid')) === 'true', 'Feld nicht als ungültig markiert')
+    await page.reload()
+    await standardBereich().locator('dl').waitFor()
+    ok(/Projekte je Nutzer:\s*3/.test(await stand()), `Ungültiges gespeichert: ${await stand()}`)
+
+    await anmelden('e2e-grenze-a@example.org')
+    const fremd = await page.request.get(GRENZEN, { maxRedirects: 0 })
+    ok(fremd.status() === 403 || (fremd.status() === 302 && fremd.headers().location.startsWith('/restricted')), `Grenzen für Nicht-Admin: ${fremd.status()}`)
+  }
+
+  // Ein ZIP mit einer Datei, ohne Kompression (für den ZIP-Upload).
+  function zipMitDatei(name, text) {
+    const daten = Buffer.from(text)
+    const crcTabelle = Array.from({ length: 256 }, (_, n) => {
+      let c = n
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+      return c >>> 0
+    })
+    let crc = 0xffffffff
+    for (const byte of daten) crc = crcTabelle[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+    crc = (crc ^ 0xffffffff) >>> 0
+    const dateiname = Buffer.from(name)
+    const kopf = Buffer.alloc(30)
+    kopf.writeUInt32LE(0x04034b50, 0); kopf.writeUInt16LE(20, 4); kopf.writeUInt32LE(crc, 14)
+    kopf.writeUInt32LE(daten.length, 18); kopf.writeUInt32LE(daten.length, 22); kopf.writeUInt16LE(dateiname.length, 26)
+    const zentral = Buffer.alloc(46)
+    zentral.writeUInt32LE(0x02014b50, 0); zentral.writeUInt16LE(20, 4); zentral.writeUInt16LE(20, 6); zentral.writeUInt32LE(crc, 16)
+    zentral.writeUInt32LE(daten.length, 20); zentral.writeUInt32LE(daten.length, 24); zentral.writeUInt16LE(dateiname.length, 28)
+    const lokal = Buffer.concat([kopf, dateiname, daten])
+    const ende = Buffer.alloc(22)
+    ende.writeUInt32LE(0x06054b50, 0); ende.writeUInt16LE(1, 8); ende.writeUInt16LE(1, 10)
+    ende.writeUInt32LE(46 + dateiname.length, 12); ende.writeUInt32LE(lokal.length, 16)
+    return Buffer.concat([lokal, zentral, dateiname, ende])
+  }
+
+  async function projektIdVon(name) {
+    return (await jsonVon('/user/projects')).projects.find(p => p.name === name)?._id
+  }
+
+  features.p7f8 = async () => {
+    await grenzenSetzen({ projekte: '3', speicherGb: '' }, { 'e2e-grenze-b@example.org': { projekte: '5', speicherGb: '' } })
+    await anmelden('e2e-grenze-a@example.org')
+    await page.locator('.spur-grenzen-anzeige', { hasText: '3 von 3 Projekten' }).waitFor()
+
+    await page.getByRole('button', { name: 'Neues Projekt' }).first().click()
+    await page.getByRole('menuitem', { name: 'Leeres Projekt' }).click()
+    const neu = page.locator('.modal')
+    await neu.getByRole('textbox').fill('Grenze A4')
+    await neu.getByRole('button', { name: 'Erstellen' }).click()
+    await neu.getByText(PROJEKTE_VOLL).waitFor()
+    await neu.getByRole('button', { name: 'Abbrechen' }).click()
+    await neu.waitFor({ state: 'detached' })
+
+    const zeile = page.getByRole('row', { name: /Grenze A1/ }).first()
+    await zeile.getByRole('button', { name: 'Kopieren' }).click()
+    const kopie = page.locator('.modal')
+    await kopie.getByRole('button', { name: 'Kopieren' }).click()
+    await kopie.getByText(PROJEKTE_VOLL).waitFor()
+    await kopie.getByRole('button', { name: 'Abbrechen' }).click()
+    await kopie.waitFor({ state: 'detached' })
+
+    await page.getByRole('button', { name: 'Neues Projekt' }).first().click()
+    await page.getByRole('menuitem', { name: 'Existing project (.zip)' }).click()
+    const zip = page.locator('.modal')
+    await zip.locator('input[type=file]').first().setInputFiles({ name: 'grenze.zip', mimeType: 'application/zip', buffer: zipMitDatei('main.tex', 'Hallo') })
+    await zip.getByText(PROJEKTE_VOLL).waitFor({ timeout: 30000 })
+    await zip.getByRole('button', { name: 'Abbrechen' }).click()
+
+    const direkt = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze API' })
+    ok(direkt.status === 403 && direkt.daten?.code === 'projekte_voll', `POST /project/new: ${direkt.status} ${JSON.stringify(direkt.daten)}`)
+
+    const a2 = await projektIdVon('Grenze A2')
+    ok((await seitenAnfrage('POST', `/project/${a2}/trash`)).status === 200, 'Papierkorb')
+    ok((await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze Papierkorb' })).status === 403, 'Papierkorb gibt einen Platz frei')
+    ok((await seitenAnfrage('DELETE', `/project/${a2}`)).status === 200, 'Endgültig löschen')
+    const wieder = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze A4' })
+    ok(wieder.status === 200 && wieder.daten?.project_id, `Nach endgültigem Löschen: ${wieder.status}`)
+
+    await anmelden('e2e-grenze-b@example.org')
+    const viertes = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze B4' })
+    ok(viertes.status === 200, `e2e-grenze-b mit Ausnahme 5: ${viertes.status} ${JSON.stringify(viertes.daten)}`)
+  }
+
+  const MB = 1024 * 1024
+
+  async function editorHochladen(name, bytes) {
+    await panelSichern(DATEIBAUM, page.locator('.file-tree'))
+    await page.locator('.file-tree').getByRole('button', { name: /Hochladen|Upload/ }).first().click()
+    await page.locator('.modal input[type=file]').first().setInputFiles({ name, mimeType: 'application/octet-stream', buffer: Buffer.alloc(bytes, 1) })
+  }
+
+  // `url` ist die Upload-Adresse des Editors (mit folder_id), abgegriffen beim ersten Upload.
+  async function direktHochladen(url, name, bytes) {
+    return await page.evaluate(
+      async ([ziel, dateiname, groesse]) => {
+        const form = new FormData()
+        form.append('name', dateiname)
+        form.append('qqfile', new Blob([new Uint8Array(groesse)]), dateiname)
+        const r = await fetch(ziel, {
+          method: 'POST',
+          headers: { 'X-Csrf-Token': document.querySelector('meta[name="ol-csrfToken"]').content },
+          body: form,
+        })
+        return { status: r.status, daten: await r.json().catch(() => null) }
+      },
+      [url, name, bytes]
+    )
+  }
+
+  features.p7f9 = async () => {
+    await grenzenSetzen({ projekte: '', speicherGb: '0,01' })
+    await anmelden('e2e-grenze-a@example.org')
+    await projektOeffnen('Grenze A1')
+    const pid = page.url().split('/').pop()
+    const ersterUpload = page.waitForRequest(r => r.method() === 'POST' && r.url().includes(`/project/${pid}/upload`))
+    await editorHochladen('erste.bin', 6 * MB)
+    const uploadUrl = (await ersterUpload).url()
+    await page.locator('.modal').waitFor({ state: 'detached', timeout: 30000 })
+    await panelOeffnen('Quellen')
+    await page.locator('.spur-speicher-anzeige', { hasText: '0,01 GB von 0,01 GB' }).waitFor({ timeout: 20000 })
+
+    await editorHochladen('zweite.bin', 6 * MB)
+    await page.locator('.modal').getByText(/^Dieses Projekt nutzt 0,01 GB von 0,01 GB\. Lösche Dateien oder Quellen oder frag deinen Admin\.$/).waitFor({ timeout: 30000 })
+    await page.keyboard.press('Escape')
+    await page.locator('.modal').waitFor({ state: 'detached' })
+
+    await panelSichern('Quellen', page.locator('.spur-panel input[type=file]'))
+    await page.locator('.spur-panel input[type=file]').setInputFiles({ name: 'gross.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(6 * MB, 1) })
+    await page.locator('.spur-panel').getByText(/Dieses Projekt nutzt 0,01 GB von 0,01 GB/).waitFor({ timeout: 30000 })
+
+    // source_add bringt ein kleines PDF; mit 0,005 GB ist das Projekt schon voll.
+    await grenzenSetzen({ projekte: '', speicherGb: '0,005' })
+    await anmelden('e2e-grenze-a@example.org')
+    const token = await neuesToken()
+    const mcpVoll = await werkzeug(token, 'source_add', { project_id: pid, doi: '10.1371/journal.pone.0099999' })
+    ok(mcpVoll.fehler && mcpVoll.inhalt.fehler === 'speicher_voll', `source_add: ${JSON.stringify(mcpVoll.inhalt)}`)
+    await grenzenSetzen({ projekte: '', speicherGb: '0,01' })
+    await anmelden('e2e-grenze-a@example.org')
+    await projektOeffnen('Grenze A1')
+
+    await editorErsetzen('Text.', 'Text. Weiter geschrieben trotz voller Grenze.')
+    await gespeichert(token, pid, 'Weiter geschrieben trotz voller Grenze.')
+
+    const erste = page.locator('.file-tree').getByRole('treeitem', { name: 'erste.bin' })
+    await panelSichern(DATEIBAUM, erste)
+    await erste.click()
+    await page.getByRole('button', { name: 'Aktionsmenü für erste.bin öffnen' }).click()
+    await page.getByRole('menuitem', { name: 'Löschen' }).click()
+    await page.locator('.modal').getByRole('button', { name: 'Löschen' }).click()
+    await page.locator('.modal').waitFor({ state: 'detached' })
+    await erste.waitFor({ state: 'detached' })
+    const danach = await direktHochladen(uploadUrl, 'dritte.bin', 6 * MB)
+    ok(danach.status === 200 && danach.daten?.success, `Upload nach dem Löschen: ${danach.status} ${JSON.stringify(danach.daten)}`)
+
+    const ergebnisse = await Promise.all([direktHochladen(uploadUrl, 'gleich-1.bin', 3 * MB), direktHochladen(uploadUrl, 'gleich-2.bin', 3 * MB)])
+    const angenommen = ergebnisse.filter(e => e.status === 200).length
+    ok(angenommen === 1, `Gleichzeitige Uploads: ${JSON.stringify(ergebnisse)}`)
+  }
+
+  features.p7f10 = async () => {
+    await grenzenSetzen({ projekte: '3', speicherGb: '0,01' })
+    await page.goto(GRENZEN)
+    const a = nutzerZeileGrenze('e2e-grenze-a@example.org')
+    await a.waitFor()
+    ok((await a.innerText()).includes('3 / 3') && (await a.getByText('erreicht', { exact: true }).count()) === 1, `Zeile e2e-grenze-a: ${await a.innerText()}`)
+
+    const projekte = page.locator('section', { has: page.getByRole('heading', { name: 'Projekte', exact: true }) })
+    const b2 = projekte.locator('tr[data-projekt="Grenze B2"]')
+    const vorher = await b2.innerText()
+    ok(vorher.includes('e2e-grenze-b@example.org') && vorher.includes('/ 0,01 GB'), `Zeile Grenze B2: ${vorher}`)
+    ok((await b2.getByText('ab 80 %').count()) === 0, 'Grenze B2 schon vor dem Vergrößern markiert')
+    const r = await page.request.post(`${BASE}/spur/dev/quelle-vergroessern`, { data: { projekt: 'Grenze B2', bytes: 9 * MB } })
+    ok(r.status() === 204, `Quelle vergrößern: ${r.status()}`)
+    await page.reload()
+    await b2.waitFor()
+    ok((await b2.innerText()) === vorher, 'Stand ändert sich ohne Neuberechnung')
+    await b2.getByRole('button', { name: 'Speicher von „Grenze B2“ neu berechnen' }).click()
+    await b2.getByText('ab 80 %').waitFor({ timeout: 20000 })
+
+    for (const bereich of ['Nutzer', 'Projekte']) {
+      const abschnitt = page.locator('section', { has: page.getByRole('heading', { name: bereich, exact: true }) })
+      await abschnitt.getByRole('button', { name: /^Auslastung/ }).click()
+      const erste = await abschnitt.locator('tbody tr').first().innerText()
+      ok(/überschritten|erreicht|ab 80 %/.test(erste), `${bereich} nach Auslastung: ${erste}`)
+    }
+    await breite(360)
+    await ohneSeitlichesRollen('Grenzen 360 px')
+    await breite(1280)
+  }
+
+  features.p7f11 = async () => {
+    await grenzenSetzen({ projekte: '', speicherGb: '' })
+    await page.goto(GRENZEN)
+    await standardBereich().locator('dl').waitFor()
+    const stand = await standardBereich().locator('dl').innerText()
+    ok(/Projekte je Nutzer:\s*unbegrenzt/.test(stand) && /Speicher je Projekt:\s*unbegrenzt/.test(stand), `Ohne Einstellung: ${stand}`)
+    await anmelden('e2e-grenze-c@example.org')
+    await page.locator('.project-list-header-row').first().waitFor()
+    ok((await page.locator('.spur-grenzen-anzeige').count()) === 0, 'Projektzahl ohne Grenze angezeigt')
+    const sechstes = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze C6' })
+    ok(sechstes.status === 200, `Ohne Grenze: ${sechstes.status}`)
+    ok((await seitenAnfrage('DELETE', `/project/${sechstes.daten.project_id}`)).status === 200, 'Aufräumen')
+
+    await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-grenze-c@example.org': { projekte: '3', speicherGb: '' } })
+    await anmelden('e2e-grenze-c@example.org')
+    await page.locator('.spur-grenzen-anzeige', { hasText: '5 von 3 Projekten' }).waitFor()
+    await projektOeffnen('Grenze C5')
+    await editorErsetzen('Text.', 'Text. Bleibt bearbeitbar.')
+    const token = await neuesToken()
+    await gespeichert(token, page.url().split('/').pop(), 'Bleibt bearbeitbar.')
+    const gesperrt = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze C6' })
+    ok(gesperrt.status === 403 && gesperrt.daten?.code === 'projekte_voll', `Sechstes Projekt: ${gesperrt.status}`)
+
+    await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-grenze-c@example.org': { projekte: '', speicherGb: '' } })
+    const REPO = `${FIXTURES}/../../../../../..`
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const betrieb = readme.split('### Limits\n')[1]?.split('\n### ')[0] ?? ''
+    ok(betrieb.includes('Admin → Limits') && betrieb.includes('unlimited'), 'README ohne Abschnitt zu den Grenzen')
+  }
+
+  // Binärdatei aus dem Repo als Buffer (repoDatei liest Text).
+  async function repoBytes(pfad) {
+    await page.setContent('<input type="file">')
+    await page.locator('input').setInputFiles(pfad)
+    const base64 = await page.locator('input').evaluate(async el => {
+      const bytes = new Uint8Array(await el.files[0].arrayBuffer())
+      let text = ''
+      for (const b of bytes) text += String.fromCharCode(b)
+      return btoa(text)
+    })
+    return Buffer.from(base64, 'base64')
+  }
+
+  async function perLink(link, datei, felder = {}) {
+    const inhalt = typeof datei === 'string' ? { name: datei, mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/${datei}`) } : datei
+    const r = await page.request.post(link, { multipart: { datei: inhalt, ...felder } })
+    return { status: r.status(), daten: await r.json().catch(() => null) }
+  }
+
+  features.p7f12 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E Hochladen')
+    const andere = await projektId(token, 'E2E Hochladen B')
+    const eintrag = await werkzeug(token, 'acquisition_add', { project_id: pid, doi: '10.5555/spur.2024.001' })
+    ok(!eintrag.fehler, `acquisition_add: ${JSON.stringify(eintrag.inhalt)}`)
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    ok(link.gueltig_minuten === 15 && link.max_dateien === 50 && link.link.startsWith(`${BASE}/spur/hochladen/`), `Link: ${JSON.stringify(link)}`)
+
+    const smith = await perLink(link.link, 'smith2024.pdf', { project_id: andere })
+    ok(smith.status === 200 && smith.daten.status === 'angelegt' && /^[0-9a-f]{24}$/.test(smith.daten.quelle_id), `smith2024.pdf: ${JSON.stringify(smith)}`)
+    ok(smith.daten.beschaffung_id === eintrag.inhalt.eintrag_id, `Nicht der Beschaffungsliste zugeordnet: ${JSON.stringify(smith.daten)}`)
+    const bericht = await perLink(link.link, 'arxiv2401.01234.pdf', { titel: 'Testbericht' })
+    ok(bericht.status === 200 && bericht.daten.status === 'angelegt', `Zweite Datei: ${JSON.stringify(bericht)}`)
+    const nochmal = await perLink(link.link, 'smith2024.pdf')
+    ok(nochmal.daten?.status === 'vorhanden' && nochmal.daten.quelle_id === smith.daten.quelle_id, `Duplikat: ${JSON.stringify(nochmal)}`)
+    const text = { name: 'kein.pdf', mimeType: 'application/pdf', buffer: Buffer.from('nur Text, kein PDF') }
+    const falsch = await perLink(link.link, text)
+    ok(falsch.daten?.status === 'abgelehnt' && falsch.daten.grund.startsWith('Keine PDF-Datei'), `Text als PDF: ${JSON.stringify(falsch)}`)
+
+    const imAnderen = (await werkzeug(token, 'sources_list', { project_id: andere })).inhalt.eintraege
+    ok(imAnderen.length === 0, `Upload landete in Projekt B: ${JSON.stringify(imAnderen)}`)
+    const ohne = await page.request.post(`${BASE}/spur/hochladen`, { multipart: { datei: text } })
+    ok(ohne.status() === 401, `Ohne Token: ${ohne.status()}`)
+    const fremd = await page.request.post(`${BASE}/spur/hochladen/${'0'.repeat(64)}`, { multipart: { datei: text } })
+    ok(fremd.status() === 401, `Falsches Token: ${fremd.status()}`)
+
+    const { inhalt: kurz } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const spaeter = new Date(Date.now() + 16 * 60 * 1000).toISOString()
+    ok((await page.request.post(`${BASE}/spur/dev/zeit`, { data: { jetzt: spaeter } })).status() === 204, 'Zeit vorstellen')
+    try {
+      const abgelaufen = await perLink(kurz.link, text)
+      ok(abgelaufen.status === 410 && abgelaufen.daten.detail.startsWith('Link abgelaufen'), `Nach 15 Minuten: ${JSON.stringify(abgelaufen)}`)
+    } finally {
+      await page.request.post(`${BASE}/spur/dev/zeit`, { data: { jetzt: null } })
+    }
+    const { inhalt: voll } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    for (let i = 0; i < 50; i++) ok((await perLink(voll.link, text)).status === 200, `Upload ${i + 1}`)
+    const einundfuenfzig = await perLink(voll.link, text)
+    ok(einundfuenfzig.status === 410 && einundfuenfzig.daten.detail.startsWith('Link verbraucht'), `51. Upload: ${JSON.stringify(einundfuenfzig)}`)
+
+    await projektOeffnen('E2E Hochladen')
+    await panelOeffnen('Quellen')
+    for (const name of ['smith2024.pdf', 'arxiv2401.01234.pdf']) await page.getByRole('button', { name }).first().waitFor({ timeout: 20000 })
+    const liste = await jsonVon(`/spur/project/${pid}/beschaffung`)
+    const zugeordnet = (liste.eintraege ?? liste).find(e => e.doi === '10.5555/spur.2024.001')
+    ok(zugeordnet?.status === 'beschafft', `Beschaffungsliste: ${JSON.stringify(zugeordnet)}`)
+
+    await panelOeffnen('Claude')
+    for (const name of ['smith2024.pdf', 'arxiv2401.01234.pdf']) await karte().getByText(name, { exact: true }).waitFor({ timeout: 20000 })
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const danach = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    ok(danach.length === 0, `Nach „Lauf rückgängig“: ${danach.map(q => q.dateiname)}`)
+  }
+
+  // Die Skripte selbst prüft tools/tests/plugin-skripte.test.mjs gegen lokale Fakes.
+  features.p7f13 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    for (const skript of ['spur-pdf-holen', 'spur-hochladen']) {
+      const text = await repoDatei(`${REPO}/plugins/spur/bin/${skript}`)
+      ok(text.startsWith('#!/usr/bin/env bash') || text.startsWith('#!/bin/bash'), `${skript} ohne bash-Shebang`)
+      ok(text.includes('--help'), `${skript} ohne --help`)
+    }
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    const ablauf = skill.split('## PDFs from your computer\n')[1]?.split('\n## ')[0] ?? ''
+    for (const teil of ['spur-pdf-holen', 'Playwright', 'source_upload_link', 'spur-hochladen', 'paywall']) {
+      ok(ablauf.includes(teil), `SKILL.md: Ablauf ohne „${teil}“`)
+    }
+    const test = await repoDatei(`${REPO}/tools/tests/plugin-skripte.test.mjs`)
+    ok(test.includes('spur-pdf-holen') && test.includes('spur-hochladen'), 'Test der Plugin-Skripte fehlt')
+  }
+
+  // Die Paketliste prüft tools/tests/tex-pakete.test.mjs; der Smoke auf spur nach dem Merge ist Handprüfung.
+  features.p7f14 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
+    const liste = dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1]?.split('&&')[0] ?? ''
+    ok(/\sxfrac\s/.test(liste), 'xfrac fehlt in der Paketliste des Images')
+    const test = await repoDatei(`${REPO}/tools/tests/tex-pakete.test.mjs`)
+    ok(/chemformula: \[[^\]]*'xfrac'/.test(test), 'Der Paket-Test kennt die Pakete nicht, die chemformula nachlädt')
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

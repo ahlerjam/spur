@@ -13,6 +13,8 @@ import { fetchNothing } from '@overleaf/fetch-utils'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
 import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
+import * as TexPakete from '../../app/src/kompilieren/TexPakete.mjs'
+import { grenzen, speicher as speicherSammlung } from '../../app/src/sammlungen.mjs'
 import {
   ereignisse,
   herzschlaege,
@@ -192,6 +194,8 @@ Zweiter Absatz.
 
 // Auch die Dev-Route POST /spur/dev/e2e/vorbereiten ruft das auf, damit die Suite sich selbst zurücksetzt.
 export async function e2eDatenVorbereiten() {
+  // Zuerst: Grenzen eines früheren Laufs würden sonst das Anlegen der Testdaten sperren.
+  await (await grenzen()).deleteMany({})
   const a = await konto('e2e-a@example.org')
   const leser = await konto('e2e-leser@example.org')
   const link = await konto('e2e-link@example.org')
@@ -296,7 +300,7 @@ Delta Satz.
   await testToken(weg, 'spur_e2e_weg', new Date(Date.now() + 24 * 3600 * 1000))
 
   // Ein Konto ohne Bot und ohne Token: f8 prüft das allererste Token eines neuen Nutzers.
-  for (const email of ['e2e-neu@example.org']) {
+  for (const email of ['e2e-neu@example.org', 'neu-p7@example.org', 'zweit-p7@example.org', 'dritt-p7@example.org']) {
     const alt = await db.users.findOne({ email })
     if (alt) {
       await kontoAufraeumen(alt._id)
@@ -333,6 +337,18 @@ Text davor.
 \end{document}`,
   })
   await neuAnlegen(a, 'E2E Folien', { 'main.tex': 'Folien folgen.\n' })
+  // P7: Theme aus dem TeX-Live-Fake, das nicht im Image ist.
+  await neuAnlegen(a, 'E2E Pakete', {
+    'main.tex': String.raw`\documentclass{beamer}
+\usetheme{spurtest}
+\begin{document}
+\begin{frame}{Pakete}Theme aus dem Projekt.\end{frame}
+\end{document}
+`,
+  })
+  await TexPakete.begrenzer.delete(String(a._id))
+  await neuAnlegen(a, 'E2E Hochladen', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Hochladen B', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Semantik', {
     'main.tex': String.raw`\documentclass{article}
 \usepackage{csquotes}
@@ -454,6 +470,30 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   })
   await quelleAusFixture(p6Bericht._id, a._id, 'smith2024.pdf')
   await neuAnlegen(a, 'E2E P6 Zahlen', { 'main.tex': LEER, 'quellen.bib': '@article{p6,\n  title = {Zahlen}\n}\n' })
+  await grenzenVorbereiten()
+}
+
+// P7 Grenzen: eigene Konten ohne Admin-Rechte, damit die Projektzahlen klein und bekannt sind.
+async function grenzenVorbereiten() {
+  const [ga, gb, gc] = await Promise.all(['e2e-grenze-a', 'e2e-grenze-b', 'e2e-grenze-c'].map(n => konto(`${n}@example.org`)))
+  for (const konto of [ga, gb, gc]) {
+    for (const alt of await db.projects.find({ owner_ref: konto._id }).toArray()) {
+      await ProjectDeleter.promises.deleteProject(alt._id)
+      await ProjectDeleter.promises.expireDeletedProject(alt._id)
+    }
+  }
+  const tex = 'Text.\n'
+  await projektAnlegen(ga._id, 'Grenze A1', { 'main.tex': tex })
+  await projektAnlegen(ga._id, 'Grenze A2', { 'main.tex': tex })
+  const archiv = await projektAnlegen(ga._id, 'Grenze A3', { 'main.tex': tex })
+  await db.projects.updateOne({ _id: archiv._id }, { $set: { archived: [ga._id] } })
+  const geteilt = await projektAnlegen(gb._id, 'Grenze B1', { 'main.tex': tex })
+  await db.projects.updateOne({ _id: geteilt._id }, { $set: { collaberator_refs: [ga._id] } })
+  const mitQuelle = await projektAnlegen(gb._id, 'Grenze B2', { 'main.tex': tex })
+  await quelleAusFixture(mitQuelle._id, gb._id, 'smith2024.pdf')
+  await projektAnlegen(gb._id, 'Grenze B3', { 'main.tex': tex })
+  for (let i = 1; i <= 5; i++) await projektAnlegen(gc._id, `Grenze C${i}`, { 'main.tex': tex })
+  await (await speicherSammlung()).deleteMany({})
 }
 
 // Als Skript läuft es als root; die Ablage muss danach dem Web-Prozess gehören.

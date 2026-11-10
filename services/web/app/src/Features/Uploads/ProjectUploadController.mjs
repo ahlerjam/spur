@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
 import Path from 'node:path'
 import FileSystemImportManager from './FileSystemImportManager.mjs'
+import Modules from '../../infrastructure/Modules.mjs'
 import ProjectUploadManager from './ProjectUploadManager.mjs'
 import SessionManager from '../Authentication/SessionManager.mjs'
 import EditorController from '../Editor/EditorController.mjs'
@@ -111,6 +112,12 @@ function uploadProject(req, res) {
             success: false,
             error: req.i18n.translate(error.message),
           })
+        } else if (error.spurGrenze) {
+          return res.status(403).json({
+            success: false,
+            error: error.message,
+            code: error.spurGrenze,
+          })
         } else {
           return res.status(500).json({
             success: false,
@@ -173,6 +180,22 @@ async function uploadFile(req, res) {
     throw error
   }
 
+  // spur: storage limit per project; the reservation ends once the file is in the project.
+  let freigeben
+  try {
+    ;[freigeben] = await Modules.promises.hooks.fire(
+      'reserveProjectStorage',
+      projectId,
+      file.size
+    )
+  } catch (error) {
+    await fsPromises.unlink(path).catch(() => {})
+    if (error.spurGrenze) {
+      return res.status(422).json({ success: false, error: error.message })
+    }
+    throw error
+  }
+
   return FileSystemImportManager.addEntity(
     userId,
     projectId,
@@ -182,6 +205,7 @@ async function uploadFile(req, res) {
     true,
     function (error, entity) {
       fs.unlink(path, function () {})
+      freigeben?.().catch(err => logger.warn({ err }, 'storage reservation not released'))
       timer.done()
       if (error != null) {
         if (error.name === 'InvalidNameError') {

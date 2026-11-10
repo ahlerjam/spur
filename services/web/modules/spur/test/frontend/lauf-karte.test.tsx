@@ -92,4 +92,32 @@ describe('Lauf-Karte', function () {
     zeigen('owner')
     expect(screen.queryByText('Zahl ohne Beleg')).to.not.exist
   })
+
+  it('listet angelegte Dateien und bietet „Lauf rückgängig“ auch vor dem Annehmen', function () {
+    render(
+      <LaufKarte
+        lauf={{ ...lauf, aenderungen: 0, angelegt: [{ art: 'ordner', pfad: 'tex-pakete/foo' }, { art: 'datei', pfad: 'latexmkrc' }] }}
+        aenderungen={[]}
+        automatik={false}
+        neuLaden={async () => {}}
+      />,
+      { wrapper: mitRolle('owner') }
+    )
+    expect(screen.getByText('tex-pakete/foo')).to.exist
+    expect(screen.getByText('latexmkrc')).to.exist
+    expect(screen.getByRole('button', { name: 'Lauf rückgängig' })).to.exist
+  })
+
+  it('zeigt Lesenden „Lauf rückgängig“ nicht', function () {
+    render(
+      <LaufKarte
+        lauf={{ ...lauf, angelegt: [{ art: 'datei', pfad: 'latexmkrc' }] }}
+        aenderungen={[]}
+        automatik={false}
+        neuLaden={async () => {}}
+      />,
+      { wrapper: mitRolle('readOnly') }
+    )
+    expect(screen.queryByRole('button', { name: 'Lauf rückgängig' })).to.not.exist
+  })
 })

@@ -259,6 +259,25 @@ describe('LaunchpadController', function () {
     beforeEach(function (ctx) {
       ctx.EmailHandler.promises.sendEmail = sinon.stub().resolves()
       ctx.req.body.email = 'someone@example.com'
+      ctx.Settings.email = {
+        fromAddress: 'spur@example.com',
+        parameters: { host: 'smtp.example.com' },
+      }
+    })
+
+    describe('when no email is set up', function () {
+      beforeEach(function (ctx) {
+        delete ctx.Settings.email
+      })
+
+      it('says so instead of reporting a sent email', async function (ctx) {
+        await ctx.LaunchpadController.sendTestEmail(ctx.req, ctx.res, ctx.next)
+        expect(ctx.res.status).toHaveBeenCalledWith(503)
+        expect(ctx.res.json).toHaveBeenCalledWith({
+          message: { text: 'spur_keine_mail_readme' },
+        })
+        ctx.EmailHandler.promises.sendEmail.callCount.should.equal(0)
+      })
     })
 
     it('should produce a 200 response', async function (ctx) {

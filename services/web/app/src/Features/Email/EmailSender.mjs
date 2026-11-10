@@ -8,8 +8,6 @@ import OError from '@overleaf/o-error'
 import { RateLimiter } from '../../infrastructure/RateLimiter.mjs'
 import _ from 'lodash'
 
-const EMAIL_SETTINGS = Settings.email || {}
-
 export default {
   sendEmail: callbackify(sendEmail),
   promises: {
@@ -17,14 +15,22 @@ export default {
   },
 }
 
-const client = getClient()
+// spur: the client follows Settings.email, so the dev stack can switch to a fake SMTP server without a restart.
+let current = { settings: null, client: null }
+
+function currentClient() {
+  if (!current.client || current.settings !== Settings.email) {
+    current = { settings: Settings.email, client: getClient(Settings.email || {}) }
+  }
+  return current.client
+}
 
 const rateLimiter = new RateLimiter('send_email', {
   points: 100,
   duration: 3 * 60 * 60,
 })
 
-function getClient() {
+function getClient(EMAIL_SETTINGS) {
   let client
   if (EMAIL_SETTINGS.parameters) {
     const emailParameters = EMAIL_SETTINGS.parameters
@@ -77,7 +83,7 @@ function getClient() {
 }
 
 async function sendEmail(options, emailType) {
-console.log("EMAIL_SETTINGS  = ", EMAIL_SETTINGS)
+  const EMAIL_SETTINGS = Settings.email || {}
   try {
     const canContinue = await checkCanSendEmail(options)
     metrics.inc('email_status', {
@@ -118,7 +124,7 @@ console.log("EMAIL_SETTINGS  = ", EMAIL_SETTINGS)
         'X-SMTPAPI': JSON.stringify({ category: options.category }),
       }
     }
-    await client.sendMail(sendMailOptions)
+    await currentClient().sendMail(sendMailOptions)
   } catch (err) {
     throw new OError('error sending message').withCause(err)
   }

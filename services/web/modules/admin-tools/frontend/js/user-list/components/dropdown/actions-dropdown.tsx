@@ -15,6 +15,7 @@ import RestoreUserButton from '../table/cells/action-buttons/restore-user-button
 import PurgeUserButton from '../table/cells/action-buttons/purge-user-button'
 import ShowUserInfoButton from '../table/cells/action-buttons/show-user-info-button'
 import SendRegEmailButton from '../table/cells/action-buttons/send-reg-email-button'
+import NewInviteLinkButton from '../table/cells/action-buttons/new-invite-link-button'
 import { User } from '../../../../../types/user/api'
 
 const flagActions = [
@@ -151,6 +152,16 @@ function ActionsDropdown({ user }: ActionsDropdownProps) {
                 )}
               </SendRegEmailButton>
             )}
+            {/* spur: invitation link to pass on when email is not set up */}
+            <NewInviteLinkButton user={user}>
+              {(text, open) => (
+                <li role="none">
+                  <OLDropdownItem as="button" tabIndex={-1} onClick={open} leadingIcon="link">
+                    {text}
+                  </OLDropdownItem>
+                </li>
+              )}
+            </NewInviteLinkButton>
           </>
         )}
       </OLDropdownMenu>

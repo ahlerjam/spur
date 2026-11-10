@@ -13,6 +13,7 @@ import * as Crossref from './Crossref.mjs'
 import { ocrSeite, seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
 import { abrufen } from './WebSchnappschuss.mjs'
 import { quelleGeaendert } from './live.mjs'
+import * as Speicher from './Speicher.mjs'
 
 export const MAX_BYTES = 50 * 1024 * 1024
 const SEITE_LISTE = 100
@@ -127,8 +128,18 @@ async function speichern(quelle, seitenListe, schreibeDatei) {
 }
 
 // key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF.
-export async function aufnehmen({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, nurProjekt = false }) {
-  pruefeDateityp(dateiname)
+export async function aufnehmen(angaben) {
+  pruefeDateityp(angaben.dateiname)
+  // Vor dem Auslesen: eine zu große Datei wird abgewiesen, ehe Text und OCR Zeit kosten.
+  const freigeben = await Speicher.reservieren(angaben.projectId, angaben.groesse ?? 0)
+  try {
+    return await aufnehmenOhneReservierung(angaben)
+  } finally {
+    await freigeben()
+  }
+}
+
+async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, nurProjekt = false }) {
   const key = vorgabe ?? schluesselAus(dateiname)
   if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
   const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
@@ -206,9 +217,12 @@ export async function webAufnehmen({ projectId, userId, url }) {
     angelegtVon: userId,
     angelegtAm: jetzt(),
   }
-  return await speichern(quelle, [{ seite: 1, label: null, text: seite.text }], ziel =>
-    fs.writeFile(ziel, html)
-  )
+  const freigeben = await Speicher.reservieren(projectId, html.length)
+  try {
+    return await speichern(quelle, [{ seite: 1, label: null, text: seite.text }], ziel => fs.writeFile(ziel, html))
+  } finally {
+    await freigeben()
+  }
 }
 
 // Schreibt die Seite nach jeder Seite fort; steht sie länger still, ist der Prozess weg (Neustart).

@@ -1,15 +1,18 @@
 import { promiseMapWithLimit } from '@overleaf/promise-utils'
+import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
 import EditorRealTimeController from '../../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from '../probleme.mjs'
-import { einstellungen, laeufe } from '../sammlungen.mjs'
+import { einstellungen, laeufe, quellen } from '../sammlungen.mjs'
+import * as QuellenManager from '../QuellenManager.mjs'
 import * as LaufManager from './LaufManager.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
 import { rolleFuerClaude } from '../rechte.mjs'
 import { heutigePosition, kontextUm, umkehrOps } from './ops.mjs'
+import { paketEntfernt } from '../kompilieren/TexPakete.mjs'
 
 async function pfadVon(projectId, docId) {
   try {
@@ -95,6 +98,24 @@ async function statusSetzen(lauf, status) {
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { status } })
 }
 
+// Entfernt, was der Lauf außerhalb der Dokumente angelegt hat. Von Hand schon Gelöschtes wird übergangen.
+async function angelegtEntfernen(projectId, lauf, userId) {
+  for (const eintrag of lauf.angelegt ?? []) {
+    if (eintrag.art === 'quelle') {
+      const quelle = await (await quellen()).findOne({ _id: eintrag.quelleId, projectId })
+      if (quelle) await QuellenManager.loeschen(quelle)
+      continue
+    }
+    try {
+      await EditorController.promises.deleteEntityWithPath(projectId, `/${eintrag.pfad}`, 'spur', userId)
+    } catch (error) {
+      if (!(error instanceof Errors.NotFoundError)) throw error
+    }
+    if (eintrag.paket) await paketEntfernt(projectId, eintrag.paket)
+  }
+  await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { angelegt: [] } })
+}
+
 export async function annehmen(projectId, lauf, userId, nurIds) {
   mussOffenSein(lauf)
   const liste = await aenderungen(projectId, lauf)
@@ -132,6 +153,10 @@ export async function ablehnen(projectId, lauf, userId, nurIds) {
     abgelehnt += changes.length
   }
   const rest = liste.reduce((n, d) => n + d.changes.length, 0) - abgelehnt
+  // Dateien und Quellen löschen darf nur, wer schreiben darf; Reviewer lehnen nur die Changes ab.
+  if (!nurIds && ['readAndWrite', 'owner'].includes(await rolleFuerClaude(userId, projectId))) {
+    await angelegtEntfernen(projectId, lauf, userId)
+  }
   if (rest === 0) await statusSetzen(lauf, 'abgelehnt')
   return { abgelehnt, rest }
 }
@@ -147,6 +172,12 @@ function konflikt(text, p) {
 
 // Rücknahme eines angenommenen Laufs als neue Track Changes; bei Überschneidung nichts ändern.
 export async function zuruecknehmen(projectId, lauf, userId) {
+  // Ein noch nicht angenommener Lauf mit angelegten Dateien: Changes ablehnen und das Angelegte entfernen.
+  if ((lauf.status === 'offen' || lauf.status === 'fertig') && lauf.angelegt?.length) {
+    await ablehnen(projectId, lauf, userId)
+    await statusSetzen(lauf, 'zurueckgenommen')
+    return
+  }
   if (lauf.status !== 'angenommen') {
     throw new Problem(409, 'nicht_angenommen', 'spur_fehler_nicht_angenommen')
   }
@@ -166,6 +197,7 @@ export async function zuruecknehmen(projectId, lauf, userId) {
   for (const { docId, version, ops } of plan) {
     await spurUpdate(projectId, docId, ops, version, { userId, tracked: true })
   }
+  await angelegtEntfernen(projectId, lauf, userId)
   await statusSetzen(lauf, 'zurueckgenommen')
 }
 

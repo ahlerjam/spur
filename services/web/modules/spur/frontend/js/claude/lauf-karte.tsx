@@ -16,6 +16,7 @@ export type Lauf = {
   rot: { grund: string; auszug: string }[]
   zahlen: { zahl: string; pfad: string }[]
   zusammenfassung: string | null
+  angelegt?: { art: 'datei' | 'ordner' | 'quelle'; pfad?: string; name?: string }[]
 }
 
 export type Aenderung = {
@@ -58,6 +59,7 @@ export default function LaufKarte({
   const pfad = (aktion: string) => projektPfad(`/laeufe/${lauf.id}/${aktion}`)
   const offen = lauf.status === 'offen' || lauf.status === 'fertig'
   const changes = aenderungen.filter(a => !a.geloescht)
+  const angelegt = lauf.angelegt ?? []
 
   const aktion = async (methode: string, url: string, daten?: unknown) => {
     setLaeuft(true)
@@ -109,6 +111,18 @@ export default function LaufKarte({
       {aenderungen.some(a => a.geloescht) && (
         <p className="spur-zeile-meta">{t('spur_datei_geloescht')}</p>
       )}
+      {angelegt.length > 0 && (
+        <div>
+          <p className="spur-zeile-meta">{t('spur_lauf_angelegt')}</p>
+          <ul className="spur-liste">
+            {angelegt.map(a => (
+              <li key={`${a.art}-${a.pfad ?? a.name}`} className="spur-zeile-meta spur-lauf-angelegt">
+                {a.pfad ?? a.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {fehler && <Notification type="error" content={fehler} />}
       {offen && changes.length > 0 && (
         <ul className="spur-liste">
@@ -156,7 +170,7 @@ export default function LaufKarte({
             {t('spur_lauf_ablehnen')}
           </OLButton>
         )}
-        {lauf.status === 'angenommen' && write && (
+        {(lauf.status === 'angenommen' || (offen && angelegt.length > 0)) && write && (
           <OLButton variant="secondary" size="sm" disabled={laeuft} onClick={() => aktion('POST', pfad('zuruecknehmen'))}>
             {t('spur_lauf_rueckgaengig')}
           </OLButton>

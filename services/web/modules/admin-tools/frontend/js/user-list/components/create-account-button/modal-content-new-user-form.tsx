@@ -23,11 +23,15 @@ import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
 import getMeta from '@/utils/meta'
+import EinladungsLink from '@modules/spur/frontend/js/einladung/einladungs-link'
 import { useUserListContext } from '../../context/user-list-context'
 import { User } from '../../../../../types/user/api'
 
 type CreateUserResult = {
   user: User
+  activationUrl: string | null
+  emailConfigured: boolean
+  emailIsNotSent: boolean
 }
 
 type Props = {
@@ -66,7 +70,8 @@ function ModalContentNewUserForm({ handleCloseModal }: Props) {
     )
       .then(data => {
         addUserToView(data.user)
-        if (!data.emailIsNotSent) {
+        // spur: keep the dialog open while it shows the invitation link
+        if (!data.emailIsNotSent && !data.activationUrl) {
           handleCloseModal()
         }
       })
@@ -110,6 +115,13 @@ function ModalContentNewUserForm({ handleCloseModal }: Props) {
               content={'The account has been created, but the notification email was not sent to the user. Please check your SMTP configuration.'}
             />
           </div>
+        )}
+
+        {data?.activationUrl && (
+          <EinladungsLink
+            url={data.activationUrl}
+            perMail={data.emailIsNotSent ? undefined : data.emailConfigured}
+          />
         )}
 
         <OLForm onSubmit={handleSubmit}>
@@ -183,7 +195,7 @@ function ModalContentNewUserForm({ handleCloseModal }: Props) {
 
       <OLModalFooter>
         <OLButton variant="secondary" onClick={handleCloseModal}>
-          {t('cancel')}
+          {data ? t('close') : t('cancel')}
         </OLButton>
         <OLButton
           variant="primary"
@@ -192,7 +204,7 @@ function ModalContentNewUserForm({ handleCloseModal }: Props) {
                     userData.lastName.trim() === '' ||
                     userData.firstName.trim() === '' ||
                     isLoading || redirecting ||
-                    data?.emailIsNotSent ||
+                    Boolean(data) ||
                     (error && error.info?.statusCode !== 409)}
           isLoading={isLoading}
           loadingLabel={t('creating')}

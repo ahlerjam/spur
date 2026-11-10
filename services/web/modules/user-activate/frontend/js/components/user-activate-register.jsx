@@ -5,6 +5,7 @@ import OLRow from '@/shared/components/ol/ol-row'
 import OLCol from '@/shared/components/ol/ol-col'
 import OLCard from '@/shared/components/ol/ol-card'
 import Notification from '@/shared/components/notification'
+import EinladungsLink from '@modules/spur/frontend/js/einladung/einladungs-link'
 
 function UserActivateRegister() {
   const [emails, setEmails] = useState([])
@@ -28,13 +29,7 @@ function UserActivateRegister() {
           {registerError ? (
             <UserActivateError failedEmails={failedEmails} />
           ) : null}
-          {registrationSuccess ? (
-            <>
-              <SuccessfulRegistrationMessage />
-              <hr />
-              <DisplayEmailsList emails={emails} />
-            </>
-          ) : null}
+          {registrationSuccess ? <InvitationLinks emails={emails} /> : null}
         </OLCard>
       </OLCol>
     </OLRow>
@@ -58,42 +53,24 @@ function UserActivateError({ failedEmails }) {
   )
 }
 
-function SuccessfulRegistrationMessage() {
+// spur: one copyable link per account; the hint about email (sent or not set up) only once, above the first.
+function InvitationLinks({ emails }) {
   return (
-    <div className="row-spaced text-success">
-      <p>We've sent out welcome emails to the registered users.</p>
-      <p>
-        You can also manually send them URLs below to allow them to reset their
-        password and log in for the first time.
-      </p>
-      <p>
-        (Password reset tokens will expire after one week and the user will need
-        registering again).
-      </p>
+    <div className="row-spaced">
+      {emails.map((user, i) => (
+        <div key={user.email}>
+          <h2 className="h5">{user.email}</h2>
+          <EinladungsLink
+            url={user.setNewPasswordUrl}
+            perMail={i === 0 ? user.emailConfigured : undefined}
+          />
+        </div>
+      ))}
     </div>
   )
 }
 
-function DisplayEmailsList({ emails }) {
-  return (
-    <table className="table table-striped ">
-      <tbody>
-        <tr>
-          <th>Email</th>
-          <th>Set Password Url</th>
-        </tr>
-        {emails.map(user => (
-          <tr key={user.email}>
-            <td>{user.email}</td>
-            <td style={{ wordBreak: 'break-all' }}>{user.setNewPasswordUrl}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-DisplayEmailsList.propTypes = {
+InvitationLinks.propTypes = {
   emails: PropTypes.array,
 }
 UserActivateError.propTypes = {
