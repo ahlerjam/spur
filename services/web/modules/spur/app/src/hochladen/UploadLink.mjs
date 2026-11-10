@@ -23,7 +23,7 @@ export async function erzeugen({ projectId, menschId, botId }) {
   }
 }
 
-function ungueltig() {
+export function ungueltig() {
   return new Problem(401, 'token', 'spur_fehler_link_ungueltig')
 }
 
@@ -43,12 +43,13 @@ export async function pruefen(token) {
 }
 
 export async function verbrauchen(token) {
-  const link = await pruefen(token)
+  if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) throw ungueltig()
   const verbraucht = await (await links()).findOneAndUpdate(
-    { _id: link._id, genutzt: { $lt: MAX_DATEIEN }, ablauf: { $gt: jetzt() } },
+    { hash: hash(token), genutzt: { $lt: MAX_DATEIEN }, ablauf: { $gt: jetzt() } },
     { $inc: { genutzt: 1 } },
     { returnDocument: 'after' }
   )
-  if (!verbraucht) throw grund(await (await links()).findOne({ _id: link._id }))
-  return verbraucht
+  if (verbraucht) return verbraucht
+  await pruefen(token)
+  throw new Error('Upload-Link weder gültig noch ungültig')
 }

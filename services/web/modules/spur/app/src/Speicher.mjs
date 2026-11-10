@@ -31,23 +31,29 @@ async function quellenBytes(projectId) {
   return summe?.bytes ?? 0
 }
 
+async function standVon(p) {
+  const [dateien, quellenTeil] = await Promise.all([dateienBytes(p), quellenBytes(p._id)])
+  return dateien + quellenTeil
+}
+
 export async function stand(projectId) {
-  const p = await projekt(projectId)
-  return (await dateienBytes(p)) + (await quellenBytes(projectId))
+  return await standVon(await projekt(projectId))
 }
 
 export async function info(projectId) {
   const p = await projekt(projectId)
-  return { bytes: await stand(projectId), grenze: await speicherGrenzeBytes(p.owner_ref) }
+  const [bytes, grenze] = await Promise.all([standVon(p), speicherGrenzeBytes(p.owner_ref)])
+  return { bytes, grenze }
 }
 
-export async function voll(projectId) {
-  const { bytes, grenze } = await info(projectId)
-  return grenze !== null && bytes >= grenze
-}
-
-export function vollFehler(bytes, grenze) {
+function vollFehler(bytes, grenze) {
   return new GrenzeErreicht('speicher_voll', 'spur_fehler_speicher_voll', { stand: gbText(bytes), grenze: gbText(grenze) })
+}
+
+// Für Wege ohne bekannte Größe vorab (verknüpfte Dateien, TeX-Pakete): gesperrt, sobald die Grenze erreicht ist.
+export async function nichtVollPruefen(projectId) {
+  const { bytes, grenze } = await info(projectId)
+  if (grenze !== null && bytes >= grenze) throw vollFehler(bytes, grenze)
 }
 
 // Reserviert Platz für einen Upload und gibt eine Funktion zurück, die ihn freigibt, sobald die Datei im Projekt
@@ -58,7 +64,7 @@ export async function reservieren(projectId, bytes) {
   const grenze = p && (await speicherGrenzeBytes(p.owner_ref))
   if (grenze === null || grenze === undefined) return async () => {}
   const _id = new ObjectId(projectId)
-  const aktuell = await stand(projectId)
+  const aktuell = await standVon(p)
   const sammlung = await speicher()
   await sammlung.updateOne({ _id }, { $setOnInsert: { reserviert: 0 } }, { upsert: true })
   const { modifiedCount } = await sammlung.updateOne(

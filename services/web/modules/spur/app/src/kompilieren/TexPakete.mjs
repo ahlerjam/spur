@@ -92,13 +92,14 @@ async function latexmkrcSichern({ projectId, menschId, botId, stand, ordner, lau
   if (stand.rcDoc) {
     const doc = (await ProjectEntityHandler.promises.getAllDocs(projectId))['/latexmkrc']
     const text = doc.lines.join('\n')
-    if (latexmkrcErgaenzen(text) === null) return
+    const ergaenzt = latexmkrcErgaenzen(text)
+    if (ergaenzt === null) return
     await SchreibManager.docEdit({
       projectId,
       botId,
       pfad: 'latexmkrc',
       alt: '',
-      neu: `${text.endsWith('\n') || !text ? '' : '\n'}${LATEXMKRC_BLOCK}`,
+      neu: ergaenzt.slice(text.length),
       schluessel: `tex-pakete-rc-${lauf._id}`,
     })
     return
@@ -132,6 +133,7 @@ export async function hinzufuegen({ projectId, menschId, botId, paket }) {
     return { paket, im_image: false, dateien: [], fehlende_abhaengigkeiten: [], hinweis: 'schon im Projekt' }
   }
 
+  await Speicher.nichtVollPruefen(projectId)
   const ordner = await fs.mkdtemp(Path.join(os.tmpdir(), 'spur-tex-'))
   try {
     const archiv = Path.join(ordner, 'paket.tar.xz')

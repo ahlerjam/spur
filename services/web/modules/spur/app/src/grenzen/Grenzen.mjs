@@ -68,9 +68,16 @@ export async function ausnahmen() {
   return await (await grenzen()).find({ _id: { $ne: STANDARD } }).toArray()
 }
 
+// Die Regel an einer Stelle: Ausnahme, wenn das Feld gesetzt ist (auch null), sonst Standard.
+export function grenzeAus(eigene, standardEintrag, feld) {
+  return eigene && feld in eigene ? eigene[feld] : (standardEintrag?.[feld] ?? null)
+}
+
+export const gbZuBytes = gb => (gb === null ? null : Math.round(gb * GB))
+
 async function gilt(userId, feld) {
-  const eigene = await ausnahme(userId)
-  return feld in eigene ? eigene[feld] : (await standard())[feld]
+  const eintraege = await (await grenzen()).find({ _id: { $in: [STANDARD, new ObjectId(userId)] } }).toArray()
+  return grenzeAus(eintraege.find(e => e._id !== STANDARD), eintraege.find(e => e._id === STANDARD), feld)
 }
 
 export async function projektGrenze(userId) {
@@ -78,8 +85,7 @@ export async function projektGrenze(userId) {
 }
 
 export async function speicherGrenzeBytes(userId) {
-  const gb = await gilt(userId, 'speicherGb')
-  return gb === null ? null : Math.round(gb * GB)
+  return gbZuBytes(await gilt(userId, 'speicherGb'))
 }
 
 // Alle Projekte, deren Eigentümer der Nutzer ist, auch archivierte und im Papierkorb; endgültig gelöschte liegen
@@ -90,8 +96,10 @@ export async function projektStand(userId) {
 }
 
 export async function projektAnlegenPruefen(ownerId) {
-  const { anzahl, grenze } = await projektStand(ownerId)
-  if (grenze !== null && anzahl >= grenze) {
+  const grenze = await projektGrenze(ownerId)
+  if (grenze === null) return
+  const anzahl = await db.projects.countDocuments({ owner_ref: new ObjectId(ownerId) })
+  if (anzahl >= grenze) {
     throw new GrenzeErreicht('projekte_voll', 'spur_fehler_projekte_voll', { anzahl, grenze })
   }
 }

@@ -1,4 +1,5 @@
 import Path from 'node:path'
+import { promiseMapWithLimit } from '@overleaf/promise-utils'
 import { fileURLToPath } from 'node:url'
 import { db, ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import { menschId, projektId } from '../anfrage.mjs'
@@ -8,7 +9,6 @@ import * as Speicher from '../Speicher.mjs'
 import * as Grenzen from './Grenzen.mjs'
 
 const SEITE = Path.resolve(Path.dirname(fileURLToPath(import.meta.url)), '../../views/grenzen-admin')
-const BOT = /@bot\.spur\.invalid$/
 
 export function seite(_req, res) {
   res.render(SEITE, { title: 'Limits' })
@@ -32,16 +32,14 @@ function felderLesen(body, felder, umwandeln) {
 export const daten = mitProblemen(async (_req, res) => {
   const standard = await Grenzen.standard()
   const ausnahmen = new Map((await Grenzen.ausnahmen()).map(a => [String(a._id), a]))
-  const nutzer = (await db.users.find({}, { projection: { email: 1, first_name: 1, last_name: 1 } }).toArray()).filter(
-    u => !BOT.test(u.email)
-  )
+  // Ohne die Claude-Bots (ClaudeZugang.botFuer).
+  const nutzer = await db.users
+    .find({ 'spur.botFuer': { $exists: false } }, { projection: { email: 1, first_name: 1, last_name: 1 } })
+    .toArray()
   const projekte = await db.projects.find({}, { projection: { name: 1, owner_ref: 1 } }).toArray()
   const anzahl = new Map()
   for (const p of projekte) anzahl.set(String(p.owner_ref), (anzahl.get(String(p.owner_ref)) ?? 0) + 1)
-  const gilt = (id, feld) => {
-    const eigene = ausnahmen.get(id)
-    return eigene && feld in eigene ? eigene[feld] : standard[feld]
-  }
+  const gilt = (id, feld) => Grenzen.grenzeAus(ausnahmen.get(id), standard, feld)
   const email = new Map(nutzer.map(u => [String(u._id), u.email]))
   res.json({
     standard,
@@ -57,18 +55,14 @@ export const daten = mitProblemen(async (_req, res) => {
         ausnahme: { projekte: eigene.projekte, speicherGb: eigene.speicherGb },
       }
     }),
-    projekte: await Promise.all(
-      projekte.map(async p => {
-        const gb = gilt(String(p.owner_ref), 'speicherGb')
-        return {
-          id: String(p._id),
-          name: p.name,
-          eigentuemer: email.get(String(p.owner_ref)) ?? '',
-          bytes: await Speicher.stand(p._id),
-          grenze: gb === null ? null : Math.round(gb * Grenzen.GB),
-        }
-      })
-    ),
+    // Je Projekt eine Anfrage an history-v1; begrenzt, damit die Übersicht den Dienst nicht flutet.
+    projekte: await promiseMapWithLimit(5, projekte, async p => ({
+      id: String(p._id),
+      name: p.name,
+      eigentuemer: email.get(String(p.owner_ref)) ?? '',
+      bytes: await Speicher.stand(p._id),
+      grenze: Grenzen.gbZuBytes(gilt(String(p.owner_ref), 'speicherGb')),
+    })),
   })
 })
 

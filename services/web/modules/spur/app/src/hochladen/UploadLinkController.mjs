@@ -25,7 +25,7 @@ export async function linkPruefen(req, res, next) {
 }
 
 export function ohneToken(_req, res) {
-  problemSenden(res, new Problem(401, 'token', 'spur_fehler_link_ungueltig'))
+  problemSenden(res, UploadLink.ungueltig())
 }
 
 async function istPdf(pfad) {

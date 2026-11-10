@@ -142,11 +142,11 @@ describe('Speicher', () => {
     await freigeben()
   })
 
-  it('meldet „voll“ erst, wenn der Stand die Grenze erreicht', async () => {
+  it('sperrt Wege ohne bekannte Größe erst, wenn der Stand die Grenze erreicht', async () => {
     await Grenzen.standardSetzen({ projekte: null, speicherGb: 0.01 })
     blobBytes = 1024
-    expect(await Speicher.voll(projektId)).toBe(false)
+    await Speicher.nichtVollPruefen(projektId)
     blobBytes = 0.02 * GB
-    expect(await Speicher.voll(projektId)).toBe(true)
+    expect(await fehlerVon(Speicher.nichtVollPruefen(projektId))).toMatchObject({ typ: 'speicher_voll' })
   })
 })

@@ -18,7 +18,7 @@ Running without email needs patches in Overleaf's account code, because spur can
 - `LaunchpadController.mjs` (test email) and `PasswordResetController.mjs` (forgot password) say that no email is set up, where they used to report a sent email.
 
 Limits for projects and storage need hooks where Overleaf creates projects and accepts files:
-- `ProjectCreationHandler.mjs` fires `beforeProjectCreated` in `_createBlankProject`, which new, template, ZIP and copy all pass. `OwnershipTransferHandler.mjs` fires it for the new owner.
+- `ProjectCreationHandler.mjs` fires `beforeProjectCreated` in `_createBlankProject`, which new, template, ZIP and copy all pass. `OwnershipTransferHandler.mjs` fires `beforeProjectOwnerChanged` for the new owner.
 - `ProjectUploadController.mjs` fires `reserveProjectStorage` before an upload and maps a limit error for the ZIP upload; `LinkedFilesController.mjs` fires `checkProjectStorage`.
 - `ErrorController.mjs` answers errors with `spurGrenze` with 403 and the message, instead of the generic restricted page.
 - In the frontend, the clone dialog, the ZIP upload dialog and the file tree upload show that message (`clone-project-modal-content.tsx`, `upload-project-modal.tsx`, `error-message.tsx`). The project list shows "x of y projects" (`project-list-ds-nav.tsx`), and the admin menu links to the limits page.

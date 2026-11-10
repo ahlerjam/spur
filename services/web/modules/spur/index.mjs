@@ -20,10 +20,8 @@ const SpurModule = {
       projectExpired: QuellenManager.projektAufraeumen,
       beforeProjectCreated: projektAnlegenPruefen,
       reserveProjectStorage: Speicher.reservieren,
-      checkProjectStorage: async projectId => {
-        const { bytes, grenze } = await Speicher.info(projectId)
-        if (grenze !== null && bytes >= grenze) throw Speicher.vollFehler(bytes, grenze)
-      },
+      beforeProjectOwnerChanged: projektAnlegenPruefen,
+      checkProjectStorage: Speicher.nichtVollPruefen,
       deleteUser: ClaudeZugang.kontoAufraeumen,
       expireDeletedUser: ClaudeZugang.kontoAufraeumen,
       // Der Hinweis im Klon ist ein Nebeneffekt: Er darf das Duplizieren nicht scheitern lassen.
