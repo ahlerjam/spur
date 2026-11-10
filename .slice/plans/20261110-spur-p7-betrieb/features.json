@@ -1,0 +1,47 @@
+{"features": [
+  {"id": "f1", "title": "Einladungslink ohne Mail kopieren", "ui": true, "passes": false, "steps": [
+    "Ohne `OVERLEAF_EMAIL_*` öffnet Admin e2e-admin die Nutzerliste der Admin-Seite und legt ein Konto für neu-p7@example.org an",
+    "Er sieht den Hinweis „E-Mail ist nicht eingerichtet – gib den Link selbst weiter.“ und einen Link, der mit `/user/activate?token=` beginnt, mit Kopierknopf; nach Klick steht „Kopiert“",
+    "Ein zweiter Browser ohne Anmeldung öffnet den Link, setzt das Passwort „Test-Passwort-1234“ und ist als neu-p7@example.org angemeldet",
+    "In der Nutzerliste wählt der Admin beim Konto neu-p7@example.org „Neuen Einladungslink erzeugen“ und bekommt einen neuen, anderen Link mit Kopierknopf",
+    "Die Registrierseite ist aus der Admin-Navigation erreichbar und zeigt nach Registrieren von zweit-p7@example.org den Link mit demselben Hinweis und Kopierknopf",
+    "Ein Nicht-Admin (e2e-a) ruft die Registrierseite und die Link-Aktion auf und bekommt 403 bzw. keine Seite",
+    "Mit gesetzter Mail-Einrichtung (Fake-SMTP) zeigt „Nutzer anlegen“ „Einladung per E-Mail verschickt“, der Link ist zusätzlich kopierbar, und der Fake-SMTP hat eine Mail an die Adresse erhalten"
+  ]},
+  {"id": "f2", "title": "Ehrliche Meldungen ohne Mail", "ui": true, "passes": false, "steps": [
+    "Ohne Mail-Einrichtung klickt der Admin auf der Admin-Seite „Test-Mail senden“ und sieht „Keine E-Mail eingerichtet“ mit Verweis auf die README, nicht „E-Mail versendet“",
+    "Ohne Mail-Einrichtung fordert ein abgemeldeter Nutzer unter „Passwort vergessen“ einen Link für e2e-a an und sieht den Hinweis, dass ein Admin einen neuen Link erzeugen kann",
+    "Mit Fake-SMTP zeigt „Test-Mail senden“ wieder „E-Mail versendet“, und der Fake-SMTP hat die Mail erhalten"
+  ]},
+  {"id": "f3", "title": "Ersteinrichtung mit make setup", "passes": false, "steps": [
+    "In einem frischen Klon ohne `.env` führt der Betreiber `make setup` in einem Terminal aus und beantwortet: Adresse `https://spur.example.org`, Mail ja, Absender `spur@example.org`, Host `smtp.example.org`, Port `587`, Nutzer `spur@example.org`, Passwort `geheim123`, Kontaktadresse `admin@example.org`",
+    "`.env` enthält danach `OVERLEAF_INVITE_TOKEN_SECRET`, `SPUR_URL=https://spur.example.org`, `OVERLEAF_SECURE_COOKIE=true`, die fünf `OVERLEAF_EMAIL_*`-Werte, `CROSSREF_MAILTO=admin@example.org` und `UNPAYWALL_EMAIL=admin@example.org`; die Datei hat die Rechte 600",
+    "Die Terminal-Ausgabe zeigt `geheim123` nirgends",
+    "Ein zweiter Aufruf von `make setup` fragt, ob vorhandene Werte geändert werden sollen; mit „nein“ bleibt `.env` unverändert (gleicher Hash)",
+    "`make setup` ohne Terminal (`make setup < /dev/null`) bricht mit einem Hinweis ab und ändert nichts",
+    "Ein Test unter `tools/tests` führt `make setup` mit vorgegebenen Antworten in einem Testordner aus (ohne Docker-Start, Schalter für Trockenlauf) und prüft `.env`; er ist grün"
+  ]},
+  {"id": "f4", "title": "Claude arbeitet bei gedrosselten Diensten weiter", "passes": false, "steps": [
+    "Die Plugin-Anleitung `plugins/spur/skills/spur/SKILL.md` enthält eine Regel für „gedrosselt“ und „nicht_erreichbar“: mit den anderen Diensten weitermachen, denselben Dienst nicht sofort erneut fragen, Lücke in der Zusammenfassung nennen",
+    "Der Workflow-Text „Quellen sammeln“ verweist auf dieselbe Regel",
+    "Der Befehlsnamen-Test und ein neuer Test, der die Regel in SKILL.md findet, sind grün"
+  ]},
+  {"id": "f5", "title": "Claude holt ein fehlendes Paket ins Projekt", "ui": true, "passes": false, "steps": [
+    "Ein Projekt enthält main.tex mit `\\documentclass{beamer}` und `\\usetheme{<Fixture-Theme>}` (ein Theme, das nicht im Image ist, als Fixture im TeX-Live-Fake); der Compile scheitert mit „not found“",
+    "Ein Fake-Client ruft über MCP `tex_package_add` mit dem Paketnamen des Themes auf; die Antwort nennt die angelegten Dateien unter `tex-pakete/<paket>/` und fehlende Abhängigkeiten (Fixture-Abhängigkeit)",
+    "Nach `tex_package_add` für die Abhängigkeit und erneutem Compile entsteht ein PDF",
+    "Die Lauf-Karte listet die angelegten Dateien; „Lauf rückgängig“ entfernt sie, ein erneuter Compile scheitert wieder",
+    "`tex_package_add` für `beamer` meldet „schon im Image“ und legt nichts an",
+    "Ein Paketname mit `../` oder Leerzeichen liefert einen Eingabefehler; ein Archiv im Fake mit einem Eintrag `../../etc/x` wird abgelehnt, nichts wird angelegt",
+    "Ein Fake-Paket über 20 MB wird abgelehnt mit einer Meldung, die die Grenze nennt",
+    "Mit `SPUR_TEX_PAKETE=aus` liefert `tex_package_add` eine Meldung, dass der Admin das Werkzeug abgeschaltet hat",
+    "Die Plugin-Anleitung beschreibt den Ablauf Compile lesen, Paket bestimmen, `tex_package_add`, neu kompilieren, Abhängigkeiten nachholen; README und MCP-Vertrag nennen das Werkzeug"
+  ]},
+  {"id": "f6", "title": "CI verbraucht weniger", "passes": false, "steps": [
+    "`.github/workflows/ci.yml` lässt `upstream` nur bei Änderungen unter `services/`, `libraries/`, `tools/tests/` oder an Lockfiles laufen; sonst meldet ein Job gleichen Namens Erfolg in unter 1 Minute",
+    "`test` überspringt Stack und E2E bei reinen Doku-Änderungen (`*.md`, `docs/`) und meldet trotzdem Erfolg",
+    "`publish.yml` startet bei Tags `v*` und weiterhin per Hand; die README beschreibt das Release mit Tag",
+    "Ein Test unter `tools/tests` prüft die Pfadregeln an Beispiellisten geänderter Dateien (Doku, Workflow, Code) und ist grün; actionlint (falls installiert) meldet keine Fehler",
+    "Handprüfung am PR: Der PR dieses Plans zeigt `test` und `upstream` als bestanden"
+  ]}
+]}
