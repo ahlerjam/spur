@@ -3640,10 +3640,16 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.goto(`${BASE}/admin/user`)
     await page.getByRole('button', { name: 'Konto erstellen' }).click()
     const dialog = page.locator('.modal')
-    await dialog.getByLabel(/^E-Mail/).fill(email)
-    await dialog.getByLabel('Vorname').fill('Neu')
-    await dialog.getByLabel('Nachname').fill('P7')
-    await dialog.getByRole('button', { name: 'Erstellen' }).click()
+    const erstellen = dialog.getByRole('button', { name: 'Erstellen' })
+    // Während der Dialog einblendet, gehen Eingaben verloren; dann bleibt „Erstellen“ gesperrt.
+    for (let versuch = 0; versuch < 10; versuch++) {
+      await dialog.getByLabel(/^E-Mail/).fill(email)
+      await dialog.getByLabel('Vorname').fill('Neu')
+      await dialog.getByLabel('Nachname').fill('P7')
+      if (await erstellen.isEnabled()) break
+      await page.waitForTimeout(300)
+    }
+    await erstellen.click()
     return dialog
   }
 
