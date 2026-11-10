@@ -37,7 +37,7 @@
     "Mit `SPUR_TEX_PAKETE=aus` liefert `tex_package_add` eine Meldung, dass der Admin das Werkzeug abgeschaltet hat",
     "Die Plugin-Anleitung beschreibt den Ablauf Compile lesen, Paket bestimmen, `tex_package_add`, neu kompilieren, Abhängigkeiten nachholen; README und MCP-Vertrag nennen das Werkzeug"
   ]},
-  {"id": "f6", "title": "CI verbraucht weniger", "passes": false, "steps": [
+  {"id": "f6", "title": "CI verbraucht weniger", "passes": true, "steps": [
     "`.github/workflows/ci.yml` lässt `upstream` nur bei Änderungen unter `services/`, `libraries/`, `tools/tests/` oder an Lockfiles laufen; sonst meldet ein Job gleichen Namens Erfolg in unter 1 Minute",
     "`test` überspringt Stack und E2E bei reinen Doku-Änderungen (`*.md`, `docs/`) und meldet trotzdem Erfolg",
     "`publish.yml` startet bei Tags `v*` und weiterhin per Hand; die README beschreibt das Release mit Tag",
