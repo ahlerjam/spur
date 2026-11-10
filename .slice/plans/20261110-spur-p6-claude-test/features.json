@@ -1,5 +1,5 @@
 {"features": [
-  {"id": "f1", "title": "Claude wartet nach dem Start sofort auf Aufträge", "ui": true, "passes": false, "steps": [
+  {"id": "f1", "title": "Claude wartet nach dem Start sofort auf Aufträge", "ui": true, "passes": true, "steps": [
     "Nutzer e2e-a erzeugt unter Einstellungen „Claude verbinden“ einen Token und liest Schritt 3",
     "Der Befehl in Schritt 3 beginnt mit `claude --allowedTools \"` wie bisher und endet mit einem Prompt in Anführungszeichen, der `wait_for_event` nennt; `claude --help` im Terminal zeigt, dass ein Prompt-Argument erlaubt ist",
     "Nutzer öffnet ein Projekt, öffnet das Claude-Panel ohne laufende Claude-Session und sieht „Claude nicht verbunden“, darunter denselben Startbefehl wie in Schritt 3 mit Kopierknopf",

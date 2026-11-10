@@ -2712,11 +2712,13 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ['spur mit deinem Konto verbinden', 'Der Befehl enthält deinen persönlichen Schlüssel. Gib ihn nicht weiter.'],
     [
       'Claude Code starten',
-      'Starte damit Claude Code im Terminal. Claude darf dann in spur schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.',
+      'Starte damit Claude Code im Terminal. Claude wartet dann von selbst auf Aufträge aus spur und darf dort schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.',
     ],
   ]
   const SCHREIBWERKZEUGE = ['quote_mark', 'doc_edit', 'doc_create', 'reply', 'run_finish', 'wait_for_event']
-  const START = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
+  const START_WERKZEUGE = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
+  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur."`
+  const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur."`
 
   // Kein Kasten ist breiter als sein Container, kein Befehl wird abgeschnitten.
   async function kaestenGanz(wo) {
@@ -3106,7 +3108,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     for (const name of ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln']) {
       ok(readme.includes(`/plugin:spur:spur:${name}`), `README ohne /plugin:spur:spur:${name}`)
     }
-    for (const befehl of ['claude plugin marketplace add ahlerjam/spur', 'claude plugin install spur@spur', START]) {
+    for (const befehl of ['claude plugin marketplace add ahlerjam/spur', 'claude plugin install spur@spur', START_EN]) {
       ok(readme.includes(befehl), `README ohne Schritt: ${befehl.slice(0, 40)}`)
     }
     for (const datei of ['README.md', 'CLAUDE.md', 'docs/backlog.md', 'docs/mcp-contract.md', 'plugins/spur/skills/spur/SKILL.md']) {
@@ -3119,6 +3121,37 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
     ok(eintraege === 35, `Backlog hat ${eintraege} Einträge statt 35`)
     ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /1616/.test(backlog), 'Backlog ohne Transformers, Tesseract oder 1616 Übersetzungen')
+  }
+
+  // P6: Befunde aus der ersten echten Claude-Session.
+  features.p6f1 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await page.goto(`${BASE}/user/settings`)
+    await page.getByRole('button', { name: 'Token erzeugen' }).click()
+    const neu = page.locator('.spur-token-neu')
+    const token = await neu.getAttribute('data-spur-token')
+    const schritt3 = (await neu.locator('ol > li').nth(2).locator('pre').textContent()).trim()
+    ok(schritt3.startsWith('claude --allowedTools "'), `Schritt 3 beginnt anders: ${schritt3}`)
+    ok(/ -- "[^"]*wait_for_event[^"]*"$/.test(schritt3), `Schritt 3 endet ohne Prompt mit wait_for_event: ${schritt3}`)
+    ok(schritt3 === START, `Schritt 3: ${schritt3}`)
+
+    await projektOeffnen('Demo')
+    await panelOeffnen('Claude')
+    // Ohne laufende Session; ein Herzschlag eines früheren Features gilt noch bis zu 45 s.
+    await claudePanel().getByText('Claude nicht verbunden').waitFor({ timeout: 50000 })
+    await claudePanel()
+      .getByText('Starte Claude Code im Terminal mit diesem Befehl. Claude wartet danach von selbst auf Aufträge aus diesem Panel:', { exact: true })
+      .waitFor()
+    const kasten = claudePanel().locator('.spur-befehl-kasten')
+    ok((await kasten.locator('pre').textContent()) === schritt3, 'Panel zeigt einen anderen Befehl als Schritt 3')
+    ok((await kasten.getByRole('button', { name: 'Kopieren' }).count()) === 1, 'Panel ohne Kopierknopf')
+
+    const start = Date.now()
+    await warteStarten(token)
+    await claudePanel().getByText('Claude verbunden', { exact: true }).waitFor({ timeout: 5000 })
+    ok(Date.now() - start <= 5000, `„Claude verbunden“ erst nach ${Date.now() - start} ms`)
+    await page.evaluate(() => window.__spur.abbruch.abort())
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
