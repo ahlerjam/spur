@@ -288,7 +288,7 @@
   "spur_recherche_ansicht": "View",
   "spur_recherche_leer": "Search for a topic, a title or a DOI.",
   "spur_referenz_nicht_gefunden": "DOI unknown to Crossref",
-  "spur_referenz_nicht_pruefbar": "cannot be checked – Crossref is not responding right now",
+  "spur_referenz_nicht_pruefbar": "cannot be checked: Crossref is not responding right now",
   "spur_sammeln_starten": "Start collecting",
   "spur_schnappschuss_von": "Snapshot of __url__. Later changes to the page are not included.",
   "spur_sammlung": "Collection",

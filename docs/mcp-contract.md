@@ -21,7 +21,7 @@ Status: draft before run 0. Changes to names and error codes count as a breaking
 | `project_list`, `doc_list`, `doc_read` | P1 | Read projects and documents |
 | `sources_list`, `source_search`, `source_read` | P1 | Search sources and read sections |
 | `quote_mark` | P1 | Mark a passage in a source |
-| `check_report` | P1 | Check report of the project |
+| `check_report` | P1 | Check report of the project; `zaehlung` counts citations by `status` (`geprueft`, `ohne_quelle`, `ohne_seitenangabe`, `nicht_pruefbar`), and every citation that was not checked names its `grund` (P6) |
 | `bib_list` | P1 | References and their status |
 | `doc_edit` | P1 | Change as a track change, with the expected old text and an idempotency key |
 | `doc_create` | P1 | Create an empty document; content follows through `doc_edit` |
