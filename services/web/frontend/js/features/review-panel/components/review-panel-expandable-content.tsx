@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { Fragment, memo, useCallback, useMemo, useRef, useState } from 'react'
 import OLButton from '@/shared/components/ol/ol-button'
 import { useTranslation } from 'react-i18next'
 import classNames from 'classnames'
@@ -9,6 +9,7 @@ import {
   parseMentions,
   sliceMentionSegments,
 } from '@/shared/utils/parse-mentions'
+import { highlightComment } from '../utils/comment-extensions'
 
 export const ExpandableContent = memo<{
   className?: string
@@ -45,9 +46,7 @@ export const ExpandableContent = memo<{
     ? renderSegments(
         isExpanded ? segments : sliceMentionSegments(segments, limit)
       )
-    : isExpanded
-      ? content
-      : content.slice(0, limit)
+    : highlightComment(isExpanded ? content : content.slice(0, limit))
 
   const handleShowMore = useCallback(() => {
     setIsExpanded(true)
@@ -111,7 +110,7 @@ function renderSegments(segments: MentionSegment[]) {
         <MentionBadge key={`${i}-${segment.userId}`} userId={segment.userId} />
       )
     }
-    return segment.value
+    return <Fragment key={i}>{highlightComment(segment.value)}</Fragment>
   })
 }
 

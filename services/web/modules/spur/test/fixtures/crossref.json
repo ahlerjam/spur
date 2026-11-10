@@ -1,4 +1,13 @@
 {
+  "10.3390/foods11223570": {
+    "DOI": "10.3390/foods11223570",
+    "type": "journal-article",
+    "title": ["Testwerk für gedrosseltes Crossref"],
+    "author": [{ "given": "Fixture", "family": "Drossel" }],
+    "container-title": ["Foods"],
+    "issued": { "date-parts": [[2022]] },
+    "page": "3570"
+  },
   "10.5555/spur.2024.001": {
     "DOI": "10.5555/spur.2024.001",
     "type": "journal-article",

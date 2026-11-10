@@ -26,7 +26,7 @@ const ergebnis = (teil: object) => ({
   treffer: [NRN],
   weiter: false,
   fehler: [],
-  hinweise: [],
+  hinweis: null,
   ...teil,
 })
 

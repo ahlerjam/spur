@@ -141,10 +141,6 @@
   gap: var(--spacing-02);
 }
 
-.spur-gross-oeffnen {
-  margin-bottom: var(--spacing-03);
-}
-
 .spur-gross {
   .modal-dialog {
     max-width: none;
@@ -533,6 +529,19 @@
   margin-top: var(--spacing-04);
 }
 
+// In der Werkzeugleiste der Vorschau: Knöpfe auf einer Linie, die Seitenangabe bricht in sich um.
+.spur-panel-werkzeuge > .spur-blaettern {
+  flex: 1;
+  flex-wrap: nowrap;
+  min-width: 0;
+  margin-top: 0;
+
+  .spur-seitenzahl {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 .spur-reiter {
   display: flex;
   gap: var(--spacing-02);
@@ -853,5 +862,21 @@
   h2 {
     font-size: var(--font-size-05);
     margin: 0 0 var(--spacing-02);
+  }
+}
+
+// @claude im Kommentar: blau wie Overleafs Erwähnungen (.mention-badge), in beiden Designs.
+.spur-claude-erwaehnung {
+  color: var(--content-info-themed);
+  font-weight: 600;
+}
+
+.spur-claude-hinweis {
+  margin-top: var(--spacing-02);
+  font-size: var(--font-size-02);
+  color: var(--content-secondary-themed);
+
+  &:empty {
+    display: none;
   }
 }

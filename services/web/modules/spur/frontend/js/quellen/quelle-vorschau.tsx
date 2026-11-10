@@ -54,7 +54,7 @@ export default function QuelleVorschau({
       <RailPanelHeader title={anzeigename(quelle)} />
       <div className="spur-panel-werkzeuge">
         <OLIconButton
-          variant="secondary"
+          variant="ghost"
           size="sm"
           icon="arrow_back"
           accessibilityLabel={t('spur_zurueck')}
@@ -67,22 +67,20 @@ export default function QuelleVorschau({
         ) : (
           <SeitenBlaettern quelle={quelle} nummer={nummer} seite={seite} setNummer={setNummer} />
         )}
+        {seite && (
+          <OLIconButton
+            variant="ghost"
+            size="sm"
+            icon="open_in_full"
+            accessibilityLabel={t('spur_gross_oeffnen')}
+            onClick={() => setGross(true)}
+          />
+        )}
       </div>
       <div className="spur-panel-inhalt">
         {seitenFehler && <Notification type="warning" content={seitenFehler} />}
         {fehler && <Notification type="error" content={fehler} />}
         {!seite && !seitenFehler && <OLSpinner size="sm" />}
-        {seite && (
-          <OLButton
-            className="spur-gross-oeffnen"
-            variant="secondary"
-            size="sm"
-            leadingIcon="open_in_full"
-            onClick={() => setGross(true)}
-          >
-            {t('spur_gross_oeffnen')}
-          </OLButton>
-        )}
         {seite && quelle.art === 'pdf' && (
           <Seitenbild
             alt={t('spur_seite_von', { seite: nummer, gesamt: quelle.seitenzahl })}

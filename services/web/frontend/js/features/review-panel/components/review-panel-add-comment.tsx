@@ -17,6 +17,7 @@ import {
   MentionsInputHandle,
 } from '@/shared/components/mentions-input'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
+import { commentExtensions } from '../utils/comment-extensions'
 
 export const ReviewPanelAddComment = memo<{
   docId: string
@@ -163,6 +164,9 @@ export const ReviewPanelAddComment = memo<{
           }
           disabled={submitting}
         />
+        {commentExtensions.map(({ InputHint }, i) => (
+          <InputHint key={i} text={content} />
+        ))}
         <div className="review-panel-add-comment-buttons">
           <OLButton
             variant="ghost"

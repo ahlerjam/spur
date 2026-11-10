@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { istProblem, quelleZu, zeileBewerten } from '../../app/src/pruefung/bewertung.mjs'
+import { istProblem, quelleZu, stelleEinordnen, zeileBewerten } from '../../app/src/pruefung/bewertung.mjs'
 
 const SEITEN = [
   { label: '345', text: 'Anfang der Studie.' },
@@ -90,10 +90,15 @@ describe('zeileBewerten', () => {
     expect(zeileBewerten(fund({ roh: `  ${'a'.repeat(300)}` }), kontext()).auszug).toHaveLength(200)
   })
 
-  it('bewertet die Referenz: ohne DOI, unbekannt, nicht gefunden, zurückgezogen', () => {
+  it('bewertet die Referenz: ohne DOI, nicht prüfbar, nicht gefunden, zurückgezogen', () => {
     const ohneDoi = kontext({ bibEintraege: new Map([['smith2024', { key: 'smith2024', doi: null }]]) })
     expect(zeileBewerten(fund(), ohneDoi)).toMatchObject({ referenz: 'ohne_doi', retraction: null })
-    expect(zeileBewerten(fund(), kontext({ werke: new Map([['10.5555/spur.1', null]]) })).referenz).toBe('unbekannt')
+    // Crossref nicht erreichbar ist kein Befund über die Arbeit: nicht prüfbar mit Grund, nie „unbekannt“.
+    expect(zeileBewerten(fund(), kontext({ werke: new Map([['10.5555/spur.1', null]]) }))).toMatchObject({
+      referenz: 'nicht_pruefbar',
+      grund: 'crossref_nicht_erreichbar',
+      retraction: null,
+    })
     expect(zeileBewerten(fund(), kontext({ werke: new Map([['10.5555/spur.1', { gefunden: false }]]) }))).toMatchObject({
       referenz: 'nicht_gefunden',
       retraction: null,
@@ -115,7 +120,7 @@ describe('istProblem', () => {
     [{ wortlaut: 'exakt', retraction: 'korrektur' }, true],
     [{ wortlaut: 'exakt', seite: 'stimmt', referenz: 'gefunden', retraction: 'keine_meldung' }, false],
     [{ wortlaut: 'trennung', seite: 'bestaetigt', referenz: 'ohne_doi' }, false],
-    [{ wortlaut: null, seite: null, referenz: 'unbekannt' }, false],
+    [{ wortlaut: null, seite: null, referenz: 'nicht_pruefbar' }, false],
   ])('bewertet %j als %s', (zeile, erwartet) => {
     expect(istProblem(zeile)).toBe(erwartet)
   })
@@ -170,5 +175,22 @@ describe('Webseiten', () => {
   it('meldet abweichenden Wortlaut', () => {
     const zeile = zeileBewerten(fund({ roh: 'Irregular sleep helps.', belege: [{ key: 'testseite' }] }), webKontext())
     expect(zeile.wortlaut).toBe('abweichend')
+  })
+})
+
+describe('stelleEinordnen', () => {
+  const QUELLE_ID = 'q1'
+  it.each([
+    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'exakt', seitenangabe: 'S. 3', referenz: 'gefunden' }, 'geprueft', null],
+    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'abweichend', seitenangabe: '3' }, 'geprueft', null],
+    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: null, seitenangabe: null, referenz: 'ohne_doi' }, 'geprueft', null],
+    [{ key: 'a', quelleId: null, wortlaut: 'quelle_fehlt' }, 'ohne_quelle', 'keine_quelle'],
+    [{ key: 'a', quelleId: null, wortlaut: null }, 'ohne_quelle', 'keine_quelle'],
+    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'exakt', seitenangabe: null }, 'ohne_seitenangabe', 'seitenangabe_fehlt'],
+    [{ key: 'a', quelleId: null, wortlaut: null, referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar' }, 'nicht_pruefbar', 'crossref_nicht_erreichbar'],
+    [{ key: null, wortlaut: 'nicht_pruefbar' }, 'nicht_pruefbar', 'zitierform_unbekannt'],
+    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'nicht_pruefbar', seitenangabe: '3' }, 'nicht_pruefbar', 'quelle_ohne_text'],
+  ])('%o ist %s', (zeile, status, grund) => {
+    expect(stelleEinordnen(zeile)).toEqual({ status, grund })
   })
 })

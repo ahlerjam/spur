@@ -29,7 +29,10 @@ type Status = {
 
 export default function ClaudePanel() {
   const { t } = useTranslation()
-  const { daten: status, fehler, setFehler, laden } = useAbfrage<Status>(projektPfad('/claude'))
+  // Ohne Verbindung alle 2 s: Eine neue Verbindung soll binnen 5 s sichtbar sein, auch mit der Antwortzeit.
+  const [takt, setTakt] = useState(2000)
+  const { daten: status, fehler, setFehler, laden } = useAbfrage<Status>(projektPfad('/claude'), takt)
+  useEffect(() => setTakt(status?.verbunden ? 5000 : 2000), [status?.verbunden])
   const [offenlegung, setOffenlegung] = useState(false)
 
   return (
@@ -72,7 +75,7 @@ function Verbindung({ verbunden }: { verbunden: boolean }) {
       {!verbunden && (
         <>
           <p className="spur-zeile-meta">{t('spur_claude_starten')}</p>
-          <BefehlKasten befehl={startBefehl()} />
+          <BefehlKasten befehl={startBefehl(t)} />
         </>
       )}
     </div>

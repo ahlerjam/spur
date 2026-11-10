@@ -14,6 +14,7 @@ import {
   ThreadId,
 } from '../../../../../types/review-panel/review-panel'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
+import { commentExtensions } from '../utils/comment-extensions'
 
 export const ReviewPanelCommentContent = memo<{
   comment: Change<CommentOperation>
@@ -126,6 +127,11 @@ export const ReviewPanelCommentContent = memo<{
             disabled={submitting}
           />
         )}
+        {permissions.comment &&
+          !isResolved &&
+          commentExtensions.map(({ InputHint }, i) => (
+            <InputHint key={i} text={content} />
+          ))}
       </div>
     )
   }

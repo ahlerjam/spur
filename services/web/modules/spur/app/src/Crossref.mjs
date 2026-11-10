@@ -1,6 +1,6 @@
 import logger from '@overleaf/logger'
 import { crossrefCache } from './sammlungen.mjs'
-import { jetzt, paperApiBasis } from './schalter.mjs'
+import { jetzt, paperApiBasis, umgebung } from './schalter.mjs'
 
 const BASIS = 'https://api.crossref.org'
 const TAG_MS = 24 * 60 * 60 * 1000
@@ -36,33 +36,61 @@ export function werkAuswerten(message) {
   }
 }
 
+// Crossref drosselt mit 429 und ist zeitweise mit 503 weg: wenige Versuche mit Pause, Retry-After zuerst.
+const VERSUCHE = 4
+const MAX_PAUSE_MS = 5000
+const WIEDERHOLEN = new Set([429, 503])
+// Nach einem Abruf, der trotz aller Versuche gedrosselt blieb, versucht spur eine Minute lang je DOI nur einmal:
+// Sonst wartet ein Prüfbericht mit vielen DOIs bei einem Ausfall für jede DOI die vollen Pausen ab.
+const AUSFALL_MS = 60 * 1000
+let ausfallBis = 0
+// Nach einem Netzfehler oder Timeout (keine HTTP-Antwort) fragt spur 30 s lang nicht: Jeder Versuch kostete bis zu
+// 10 s. Eine HTTP-Antwort wie 503 sperrt dagegen nicht, damit die DOI gleich nach der Erholung aufgenommen wird.
+const NETZFEHLER_MS = 30 * 1000
+let netzfehlerBis = 0
+
+function pauseMs(antwort, versuch) {
+  const kopf = antwort.headers.get('retry-after')
+  const sekunden = kopf == null ? NaN : Number(kopf)
+  const ms = Number.isFinite(sekunden) && sekunden >= 0 ? sekunden * 1000 : 1000 * 2 ** (versuch - 1)
+  return Math.min(ms, MAX_PAUSE_MS)
+}
+
 async function abrufen(doi) {
   const url = new URL(
     `${paperApiBasis() ?? BASIS}/works/${encodeURIComponent(doi)}`
   )
-  if (process.env.CROSSREF_MAILTO) {
-    url.searchParams.set('mailto', process.env.CROSSREF_MAILTO)
+  if (umgebung('CROSSREF_MAILTO')) {
+    url.searchParams.set('mailto', umgebung('CROSSREF_MAILTO'))
   }
-  const antwort = await fetch(url, { signal: AbortSignal.timeout(10000) })
-  if (antwort.status === 404) return { gefunden: false }
-  if (!antwort.ok) throw new Error(`Crossref antwortet ${antwort.status}`)
-  const { message } = await antwort.json()
-  return werkAuswerten(message)
+  const versuche = Date.now() < ausfallBis ? 1 : VERSUCHE
+  for (let versuch = 1; ; versuch++) {
+    const antwort = await fetch(url, { signal: AbortSignal.timeout(10000) }).catch(error => {
+      netzfehlerBis = Date.now() + NETZFEHLER_MS
+      throw error
+    })
+    if (antwort.status === 404) return { gefunden: false }
+    if (WIEDERHOLEN.has(antwort.status) && versuch < versuche) {
+      await new Promise(weiter => setTimeout(weiter, pauseMs(antwort, versuch)))
+      continue
+    }
+    // Nur ein voller Satz Versuche öffnet das Fenster; Einzelversuche darin verlängern es nicht.
+    if (WIEDERHOLEN.has(antwort.status) && versuche > 1) ausfallBis = Date.now() + AUSFALL_MS
+    if (!antwort.ok) throw new Error(`Crossref antwortet ${antwort.status}`)
+    const { message } = await antwort.json()
+    return werkAuswerten(message)
+  }
 }
 
-// DOIs, deren Abruf gerade gescheitert ist: nicht bei jedem Bericht erneut 10 s warten.
-const FEHLER_PAUSE_MS = 5 * 60 * 1000
-const zuletztGescheitert = new Map()
-
+// null heißt: Crossref gerade nicht erreichbar (nicht prüfbar), { gefunden: false }: DOI unbekannt (404).
 export async function werk(doi) {
   const _id = doi.toLowerCase()
   const cache = await crossrefCache()
   const eintrag = await cache.findOne({ _id })
   if (eintrag && jetzt() - eintrag.abgerufenAm < TAG_MS) return eintrag.werk
-  if (Date.now() - (zuletztGescheitert.get(_id) ?? 0) < FEHLER_PAUSE_MS) return eintrag?.werk ?? null
+  if (Date.now() < netzfehlerBis) return eintrag?.werk ?? null
   try {
     const neu = await abrufen(doi)
-    zuletztGescheitert.delete(_id)
     await cache.updateOne(
       { _id },
       { $set: { werk: neu, abgerufenAm: jetzt() } },
@@ -71,7 +99,6 @@ export async function werk(doi) {
     return neu
   } catch (error) {
     logger.warn({ err: error, doi }, 'Crossref nicht erreichbar')
-    zuletztGescheitert.set(_id, Date.now())
     return eintrag?.werk ?? null
   }
 }

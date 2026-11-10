@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
+import { crossrefCache, paperCache } from '../sammlungen.mjs'
 import { devSchalterSetzen } from '../schalter.mjs'
 import { modellOrdner } from '../semantik/einbetten.mjs'
 
@@ -26,7 +27,9 @@ const WERKE = [
 ]
 const nachDoi = doi => WERKE.find(w => w.doi === doi?.toLowerCase())
 
-const zustand = { ausfall: new Set(), protokoll: [] }
+// stoerungen: je Dienst oder je `crossref:<doi>` eine Antwort statt der echten, z. B. { status: 429, retryAfter: 1,
+// mal: 2 } (zweimal, dann normal), { status: 503 } (dauerhaft) oder { trennen: true } (Verbindung bricht ab).
+const zustand = { ausfall: new Set(), stoerungen: {}, protokoll: [] }
 
 function begriffe(anfrage) {
   return (anfrage ?? '')
@@ -117,8 +120,13 @@ const seite = (liste, ab, anzahl) => liste.slice(ab, ab + anzahl)
 
 export const paperFake = express.Router()
 
-paperFake.post('/_steuerung', express.json(), (req, res) => {
+paperFake.post('/_steuerung', express.json(), async (req, res) => {
   zustand.ausfall = new Set(req.body?.ausfall ?? [])
+  zustand.stoerungen = req.body?.stoerungen ?? {}
+  // Antworten cacht spur einen Tag; ein Test, der Dienste umschaltet, muss danach wirklich abrufen.
+  if (req.body?.cachesLeeren) {
+    await Promise.all([crossrefCache, paperCache].map(async sammlung => await (await sammlung()).deleteMany({})))
+  }
   if (req.body?.protokollLeeren) zustand.protokoll = []
   if (req.body?.schalter) devSchalterSetzen(req.body.schalter)
   res.sendStatus(204)
@@ -141,7 +149,14 @@ paperFake.use((req, res, next) => {
   zustand.protokoll.push({ dienst, pfad: req.originalUrl, zeit: Date.now() })
   zustand.protokoll = zustand.protokoll.slice(-500)
   if (zustand.ausfall.has(dienst)) return res.status(503).send('Service unavailable')
-  next()
+  const doi = dienst === 'crossref' && /^\/works\/(.+)$/.exec(req.path)?.[1]
+  const schluessel = [doi && `crossref:${decodeURIComponent(doi).toLowerCase()}`, dienst].find(k => zustand.stoerungen[k])
+  const stoerung = zustand.stoerungen[schluessel]
+  if (!stoerung || stoerung.mal === 0) return next()
+  if (stoerung.mal) stoerung.mal--
+  if (stoerung.trennen) return req.socket.destroy()
+  if (stoerung.retryAfter != null) res.set('Retry-After', String(stoerung.retryAfter))
+  res.status(stoerung.status).send(stoerung.status === 429 ? 'Too Many Requests' : 'Service unavailable')
 })
 
 paperFake.get('/pdf/:datei', (req, res) => {

@@ -1217,6 +1217,9 @@ module.exports = {
       Path.resolve(__dirname, '../modules/spur/frontend/js/recherche/recherche-rail.tsx'),
       Path.resolve(__dirname, '../modules/spur/frontend/js/vorschlaege/vorschlaege-rail.tsx'),
     ],
+    reviewPanelComments: [
+      Path.resolve(__dirname, '../modules/spur/frontend/js/erwaehnung/claude-erwaehnung.tsx'),
+    ],
     railPopovers: [],
     railActions: [],
     railModals: [],

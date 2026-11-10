@@ -125,13 +125,6 @@ export async function perDoi({ projectId, userId, doi }) {
   }
   const { meta, arxiv } = await metadaten(wert)
   if (!meta.gefunden) throw new Problem(404, 'doi_nicht_gefunden', 'spur_fehler_doi_nicht_gefunden')
-  if (!arxiv && !process.env.UNPAYWALL_EMAIL && !paperApiBasis()) {
-    throw new Problem(
-      503,
-      'unpaywall_aus',
-      'spur_fehler_unpaywall_aus'
-    )
-  }
   const zugang = arxiv ? { frei: true, pdf: meta.pdf, lizenz: null } : await unpaywall.status(wert)
   if (!zugang?.frei || !zugang.pdf) {
     throw new Problem(409, 'nicht_frei', 'spur_fehler_nicht_frei')

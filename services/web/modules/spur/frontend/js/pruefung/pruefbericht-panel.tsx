@@ -7,7 +7,7 @@ import OLButton from '@/shared/components/ol/ol-button'
 import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
-import { pruefen, pruefenWennNoetig, pruefStore, Zeile } from './pruef-store'
+import { type Bericht, pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, Zeile } from './pruef-store'
 
 type Stufe = 'success' | 'warning' | 'danger' | 'info'
 
@@ -32,6 +32,8 @@ function useBadges(zeile: Zeile) {
   }
 
   if (zeile.referenz === 'nicht_gefunden') add(t('spur_referenz_nicht_gefunden'), 'danger')
+  // Ein Ausfall bei Crossref ist kein Befund über die Arbeit: neutral, nicht als Fehler.
+  if (zeile.referenz === 'nicht_pruefbar') add(t('spur_referenz_nicht_pruefbar'), 'info')
   if (zeile.retraction === 'zurueckgezogen') add(t('spur_zurueckgezogen'), 'danger')
   if (zeile.retraction === 'korrektur') add(t('spur_korrektur'), 'warning')
   if (zeile.retraction === 'keine_meldung') add(t('spur_keine_meldung'), 'info')
@@ -54,6 +56,10 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
       </OLButton>
       {zeile.key && <span className="spur-zeile-key">{zeile.key}</span>}
       {zeile.auszug && <p className="spur-zeile-auszug">{zeile.auszug}</p>}
+      {/* Den Crossref-Ausfall nennt schon die Marke darunter. */}
+      {zeile.grund && zeile.referenz !== 'nicht_pruefbar' && (
+        <p className="spur-zeile-meta">{t(`spur_grund_${zeile.grund}`)}</p>
+      )}
       <div className="spur-badges" aria-label={t('spur_status')}>
         {badges.map(b => (
           <OLBadge key={b.text} bg={b.stufe}>
@@ -63,6 +69,12 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
       </div>
     </li>
   )
+}
+
+function Zaehlung({ zaehlung }: { zaehlung: Bericht['zaehlung'] }) {
+  const { t } = useTranslation()
+  const teile = STELLEN_STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s] }))
+  return <p className="spur-zeile-meta">{t('spur_zitierstellen', { liste: teile.join(', ') })}</p>
 }
 
 export default function PruefberichtPanel() {
@@ -110,14 +122,7 @@ export default function PruefberichtPanel() {
         {bericht && bericht.zeilen.length > 0 && zeilen.length === 0 && (
           <p className="spur-leer">{t('spur_keine_probleme')}</p>
         )}
-        {bericht && (
-          <p className="spur-zeile-meta">
-            {t('spur_abschnitte_geprueft', {
-              geprueft: bericht.statistik.geprueft,
-              wiederverwendet: bericht.statistik.wiederverwendet,
-            })}
-          </p>
-        )}
+        {bericht && bericht.zeilen.length > 0 && <Zaehlung zaehlung={bericht.zaehlung} />}
         <ul className="spur-liste">
           {zeilen.map(zeile => (
             <BerichtZeile key={zeile.id} zeile={zeile} />

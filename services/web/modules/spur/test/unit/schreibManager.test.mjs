@@ -118,6 +118,22 @@ describe('docEdit', () => {
     })
   })
 
+  it('meldet keine Zahl, die schon in ergebnisse.tex steht', async () => {
+    const ergebnisse = new ObjectId()
+    projektDateien.set('ergebnisse.tex', ergebnisse)
+    docSetzen(ergebnisse, String.raw`\newcommand{\ausbeute}{\qty{75.7}{\percent}}`)
+    const ergebnis = await bearbeiten({ neu: String.raw`Ausbeute \qty{75.7}{\percent}, Volumen $V = 0{,}89\,\mathrm{L}$.` })
+    expect(ergebnis.zahlen_ohne_beleg).toEqual(['0,89'])
+  })
+
+  it('prüft in .bib-Dateien keine Zahlen', async () => {
+    const bib = new ObjectId()
+    projektDateien.set('quellen.bib', bib)
+    docSetzen(bib, '@article{a,\n}')
+    const ergebnis = await bearbeiten({ pfad: 'quellen.bib', alt: '\n}', neu: '\n  volume = {11},\n  pages = {3570}\n}' })
+    expect(ergebnis.zahlen_ohne_beleg).toEqual([])
+  })
+
   it('findet das Dokument auch über die doc_id', async () => {
     await bearbeiten({ pfad: undefined, docId: String(KAPITEL) })
     expect(spurUpdate).toHaveBeenCalledTimes(1)

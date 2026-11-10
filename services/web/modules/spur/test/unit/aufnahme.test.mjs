@@ -2,6 +2,7 @@ import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { Problem } from '../../app/src/probleme.mjs'
 import { meldung } from '../../app/src/meldungen.mjs'
 
 let Aufnahme
@@ -244,8 +245,9 @@ describe('perDoi', () => {
     expect(m.QuellenManager.loeschen).toHaveBeenCalled()
   })
 
-  it('meldet ein nicht eingerichtetes Unpaywall statt „kein freier Volltext“', async () => {
-    vi.stubEnv('UNPAYWALL_EMAIL', '')
+  it('meldet ein nicht eingerichtetes Unpaywall statt „kein freier Volltext“ und lädt nichts', async () => {
+    m.dienste.unpaywall.status.mockRejectedValue(new Problem(503, 'unpaywall_aus', 'spur_fehler_unpaywall_aus'))
     expect(await fehlerVon(aufnehmen('10.1371/journal.pone.0099999'))).toMatchObject({ status: 503, typ: 'unpaywall_aus' })
+    expect(holen).not.toHaveBeenCalled()
   })
 })

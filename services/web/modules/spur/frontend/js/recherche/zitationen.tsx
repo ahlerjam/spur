@@ -8,7 +8,7 @@ import PaperEintrag from './paper-treffer'
 import type { DienstFehler, PaperTreffer } from './typen'
 
 type Richtung = 'zitiert_von' | 'zitiert'
-type Antwort = { treffer: PaperTreffer[]; fehler: DienstFehler[] }
+type Antwort = { treffer: PaperTreffer[]; fehler: DienstFehler[]; hinweis: string | null }
 
 function ZitationsListe({ doi, richtung }: { doi: string; richtung: Richtung }) {
   const { t } = useTranslation()
@@ -33,7 +33,8 @@ function ZitationsListe({ doi, richtung }: { doi: string; richtung: Richtung }) 
         </p>
       )}
       {antwort?.fehler.map(f => <Notification key={f.dienst} type="warning" content={f.text} />)}
-      {antwort && antwort.treffer.length === 0 && (
+      {antwort?.hinweis && <Notification type="warning" content={antwort.hinweis} />}
+      {antwort && antwort.treffer.length === 0 && !antwort.hinweis && (
         <p className="spur-leer">{t('spur_keine_zitationen')}</p>
       )}
       {antwort && antwort.treffer.length > 0 && (

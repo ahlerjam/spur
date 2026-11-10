@@ -1,5 +1,6 @@
 import { parseStringPromise } from 'xml2js'
-import { paperApiBasis } from '../schalter.mjs'
+import { Problem } from '../probleme.mjs'
+import { paperApiBasis, umgebung } from '../schalter.mjs'
 import { abrufen } from './abruf.mjs'
 
 export const PRO_SEITE = 10
@@ -116,7 +117,6 @@ const openalex = {
   name: 'openalex',
   anzeige: 'OpenAlex',
   abstandMs: 100,
-  keyVariable: 'OPENALEX_API_KEY',
   kopf() {
     const key = process.env.OPENALEX_API_KEY
     return key ? { Authorization: `Bearer ${key}` } : {}
@@ -158,7 +158,6 @@ const s2 = {
   name: 's2',
   anzeige: 'Semantic Scholar',
   abstandMs: 1000,
-  keyVariable: 'SEMANTIC_SCHOLAR_API_KEY',
   kopf() {
     const key = process.env.SEMANTIC_SCHOLAR_API_KEY
     return key ? { 'x-api-key': key } : {}
@@ -194,7 +193,7 @@ const crossref = {
     url.searchParams.set('rows', String(PRO_SEITE))
     url.searchParams.set('offset', String(seite * PRO_SEITE))
     url.searchParams.set('select', 'DOI,title,author,issued,abstract')
-    if (process.env.CROSSREF_MAILTO) url.searchParams.set('mailto', process.env.CROSSREF_MAILTO)
+    if (umgebung('CROSSREF_MAILTO')) url.searchParams.set('mailto', umgebung('CROSSREF_MAILTO'))
     const daten = await abrufen(this, url.toString())
     const items = daten?.message?.items ?? []
     return {
@@ -218,9 +217,9 @@ export const unpaywall = {
   abstandMs: 100,
   // Ergebnis: { frei, pdf, lizenz } oder null, wenn Unpaywall die DOI nicht kennt.
   async status(doi) {
-    // Unpaywall verlangt eine Kontaktadresse; ohne sie bleibt der Status unbekannt.
-    const email = process.env.UNPAYWALL_EMAIL ?? (paperApiBasis() && 'fake@example.org')
-    if (!email) return null
+    // Unpaywall verlangt eine Kontaktadresse; die von Crossref taugt auch dafür.
+    const email = umgebung('UNPAYWALL_EMAIL') || umgebung('CROSSREF_MAILTO')
+    if (!email) throw new Problem(503, 'unpaywall_aus', 'spur_fehler_unpaywall_aus')
     const url = new URL(`${basis('unpaywall')}/v2/${doiPfad(doi)}`)
     url.searchParams.set('email', email)
     const daten = await abrufen(this, url.toString(), { cacheSchluessel: `unpaywall:${doi}` })
@@ -250,10 +249,6 @@ export async function arxivMetadaten(id) {
   }
 }
 
+// OpenAlex und Semantic Scholar antworten auch ohne Key; ein Key hebt nur die Limits.
 export const SUCHDIENSTE = [arxiv, openalex, crossref, s2]
 export const ZITATIONSDIENSTE = [openalex, s2]
-
-// Ohne Key bleiben OpenAlex und Semantic Scholar aus; mit Paper-Fake braucht kein Dienst einen.
-export function aktiv(dienst) {
-  return !dienst.keyVariable || Boolean(paperApiBasis()) || Boolean(process.env[dienst.keyVariable])
-}
