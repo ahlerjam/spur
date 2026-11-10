@@ -208,12 +208,14 @@ export const WERKZEUGE = {
   },
 
   check_report: {
-    description: 'Prüfbericht des Projekts wie im Browser.',
+    description:
+      'Prüfbericht des Projekts wie im Browser. zaehlung zählt die Zitierstellen nach status (geprueft, ohne_quelle, ' +
+      'ohne_seitenangabe, nicht_pruefbar); jede nicht geprüfte Stelle nennt ihren grund.',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
-      const { zeilen, statistik } = await PruefManager.bericht(projectId)
-      return { ...blatt(zeilen, cursor), statistik }
+      const { zeilen, zaehlung } = await PruefManager.bericht(projectId)
+      return { ...blatt(zeilen, cursor), zaehlung }
     },
   },
 

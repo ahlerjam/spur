@@ -44,7 +44,7 @@
     "Sie meldet nicht: 169, 11 (Optionen), 3.5, 2.25 (TikZ), 30 (Farbe), 234, 28, 10 (Farbdefinition), 2 (Exponent), 3570 oder 11 aus der .bib",
     "Steht 75.7 in ergebnisse.tex, wird es nicht gemeldet"
   ]},
-  {"id": "f8", "title": "Prüfbericht zählt Zitierstellen und nennt Gründe", "ui": true, "passes": false, "steps": [
+  {"id": "f8", "title": "Prüfbericht zählt Zitierstellen und nennt Gründe", "ui": true, "passes": true, "steps": [
     "Ein Projekt hat 7 Zitierstellen: 1 mit aufgenommener Quelle und passendem Wortlaut, 4 ohne aufgenommene Quelle, 1 mit Quelle ohne Seitenangabe, 1 mit einer DOI, für die der Crossref-Fake 503 liefert",
     "Der Prüfbericht zeigt oben die Zählung nach Status, die zusammen 7 ergibt, z. B. „1 geprüft, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar“",
     "Jede nicht geprüfte Stelle nennt ihren Grund: „keine Quelle aufgenommen“, „Seitenangabe fehlt“ bzw. „Crossref gerade nicht erreichbar“",

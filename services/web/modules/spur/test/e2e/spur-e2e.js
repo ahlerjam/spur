@@ -675,8 +675,10 @@ async page => {
       )
       await page.getByLabel('Nur Probleme').uncheck()
 
+      // P6: Der Cache von Abschnitten erscheint nicht mehr; die Zählung der Zitierstellen bleibt gleich.
+      const zaehlung = await page.getByText(/^Zitierstellen: /).innerText()
       await editorErsetzen('\\section{Zwei}', '\\section{Zwei!}')
-      await sichtbar('Abschnitte geprüft: 1, unverändert übernommen: 3')
+      await page.getByText(zaehlung, { exact: true }).waitFor()
       await editorErsetzen('\\section{Zwei!}', '\\section{Zwei}')
 
       await texErsetzen('ersetzen/kapitel.tex')
@@ -3455,6 +3457,45 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const danach = await schreiben('main.tex', String.raw` Nochmals \qty{75.7}{\percent} und $0{,}89$.`, 4)
     ok(JSON.stringify(danach) === JSON.stringify(['0,89']), `Mit ergebnisse.tex gemeldet: ${JSON.stringify(danach)}`)
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zahlen geprüft.' })
+  }
+
+  features.p6f8 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const ZAEHLUNG = 'Zitierstellen: 1 geprüft, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar'
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    try {
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { [`crossref:${FOODS}`]: { status: 503 } } })
+      await projektOeffnen('E2E P6 Bericht')
+      const pid = page.url().split('/').pop()
+      await panelOeffnen('Prüfbericht')
+      await page.getByLabel('Nur Probleme').setChecked(false)
+      await page.getByText(ZAEHLUNG, { exact: true }).waitFor({ timeout: 60000 })
+      for (const key of ['ohneA', 'ohneB', 'ohneC', 'ohneD']) {
+        await zeile(key).getByText('keine Quelle aufgenommen', { exact: true }).waitFor()
+      }
+      await zeile('Sleep supports the consolidation').getByText('Seitenangabe fehlt', { exact: true }).waitFor()
+      await zeile('foods2022').getByText('nicht prüfbar – Crossref gerade nicht erreichbar', { exact: true }).waitFor()
+      ok(!/keine Quelle|Seitenangabe fehlt/.test(await zeile('hippocampus').innerText()), 'Geprüfte Stelle nennt einen Grund')
+
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await page.waitForTimeout(500)
+      await page.getByText(ZAEHLUNG, { exact: true }).waitFor({ timeout: 60000 })
+
+      const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
+      ok(
+        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, nicht_pruefbar: 1 }),
+        `check_report: ${JSON.stringify(bericht.zaehlung)}`
+      )
+      const gruende = bericht.eintraege.map(z => z.grund).filter(Boolean).sort()
+      ok(
+        JSON.stringify(gruende) === JSON.stringify(['crossref_nicht_erreichbar', 'keine_quelle', 'keine_quelle', 'keine_quelle', 'keine_quelle', 'seitenangabe_fehlt']),
+        `Gründe über MCP: ${JSON.stringify(gruende)}`
+      )
+    } finally {
+      await fakeSteuern({})
+    }
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

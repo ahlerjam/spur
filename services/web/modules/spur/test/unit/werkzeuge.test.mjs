@@ -263,10 +263,11 @@ describe('Lesen im Projekt', () => {
   })
 
   it('check_report liefert Zeilen seitenweise samt Statistik', async () => {
-    m.PruefManager.bericht.mockResolvedValue({ zeilen: Array.from({ length: 55 }, (_, i) => ({ i })), statistik: { geprueft: 1, wiederverwendet: 0 } })
+    m.PruefManager.bericht.mockResolvedValue({ zeilen: Array.from({ length: 55 }, (_, i) => ({ i })), zaehlung: { geprueft: 1, ohne_quelle: 2 }, abschnitte: { neu: 1, uebernommen: 0 } })
     const ergebnis = await aufruf('check_report', { project_id: projekt })
     expect(ergebnis.eintraege).toHaveLength(50)
-    expect(ergebnis).toMatchObject({ naechster_cursor: '50', statistik: { geprueft: 1, wiederverwendet: 0 } })
+    expect(ergebnis).toMatchObject({ naechster_cursor: '50', zaehlung: { geprueft: 1, ohne_quelle: 2 } })
+    expect(ergebnis).not.toHaveProperty('abschnitte')
   })
 
   it('bib_list nennt den Crossref-Status je Eintrag', async () => {

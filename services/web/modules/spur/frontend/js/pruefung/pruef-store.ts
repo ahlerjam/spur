@@ -16,11 +16,15 @@ export type Zeile = {
   referenz?: string
   retraction?: string | null
   problem: boolean
+  status: StellenStatus
+  grund: string | null
 }
+
+export type StellenStatus = 'geprueft' | 'ohne_quelle' | 'ohne_seitenangabe' | 'nicht_pruefbar'
 
 export type Bericht = {
   zeilen: Zeile[]
-  statistik: { geprueft: number; wiederverwendet: number }
+  zaehlung: Record<StellenStatus, number>
 }
 
 export type PruefZustand = {
