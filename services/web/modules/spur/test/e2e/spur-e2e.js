@@ -651,7 +651,7 @@ async page => {
       )
       await zeigt('korrigiert', 'Korrektur vorhanden')
       await zeigt('Sleep supports […] declarative memory.', 'Keine Meldung in Crossref')
-      await zeigt('unbekannt', 'Referenz nicht gefunden')
+      await zeigt('unbekannt', 'DOI bei Crossref unbekannt')
       await zeigt('footfullcite', 'Nicht prüfbar')
 
       await panelOeffnen('Quellen')
