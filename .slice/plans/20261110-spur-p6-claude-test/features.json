@@ -38,7 +38,7 @@
     "Ohne `UNPAYWALL_EMAIL`, aber mit `CROSSREF_MAILTO=spur@example.org` nimmt `source_add` eine frei verfügbare DOI aus dem Fake auf; die Quelle erscheint in der Quellenliste",
     "Ohne beide Variablen liefert `source_add` eine Meldung, die `UNPAYWALL_EMAIL` und `CROSSREF_MAILTO` nennt und auf die README verweist; der Fehlercode bleibt `unpaywall_aus`"
   ]},
-  {"id": "f7", "title": "Zahlenprüfung meldet Rechenwerte, nicht Grafik- und Formatangaben", "passes": false, "ui": true, "steps": [
+  {"id": "f7", "title": "Zahlenprüfung meldet Rechenwerte, nicht Grafik- und Formatangaben", "passes": true, "ui": true, "steps": [
     "Ein Projekt enthält main.tex mit `\\documentclass[aspectratio=169,11pt]{beamer}`, einer `tikzpicture` mit `\\draw (0,0) -- (3.5,2.25);`, `\\fill[red!30]`, `\\definecolor{eon}{RGB}{234,28,10}`, der Formel `$V = 0{,}89\\,\\mathrm{L}$`, `\\qty{75.7}{\\percent}` und `$x^2$`; dazu quellen.bib mit `volume = {11}`, `pages = {3570}`",
     "Die Prüfung ungestützter Zahlen (Prüfbericht und Lauf-Karte, wie bisher) meldet 0,89 und 75.7",
     "Sie meldet nicht: 169, 11 (Optionen), 3.5, 2.25 (TikZ), 30 (Farbe), 234, 28, 10 (Farbdefinition), 2 (Exponent), 3570 oder 11 aus der .bib",

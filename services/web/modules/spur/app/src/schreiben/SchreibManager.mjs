@@ -12,7 +12,7 @@ import { bereichPruefen } from '../pruefung/PruefManager.mjs'
 import { bearbeitungen } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import * as LaufManager from './LaufManager.mjs'
-import { zahlenOhneBeleg } from './zahlen.mjs'
+import { zahlenIn, zahlenOhneBeleg } from './zahlen.mjs'
 import { opsFuer } from './ops.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
 
@@ -55,6 +55,19 @@ async function docAufloesen(projectId, docId, pfad) {
     if (!(error instanceof Errors.NotFoundError)) throw error
   }
   throw new WerkzeugFehler('doc_fehlt', 'spur_fehler_doc_fehlt_liste')
+}
+
+// Zahlen aus ergebnisse.tex im Wurzelordner gelten als belegt.
+async function ergebnisZahlen(projectId) {
+  let doc
+  try {
+    doc = await docAufloesen(projectId, null, 'ergebnisse.tex')
+  } catch (error) {
+    if (error instanceof WerkzeugFehler) return []
+    throw error
+  }
+  const { lines } = await DocumentUpdaterHandler.promises.getDocument(projectId, doc.docId, -1)
+  return zahlenIn(lines.join('\n'))
 }
 
 function vorkommen(text, teil) {
@@ -182,8 +195,9 @@ async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
   const neuerText = text.slice(0, start) + neu + text.slice(start + alt.length)
   const rot = await pruefSperre(projectId, neuerText, start, start + neu.length)
 
-  // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt.
-  const zahlen = /(^|\/)ergebnisse\.tex$/.test(doc.pfad) ? [] : zahlenOhneBeleg(neu)
+  // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt, in .bib-Dateien stehen nur Metadaten.
+  const ohnePruefung = /(^|\/)ergebnisse\.tex$|\.bib$/.test(doc.pfad)
+  const zahlen = ohnePruefung ? [] : zahlenOhneBeleg(neu, await ergebnisZahlen(projectId))
   const op = opsFuer(start, alt, neu)
   const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
   let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot, zahlen_ohne_beleg: zahlen }

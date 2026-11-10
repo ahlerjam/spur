@@ -3414,6 +3414,49 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
   }
 
+  features.p6f7 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P6 Zahlen')
+    const lauf = Date.now()
+    const schreiben = async (pfad, neu, n) => {
+      const { fehler, inhalt } = await werkzeug(token, 'doc_edit', { project_id: pid, pfad, neu, idempotenz_schluessel: `p6f7-${lauf}-${n}` })
+      ok(!fehler, `doc_edit ${pfad}: ${JSON.stringify(inhalt)}`)
+      return inhalt.zahlen_ohne_beleg
+    }
+    const FOLIEN = String.raw`
+\documentclass[aspectratio=169,11pt]{beamer}
+\definecolor{eon}{RGB}{234,28,10}
+\begin{tikzpicture}
+  \draw (0,0) -- (3.5,2.25);
+  \fill[red!30] (0,0) rectangle (1,1);
+\end{tikzpicture}
+Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die Fläche $x^2$.`
+    const gemeldet = await schreiben('main.tex', FOLIEN, 1)
+    ok(JSON.stringify(gemeldet) === JSON.stringify(['0,89', '75.7']), `Gemeldet: ${JSON.stringify(gemeldet)}`)
+    const bib = await schreiben('quellen.bib', '@article{p6b,\n  volume = {11},\n  pages = {3570}\n}\n', 2)
+    ok(bib.length === 0, `.bib gemeldet: ${JSON.stringify(bib)}`)
+
+    await projektOeffnen('E2E P6 Zahlen')
+    await panelOeffnen('Claude')
+    const karte = claudePanel().locator('.spur-lauf-rot', { hasText: 'Zahl ohne Beleg' })
+    await karte.getByText('„0,89“ in main.tex', { exact: false }).waitFor({ timeout: 10000 })
+    await karte.getByText('„75.7“ in main.tex', { exact: false }).waitFor()
+    const text = await karte.innerText()
+    for (const zahl of ['169', '11', '3.5', '2.25', '30', '234', '28', '10', '2', '3570']) {
+      ok(!text.includes(`„${zahl}“`), `Lauf-Karte meldet ${zahl}`)
+    }
+
+    const neu = await werkzeug(token, 'doc_create', {
+      project_id: pid, pfad: 'ergebnisse.tex', inhalt: String.raw`\newcommand{\ausbeute}{\qty{75.7}{\percent}}`, idempotenz_schluessel: `p6f7-${lauf}-3`,
+    })
+    ok(!neu.fehler, `doc_create: ${JSON.stringify(neu.inhalt)}`)
+    const danach = await schreiben('main.tex', String.raw` Nochmals \qty{75.7}{\percent} und $0{,}89$.`, 4)
+    ok(JSON.stringify(danach) === JSON.stringify(['0,89']), `Mit ergebnisse.tex gemeldet: ${JSON.stringify(danach)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zahlen geprüft.' })
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

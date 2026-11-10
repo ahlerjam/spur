@@ -432,6 +432,7 @@ Lebensmittelabfälle \cite{foods2022}. Eine erfundene Quelle \cite{erfunden}.
   doi = {10.9999/gibt-es-nicht}
 }`,
   })
+  await neuAnlegen(a, 'E2E P6 Zahlen', { 'main.tex': LEER, 'quellen.bib': '@article{p6,\n  title = {Zahlen}\n}\n' })
 }
 
 // Als Skript läuft es als root; die Ablage muss danach dem Web-Prozess gehören.
