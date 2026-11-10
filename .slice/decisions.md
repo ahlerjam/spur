@@ -39,3 +39,6 @@
 - D7 (plan 20261109-spur-p5-abnahme) f6: Zweite unabhängige Abnahme: „Zurück“ in der Blätterleiste des Panels sitzt bei 1280 px 4–5 px höher als Vorherige/Nächste Seite (`spur.scss`, `margin-top` auf `.spur-blaettern`); optisch eine Zeile, „dieselbe obere Kante“ wörtlich nicht erfüllt.
   Interim: so gelassen.
   Options: A (empfohlen) kleiner Nachbesserungsplan vor dem Merge | B so lassen
+- D8 (plan 20261110-spur-p6-claude-test) f7: Gilt eine Zahl, die in `ergebnisse.tex` steht, auch im Fließtext als belegt?
+  Interim: Nur in Formeln und siunitx-Werten; im Fließtext bleibt eine getippte Zahl gemeldet (Hinweis: Makro nutzen), p2f8 bleibt grün.
+  Options: A (empfohlen) so lassen, Fließtext soll das Makro nutzen | B überall als belegt werten und p2f8 anpassen | C nirgends als belegt werten, nur Makros zählen
