@@ -3546,6 +3546,31 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(kaputt.length === 0, `Links: ${kaputt.join(' | ')}`)
   }
 
+  features.p6f11 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E P6 Bericht')
+    await panelSichern('Quellen', page.getByRole('button', { name: 'smith2024.pdf' }))
+    await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+    await page.locator('img.spur-seitenbild').waitFor()
+    const leiste = page.locator('.spur-panel-werkzeuge')
+    const knoepfe = ['Zurück', 'Vorherige Seite', 'Nächste Seite', 'Groß öffnen'].map(name => leiste.getByRole('button', { name }))
+    const masse = async () => await Promise.all(knoepfe.map(async k => await k.boundingBox()))
+    const bei1280 = await masse()
+    const oben = bei1280.map(b => b.y)
+    ok(Math.max(...oben) - Math.min(...oben) <= 1, `Oberkanten bei 1280 px: ${oben}`)
+    const hoehen = bei1280.map(b => b.height)
+    ok(Math.max(...hoehen) - Math.min(...hoehen) <= 1, `Höhen bei 1280 px: ${hoehen}`)
+
+    await breite(360)
+    await page.locator('img.spur-seitenbild').waitFor()
+    await ohneSeitlichesRollen('Quellen-Vorschau 360 px')
+    for (const [i, b] of (await masse()).entries()) {
+      ok(b && b.width >= 24 && b.height >= 24, `Knopf ${i + 1} bei 360 px: ${JSON.stringify(b)}`)
+    }
+    await breite(1280)
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

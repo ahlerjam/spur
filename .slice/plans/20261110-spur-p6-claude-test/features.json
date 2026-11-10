@@ -65,7 +65,7 @@
     "Sie hat Abschnitte „Update“ (`make update`) und Betrieb hinter einem Firmen-Proxy mit einem vollständigen Beispiel für `docker-compose.override.yml` und `NODE_EXTRA_CA_CERTS`",
     "Alle Links der README funktionieren; der Befehlsnamen-Test bleibt grün"
   ]},
-  {"id": "f11", "title": "Blätterleiste: Zurück auf einer Linie", "ui": true, "passes": false, "steps": [
+  {"id": "f11", "title": "Blätterleiste: Zurück auf einer Linie", "ui": true, "passes": true, "steps": [
     "Nutzer öffnet im Quellen-Panel eine PDF-Quelle bei 1280 px Fensterbreite und Standardbreite des Panels",
     "„Zurück“, „Vorherige Seite“, „Nächste Seite“ und „Groß öffnen“ haben dieselbe Oberkante (Abweichung höchstens 1 px) und stehen in einer Zeile",
     "Bei 360 px gibt es kein horizontales Rollen, alle Knöpfe sind mindestens 24 × 24 px"
