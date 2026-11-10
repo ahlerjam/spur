@@ -171,9 +171,13 @@ describe('werk', () => {
     expect(abrufe).toHaveLength(4)
     expect((await mitPausen(() => Crossref.werk('10.1/b'))).ergebnis).toBeNull()
     expect(abrufe).toHaveLength(5)
-    vi.setSystemTime(Date.now() + 61 * 1000)
+    // Der Einzelversuch nach 50 s verlängert das Fenster nicht.
+    vi.setSystemTime(Date.now() + 50 * 1000)
     await mitPausen(() => Crossref.werk('10.1/c'))
-    expect(abrufe).toHaveLength(9)
+    expect(abrufe).toHaveLength(6)
+    vi.setSystemTime(Date.now() + 11 * 1000)
+    await mitPausen(() => Crossref.werk('10.1/d'))
+    expect(abrufe).toHaveLength(10)
   })
 
   it('wiederholt andere Fehler nicht', async () => {

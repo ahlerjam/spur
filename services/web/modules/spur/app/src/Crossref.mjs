@@ -67,7 +67,8 @@ async function abrufen(doi) {
       await new Promise(weiter => setTimeout(weiter, pauseMs(antwort, versuch)))
       continue
     }
-    if (WIEDERHOLEN.has(antwort.status)) ausfallBis = Date.now() + AUSFALL_MS
+    // Nur ein voller Satz Versuche öffnet das Fenster; Einzelversuche darin verlängern es nicht.
+    if (WIEDERHOLEN.has(antwort.status) && versuche > 1) ausfallBis = Date.now() + AUSFALL_MS
     if (!antwort.ok) throw new Error(`Crossref antwortet ${antwort.status}`)
     const { message } = await antwort.json()
     return werkAuswerten(message)
