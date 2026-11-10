@@ -9,6 +9,7 @@ let datenbank
 let schalter
 let abrufe
 let ausfall
+let gedrosselt
 let sonder
 
 const ATOM = `<?xml version="1.0"?>
@@ -94,6 +95,7 @@ beforeEach(async () => {
   await datenbank.leeren()
   abrufe = []
   ausfall = new Set()
+  gedrosselt = new Set()
   sonder = () => null
   schalter = schalterAttrappe()
   schalter.paperApiBasis = 'http://paper.test/fake'
@@ -106,6 +108,7 @@ beforeEach(async () => {
       const dienst = dienstAus(url)
       abrufe.push({ dienst, url: String(url), zeit: Date.now() })
       if (ausfall.has(dienst)) return { ok: false, status: 503 }
+      if (gedrosselt.has(dienst)) return { ok: false, status: 429 }
       const extra = sonder(String(url))
       if (extra) return { ok: true, status: 200, json: async () => extra }
       const { text, json } = ANTWORTEN[dienst]()
@@ -207,18 +210,38 @@ describe('suchen', () => {
     expect(abrufe.filter(a => a.dienst === 'openalex').at(-1).url).toContain('page=2')
   })
 
-  it('lässt Dienste ohne Key aus und nennt sie im Hinweis', async () => {
+  it('fragt ohne Keys alle vier Dienste ab, ohne Key-Kopf', async () => {
     schalter.paperApiBasis = undefined
     vi.stubEnv('OPENALEX_API_KEY', '')
     vi.stubEnv('SEMANTIC_SCHOLAR_API_KEY', '')
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}), text: async () => '<feed/>' })))
     const ergebnis = await suchen('sleep')
-    expect(ergebnis.hinweise).toEqual([
-      meldung('spur_fehler_suchdienst_aus', { dienst: 'OpenAlex', variable: 'OPENALEX_API_KEY' }),
-      meldung('spur_fehler_suchdienst_aus', { dienst: 'Semantic Scholar', variable: 'SEMANTIC_SCHOLAR_API_KEY' }),
-    ])
     const hosts = fetch.mock.calls.map(([url]) => new URL(url).host)
-    expect(hosts.sort()).toEqual(['api.crossref.org', 'export.arxiv.org'])
+    expect(hosts.sort()).toEqual(['api.crossref.org', 'api.openalex.org', 'api.semanticscholar.org', 'export.arxiv.org'])
+    for (const [, optionen] of fetch.mock.calls) {
+      expect(optionen.headers ?? {}).not.toHaveProperty('Authorization')
+      expect(optionen.headers ?? {}).not.toHaveProperty('x-api-key')
+    }
+    expect(ergebnis.dienste.map(d => d.antwort)).toEqual(['geantwortet', 'geantwortet', 'geantwortet', 'geantwortet'])
+  })
+
+  it('schickt einen gesetzten Key mit', async () => {
+    vi.stubEnv('SEMANTIC_SCHOLAR_API_KEY', 's2-key')
+    await suchen('sleep')
+    const s2 = fetch.mock.calls.find(([url]) => dienstAus(url) === 's2')
+    expect(s2[1].headers).toMatchObject({ 'x-api-key': 's2-key' })
+  })
+
+  it('nennt je Dienst, ob er geantwortet hat', async () => {
+    ausfall.add('s2')
+    const ergebnis = await suchen('sleep')
+    expect(ergebnis.dienste).toEqual([
+      { dienst: 'arXiv', antwort: 'geantwortet' },
+      { dienst: 'OpenAlex', antwort: 'geantwortet' },
+      { dienst: 'Crossref', antwort: 'geantwortet' },
+      { dienst: 'Semantic Scholar', antwort: 'nicht_erreichbar' },
+    ])
+    expect(ergebnis.hinweis).toBeNull()
   })
 
   it('schreibt je Dienst Datum, Datenbank, Anfrage und Trefferzahl ins Protokoll', async () => {
@@ -324,6 +347,25 @@ describe('zitationen', () => {
     const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
     expect(ergebnis.fehler.map(f => f.text)).toEqual([meldung('spur_fehler_dienst_nicht_erreichbar', { dienst: 'OpenAlex' })])
     expect(ergebnis.treffer).toHaveLength(2)
+  })
+
+  it('meldet einen gedrosselten Dienst und liefert die Zitationen der anderen', async () => {
+    gedrosselt.add('s2')
+    const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
+    expect(ergebnis.treffer.map(t => t.doi)).toEqual(['10.1/a'])
+    expect(ergebnis.dienste).toEqual([
+      { dienst: 'OpenAlex', antwort: 'geantwortet' },
+      { dienst: 'Semantic Scholar', antwort: 'gedrosselt' },
+    ])
+  })
+
+  it('liefert keine stille leere Liste, wenn kein Dienst antwortet', async () => {
+    ausfall.add('openalex')
+    gedrosselt.add('s2')
+    const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
+    expect(ergebnis.treffer).toEqual([])
+    expect(ergebnis.hinweis).toBe(meldung('spur_hinweis_kein_dienst'))
+    expect(ergebnis.fehler.map(f => [f.dienst, f.art])).toEqual([['openalex', 'nicht_erreichbar'], ['s2', 'limit']])
   })
 
   it('lehnt eine ungültige Richtung oder DOI ab', async () => {

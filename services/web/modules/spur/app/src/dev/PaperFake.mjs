@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
-import { crossrefCache } from '../sammlungen.mjs'
+import { crossrefCache, paperCache } from '../sammlungen.mjs'
 import { devSchalterSetzen } from '../schalter.mjs'
 import { modellOrdner } from '../semantik/einbetten.mjs'
 
@@ -123,8 +123,10 @@ export const paperFake = express.Router()
 paperFake.post('/_steuerung', express.json(), async (req, res) => {
   zustand.ausfall = new Set(req.body?.ausfall ?? [])
   zustand.stoerungen = req.body?.stoerungen ?? {}
-  // Gefundene Werke cacht spur einen Tag; ein Test, der Crossref umschaltet, muss danach wirklich abrufen.
-  if (req.body?.crossrefCacheLeeren) await (await crossrefCache()).deleteMany({})
+  // Antworten cacht spur einen Tag; ein Test, der Dienste umschaltet, muss danach wirklich abrufen.
+  if (req.body?.cachesLeeren) {
+    await Promise.all([crossrefCache, paperCache].map(async sammlung => await (await sammlung()).deleteMany({})))
+  }
   if (req.body?.protokollLeeren) zustand.protokoll = []
   if (req.body?.schalter) devSchalterSetzen(req.body.schalter)
   res.sendStatus(204)

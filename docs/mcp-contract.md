@@ -74,7 +74,7 @@ Unrecognized citation forms and DOIs that cannot be resolved are accepted, but m
 
 Every hit of `paper_search` carries `abstract` (from the first service that supplies one; otherwise empty).
 
-`paper_search` and `paper_citations` do not fail because of a single service: `fehler` names failed services, and the remaining hits still arrive.
+`paper_search` and `paper_citations` do not fail because of a single service: `fehler` names failed services with the reason, and the remaining hits still arrive. `dienste` lists every service asked with `antwort` `geantwortet`, `gedrosselt` or `nicht_erreichbar`. If no service answered, `hinweis` says so, so an empty list never looks like "no results". OpenAlex and Semantic Scholar work without an API key; a key only raises their limits.
 
 ## Events for `events_since`
 `task_created`, `chat_message`, `comment_mention`, `suggest_trigger`. Every event applies to exactly one bot.

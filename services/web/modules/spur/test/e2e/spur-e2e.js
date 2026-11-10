@@ -3303,7 +3303,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const NICHT_PRUEFBAR = 'nicht prüfbar – Crossref gerade nicht erreichbar'
     try {
       // Vor dem Öffnen: Overleaf stellt ein offenes Prüfbericht-Panel sofort wieder her.
-      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 429, retryAfter: 1, mal: 2 } }, crossrefCacheLeeren: true, protokollLeeren: true })
+      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 429, retryAfter: 1, mal: 2 } }, cachesLeeren: true, protokollLeeren: true })
       await projektOeffnen('E2E P6 Crossref')
       const pid = page.url().split('/').pop()
       await panelOeffnen('Prüfbericht')
@@ -3315,7 +3315,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       ok(abrufe.length === 3, `Crossref-Abrufe für die gedrosselte DOI: ${abrufe.length}`)
       await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
 
-      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 503 } }, crossrefCacheLeeren: true })
+      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 503 } }, cachesLeeren: true })
       await page.getByRole('button', { name: 'Erneut prüfen' }).click()
       await zeile('foods2022').getByText(NICHT_PRUEFBAR, { exact: true }).waitFor({ timeout: 30000 })
       ok(!/unbekannt/.test(await zeile('foods2022').innerText()), 'Ausfall erscheint als unbekannt')
@@ -3335,6 +3335,51 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       await fakeSteuern({})
       const aufgenommen = await werkzeug(token, 'source_add', { project_id: pid, doi: FOODS })
       ok(!aufgenommen.fehler, `source_add nach Ausfall: ${JSON.stringify(aufgenommen.inhalt)}`)
+    } finally {
+      await fakeSteuern({})
+    }
+  }
+
+  features.p6f5 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P6 Crossref')
+    const antworten = ergebnis => Object.fromEntries(ergebnis.dienste.map(d => [d.dienst, d.antwort]))
+    try {
+      await fakeSteuern({ cachesLeeren: true })
+      const suche = (await werkzeug(token, 'paper_search', { project_id: pid, anfrage: 'food waste' })).inhalt
+      const quellen = new Set(suche.treffer.flatMap(t => t.dienste))
+      for (const dienst of ['OpenAlex', 'Semantic Scholar', 'Crossref', 'arXiv']) {
+        ok(quellen.has(dienst), `paper_search ohne Treffer aus ${dienst}: ${[...quellen]}`)
+        ok(antworten(suche)[dienst] === 'geantwortet', `paper_search: ${JSON.stringify(suche.dienste)}`)
+      }
+
+      for (const richtung of ['zitiert_von', 'zitiert']) {
+        const z = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung })).inhalt
+        ok(z.treffer.length > 0 && !z.hinweis, `paper_citations ${richtung}: ${JSON.stringify(z).slice(0, 300)}`)
+      }
+
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { s2: { status: 429 } } })
+      const gedrosselt = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })).inhalt
+      ok(gedrosselt.treffer.length > 0 && gedrosselt.treffer.every(t => t.dienste.includes('OpenAlex')), `Treffer ohne OpenAlex: ${JSON.stringify(gedrosselt.treffer)}`)
+      ok(antworten(gedrosselt)['Semantic Scholar'] === 'gedrosselt' && antworten(gedrosselt).OpenAlex === 'geantwortet', `Dienste: ${JSON.stringify(gedrosselt.dienste)}`)
+
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { s2: { trennen: true }, openalex: { trennen: true } } })
+      const keiner = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })).inhalt
+      ok(keiner.treffer.length === 0 && /Keiner der Dienste hat geantwortet/.test(keiner.hinweis), `Kein Hinweis: ${JSON.stringify(keiner)}`)
+      ok(
+        keiner.fehler.length === 2 && keiner.fehler.every(f => f.art === 'nicht_erreichbar' && f.text) &&
+          Object.values(antworten(keiner)).every(a => a === 'nicht_erreichbar'),
+        `Gründe je Dienst: ${JSON.stringify(keiner)}`
+      )
+
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { s2: { status: 503 } } })
+      await projektOeffnen('E2E P6 Crossref')
+      await panelOeffnen('Recherche')
+      await paperSuchen('food waste')
+      await page.locator('.spur-panel').getByText('Semantic Scholar nicht erreichbar').waitFor({ timeout: 10000 })
+      await page.locator('.spur-panel').getByText('Food waste in private households').first().waitFor()
     } finally {
       await fakeSteuern({})
     }

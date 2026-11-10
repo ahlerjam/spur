@@ -116,7 +116,6 @@ const openalex = {
   name: 'openalex',
   anzeige: 'OpenAlex',
   abstandMs: 100,
-  keyVariable: 'OPENALEX_API_KEY',
   kopf() {
     const key = process.env.OPENALEX_API_KEY
     return key ? { Authorization: `Bearer ${key}` } : {}
@@ -158,7 +157,6 @@ const s2 = {
   name: 's2',
   anzeige: 'Semantic Scholar',
   abstandMs: 1000,
-  keyVariable: 'SEMANTIC_SCHOLAR_API_KEY',
   kopf() {
     const key = process.env.SEMANTIC_SCHOLAR_API_KEY
     return key ? { 'x-api-key': key } : {}
@@ -250,10 +248,6 @@ export async function arxivMetadaten(id) {
   }
 }
 
+// OpenAlex und Semantic Scholar antworten auch ohne Key; ein Key hebt nur die Limits.
 export const SUCHDIENSTE = [arxiv, openalex, crossref, s2]
 export const ZITATIONSDIENSTE = [openalex, s2]
-
-// Ohne Key bleiben OpenAlex und Semantic Scholar aus; mit Paper-Fake braucht kein Dienst einen.
-export function aktiv(dienst) {
-  return !dienst.keyVariable || Boolean(paperApiBasis()) || Boolean(process.env[dienst.keyVariable])
-}

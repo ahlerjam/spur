@@ -27,7 +27,7 @@
     "`source_add` mit der 503-DOI liefert eine Meldung, dass Crossref gerade nicht antwortet und ein späterer Versuch hilft; der Fehlercode ist nicht `doi_nicht_gefunden`",
     "Nach Umschalten des Fakes auf normal nimmt `source_add` die DOI sofort auf, ohne 5 Minuten Sperre"
   ]},
-  {"id": "f5", "title": "Recherche läuft ohne Schlüssel über alle Dienste und sagt, wer geantwortet hat", "passes": false, "steps": [
+  {"id": "f5", "title": "Recherche läuft ohne Schlüssel über alle Dienste und sagt, wer geantwortet hat", "passes": true, "steps": [
     "Ohne `OPENALEX_API_KEY` und `SEMANTIC_SCHOLAR_API_KEY` liefert `paper_search` „food waste“ über MCP Treffer aus OpenAlex, Semantic Scholar, Crossref und arXiv (Fake) und listet die vier Dienste als „geantwortet“",
     "`paper_citations` für eine DOI mit Zitationen im Fake liefert in beiden Richtungen nicht leere Listen",
     "Der Fake schaltet Semantic Scholar auf 429; `paper_citations` liefert die Treffer von OpenAlex und meldet Semantic Scholar als „gedrosselt“",
