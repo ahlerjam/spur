@@ -44,3 +44,17 @@
   hat; das hält p2f8 („bitte als Makro einsetzen“) grün.
   Options: A (empfohlen) so lassen, Fließtext soll das Makro nutzen | B überall als belegt werten und p2f8 anpassen |
   C nirgends als belegt werten, nur Makros zählen (f7 Schritt 4 entfiele)
+
+## Abschluss: Review-Befunde
+- Behoben: Crossref-Ausfallfenster verlängert sich nicht mehr durch Einzelversuche.
+- Geprüft, nicht geändert:
+  - Crossref bei Netzfehlern und Timeouts: Diese Fehler werden ohnehin nicht wiederholt (ein Versuch, 10 s Timeout).
+    Ein Negativ-Cache würde den sofortigen neuen Versuch verhindern, den f4 Schritt 7 verlangt.
+  - Takt im Claude-Panel per Effekt: Der Status kommt aus demselben Hook, der den Takt braucht. Der eine zusätzliche
+    Render beim Wechsel von verbunden/getrennt ist gewollt.
+  - Zweimal `zahlenOhneBeleg` in `SchreibManager`: Der erste Lauf entscheidet billig, ob `ergebnisse.tex` überhaupt
+    geladen werden muss. Ein Nachfiltern geht nicht, weil die Ausnahme nur für Formeln und siunitx-Werte gilt.
+  - Späte Unpaywall-Prüfung in `perDoi`, Dienste ohne Schlüssel (so in der Spec entschieden), Prompt-Quoting (eigene
+    Übersetzungen ohne Sonderzeichen), 1.000/1,000, `\item [3 …]` (Spec: optionale Argumente nicht melden), Robustheit
+    des Dev-Fakes.
+- /security-review: keine Befunde.
