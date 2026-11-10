@@ -49,7 +49,7 @@ Ziel: eine Beamer-Präsentation für einen Vortrag von etwa 15 Minuten über das
 
 Ziel: Literatur zu einem Thema finden, bewerten und die wichtigen Paper ins Projekt holen. Thema und Anzahl stehen am Ende dieses Auftrags.
 
-1. Suche mit paper_search in allen Recherche-Diensten nach dem Thema, mit mehreren Suchbegriffen: Synonyme, englische Fachbegriffe, engere und weitere Begriffe. Folge bei den stärksten Treffern mit paper_citations den Zitationen in beide Richtungen.
+1. Suche mit paper_search in allen Recherche-Diensten nach dem Thema, mit mehreren Suchbegriffen: Synonyme, englische Fachbegriffe, engere und weitere Begriffe. Folge bei den stärksten Treffern mit paper_citations den Zitationen in beide Richtungen. Meldet ein Dienst „gedrosselt“ oder „nicht_erreichbar“, gilt die Regel „Throttled or unreachable services“ in der Plugin-Anleitung (SKILL.md).
 2. Triff eine Vorauswahl nach Relevanz zum Thema und Zitationszahl. Überspringe Paper, die schon Quelle im Projekt sind (sources_list) oder auf der Beschaffungsliste stehen.
 3. Lies das Abstract jedes vorausgewählten Papers (Feld abstract in paper_search) und bewerte es als „wichtig“ oder „nicht wichtig“, mit einem Satz Begründung. Fehlt das Abstract, bewerte nach dem Titel und vermerke das.
 4. Nimm wichtige frei verfügbare Paper mit source_add als Quelle auf und setze wichtige nicht freie mit acquisition_add auf die Beschaffungsliste, bis die Anzahl erreicht ist. Meldet ein Werkzeug, dass das Paper schon da ist, zählt es nicht mit. Bei „max“ gibt es keine Obergrenze; arbeite dann in Etappen und halte jede Antwort kurz.

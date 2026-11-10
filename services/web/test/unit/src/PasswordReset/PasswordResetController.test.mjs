@@ -123,6 +123,23 @@ describe('PasswordResetController', function () {
   describe('requestReset', function () {
     beforeEach(function (ctx) {
       ctx.req.body = { email: ctx.req.body.email }
+      ctx.settings.email = {
+        fromAddress: 'spur@example.com',
+        parameters: { host: 'smtp.example.com' },
+      }
+    })
+
+    it('points to an admin when no email is set up', async function (ctx) {
+      delete ctx.settings.email
+      ctx.req.i18n.translate = key => key
+      await ctx.PasswordResetController.requestReset(ctx.req, ctx.res)
+      expect(ctx.res.statusCode).to.equal(200)
+      expect(ctx.res.json).toHaveBeenCalledWith({
+        message: 'spur_passwort_admin_fragen',
+      })
+      ctx.PasswordResetHandler.promises.generateAndEmailResetToken.callCount.should.equal(
+        0
+      )
     })
 
     it('should tell the handler to process that email', async function (ctx) {

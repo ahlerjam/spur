@@ -3571,6 +3571,46 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await breite(1280)
   }
 
+  // Der Ablauf selbst läuft in tools/tests/setup.test.mjs (Terminal-Fragen, .env, Rechte, zweiter Aufruf).
+  features.p7f3 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const make = await repoDatei(`${REPO}/Makefile`)
+    ok(/\nsetup:\n\t@\.\/tools\/setup\.sh\n/.test(make), 'make setup ruft tools/setup.sh nicht auf')
+    const skript = await repoDatei(`${REPO}/tools/setup.sh`)
+    ok(skript.includes('[ ! -t 0 ]') && skript.includes('read -r -s'), 'setup.sh ohne Terminal-Prüfung oder verdeckte Passworteingabe')
+    ok(skript.includes('umask 077'), 'setup.sh legt .env nicht mit Rechten 600 an')
+    const readme = await repoDatei(`${REPO}/README.md`)
+    ok(readme.includes('make setup'), 'README ohne make setup')
+  }
+
+  features.p7f4 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    const regel = skill.split('## Throttled or unreachable services\n')[1] ?? ''
+    for (const teil of ['gedrosselt', 'nicht_erreichbar', 'other services', 'right away', 'summary', 'stages']) {
+      ok(regel.includes(teil), `Regel in SKILL.md ohne „${teil}“`)
+    }
+    const texte = await repoDatei(`${REPO}/services/web/modules/spur/app/src/workflows/standardtexte.mjs`)
+    const sammeln = texte.split('Literatur zu einem Thema finden')[1] ?? ''
+    ok(sammeln.includes('Throttled or unreachable services'), 'Quellen sammeln verweist nicht auf die Regel')
+  }
+
+  // Die Pfadregeln selbst prüft tools/tests/ci-pfade.test.mjs; der PR-Lauf ist Handprüfung.
+  features.p7f6 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const ci = await repoDatei(`${REPO}/.github/workflows/ci.yml`)
+    ok(!/^on:[\s\S]*?^\s+paths:/m.test(ci.split('\njobs:')[0]), 'ci.yml filtert Pfade am Workflow; die Pflicht-Prüfung bliebe aus')
+    ok(ci.includes('node tools/ci/aenderungen.mjs'), 'ci.yml ruft die Pfadregeln nicht auf')
+    for (const job of ['test', 'upstream']) {
+      const block = ci.split(`\n  ${job}:\n`)[1]?.split(/\n  \S/)[0] ?? ''
+      ok(block.includes(`needs.changes.outputs.${job} == 'leicht'`) && block.includes('!cancelled()'), `Job ${job} ohne leichten Weg`)
+    }
+    const publish = await repoDatei(`${REPO}/.github/workflows/publish.yml`)
+    ok(/tags:\s*\[?\s*['"]?v\*/.test(publish) && publish.includes('workflow_dispatch'), 'publish.yml startet nicht bei v*-Tags und per Hand')
+    const readme = await repoDatei(`${REPO}/README.md`)
+    ok(/git tag v[\d.]+ && git push origin v[\d.]+/.test(readme), 'README ohne Release mit Tag')
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

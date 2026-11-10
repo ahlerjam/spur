@@ -11,7 +11,8 @@ import { DeletedProject } from '../../../../app/src/models/DeletedProject.mjs'
 import { expressify, promiseMapWithLimit } from '@overleaf/promise-utils'
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
-import EmailHandler from '../../../../app/src/Features/Email/EmailHandler.mjs'
+import { emailIsConfigured } from '../../../../app/src/Features/Email/EmailConfiguration.mjs'
+import { createActivationLink, inviteUser } from './ActivationLink.mjs'
 import OneTimeTokenHandler from '../../../../app/src/Features/Security/OneTimeTokenHandler.mjs'
 import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
 import UserUpdater from '../../../../app/src/Features/User/UserUpdater.mjs'
@@ -42,25 +43,6 @@ const userDetailsUpdatedOnLogin = Object.fromEntries(
     Boolean(Settings[m]?.updateUserDetailsOnLogin)
   ])
 )
-
-async function _sendActivationEmail(idString) {
-  const user = await User.findById(idString, { email: 1, _id: 0 }).lean()
-  if (!user) {
-    throw new OError('User does not exist, cannot send activation email', { userId: idString })
-  }
-  const ONE_WEEK = 7 * 24 * 60 * 60 // seconds
-  const token = await OneTimeTokenHandler.promises.getNewToken(
-    'password',
-    { user_id: idString, email: user.email },
-    { expiresIn: ONE_WEEK }
-  )
-  const setNewPasswordUrl = `${Settings.siteUrl}/user/activate?token=${token}&user_id=${idString}`
-  await EmailHandler.promises.sendEmail('registered', { to: user.email, setNewPasswordUrl })
-    .catch(error => {
-      throw new OError('Failed to send activation email', { error: error.message, email: user.email })
-    })
-  return
-}
 
 function cleanupSession(req) {
   // cleanup redirects at the end of the redirect chain
@@ -112,7 +94,7 @@ async function registerNewUser(req, res, next) {
   req.body.analyticsId = crypto.randomUUID()
 
  let user
- let emailIsNotSent = false
+ let invitation = { activationUrl: null, emailSent: false }
   try {
     user = await UserRegistrationHandler.promises.registerNewUser(req.body)
   } catch (err) {
@@ -146,12 +128,7 @@ async function registerNewUser(req, res, next) {
     await User.updateOne({ _id: user._id }, update).exec()
 
     if (!isExternal) {
-      try {
-        await _sendActivationEmail(user._id.toString())
-      } catch (error) {
-        logger.warn({ error })
-        emailIsNotSent = true
-      }
+      invitation = await inviteUser(user._id.toString())
     }
   } catch (err) {
     OError.tag(err, 'error finishing user registration', {
@@ -163,18 +140,29 @@ async function registerNewUser(req, res, next) {
   const authMethods = isExternal ? [] : ['local']
   const { id, first_name, last_name, signUpDate } = user
   const newUser = { id, email, firstName: first_name, lastName: last_name, isAdmin, signUpDate, inactive: true, deleted: false, authMethods }
-  res.json({ user: newUser, emailIsNotSent })
+  const emailConfigured = emailIsConfigured()
+  res.json({
+    user: newUser,
+    activationUrl: invitation.activationUrl,
+    emailConfigured,
+    emailIsNotSent: emailConfigured && !isExternal && !invitation.emailSent,
+  })
 }
 
 async function sendActivationEmail(req, res, next) {
   const { userId } = req.params
-  try {
-    await _sendActivationEmail(userId)
-  } catch (err) {
-    logger.warn({ err })
+  if (!emailIsConfigured()) {
+    return HttpErrorHandler.unprocessableEntity(req, res, req.i18n.translate('spur_keine_mail'))
+  }
+  const { emailSent } = await inviteUser(userId)
+  if (!emailSent) {
     return HttpErrorHandler.unprocessableEntity(req, res, 'Error sending activation email. Please check your SMTP configuration.')
   }
   res.sendStatus(200)
+}
+
+async function newActivationLink(req, res) {
+  res.json({ activationUrl: await createActivationLink(req.params.userId) })
 }
 
 async function getUsersJson(req, res) {
@@ -618,6 +606,7 @@ export default {
   registerNewUser: expressify(registerNewUser),
   activateAccountPage: expressify(activateAccountPage),
   sendActivationEmail: expressify(sendActivationEmail),
+  newActivationLink: expressify(newActivationLink),
   deleteUser: expressify(deleteUser),
   restoreDeletedUser: expressify(restoreDeletedUser),
   purgeDeletedUser: expressify(purgeDeletedUser),

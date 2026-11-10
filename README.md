@@ -13,8 +13,10 @@ You need Docker with Compose and `make`. MongoDB 8 does not start on Linux kerne
 ```sh
 git clone https://github.com/ahlerjam/spur.git
 cd spur
-make start
+make setup
 ```
+
+`make setup` asks for the address, optional email settings and a contact address for Crossref and Unpaywall, writes the answers to `.env` and starts spur. It needs a terminal and never prints the SMTP password. If `.env` already has values, it asks before changing them. Plain `make start` asks nothing and keeps the defaults.
 
 On the first start, `make start` creates a `.env` file with a random `OVERLEAF_INVITE_TOKEN_SECRET`. Each `make start` first pulls the current published image and then starts it; without network access it starts the image you already have. The container does not start without this secret. spur then runs on <http://localhost:8080>.
 
@@ -114,6 +116,7 @@ Docker Compose reads this file together with `docker-compose.yml` on its own, so
 
 | Command | Effect |
 |---|---|
+| `make setup` | Asks for address, email and contact address, writes `.env`, then starts spur |
 | `make start` | Pulls the current image and starts spur |
 | `make update` | Pulls the current images and restarts spur |
 | `make stop` | Stops spur |
@@ -136,6 +139,16 @@ Development uses `spur-dev` from `tools/spur-dev/`: `tools/spur-dev/spur-dev ins
 | `spur-dev run modules/spur/test/e2e/vorbereiten.mjs` | Resets the E2E data; `make e2e` also does this itself before the first feature |
 
 The `upstream` commands run in a separate container with `NODE_ENV=test` and their own test database, and end with the line `bestanden, fehlgeschlagen, bekannt, neu`. They fail with exit 1 only on new failures, and with exit 2 if a given file is missing, excluded or contains no tests, or if no test runs at all. Failures that already occur in Overleaf or overleaf-cep are listed with origin and reason in `tools/tests/upstream-bekannt.json`. Test files that need Overleaf Server Pro modules are listed in `tools/tests/upstream-ausschluss.json`. An entry with origin `spur` is not allowed: whatever spur breaks gets fixed. Check single files with `spur-dev upstream web test/unit/src/…`. Every pull request runs the jobs `test` (stack, unit tests, E2E) and `upstream`.
+
+### Releases
+
+The `Publish` workflow builds the operator image for amd64 and arm64 and pushes it to GHCR. It starts when a tag matching `v*` is pushed, or by hand from the Actions tab. To release:
+
+```sh
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+CI skips what a change cannot affect: `upstream` runs only for changes under `services/`, `libraries/` or `tools/tests/` and for lockfiles, and `test` skips the stack and E2E when only Markdown files or `docs/` changed. Both jobs still report success, so the required checks stay satisfied. The rules live in `tools/ci/aenderungen.mjs`; other events such as a manual run always run everything.
 
 ## Claude and your data
 
