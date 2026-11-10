@@ -44,6 +44,10 @@ const WIEDERHOLEN = new Set([429, 503])
 // Sonst wartet ein Prüfbericht mit vielen DOIs bei einem Ausfall für jede DOI die vollen Pausen ab.
 const AUSFALL_MS = 60 * 1000
 let ausfallBis = 0
+// Nach einem Netzfehler oder Timeout (keine HTTP-Antwort) fragt spur 30 s lang nicht: Jeder Versuch kostete bis zu
+// 10 s. Eine HTTP-Antwort wie 503 sperrt dagegen nicht, damit die DOI gleich nach der Erholung aufgenommen wird.
+const NETZFEHLER_MS = 30 * 1000
+let netzfehlerBis = 0
 
 function pauseMs(antwort, versuch) {
   const kopf = antwort.headers.get('retry-after')
@@ -61,7 +65,10 @@ async function abrufen(doi) {
   }
   const versuche = Date.now() < ausfallBis ? 1 : VERSUCHE
   for (let versuch = 1; ; versuch++) {
-    const antwort = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    const antwort = await fetch(url, { signal: AbortSignal.timeout(10000) }).catch(error => {
+      netzfehlerBis = Date.now() + NETZFEHLER_MS
+      throw error
+    })
     if (antwort.status === 404) return { gefunden: false }
     if (WIEDERHOLEN.has(antwort.status) && versuch < versuche) {
       await new Promise(weiter => setTimeout(weiter, pauseMs(antwort, versuch)))
@@ -81,6 +88,7 @@ export async function werk(doi) {
   const cache = await crossrefCache()
   const eintrag = await cache.findOne({ _id })
   if (eintrag && jetzt() - eintrag.abgerufenAm < TAG_MS) return eintrag.werk
+  if (Date.now() < netzfehlerBis) return eintrag?.werk ?? null
   try {
     const neu = await abrufen(doi)
     await cache.updateOne(

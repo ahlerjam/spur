@@ -127,11 +127,20 @@ describe('werk', () => {
     expect(abrufe).toHaveLength(2)
   })
 
-  it('liefert bei Ausfall nichts und versucht es beim nächsten Aufruf sofort wieder', async () => {
+  it('fragt nach einem Netzfehler 30 s lang nicht erneut, danach wieder', async () => {
     antworten(new Error('Netz weg'), json(ANTWORT))
     expect(await Crossref.werk('10.1/a')).toBeNull()
+    expect(await Crossref.werk('10.1/b')).toBeNull()
+    expect(abrufe).toHaveLength(1)
+    vi.setSystemTime(Date.now() + 31 * 1000)
     expect((await Crossref.werk('10.1/a')).gefunden).toBe(true)
     expect(abrufe).toHaveLength(2)
+  })
+
+  it('versucht es nach einer HTTP-Fehlerantwort beim nächsten Aufruf sofort wieder', async () => {
+    antworten(json({}, 500), json(ANTWORT))
+    expect(await Crossref.werk('10.1/a')).toBeNull()
+    expect((await Crossref.werk('10.1/a')).gefunden).toBe(true)
   })
 
   // Die Pausen laufen mit falschen Uhren; gemessen wird die vergangene Zeit.

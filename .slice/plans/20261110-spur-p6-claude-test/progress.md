@@ -48,8 +48,8 @@
 ## Abschluss: Review-Befunde
 - Behoben: Crossref-Ausfallfenster verlängert sich nicht mehr durch Einzelversuche.
 - Geprüft, nicht geändert:
-  - Crossref bei Netzfehlern und Timeouts: Diese Fehler werden ohnehin nicht wiederholt (ein Versuch, 10 s Timeout).
-    Ein Negativ-Cache würde den sofortigen neuen Versuch verhindern, den f4 Schritt 7 verlangt.
+  - Crossref bei Netzfehlern und Timeouts: nachträglich behoben, 30 s Negativ-Cache nur für Netzfehler (keine HTTP-Antwort).
+    HTTP-Antworten wie 503 sperren weiter nicht, damit f4 Schritt 7 (sofortige Aufnahme) gilt.
   - Takt im Claude-Panel per Effekt: Der Status kommt aus demselben Hook, der den Takt braucht. Der eine zusätzliche
     Render beim Wechsel von verbunden/getrennt ist gewollt.
   - Zweimal `zahlenOhneBeleg` in `SchreibManager`: Der erste Lauf entscheidet billig, ob `ergebnisse.tex` überhaupt
