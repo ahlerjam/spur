@@ -21,7 +21,7 @@
     "`make setup` ohne Terminal (`make setup < /dev/null`) bricht mit einem Hinweis ab und ändert nichts",
     "Ein Test unter `tools/tests` führt `make setup` mit vorgegebenen Antworten in einem Testordner aus (ohne Docker-Start, Schalter für Trockenlauf) und prüft `.env`; er ist grün"
   ]},
-  {"id": "f4", "title": "Claude arbeitet bei gedrosselten Diensten weiter", "passes": false, "steps": [
+  {"id": "f4", "title": "Claude arbeitet bei gedrosselten Diensten weiter", "passes": true, "steps": [
     "Die Plugin-Anleitung `plugins/spur/skills/spur/SKILL.md` enthält eine Regel für „gedrosselt“ und „nicht_erreichbar“: mit den anderen Diensten weitermachen, denselben Dienst nicht sofort erneut fragen, Lücke in der Zusammenfassung nennen",
     "Der Workflow-Text „Quellen sammeln“ verweist auf dieselbe Regel",
     "Der Befehlsnamen-Test und ein neuer Test, der die Regel in SKILL.md findet, sind grün"
