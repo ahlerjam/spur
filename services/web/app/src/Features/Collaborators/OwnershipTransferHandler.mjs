@@ -103,6 +103,9 @@ async function transferOwnership(projectId, newOwnerId, options = {}) {
     return
   }
 
+  // spur: the new owner must still be below their project limit.
+  await Modules.promises.hooks.fire('beforeProjectCreated', newOwnerId)
+
   // Check that user is already a collaborator
   if (
     !allowTransferToNonCollaborators &&

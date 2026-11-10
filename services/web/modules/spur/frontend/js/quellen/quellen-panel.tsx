@@ -1,3 +1,4 @@
+import SpeicherAnzeige from '../grenzen/speicher-anzeige'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
@@ -229,6 +230,7 @@ export default function QuellenPanel() {
   return (
     <div className="spur-panel">
       <RailPanelHeader title={t('spur_quellen')} />
+      <SpeicherAnzeige stand={quellen?.length} />
       <div className="spur-panel-werkzeuge">
         {darfSchreiben && (
           <>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Dashboard } from '@uppy/react'
 import { useTranslation } from 'react-i18next'
 import { useProjectUploader } from '../../hooks/use-project-uploader'
@@ -9,6 +10,7 @@ import {
   OLModalTitle,
 } from '@/shared/components/ol/ol-modal'
 import OLButton from '@/shared/components/ol/ol-button'
+import Notification from '@/shared/components/notification'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 import { useActiveOverallTheme } from '@/shared/hooks/use-active-overall-theme'
 
@@ -25,11 +27,15 @@ function UploadProjectModal({
   const { t } = useTranslation()
   const themed = useFeatureFlag('themed-modals')
   const uppyTheme = useActiveOverallTheme('themed-modals')
+  // spur: show the server's message, e.g. when the project limit is reached
+  const [error, setError] = useState<string | null>(null)
 
   const uppy = useProjectUploader({
     endpoint: '/project/new/upload',
     allowedFileTypes: ['.zip'],
     onSuccess: openProject,
+    onError: response => setError(response?.body?.error ?? t('upload_failed')),
+    onFileAdded: () => setError(null),
   })
 
   return (
@@ -45,6 +51,7 @@ function UploadProjectModal({
         <OLModalTitle as="h3">{t('upload_zipped_project')}</OLModalTitle>
       </OLModalHeader>
       <OLModalBody>
+        {error && <Notification type="error" content={error} className="mb-3" />}
         <Dashboard
           uppy={uppy}
           proudlyDisplayPoweredByUppy={false}

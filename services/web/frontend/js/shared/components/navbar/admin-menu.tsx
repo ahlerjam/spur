@@ -45,6 +45,9 @@ export default function AdminMenu({
           <NavDropdownLinkItem href="/admin/register">
             Register Users
           </NavDropdownLinkItem>
+          <NavDropdownLinkItem href="/spur/admin/grenzen">
+            Limits
+          </NavDropdownLinkItem>
         </>
       ) : null}
       {canDisplayProjectUrlLookup ? (

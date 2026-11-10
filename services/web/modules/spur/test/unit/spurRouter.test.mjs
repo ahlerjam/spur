@@ -12,6 +12,7 @@ function markenBauen() {
   const marke = name => Object.assign(() => {}, { marke: name })
   return {
     angemeldet: marke('angemeldet'),
+    admin: marke('admin'),
     eingeschraenkt: marke('eingeschraenkt'),
     lesen: marke('lesen'),
     pruefen: marke('pruefen'),
@@ -29,6 +30,7 @@ async function laden({ dev = false } = {}) {
       ensureUserCanReadProject: marken.lesen,
       ensureUserCanWriteOrReviewProjectContent: marken.pruefen,
       ensureUserCanWriteProjectContent: marken.schreiben,
+      ensureUserIsSiteAdmin: marken.admin,
     },
   }))
   vi.doMock('../../../../app/src/Features/Authentication/AuthenticationController.mjs', () => ({
@@ -51,6 +53,7 @@ async function laden({ dev = false } = {}) {
     new Proxy({}, { get: (ziel, name) => (name === 'then' || typeof name === 'symbol' ? undefined : (ziel[name] ??= Object.assign(() => {}, { handler: name }))) })
   vi.doMock('../../app/src/SpurController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/vorschlaege/VorschlaegeController.mjs', handlerAttrappe)
+  vi.doMock('../../app/src/grenzen/GrenzenController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
   vi.doMock('../../app/src/dev/TexLiveFake.mjs', () => ({ texLiveFake: Object.assign(() => {}, { handler: 'texLiveFake' }) }))
   vi.doMock('../../app/src/dev/MailFake.mjs', () => ({
@@ -61,6 +64,7 @@ async function laden({ dev = false } = {}) {
     testseite: Object.assign(() => {}, { handler: 'testseite' }),
     zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
     e2eVorbereiten: Object.assign(() => {}, { handler: 'e2eVorbereiten' }),
+    quelleVergroessern: Object.assign(() => {}, { handler: 'quelleVergroessern' }),
   }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
@@ -152,6 +156,20 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe(handler)
   })
 
+  it.each([
+    ['get', '/spur/admin/grenzen', ['admin'], 'seite'],
+    ['get', '/spur/admin/grenzen.json', ['admin'], 'daten'],
+    ['put', '/spur/admin/grenzen/standard', ['admin'], 'standardSetzen'],
+    ['put', '/spur/admin/grenzen/nutzer/:user_id', ['admin'], 'nutzerSetzen'],
+    ['post', '/spur/admin/grenzen/projekt/:project_id/neu-berechnen', ['admin'], 'neuBerechnen'],
+    ['get', '/spur/grenzen/projekte', ['angemeldet'], 'meineProjekte'],
+    ['get', '/spur/project/:project_id/speicher', ['angemeldet', 'eingeschraenkt', 'lesen'], 'projektSpeicher'],
+  ])('Grenzen: %s %s prüft %j', (methode, pfad, pruefer, handler) => {
+    const r = route(methode, pfad)
+    expect(prueferVon(r)).toEqual(pruefer)
+    expect(handlerVon(r)).toBe(handler)
+  })
+
   it('führt MCP öffentlich, ohne Sitzung: Das Token entscheidet', () => {
     const r = route('all', '/spur/mcp')
     expect(r.oeffentlich).toBe(true)
@@ -168,6 +186,7 @@ describe('Rechte der Routen', () => {
       ['post', '/spur/dev/mail', 'mailFakeSteuern'],
       ['get', '/spur/dev/mail', 'mailFakeLesen'],
       ['get', '/spur/dev/texlive/archive/:datei', 'texLiveFake'],
+      ['post', '/spur/dev/quelle-vergroessern', 'quelleVergroessern'],
     ]
     for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()
     await laden({ dev: true })

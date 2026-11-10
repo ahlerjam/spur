@@ -3821,6 +3821,295 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
   }
 
+  // P7 Grenzen. Eigene Konten (e2e-grenze-a/-b/-c, ohne Admin-Rechte); jeder Schritt setzt seine Grenzen selbst.
+  const GRENZEN = `${BASE}/spur/admin/grenzen`
+  const PROJEKTE_VOLL = 'Du hast 3 von 3 Projekten. Lösche ein Projekt endgültig oder frag deinen Admin.'
+
+  async function seitenAnfrage(methode, pfad, body) {
+    return await page.evaluate(
+      async ([m, url, daten]) => {
+        const token = document.querySelector('meta[name="ol-csrfToken"]').content
+        const r = await fetch(url, {
+          method: m,
+          headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': token, Accept: 'application/json' },
+          body: daten === undefined ? undefined : JSON.stringify(daten),
+        })
+        return { status: r.status, daten: await r.json().catch(() => null) }
+      },
+      [methode, `${BASE}${pfad}`, body]
+    )
+  }
+
+  // Als Admin: Standard und Ausnahmen setzen (Werte wie im Formular, '' = unbegrenzt bzw. Standard).
+  async function grenzenSetzen(standard, ausnahmen = {}) {
+    await anmelden('e2e-admin@example.org')
+    const r = await seitenAnfrage('PUT', '/spur/admin/grenzen/standard', { texPaketeAus: false, ...standard })
+    ok(r.status === 204, `Standard setzen: ${r.status} ${JSON.stringify(r.daten)}`)
+    const { nutzer } = (await seitenAnfrage('GET', '/spur/admin/grenzen.json')).daten
+    for (const [email, werte] of Object.entries(ausnahmen)) {
+      const id = nutzer.find(n => n.email === email).id
+      const a = await seitenAnfrage('PUT', `/spur/admin/grenzen/nutzer/${id}`, werte)
+      ok(a.status === 204, `Ausnahme ${email}: ${a.status}`)
+    }
+  }
+
+  const standardBereich = () => page.locator('section', { has: page.getByRole('heading', { name: 'Standard für alle' }) })
+  const nutzerZeileGrenze = email => page.locator(`tr[data-email="${email}"]`)
+
+  features.p7f7 = async () => {
+    await grenzenSetzen({ projekte: '', speicherGb: '' })
+    await page.goto(`${BASE}/project`)
+    await page.getByRole('menuitem', { name: 'Admin' }).click()
+    await page.getByRole('menuitem', { name: 'Limits' }).click()
+    await page.waitForURL(GRENZEN)
+    const stand = () => standardBereich().locator('dl').innerText()
+    await standardBereich().locator('dl').waitFor()
+    ok(/Projekte je Nutzer:\s*unbegrenzt/.test(await stand()) && /Speicher je Projekt:\s*unbegrenzt/.test(await stand()), `Stand: ${await stand()}`)
+
+    await standardBereich().getByLabel('Projekte je Nutzer').fill('3')
+    await standardBereich().getByLabel('Speicher je Projekt (GB)').fill('0,01')
+    await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+    await standardBereich().getByText('Gespeichert').waitFor()
+    await page.reload()
+    await standardBereich().locator('dl').waitFor()
+    ok(/Projekte je Nutzer:\s*3/.test(await stand()) && /Speicher je Projekt:\s*0,01 GB/.test(await stand()), `Nach Neuladen: ${await stand()}`)
+    ok((await standardBereich().getByLabel('Projekte je Nutzer').inputValue()) === '3', 'Feld Projekte leer nach Neuladen')
+
+    const b = nutzerZeileGrenze('e2e-grenze-b@example.org')
+    await b.getByRole('button', { name: 'Ausnahme für e2e-grenze-b@example.org ändern' }).click()
+    await b.getByLabel('Projekte je Nutzer: Art').selectOption('zahl')
+    await b.getByLabel('Projekte je Nutzer', { exact: true }).fill('5')
+    await b.getByRole('button', { name: 'Speichern' }).click()
+    await b.getByText('Projekte: 5').waitFor()
+    await page.reload()
+    await b.getByText('Projekte: 5').waitFor()
+    ok((await b.innerText()).includes('3 / 5'), `Zeile e2e-grenze-b: ${await b.innerText()}`)
+
+    await standardBereich().getByLabel('Projekte je Nutzer').fill('-1')
+    await standardBereich().getByLabel('Speicher je Projekt (GB)').fill('abc')
+    await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+    await standardBereich().getByText('Gib eine ganze Zahl ab 0 ein oder lass das Feld leer.').waitFor()
+    await standardBereich().getByText('Gib eine Zahl ab 0 ein, etwa 0,5, oder lass das Feld leer.').waitFor()
+    ok((await standardBereich().getByLabel('Projekte je Nutzer').getAttribute('aria-invalid')) === 'true', 'Feld nicht als ungültig markiert')
+    await page.reload()
+    await standardBereich().locator('dl').waitFor()
+    ok(/Projekte je Nutzer:\s*3/.test(await stand()), `Ungültiges gespeichert: ${await stand()}`)
+
+    await anmelden('e2e-grenze-a@example.org')
+    const fremd = await page.request.get(GRENZEN, { maxRedirects: 0 })
+    ok(fremd.status() === 403 || (fremd.status() === 302 && fremd.headers().location.startsWith('/restricted')), `Grenzen für Nicht-Admin: ${fremd.status()}`)
+  }
+
+  // Ein ZIP mit einer Datei, ohne Kompression (für den ZIP-Upload).
+  function zipMitDatei(name, text) {
+    const daten = Buffer.from(text)
+    const crcTabelle = Array.from({ length: 256 }, (_, n) => {
+      let c = n
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+      return c >>> 0
+    })
+    let crc = 0xffffffff
+    for (const byte of daten) crc = crcTabelle[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+    crc = (crc ^ 0xffffffff) >>> 0
+    const dateiname = Buffer.from(name)
+    const kopf = Buffer.alloc(30)
+    kopf.writeUInt32LE(0x04034b50, 0); kopf.writeUInt16LE(20, 4); kopf.writeUInt32LE(crc, 14)
+    kopf.writeUInt32LE(daten.length, 18); kopf.writeUInt32LE(daten.length, 22); kopf.writeUInt16LE(dateiname.length, 26)
+    const zentral = Buffer.alloc(46)
+    zentral.writeUInt32LE(0x02014b50, 0); zentral.writeUInt16LE(20, 4); zentral.writeUInt16LE(20, 6); zentral.writeUInt32LE(crc, 16)
+    zentral.writeUInt32LE(daten.length, 20); zentral.writeUInt32LE(daten.length, 24); zentral.writeUInt16LE(dateiname.length, 28)
+    const lokal = Buffer.concat([kopf, dateiname, daten])
+    const ende = Buffer.alloc(22)
+    ende.writeUInt32LE(0x06054b50, 0); ende.writeUInt16LE(1, 8); ende.writeUInt16LE(1, 10)
+    ende.writeUInt32LE(46 + dateiname.length, 12); ende.writeUInt32LE(lokal.length, 16)
+    return Buffer.concat([lokal, zentral, dateiname, ende])
+  }
+
+  async function projektIdVon(name) {
+    return (await jsonVon('/user/projects')).projects.find(p => p.name === name)?._id
+  }
+
+  features.p7f8 = async () => {
+    await grenzenSetzen({ projekte: '3', speicherGb: '' }, { 'e2e-grenze-b@example.org': { projekte: '5', speicherGb: '' } })
+    await anmelden('e2e-grenze-a@example.org')
+    await page.locator('.spur-grenzen-anzeige', { hasText: '3 von 3 Projekten' }).waitFor()
+
+    await page.getByRole('button', { name: 'Neues Projekt' }).first().click()
+    await page.getByRole('menuitem', { name: 'Leeres Projekt' }).click()
+    const neu = page.locator('.modal')
+    await neu.getByRole('textbox').fill('Grenze A4')
+    await neu.getByRole('button', { name: 'Erstellen' }).click()
+    await neu.getByText(PROJEKTE_VOLL).waitFor()
+    await neu.getByRole('button', { name: 'Abbrechen' }).click()
+    await neu.waitFor({ state: 'detached' })
+
+    const zeile = page.getByRole('row', { name: /Grenze A1/ }).first()
+    await zeile.getByRole('button', { name: 'Kopieren' }).click()
+    const kopie = page.locator('.modal')
+    await kopie.getByRole('button', { name: 'Kopieren' }).click()
+    await kopie.getByText(PROJEKTE_VOLL).waitFor()
+    await kopie.getByRole('button', { name: 'Abbrechen' }).click()
+    await kopie.waitFor({ state: 'detached' })
+
+    await page.getByRole('button', { name: 'Neues Projekt' }).first().click()
+    await page.getByRole('menuitem', { name: 'Existing project (.zip)' }).click()
+    const zip = page.locator('.modal')
+    await zip.locator('input[type=file]').first().setInputFiles({ name: 'grenze.zip', mimeType: 'application/zip', buffer: zipMitDatei('main.tex', 'Hallo') })
+    await zip.getByText(PROJEKTE_VOLL).waitFor({ timeout: 30000 })
+    await zip.getByRole('button', { name: 'Abbrechen' }).click()
+
+    const direkt = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze API' })
+    ok(direkt.status === 403 && direkt.daten?.code === 'projekte_voll', `POST /project/new: ${direkt.status} ${JSON.stringify(direkt.daten)}`)
+
+    const a2 = await projektIdVon('Grenze A2')
+    ok((await seitenAnfrage('POST', `/project/${a2}/trash`)).status === 200, 'Papierkorb')
+    ok((await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze Papierkorb' })).status === 403, 'Papierkorb gibt einen Platz frei')
+    ok((await seitenAnfrage('DELETE', `/project/${a2}`)).status === 200, 'Endgültig löschen')
+    const wieder = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze A4' })
+    ok(wieder.status === 200 && wieder.daten?.project_id, `Nach endgültigem Löschen: ${wieder.status}`)
+
+    await anmelden('e2e-grenze-b@example.org')
+    const viertes = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze B4' })
+    ok(viertes.status === 200, `e2e-grenze-b mit Ausnahme 5: ${viertes.status} ${JSON.stringify(viertes.daten)}`)
+  }
+
+  const MB = 1024 * 1024
+
+  async function editorHochladen(name, bytes) {
+    await panelSichern(DATEIBAUM, page.locator('.file-tree'))
+    await page.locator('.file-tree').getByRole('button', { name: /Hochladen|Upload/ }).first().click()
+    await page.locator('.modal input[type=file]').first().setInputFiles({ name, mimeType: 'application/octet-stream', buffer: Buffer.alloc(bytes, 1) })
+  }
+
+  // `url` ist die Upload-Adresse des Editors (mit folder_id), abgegriffen beim ersten Upload.
+  async function direktHochladen(url, name, bytes) {
+    return await page.evaluate(
+      async ([ziel, dateiname, groesse]) => {
+        const form = new FormData()
+        form.append('name', dateiname)
+        form.append('qqfile', new Blob([new Uint8Array(groesse)]), dateiname)
+        const r = await fetch(ziel, {
+          method: 'POST',
+          headers: { 'X-Csrf-Token': document.querySelector('meta[name="ol-csrfToken"]').content },
+          body: form,
+        })
+        return { status: r.status, daten: await r.json().catch(() => null) }
+      },
+      [url, name, bytes]
+    )
+  }
+
+  features.p7f9 = async () => {
+    await grenzenSetzen({ projekte: '', speicherGb: '0,01' })
+    await anmelden('e2e-grenze-a@example.org')
+    await projektOeffnen('Grenze A1')
+    const pid = page.url().split('/').pop()
+    const ersterUpload = page.waitForRequest(r => r.method() === 'POST' && r.url().includes(`/project/${pid}/upload`))
+    await editorHochladen('erste.bin', 6 * MB)
+    const uploadUrl = (await ersterUpload).url()
+    await page.locator('.modal').waitFor({ state: 'detached', timeout: 30000 })
+    await panelOeffnen('Quellen')
+    await page.locator('.spur-speicher-anzeige', { hasText: '0,01 GB von 0,01 GB' }).waitFor({ timeout: 20000 })
+
+    await editorHochladen('zweite.bin', 6 * MB)
+    await page.locator('.modal').getByText(/^Dieses Projekt nutzt 0,01 GB von 0,01 GB\. Lösche Dateien oder Quellen oder frag deinen Admin\.$/).waitFor({ timeout: 30000 })
+    await page.keyboard.press('Escape')
+    await page.locator('.modal').waitFor({ state: 'detached' })
+
+    await panelSichern('Quellen', page.locator('.spur-panel input[type=file]'))
+    await page.locator('.spur-panel input[type=file]').setInputFiles({ name: 'gross.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(6 * MB, 1) })
+    await page.locator('.spur-panel').getByText(/Dieses Projekt nutzt 0,01 GB von 0,01 GB/).waitFor({ timeout: 30000 })
+
+    // source_add bringt ein kleines PDF; mit 0,005 GB ist das Projekt schon voll.
+    await grenzenSetzen({ projekte: '', speicherGb: '0,005' })
+    await anmelden('e2e-grenze-a@example.org')
+    const token = await neuesToken()
+    const mcpVoll = await werkzeug(token, 'source_add', { project_id: pid, doi: '10.1371/journal.pone.0099999' })
+    ok(mcpVoll.fehler && mcpVoll.inhalt.fehler === 'speicher_voll', `source_add: ${JSON.stringify(mcpVoll.inhalt)}`)
+    await grenzenSetzen({ projekte: '', speicherGb: '0,01' })
+    await anmelden('e2e-grenze-a@example.org')
+    await projektOeffnen('Grenze A1')
+
+    await editorErsetzen('Text.', 'Text. Weiter geschrieben trotz voller Grenze.')
+    await gespeichert(token, pid, 'Weiter geschrieben trotz voller Grenze.')
+
+    const erste = page.locator('.file-tree').getByRole('treeitem', { name: 'erste.bin' })
+    await panelSichern(DATEIBAUM, erste)
+    await erste.click()
+    await page.getByRole('button', { name: 'Aktionsmenü für erste.bin öffnen' }).click()
+    await page.getByRole('menuitem', { name: 'Löschen' }).click()
+    await page.locator('.modal').getByRole('button', { name: 'Löschen' }).click()
+    await page.locator('.modal').waitFor({ state: 'detached' })
+    await erste.waitFor({ state: 'detached' })
+    const danach = await direktHochladen(uploadUrl, 'dritte.bin', 6 * MB)
+    ok(danach.status === 200 && danach.daten?.success, `Upload nach dem Löschen: ${danach.status} ${JSON.stringify(danach.daten)}`)
+
+    const ergebnisse = await Promise.all([direktHochladen(uploadUrl, 'gleich-1.bin', 3 * MB), direktHochladen(uploadUrl, 'gleich-2.bin', 3 * MB)])
+    const angenommen = ergebnisse.filter(e => e.status === 200).length
+    ok(angenommen === 1, `Gleichzeitige Uploads: ${JSON.stringify(ergebnisse)}`)
+  }
+
+  features.p7f10 = async () => {
+    await grenzenSetzen({ projekte: '3', speicherGb: '0,01' })
+    await page.goto(GRENZEN)
+    const a = nutzerZeileGrenze('e2e-grenze-a@example.org')
+    await a.waitFor()
+    ok((await a.innerText()).includes('3 / 3') && (await a.getByText('erreicht', { exact: true }).count()) === 1, `Zeile e2e-grenze-a: ${await a.innerText()}`)
+
+    const projekte = page.locator('section', { has: page.getByRole('heading', { name: 'Projekte', exact: true }) })
+    const b2 = projekte.locator('tr[data-projekt="Grenze B2"]')
+    const vorher = await b2.innerText()
+    ok(vorher.includes('e2e-grenze-b@example.org') && vorher.includes('/ 0,01 GB'), `Zeile Grenze B2: ${vorher}`)
+    ok((await b2.getByText('ab 80 %').count()) === 0, 'Grenze B2 schon vor dem Vergrößern markiert')
+    const r = await page.request.post(`${BASE}/spur/dev/quelle-vergroessern`, { data: { projekt: 'Grenze B2', bytes: 9 * MB } })
+    ok(r.status() === 204, `Quelle vergrößern: ${r.status()}`)
+    await page.reload()
+    await b2.waitFor()
+    ok((await b2.innerText()) === vorher, 'Stand ändert sich ohne Neuberechnung')
+    await b2.getByRole('button', { name: 'Speicher von „Grenze B2“ neu berechnen' }).click()
+    await b2.getByText('ab 80 %').waitFor({ timeout: 20000 })
+
+    for (const bereich of ['Nutzer', 'Projekte']) {
+      const abschnitt = page.locator('section', { has: page.getByRole('heading', { name: bereich, exact: true }) })
+      await abschnitt.getByRole('button', { name: /^Auslastung/ }).click()
+      const erste = await abschnitt.locator('tbody tr').first().innerText()
+      ok(/überschritten|erreicht|ab 80 %/.test(erste), `${bereich} nach Auslastung: ${erste}`)
+    }
+    await breite(360)
+    await ohneSeitlichesRollen('Grenzen 360 px')
+    await breite(1280)
+  }
+
+  features.p7f11 = async () => {
+    await grenzenSetzen({ projekte: '', speicherGb: '' })
+    await page.goto(GRENZEN)
+    await standardBereich().locator('dl').waitFor()
+    const stand = await standardBereich().locator('dl').innerText()
+    ok(/Projekte je Nutzer:\s*unbegrenzt/.test(stand) && /Speicher je Projekt:\s*unbegrenzt/.test(stand), `Ohne Einstellung: ${stand}`)
+    await anmelden('e2e-grenze-c@example.org')
+    await page.locator('.project-list-header-row').first().waitFor()
+    ok((await page.locator('.spur-grenzen-anzeige').count()) === 0, 'Projektzahl ohne Grenze angezeigt')
+    const sechstes = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze C6' })
+    ok(sechstes.status === 200, `Ohne Grenze: ${sechstes.status}`)
+    ok((await seitenAnfrage('DELETE', `/project/${sechstes.daten.project_id}`)).status === 200, 'Aufräumen')
+
+    await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-grenze-c@example.org': { projekte: '3', speicherGb: '' } })
+    await anmelden('e2e-grenze-c@example.org')
+    await page.locator('.spur-grenzen-anzeige', { hasText: '5 von 3 Projekten' }).waitFor()
+    await projektOeffnen('Grenze C5')
+    await editorErsetzen('Text.', 'Text. Bleibt bearbeitbar.')
+    const token = await neuesToken()
+    await gespeichert(token, page.url().split('/').pop(), 'Bleibt bearbeitbar.')
+    const gesperrt = await seitenAnfrage('POST', '/project/new', { projectName: 'Grenze C6' })
+    ok(gesperrt.status === 403 && gesperrt.daten?.code === 'projekte_voll', `Sechstes Projekt: ${gesperrt.status}`)
+
+    await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-grenze-c@example.org': { projekte: '', speicherGb: '' } })
+    const REPO = `${FIXTURES}/../../../../../..`
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const betrieb = readme.split('### Limits\n')[1]?.split('\n### ')[0] ?? ''
+    ok(betrieb.includes('Admin → Limits') && betrieb.includes('unlimited'), 'README ohne Abschnitt zu den Grenzen')
+  }
+
   // Die Paketliste prüft tools/tests/tex-pakete.test.mjs; der Smoke auf spur nach dem Merge ist Handprüfung.
   features.p7f14 = async () => {
     const REPO = `${FIXTURES}/../../../../../..`

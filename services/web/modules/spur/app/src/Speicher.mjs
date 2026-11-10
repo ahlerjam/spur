@@ -1,14 +1,82 @@
-// Speicherstand je Projekt: hochgeladene Dateien, spur-Quellen und TeX-Pakete, ohne Versionsverlauf und Compile-Ausgabe.
-import { speicher } from './sammlungen.mjs'
+// Speicherstand je Projekt: hochgeladene Dateien (Blobs der Dateien im Projektbaum, ohne Versionsverlauf), spur-Quellen
+// und damit auch TeX-Pakete unter tex-pakete/. Die Compile-Ausgabe zählt nicht.
+import fs from 'node:fs/promises'
+import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
+import { GrenzeErreicht, gbText, speicherGrenzeBytes } from './grenzen/Grenzen.mjs'
+import { quellen, speicher } from './sammlungen.mjs'
 
-export async function reservieren(projectId, bytes) {
-  await (await speicher()).updateOne({ projectId }, { $inc: { bytes } }, { upsert: true })
+function dateiHashes(ordner) {
+  return ordner.flatMap(o => [...(o.fileRefs ?? []).map(f => f.hash), ...dateiHashes(o.folders ?? [])]).filter(Boolean)
 }
 
-export async function freigeben(projectId, bytes) {
-  await (await speicher()).updateOne({ projectId }, { $inc: { bytes: -bytes } })
+async function projekt(projectId) {
+  return await db.projects.findOne(
+    { _id: new ObjectId(projectId) },
+    { projection: { owner_ref: 1, rootFolder: 1, 'overleaf.history.id': 1 } }
+  )
+}
+
+async function dateienBytes(p) {
+  const hashes = dateiHashes(p.rootFolder ?? [])
+  if (!hashes.length) return 0
+  // Erst hier laden: HistoryManager zieht viel nach, und ohne Grenze wird nie gerechnet.
+  const { default: HistoryManager } = await import('../../../../app/src/Features/History/HistoryManager.mjs')
+  return (await HistoryManager.promises.getBlobStats(p.overleaf.history.id, hashes)).totalBytes
+}
+
+async function quellenBytes(projectId) {
+  const [summe] = await (await quellen())
+    .aggregate([{ $match: { projectId: new ObjectId(projectId) } }, { $group: { _id: null, bytes: { $sum: '$groesse' } } }])
+    .toArray()
+  return summe?.bytes ?? 0
 }
 
 export async function stand(projectId) {
-  return (await (await speicher()).findOne({ projectId }))?.bytes ?? 0
+  const p = await projekt(projectId)
+  return (await dateienBytes(p)) + (await quellenBytes(projectId))
+}
+
+export async function info(projectId) {
+  const p = await projekt(projectId)
+  return { bytes: await stand(projectId), grenze: await speicherGrenzeBytes(p.owner_ref) }
+}
+
+export async function voll(projectId) {
+  const { bytes, grenze } = await info(projectId)
+  return grenze !== null && bytes >= grenze
+}
+
+export function vollFehler(bytes, grenze) {
+  return new GrenzeErreicht('speicher_voll', 'spur_fehler_speicher_voll', { stand: gbText(bytes), grenze: gbText(grenze) })
+}
+
+// Reserviert Platz für einen Upload und gibt eine Funktion zurück, die ihn freigibt, sobald die Datei im Projekt
+// liegt (dann zählt sie im Stand) oder der Upload gescheitert ist. Die Bedingung am Zähler sorgt dafür, dass
+// gleichzeitige Uploads die Grenze nicht gemeinsam überschreiten.
+export async function reservieren(projectId, bytes) {
+  const p = await projekt(projectId)
+  const grenze = p && (await speicherGrenzeBytes(p.owner_ref))
+  if (grenze === null || grenze === undefined) return async () => {}
+  const _id = new ObjectId(projectId)
+  const aktuell = await stand(projectId)
+  const sammlung = await speicher()
+  await sammlung.updateOne({ _id }, { $setOnInsert: { reserviert: 0 } }, { upsert: true })
+  const { modifiedCount } = await sammlung.updateOne(
+    { _id, reserviert: { $lte: grenze - aktuell - bytes } },
+    { $inc: { reserviert: bytes } }
+  )
+  if (!modifiedCount) throw vollFehler(aktuell, grenze)
+  return async () => {
+    await sammlung.updateOne({ _id }, { $inc: { reserviert: -bytes } })
+  }
+}
+
+// Für „Speicher neu berechnen“: Größen der Quellen-Dateien in der Ablage neu einlesen.
+export async function neuBerechnen(projectId, dateiPfad) {
+  for (const q of await (await quellen()).find({ projectId: new ObjectId(projectId) }).toArray()) {
+    const groesse = await fs.stat(dateiPfad(q)).then(s => s.size, () => null)
+    if (groesse !== null && groesse !== q.groesse) await (await quellen()).updateOne({ _id: q._id }, { $set: { groesse } })
+  }
+  await (await speicher()).updateOne({ _id: new ObjectId(projectId) }, { $set: { reserviert: 0 } })
+  return await stand(projectId)
 }

@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Lädt Dateien einzeln über einen Einmal-Link zu spur hoch, eine Ausgabezeile je Datei.
+set -u
+
+hilfe() {
+  cat <<'TXT'
+Aufruf: spur-hochladen <link> <datei>... [--doi <doi>] [--titel <titel>]
+
+Lädt jede Datei einzeln an den Upload-Link hoch (aus dem MCP-Werkzeug source_upload_link).
+--doi und --titel gelten für alle Dateien des Aufrufs; Optionen dürfen vor oder nach den
+Dateien stehen. Je Datei eine Zeile:
+  <datei>: Quelle <id>
+  <datei>: schon vorhanden (Quelle <id>)
+  <datei>: <grund>
+Exit 1, wenn eine Datei scheiterte.
+TXT
+}
+
+link=
+doi=
+titel=
+dateien=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) hilfe; exit 0 ;;
+    --doi) [ $# -ge 2 ] || { echo "--doi braucht einen Wert" >&2; exit 2; }; doi=$2; shift 2 ;;
+    --titel) [ $# -ge 2 ] || { echo "--titel braucht einen Wert" >&2; exit 2; }; titel=$2; shift 2 ;;
+    *)
+      if [ -z "$link" ]; then link=$1; else dateien+=("$1"); fi
+      shift ;;
+  esac
+done
+
+if [ -z "$link" ] || [ ${#dateien[@]} -eq 0 ]; then
+  hilfe >&2
+  exit 2
+fi
+
+antwort=$(mktemp "${TMPDIR:-/tmp}/spur-hochladen.XXXXXX") || exit 1
+trap 'rm -f "$antwort"' EXIT
+
+feld() {
+  tr -d '\n' < "$antwort" | sed -n "s/.*\"$1\": *\"\\([^\"]*\\)\".*/\\1/p"
+}
+
+rc=0
+for pfad in "${dateien[@]}"; do
+  if [ ! -f "$pfad" ]; then
+    echo "$pfad: Datei nicht gefunden"
+    rc=1
+    continue
+  fi
+  args=(-F "datei=@$pfad")
+  [ -n "$doi" ] && args+=(--form-string "doi=$doi")
+  [ -n "$titel" ] && args+=(--form-string "titel=$titel")
+  : > "$antwort"
+  if ! code=$(curl -sS -o "$antwort" -w '%{http_code}' "${args[@]}" "$link" 2>&1); then
+    echo "$pfad: Upload fehlgeschlagen ($(printf '%s' "$code" | tail -n 1))"
+    rc=1
+    continue
+  fi
+  status=$(feld status)
+  case "$code:$status" in
+    200:angelegt)  echo "$pfad: Quelle $(feld quelle_id)" ;;
+    200:vorhanden) echo "$pfad: schon vorhanden (Quelle $(feld quelle_id))"; ;;
+    200:abgelehnt) echo "$pfad: $(feld grund)"; rc=1 ;;
+    *)
+      grund=$(feld detail)
+      [ -n "$grund" ] || grund=$(feld fehler)
+      echo "$pfad: ${grund:-unerwartete Antwort (HTTP $code)}"
+      rc=1 ;;
+  esac
+done
+exit $rc

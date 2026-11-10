@@ -3,6 +3,7 @@ import { useProjectListContext } from '../context/project-list-context'
 import { useTranslation } from 'react-i18next'
 import CurrentPlanWidget from './current-plan-widget/current-plan-widget'
 import NewProjectButton from './new-project-button'
+import ProjektZaehler from '@modules/spur/frontend/js/grenzen/projekt-zaehler'
 import ProjectListTable from './table/project-list-table'
 import UserNotifications from './notifications/user-notifications'
 import SearchForm from './search-form'
@@ -41,6 +42,7 @@ export function ProjectListDsNav() {
     tags,
     selectedTagId,
     currentFilterProjectsCount,
+    totalProjectsCount,
   } = useProjectListContext()
   const activeOverallTheme = useActiveOverallTheme()
   const isSharedWorkspaceEnabled = useFeatureFlag('shared-workspace')
@@ -114,6 +116,8 @@ export function ProjectListDsNav() {
                     />
                   )}
                   <div className="project-tools">
+                    {/* spur: "x of y projects" when a project limit applies */}
+                    <ProjektZaehler stand={totalProjectsCount} />
                     <div className="d-none d-md-block">
                       {selectedProjects.length === 0 ? (
                         showTrashHeader ? null : (

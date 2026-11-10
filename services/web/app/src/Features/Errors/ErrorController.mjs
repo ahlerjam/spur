@@ -67,6 +67,12 @@ async function handleError(error, req, res, next) {
       res.status(400)
       res.render('general/500', { title: 'Invalid Error' })
     }
+  } else if (error.spurGrenze) {
+    // spur: a project or storage limit; the message says what to do.
+    req.logger.setLevel('warn')
+    if (shouldSendErrorResponse) {
+      res.status(403).json({ message: error.message, code: error.spurGrenze })
+    }
   } else if (error instanceof Errors.ForbiddenError) {
     req.logger.setLevel('warn')
     if (shouldSendErrorResponse) {

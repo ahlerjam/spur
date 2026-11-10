@@ -29,6 +29,19 @@
   `SPUR_TEX_PAKETE=aus`.
 - f7–f10: e2e-a besitzt über 30 Projekte für ältere Features, e2e-b gibt es nicht. Die Grenzen-Schritte nutzen
   eigene Konten ohne Admin-Rechte (`e2e-grenze-a`, `e2e-grenze-b`).
+- f7: Die Ausnahme je Nutzer setzt der Admin in der Nutzertabelle der Seite Admin → Limits (`/spur/admin/grenzen`),
+  nicht in Overleafs Nutzerliste (admin-tools); so bleibt es bei einer Seite und ohne weiteren Kern-Patch dort.
+  Der Schalter für `tex_package_add` (f5) steht auf derselben Seite.
+- f9: Der Speicherstand wird nicht als Zähler fortgeschrieben, sondern bei Bedarf berechnet: Blob-Größen der Dateien
+  im Projektbaum (history-v1 `blob-stats`) plus Größe der Quellen. Löschen wirkt so sofort. Gleichzeitige Uploads
+  reservieren atomar an einem Zähler je Projekt (`spurStorage.reserviert`). „Speicher neu berechnen“ liest die Größe
+  der Quellen-Dateien in der Ablage neu ein.
+- f11: Eine Migration ist nicht nötig: Ohne Eintrag in `spurLimits` gilt unbegrenzt.
+- f9: Overleafs `ProjectUploadController.test.mjs` ruft `uploadFile` jetzt mit `await` auf und mockt `Modules`,
+  weil der Speicher-Hook vor dem Upload asynchron läuft.
+- Frontend-Suite: `notifications.test.tsx`, `survey-widget.test.tsx` und `project-tools-rename.test.tsx` scheitern
+  auch mit dem Frontend-Stand der Basis, wenn man sie einzeln startet (Reihenfolge der Tests); im vollen Lauf
+  bekannt bzw. grün.
 - f14: Welche Pakete chemformula außer `xfrac` und `chemgreek` lädt, ist ohne Netz und ohne chemformula im Dev-Image
   nicht verifiziert; der Test kennt nur diese beiden.
 

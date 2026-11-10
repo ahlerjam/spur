@@ -10,7 +10,8 @@ import { IST_DEV } from './schalter.mjs'
 import * as SpurController from './SpurController.mjs'
 import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
-import { e2eVorbereiten, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
+import * as GrenzenController from './grenzen/GrenzenController.mjs'
+import { e2eVorbereiten, quelleVergroessern, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { mailFakeLesen, mailFakeSteuern } from './dev/MailFake.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { texLiveFake } from './dev/TexLiveFake.mjs'
@@ -121,6 +122,14 @@ export default {
     webRouter.get(`${ADMIN_WORKFLOWS}.json`, admin, WorkflowsAdminController.liste)
     webRouter.put(`${ADMIN_WORKFLOWS}/:name`, admin, WorkflowsAdminController.setzen)
     webRouter.delete(`${ADMIN_WORKFLOWS}/:name`, admin, WorkflowsAdminController.zuruecksetzen)
+    const ADMIN_GRENZEN = '/spur/admin/grenzen'
+    webRouter.get(ADMIN_GRENZEN, admin, GrenzenController.seite)
+    webRouter.get(`${ADMIN_GRENZEN}.json`, admin, GrenzenController.daten)
+    webRouter.put(`${ADMIN_GRENZEN}/standard`, admin, GrenzenController.standardSetzen)
+    webRouter.put(`${ADMIN_GRENZEN}/nutzer/:user_id`, admin, GrenzenController.nutzerSetzen)
+    webRouter.post(`${ADMIN_GRENZEN}/projekt/:project_id/neu-berechnen`, admin, GrenzenController.neuBerechnen)
+    webRouter.get('/spur/grenzen/projekte', angemeldet, GrenzenController.meineProjekte)
+    webRouter.get('/spur/project/:project_id/speicher', ...lesen, GrenzenController.projektSpeicher)
     const LAUF = '/spur/project/:project_id/laeufe/:lauf_id'
     webRouter.post(`${LAUF}/annehmen`, ...schreiben, SpurController.laufAnnehmen)
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)
@@ -170,6 +179,7 @@ export default {
       publicApiRouter.post('/spur/dev/mail', mailFakeSteuern)
       publicApiRouter.get('/spur/dev/mail', mailFakeLesen)
       publicApiRouter.get('/spur/dev/texlive/archive/:datei', texLiveFake)
+      publicApiRouter.post('/spur/dev/quelle-vergroessern', quelleVergroessern)
     }
   },
 }

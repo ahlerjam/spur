@@ -20,6 +20,7 @@ import {
   ORDNER,
   paketNamePruefen,
 } from './texArchiv.mjs'
+import { standard } from '../grenzen/Grenzen.mjs'
 import { texPakete } from '../sammlungen.mjs'
 import { paperApiBasis, umgebung } from '../schalter.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
@@ -108,8 +109,9 @@ async function latexmkrcSichern({ projectId, menschId, botId, stand, ordner, lau
   await LaufManager.angelegtMerken(lauf, [{ art: 'datei', pfad: 'latexmkrc' }])
 }
 
+// Abschalten per `SPUR_TEX_PAKETE=aus` oder in den spur-Einstellungen (Admin → Grenzen).
 export async function abgeschaltet() {
-  return umgebung('SPUR_TEX_PAKETE') === 'aus'
+  return umgebung('SPUR_TEX_PAKETE') === 'aus' || (await standard()).texPaketeAus
 }
 
 export async function hinzufuegen({ projectId, menschId, botId, paket }) {
@@ -150,7 +152,7 @@ export async function hinzufuegen({ projectId, menschId, botId, paket }) {
     await ausfuehren('tar', ['-xJf', archiv, '-C', ziel, '--no-same-owner', '--no-same-permissions'])
     const tlpobj = await fs.readFile(Path.join(ziel, 'tlpkg', 'tlpobj', `${paket}.tlpobj`), 'utf8').catch(() => '')
 
-    await Speicher.reservieren(projectId, bytes)
+    const freigeben = await Speicher.reservieren(projectId, bytes)
     const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
     const angelegt = []
     try {
@@ -159,9 +161,8 @@ export async function hinzufuegen({ projectId, menschId, botId, paket }) {
         await EditorController.promises.upsertFileWithPath(projectId, `/${pfad}`, Path.join(ziel, d.pfad), null, 'spur', menschId)
         angelegt.push(pfad)
       }
-    } catch (error) {
-      await Speicher.freigeben(projectId, bytes)
-      throw error
+    } finally {
+      await freigeben()
     }
     await (await texPakete()).updateOne({ projectId, paket }, { $set: { bytes } }, { upsert: true })
     await LaufManager.angelegtMerken(lauf, [{ art: 'ordner', pfad: `${ORDNER}/${paket}`, paket, bytes }])
@@ -179,8 +180,7 @@ export async function hinzufuegen({ projectId, menschId, botId, paket }) {
   }
 }
 
-// Für „Lauf rückgängig“: Ordner eines Pakets samt Buchung entfernen.
+// Für „Lauf rückgängig“: die Buchung des entfernten Paket-Ordners löschen.
 export async function paketEntfernt(projectId, paket) {
-  const eintrag = await (await texPakete()).findOneAndDelete({ projectId, paket })
-  if (eintrag) await Speicher.freigeben(projectId, eintrag.bytes)
+  await (await texPakete()).deleteOne({ projectId, paket })
 }

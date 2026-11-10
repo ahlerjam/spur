@@ -34,3 +34,15 @@ The server has a fixed TeX Live. If a package or Beamer theme is missing, you ca
 5. Add every package in `fehlende_abhaengigkeiten` the same way, then compile again.
 
 The files belong to your run: the run card lists them, and "Lauf rückgängig" removes them. If the admin has turned the tool off or a package is too large, say so in the summary instead of looking for a workaround.
+
+## PDFs from your computer
+
+Use this when a source is not freely available through spur, or the publisher's server blocks the download (bot protection). The PDF is fetched on this computer and uploaded to spur directly, not through MCP.
+
+1. Run `spur-pdf-holen <DOI> <folder>`. It tries Unpaywall and, for arXiv DOIs, arXiv, and prints the path of the PDF. It stops with "keine freie Version gefunden" if there is no free copy, and with "keine PDF-Datei" if the server returned something other than a PDF. The mail address comes from `UNPAYWALL_EMAIL` or `git config user.email`.
+2. If the download needs a login or is stopped by bot protection and Playwright is set up, open the page with Playwright. The person logs in; Claude does not enter credentials. Save the PDF into the same folder.
+3. Call the MCP tool `source_upload_link`. It returns a one-time link, valid for 15 minutes, for up to 50 files.
+4. Run `spur-hochladen <link> <files> [--doi <DOI>] [--titel <title>]`. It prints one line per file: `Quelle <id>`, `schon vorhanden (Quelle <id>)` for a duplicate, or the reason for a refusal. With `--doi`, the upload is matched to the entry on the acquisition list with that DOI.
+5. Cite the source as usual (`source_search`, `source_read`, `check_report`).
+
+Never work around a paywall or an access restriction: no shared accounts, no cookies taken from elsewhere, no mirror sites. If there is no free copy and the person has no access, say so in the summary and leave the entry on the acquisition list.

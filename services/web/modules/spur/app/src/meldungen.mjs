@@ -3,7 +3,7 @@
 import Settings from '@overleaf/settings'
 
 // Nur die Sprache der Installation laden; andere Sprachen fallen auf Englisch zurück.
-const sprache = Settings.i18n?.defaultLng === 'de' ? 'de' : 'en'
+export const sprache = Settings.i18n?.defaultLng === 'de' ? 'de' : 'en'
 const { default: texte } = await import(`../../../../locales/${sprache}.json`, { with: { type: 'json' } })
 
 export function meldung(schluessel, werte = {}) {

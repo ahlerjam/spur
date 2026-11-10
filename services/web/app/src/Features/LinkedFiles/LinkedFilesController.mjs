@@ -211,6 +211,8 @@ async function createLinkedFile(req, res, next) {
 
   data.provider = provider
   data.importedAt = new Date().toISOString()
+  // spur: no new linked files once the project has reached its storage limit.
+  await Modules.promises.hooks.fire('checkProjectStorage', projectId)
 
   const historySource = await SplitTestHandler.promises.featureFlagEnabled(
     req,
