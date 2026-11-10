@@ -60,8 +60,9 @@
 - /security-review: keine Befunde.
 
 ## Abschluss: Screenshots (360 und 1280 px)
-Token-Dialog, Claude-Panel, Kommentar mit @claude, Prüfbericht, Recherche und Quellen-Vorschau, je 360 und 1280 px;
-kein seitliches Rollen, keine Seitenfehler. Gesamtlauf der E2E-Suite nach der letzten Code-Änderung: 53 von 53 ok.
+Token-Dialog, Claude-Panel, Kommentar mit @claude (Antwort und neuer Kommentar mit Hinweis), Prüfbericht mit Zählung
+und Gründen, Recherche mit Dienst-Hinweis, Zitationen ohne antwortenden Dienst und Quellen-Vorschau, je 360 und 1280 px;
+kein seitliches Rollen, keine Seitenfehler. Gesamtlauf der E2E-Suite nach der letzten Code-Änderung (Commit 15091690bd um 13:48, Lauf beendet 13:58): 53 von 53 ok.
 
 ## Vorschläge (außerhalb dieses Plans)
 - Overleafs Review-Panel schneidet bei 360 px die Kommentare links an (Overleaf-Layout, nicht der spur-Patch).
