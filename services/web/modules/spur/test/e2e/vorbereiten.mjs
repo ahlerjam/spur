@@ -403,6 +403,15 @@ Schlaf verdoppelt die Gedächtnisleistung.
   for (const sammlung of [vorschlaege, workflows]) {
     await (await sammlung()).deleteMany({})
   }
+
+  // P6: @claude in einem offenen und in einem zuvor nie geladenen Dokument.
+  await neuAnlegen(a, 'E2E P6 Kommentar', {
+    'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Ergebnisse.
+\end{document}`,
+    'kapitel.tex': 'Im Kapitel steht die Ausbeute von 81,2 Prozent.\n',
+  })
 }
 
 // Als Skript läuft es als root; die Ablage muss danach dem Web-Prozess gehören.

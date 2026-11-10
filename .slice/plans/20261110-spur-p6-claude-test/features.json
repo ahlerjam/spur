@@ -6,7 +6,7 @@
     "Der Text über dem Befehl sagt, dass Claude nach dem Start von selbst auf Aufträge aus diesem Panel wartet; er verspricht nichts, was der Befehl nicht tut",
     "Ein Fake-Client ruft `wait_for_event` mit dem Token auf; innerhalb von 5 s zeigt das Panel „Claude verbunden“"
   ]},
-  {"id": "f2", "title": "@claude bekommt die markierte Stelle auch in einem offenen Dokument", "passes": false, "ui": true, "steps": [
+  {"id": "f2", "title": "@claude bekommt die markierte Stelle auch in einem offenen Dokument", "passes": true, "ui": true, "steps": [
     "Nutzer e2e-a öffnet ein Projekt mit main.tex, tippt in main.tex den Satz „Die Ausbeute lag bei 75,7 Prozent.“ und lässt das Dokument offen (kein Speichern, kein Schließen)",
     "Er markiert „75,7 Prozent“ und schreibt dazu einen Kommentar „@claude prüf die Zahl“",
     "Ein Fake-Client, der mit `wait_for_event` wartet, erhält das Ereignis mit `doc_id` von main.tex, `pfad` „main.tex“ und `stelle.markiert` „75,7 Prozent“ sowie der richtigen Zeilennummer",

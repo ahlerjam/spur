@@ -3154,6 +3154,75 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await page.evaluate(() => window.__spur.abbruch.abort())
   }
 
+  // Ergebnis des Long-Polls aus warteStarten: das zugestellte Ereignis oder null.
+  async function gewartetesEreignis(timeout = 20000) {
+    const handle = await page.waitForFunction(
+      () => window.__spur.log.find(e => e.fehler || e.msg?.result)?.msg?.result ?? null,
+      null,
+      { timeout }
+    )
+    const ergebnis = await handle.jsonValue()
+    return JSON.parse(ergebnis.content[0].text).ereignis
+  }
+
+  async function mitClaudeKommentieren(token, markieren, text) {
+    while ((await werkzeug(token, 'wait_for_event', { max_sekunden: 1 })).inhalt.ereignis);
+    await warteStarten(token)
+    await markieren()
+    await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
+    const eingabe = page.locator('.review-panel-add-comment-editor .cm-content').first()
+    await eingabe.waitFor()
+    await eingabe.click()
+    await page.keyboard.type(text)
+    await page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click()
+    const ereignis = await gewartetesEreignis()
+    ok(ereignis?.typ === 'comment_mention', `Kein comment_mention: ${JSON.stringify(ereignis)}`)
+    return ereignis.daten
+  }
+
+  // Markiert `text` in der Zeile, die ihn enthält, per Tastatur wie ein Mensch.
+  async function imEditorMarkieren(text) {
+    await page.evaluate(gesucht => {
+      const view = window.overleaf.unstable.store.get('editor.view')
+      const ende = view.state.doc.toString().indexOf(gesucht) + gesucht.length
+      view.dispatch({ selection: { anchor: ende } })
+      view.focus()
+    }, text)
+    for (let i = 0; i < text.length; i++) await page.keyboard.press('Shift+ArrowLeft')
+  }
+
+  features.p6f2 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E P6 Kommentar')
+    const pid = page.url().split('/').pop()
+    await page.locator('.cm-line', { hasText: 'Ergebnisse.' }).click()
+    await page.keyboard.press('End')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('Die Ausbeute lag bei 75,7 Prozent.')
+
+    const offen = await mitClaudeKommentieren(token, () => imEditorMarkieren('75,7 Prozent'), '@claude prüf die Zahl')
+    const docs = (await werkzeug(token, 'doc_list', { project_id: pid })).inhalt.eintraege
+    const main = docs.find(d => d.pfad === 'main.tex')
+    ok(
+      offen.doc_id === main.id && offen.pfad === 'main.tex' && offen.stelle?.markiert === '75,7 Prozent' && offen.stelle.zeile === 4,
+      `Offenes Dokument: ${JSON.stringify(offen)}`
+    )
+
+    // kapitel.tex war in diesem Lauf noch nie geladen, wie ein lange geschlossenes Dokument.
+    const eintrag = page.locator('.file-tree').getByRole('treeitem', { name: 'kapitel.tex' })
+    await panelSichern(DATEIBAUM, eintrag)
+    await eintrag.click()
+    await page.locator('.cm-content', { hasText: 'Im Kapitel' }).waitFor()
+    const geschlossen = await mitClaudeKommentieren(token, () => imEditorMarkieren('81,2 Prozent'), '@claude und diese?')
+    const kapitel = docs.find(d => d.pfad === 'kapitel.tex')
+    ok(
+      geschlossen.doc_id === kapitel.id && geschlossen.pfad === 'kapitel.tex' && geschlossen.stelle?.markiert === '81,2 Prozent' && geschlossen.stelle.zeile === 1,
+      `Geschlossenes Dokument: ${JSON.stringify(geschlossen)}`
+    )
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

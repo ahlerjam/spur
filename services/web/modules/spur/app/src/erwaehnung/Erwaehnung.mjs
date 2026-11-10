@@ -2,6 +2,7 @@ import { setTimeout as warten } from 'node:timers/promises'
 import logger from '@overleaf/logger'
 import ChatApiHandler from '../../../../../app/src/Features/Chat/ChatApiHandler.mjs'
 import DocstoreManager from '../../../../../app/src/Features/Docstore/DocstoreManager.mjs'
+import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import EditorRealTimeController from '../../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import UserInfoController from '../../../../../app/src/Features/User/UserInfoController.mjs'
 import UserInfoManager from '../../../../../app/src/Features/User/UserInfoManager.mjs'
@@ -14,13 +15,23 @@ import * as PruefManager from '../pruefung/PruefManager.mjs'
 // „@claude“ als eigenes Wort, nicht in einer Adresse wie mail@claude.de oder in @claudette.
 const ERWAEHNT = /(^|[^\w@.])@claude(?![\w-])/i
 
+// Ein offenes Dokument liegt im document-updater und steht oft noch nicht in Mongo; dessen Ranges zuerst.
+async function alleRanges(projectId) {
+  const offen = await DocumentUpdaterHandler.promises.getProjectRanges(String(projectId)).catch(error => {
+    logger.warn({ err: error, projectId }, 'spur: document-updater ohne Ranges, nur Docstore')
+    return []
+  })
+  const gespeichert = await DocstoreManager.promises.getAllRanges(String(projectId))
+  return [...offen.map(d => ({ docId: String(d.id), ranges: d.ranges })), ...gespeichert.map(d => ({ docId: String(d._id), ranges: d.ranges }))]
+}
+
 // Overleaf schickt die Nachricht vor der Kommentar-Op; die Stelle steht erst kurz danach im Dokument.
 async function kommentarSuchen(projectId, threadId, { versuche, pauseMs }) {
   for (let versuch = 0; versuch < versuche; versuch++) {
     if (versuch) await warten(pauseMs)
-    for (const eintrag of await DocstoreManager.promises.getAllRanges(String(projectId))) {
+    for (const eintrag of await alleRanges(projectId)) {
       const kommentar = eintrag.ranges?.comments?.find(c => c.op.t === threadId)
-      if (kommentar) return { docId: String(eintrag._id), op: kommentar.op }
+      if (kommentar) return { docId: eintrag.docId, op: kommentar.op }
     }
   }
   return null
