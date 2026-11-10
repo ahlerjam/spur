@@ -65,10 +65,12 @@ Unrecognized citation forms and DOIs that cannot be resolved are accepted, but m
 | `beschaffung_vorhanden` | The DOI is already on the acquisition list |
 | `nicht_frei` | `source_add`: no free full text; use `acquisition_add` instead |
 | `pdf_fehlt` | The free full text could not be loaded |
-| `dienst_fehlt` | Crossref does not respond |
+| `dienst_fehlt` | Crossref does not respond right now, even after waiting out a 429 or 503; try again later |
 | `spalte_fehlt` | `matrix_suggest`: the column does not exist in the matrix |
 | `kommentar_fehlt` | `reply` with `kommentar_id`: the comment thread does not exist in the project |
 | `vorschlaege_voll` | `suggest`: the panel already holds 100 open suggestions |
+
+`bib_list` gives each reference a `referenz` state: `gefunden`, `nicht_gefunden` (Crossref answers 404: the DOI is unknown), `ohne_doi`, or `nicht_pruefbar` with `grund` `crossref_nicht_erreichbar` (Crossref did not respond; this says nothing about the reference). spur waits out 429 and 503 from Crossref (`Retry-After`, otherwise a growing pause) for up to four attempts. The check report uses the same states.
 
 Every hit of `paper_search` carries `abstract` (from the first service that supplies one; otherwise empty).
 

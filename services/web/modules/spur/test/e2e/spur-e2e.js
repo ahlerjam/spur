@@ -3250,6 +3250,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await page.keyboard.type('@claude ')
     await page.keyboard.press('Escape')
     await hinweis.waitFor({ timeout: 5000 })
+    const pid = page.url().split('/').pop()
+    const kommentare = async () =>
+      (await (await page.request.get(`${BASE}/project/${pid}/ranges`)).json()).reduce((n, doc) => n + (doc.ranges.comments?.length ?? 0), 0)
+    const vorher = await kommentare()
     await formular.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click()
 
     const thread = page.locator('.review-panel-entry', { hasText: 'bitte ansehen an mail@claude.de' })
@@ -3273,10 +3277,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok((await marken.count()) === 2, `Antwort ohne Hervorhebung: ${await marken.count()}`)
 
     // Die Kommentar-Op geht gesammelt raus; vor dem Neuladen muss der Server sie kennen.
-    const pid = page.url().split('/').pop()
-    const gespeichert = async () =>
-      (await (await page.request.get(`${BASE}/project/${pid}/ranges`)).json()).some(doc => doc.ranges.comments?.length)
-    for (let ende = Date.now() + 20000; !(await gespeichert()); await page.waitForTimeout(250)) {
+    for (let ende = Date.now() + 20000; (await kommentare()) <= vorher; await page.waitForTimeout(250)) {
       ok(Date.now() < ende, 'Kommentar nach 20 s nicht beim Server')
     }
     for (const thema of ['', 'light-']) {
@@ -3289,6 +3290,53 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
         const schlecht = await unlesbar(eintrag.locator('.review-panel-comment-body').first())
         ok(schlecht.length === 0, `Kommentar im Design „${thema || 'dunkel'}“: ${schlecht}`)
       })
+    }
+  }
+
+  const FOODS = '10.3390/foods11223570'
+
+  features.p6f4 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    const NICHT_PRUEFBAR = 'nicht prüfbar – Crossref gerade nicht erreichbar'
+    try {
+      // Vor dem Öffnen: Overleaf stellt ein offenes Prüfbericht-Panel sofort wieder her.
+      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 429, retryAfter: 1, mal: 2 } }, crossrefCacheLeeren: true, protokollLeeren: true })
+      await projektOeffnen('E2E P6 Crossref')
+      const pid = page.url().split('/').pop()
+      await panelOeffnen('Prüfbericht')
+      await page.getByLabel('Nur Probleme').setChecked(false)
+      await zeile('foods2022').getByText('Keine Meldung in Crossref', { exact: true }).waitFor({ timeout: 30000 })
+      const foods = zeile('foods2022')
+      ok(!/unbekannt|nicht prüfbar/.test(await foods.innerText()), `Gedrosselte DOI: ${await foods.innerText()}`)
+      const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.pfad.includes(encodeURIComponent(FOODS)))
+      ok(abrufe.length === 3, `Crossref-Abrufe für die gedrosselte DOI: ${abrufe.length}`)
+      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+
+      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 503 } }, crossrefCacheLeeren: true })
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await zeile('foods2022').getByText(NICHT_PRUEFBAR, { exact: true }).waitFor({ timeout: 30000 })
+      ok(!/unbekannt/.test(await zeile('foods2022').innerText()), 'Ausfall erscheint als unbekannt')
+      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+
+      const bib = (await werkzeug(token, 'bib_list', { project_id: pid })).inhalt.eintraege
+      const foodsBib = bib.find(e => e.key === 'foods2022')
+      ok(foodsBib.referenz === 'nicht_pruefbar' && foodsBib.grund === 'crossref_nicht_erreichbar', `bib_list: ${JSON.stringify(foodsBib)}`)
+      ok(bib.find(e => e.key === 'erfunden').referenz === 'nicht_gefunden', `bib_list erfunden: ${JSON.stringify(bib)}`)
+
+      const abgelehnt = await werkzeug(token, 'source_add', { project_id: pid, doi: FOODS })
+      ok(
+        abgelehnt.fehler && abgelehnt.inhalt.fehler !== 'doi_nicht_gefunden' && /antwortet gerade nicht/.test(abgelehnt.inhalt.detail) && /noch einmal/.test(abgelehnt.inhalt.detail),
+        `source_add bei 503: ${JSON.stringify(abgelehnt.inhalt)}`
+      )
+
+      await fakeSteuern({})
+      const aufgenommen = await werkzeug(token, 'source_add', { project_id: pid, doi: FOODS })
+      ok(!aufgenommen.fehler, `source_add nach Ausfall: ${JSON.stringify(aufgenommen.inhalt)}`)
+    } finally {
+      await fakeSteuern({})
     }
   }
 

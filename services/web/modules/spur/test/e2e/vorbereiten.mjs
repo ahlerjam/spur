@@ -412,6 +412,26 @@ Ergebnisse.
 \end{document}`,
     'kapitel.tex': 'Im Kapitel steht die Ausbeute von 81,2 Prozent.\n',
   })
+  // P6: eine DOI, die der Crossref-Fake drosselt oder abschaltet, und eine erfundene.
+  await neuAnlegen(a, 'E2E P6 Crossref', {
+    'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Lebensmittelabfälle \cite{foods2022}. Eine erfundene Quelle \cite{erfunden}.
+\end{document}`,
+    'references.bib': `@article{foods2022,
+  author = {Drossel, Fixture},
+  title = {Testwerk für gedrosseltes Crossref},
+  journal = {Foods},
+  year = {2022},
+  doi = {10.3390/foods11223570}
+}
+@article{erfunden,
+  author = {Niemand, Nora},
+  title = {Gibt es nicht},
+  year = {2020},
+  doi = {10.9999/gibt-es-nicht}
+}`,
+  })
 }
 
 // Als Skript läuft es als root; die Ablage muss danach dem Web-Prozess gehören.

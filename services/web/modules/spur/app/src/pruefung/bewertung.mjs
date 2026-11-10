@@ -31,9 +31,10 @@ export function quelleZu(key, bibEintraege, quellen) {
   return nachDoi || quellen.find(q => q.key === key) || null
 }
 
-function referenzStatus(eintrag, doiWerk) {
+// Status einer .bib-Referenz bei Crossref; doiWerk null heißt, Crossref war nicht erreichbar.
+export function referenzStatus(eintrag, doiWerk) {
   if (!eintrag?.doi) return { referenz: 'ohne_doi', retraction: null }
-  if (!doiWerk) return { referenz: 'unbekannt', retraction: null }
+  if (!doiWerk) return { referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null }
   if (!doiWerk.gefunden) return { referenz: 'nicht_gefunden', retraction: null }
   return { referenz: 'gefunden', retraction: doiWerk.retraction }
 }

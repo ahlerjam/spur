@@ -32,6 +32,8 @@ function useBadges(zeile: Zeile) {
   }
 
   if (zeile.referenz === 'nicht_gefunden') add(t('spur_referenz_nicht_gefunden'), 'danger')
+  // Ein Ausfall bei Crossref ist kein Befund über die Arbeit: neutral, nicht als Fehler.
+  if (zeile.referenz === 'nicht_pruefbar') add(t('spur_referenz_nicht_pruefbar'), 'info')
   if (zeile.retraction === 'zurueckgezogen') add(t('spur_zurueckgezogen'), 'danger')
   if (zeile.retraction === 'korrektur') add(t('spur_korrektur'), 'warning')
   if (zeile.retraction === 'keine_meldung') add(t('spur_keine_meldung'), 'info')

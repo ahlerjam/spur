@@ -30,7 +30,7 @@ function antworten(...antworten) {
   )
 }
 
-const json = (daten, status = 200) => ({ status, ok: status < 400, json: async () => daten })
+const json = (daten, status = 200, kopf = {}) => ({ status, ok: status < 400, headers: new Headers(kopf), json: async () => daten })
 const mitUpdates = (...typen) => json({ message: { ...ANTWORT.message, 'updated-by': typen.map(type => ({ type })) } })
 
 beforeEach(async () => {
@@ -127,19 +127,50 @@ describe('werk', () => {
     expect(abrufe).toHaveLength(2)
   })
 
-  it('liefert bei Ausfall nichts und wartet fünf Minuten bis zum nächsten Versuch', async () => {
+  it('liefert bei Ausfall nichts und versucht es beim nächsten Aufruf sofort wieder', async () => {
     antworten(new Error('Netz weg'), json(ANTWORT))
     expect(await Crossref.werk('10.1/a')).toBeNull()
-    expect(await Crossref.werk('10.1/a')).toBeNull()
-    expect(abrufe).toHaveLength(1)
-    vi.setSystemTime(new Date('2026-11-07T10:05:01Z'))
     expect((await Crossref.werk('10.1/a')).gefunden).toBe(true)
     expect(abrufe).toHaveLength(2)
   })
 
-  it('behandelt einen Serverfehler wie einen Ausfall', async () => {
+  // Die Pausen laufen mit falschen Uhren; gemessen wird die vergangene Zeit.
+  async function mitPausen(aufruf) {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
+    vi.setSystemTime(new Date('2026-11-07T10:00:00Z'))
+    const start = Date.now()
+    const ergebnis = aufruf()
+    await vi.runAllTimersAsync()
+    return { ergebnis: await ergebnis, ms: Date.now() - start }
+  }
+
+  it('wartet bei 429 die Zeit aus Retry-After ab und versucht es erneut', async () => {
+    antworten(json({}, 429, { 'Retry-After': '1' }), json({}, 429, { 'Retry-After': '1' }), json(ANTWORT))
+    const { ergebnis, ms } = await mitPausen(() => Crossref.werk('10.3390/foods11223570'))
+    expect(ergebnis.gefunden).toBe(true)
+    expect(abrufe).toHaveLength(3)
+    expect(ms).toBe(2000)
+  })
+
+  it('wartet bei 503 ohne Retry-After steigend und gibt nach vier Versuchen auf', async () => {
     antworten(json({}, 503))
+    const { ergebnis, ms } = await mitPausen(() => Crossref.werk('10.1/a'))
+    expect(ergebnis).toBeNull()
+    expect(abrufe).toHaveLength(4)
+    expect(ms).toBe(1000 + 2000 + 4000)
+  })
+
+  it('wartet höchstens 5 s auf einmal, auch bei längerem Retry-After', async () => {
+    antworten(json({}, 429, { 'Retry-After': '120' }), json(ANTWORT))
+    const { ergebnis, ms } = await mitPausen(() => Crossref.werk('10.1/a'))
+    expect(ergebnis.gefunden).toBe(true)
+    expect(ms).toBe(5000)
+  })
+
+  it('wiederholt andere Fehler nicht', async () => {
+    antworten(json({}, 500))
     expect(await Crossref.werk('10.1/a')).toBeNull()
+    expect(abrufe).toHaveLength(1)
   })
 
   it('behält bei Ausfall den abgelaufenen Eintrag', async () => {

@@ -18,7 +18,7 @@
     "Nach dem Absenden steht „@claude“ im Kommentar blau hervorgehoben, der Rest normal; Kontrast mindestens 4,5:1 im hellen und im dunklen Design",
     "In einer Antwort im selben Thread ist „@claude“ ebenso hervorgehoben"
   ]},
-  {"id": "f4", "title": "Crossref-Ausfälle sind „nicht prüfbar“, Drosselung wird abgewartet", "ui": true, "passes": false, "steps": [
+  {"id": "f4", "title": "Crossref-Ausfälle sind „nicht prüfbar“, Drosselung wird abgewartet", "ui": true, "passes": true, "steps": [
     "Der Crossref-Fake wird so geschaltet, dass er für die DOI 10.3390/foods11223570 zweimal 429 mit `Retry-After: 1` antwortet und dann das Werk liefert",
     "Nutzer öffnet in einem Projekt mit dieser DOI in der .bib den Prüfbericht; die Referenz erscheint als bekannt, nicht als „unbekannt“",
     "Der Fake wird für diese DOI auf dauerhaft 503 geschaltet, die Prüfung wird neu angestoßen; die Referenz zeigt „nicht prüfbar – Crossref gerade nicht erreichbar“ und nicht „unbekannt“",

@@ -90,10 +90,15 @@ describe('zeileBewerten', () => {
     expect(zeileBewerten(fund({ roh: `  ${'a'.repeat(300)}` }), kontext()).auszug).toHaveLength(200)
   })
 
-  it('bewertet die Referenz: ohne DOI, unbekannt, nicht gefunden, zurückgezogen', () => {
+  it('bewertet die Referenz: ohne DOI, nicht prüfbar, nicht gefunden, zurückgezogen', () => {
     const ohneDoi = kontext({ bibEintraege: new Map([['smith2024', { key: 'smith2024', doi: null }]]) })
     expect(zeileBewerten(fund(), ohneDoi)).toMatchObject({ referenz: 'ohne_doi', retraction: null })
-    expect(zeileBewerten(fund(), kontext({ werke: new Map([['10.5555/spur.1', null]]) })).referenz).toBe('unbekannt')
+    // Crossref nicht erreichbar ist kein Befund über die Arbeit: nicht prüfbar mit Grund, nie „unbekannt“.
+    expect(zeileBewerten(fund(), kontext({ werke: new Map([['10.5555/spur.1', null]]) }))).toMatchObject({
+      referenz: 'nicht_pruefbar',
+      grund: 'crossref_nicht_erreichbar',
+      retraction: null,
+    })
     expect(zeileBewerten(fund(), kontext({ werke: new Map([['10.5555/spur.1', { gefunden: false }]]) }))).toMatchObject({
       referenz: 'nicht_gefunden',
       retraction: null,
@@ -115,7 +120,7 @@ describe('istProblem', () => {
     [{ wortlaut: 'exakt', retraction: 'korrektur' }, true],
     [{ wortlaut: 'exakt', seite: 'stimmt', referenz: 'gefunden', retraction: 'keine_meldung' }, false],
     [{ wortlaut: 'trennung', seite: 'bestaetigt', referenz: 'ohne_doi' }, false],
-    [{ wortlaut: null, seite: null, referenz: 'unbekannt' }, false],
+    [{ wortlaut: null, seite: null, referenz: 'nicht_pruefbar' }, false],
   ])('bewertet %j als %s', (zeile, erwartet) => {
     expect(istProblem(zeile)).toBe(erwartet)
   })

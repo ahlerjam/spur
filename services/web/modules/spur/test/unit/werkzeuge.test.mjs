@@ -278,7 +278,7 @@ describe('Lesen im Projekt', () => {
       { key: 'a', doi: '10.1/a', referenz: 'gefunden', retraction: 'zurueckgezogen' },
       { key: 'b', doi: null, referenz: 'ohne_doi', retraction: null },
       { key: 'c', doi: '10.1/c', referenz: 'nicht_gefunden', retraction: null },
-      { key: 'd', doi: '10.1/d', referenz: 'unbekannt', retraction: null },
+      { key: 'd', doi: '10.1/d', referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null },
     ])
   })
 })

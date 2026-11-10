@@ -10,6 +10,7 @@ import { rolleFuerClaude, rolleImVertrag } from '../rechte.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
+import { referenzStatus } from '../pruefung/bewertung.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
@@ -229,12 +230,7 @@ export const WERKZEUGE = {
       teil.eintraege = await Promise.all(
         teil.eintraege.map(async e => {
           const werk = e.doi ? await Crossref.werk(e.doi) : null
-          return {
-            key: e.key,
-            doi: e.doi,
-            referenz: !e.doi ? 'ohne_doi' : werk?.gefunden ? 'gefunden' : werk ? 'nicht_gefunden' : 'unbekannt',
-            retraction: werk?.retraction ?? null,
-          }
+          return { key: e.key, doi: e.doi, ...referenzStatus(e, werk) }
         })
       )
       return teil
