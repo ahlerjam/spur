@@ -51,7 +51,7 @@
     "Ein zweiter Aufruf ohne Änderung zeigt dieselbe Zählung (der Cache verändert sie nicht)",
     "`check_report` über MCP liefert dieselbe Zählung und dieselben Gründe"
   ]},
-  {"id": "f9", "title": "Deutsche und naturwissenschaftliche TeX-Pakete und metropolis im Image", "passes": false, "steps": [
+  {"id": "f9", "title": "Deutsche und naturwissenschaftliche TeX-Pakete und metropolis im Image", "passes": true, "steps": [
     "Die Paketliste des Images enthält babel-german, hyphen-german, mhchem, siunitx, chemformula, beamertheme-metropolis und pgfopts",
     "Das Smoke-Skript kompiliert zusätzlich zum APA-Dokument ein Beamer-Dokument mit `\\usetheme{metropolis}`, `\\usepackage[ngerman]{babel}`, `\\ce{H2O}` und `\\qty{0.89}{\\liter}` und prüft, dass ein PDF entsteht",
     "`node --test tools/tests/*.test.mjs` enthält einen Test, der jedes vom Smoke-Dokument geladene Paket in der Paketliste findet, und ist grün",

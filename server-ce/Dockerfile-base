@@ -84,6 +84,15 @@ RUN mkdir /install-tl-unx \
       natbib \
       beamer \
       latexdiff \
+      babel-german \
+      hyphen-german \
+      mhchem \
+      chemformula \
+      chemgreek \
+      siunitx \
+      translations \
+      beamertheme-metropolis \
+      pgfopts \
 &&  tlmgr path add \
 &&  rm -rf /install-tl-unx
 

@@ -3498,6 +3498,20 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
   }
 
+  features.p6f9 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
+    const liste = new Set(dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0].split(/[\s\\]+/).filter(Boolean))
+    const fehlen = ['babel-german', 'hyphen-german', 'mhchem', 'siunitx', 'chemformula', 'beamertheme-metropolis', 'pgfopts'].filter(p => !liste.has(p))
+    ok(fehlen.length === 0, `Fehlt im Image: ${fehlen}`)
+    const smoke = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke-dokumente.mjs`)
+    for (const teil of ['\\usetheme{metropolis}', '\\usepackage[ngerman]{babel}', '\\ce{H2O}', '\\qty{0.89}{\\liter}']) {
+      ok(smoke.includes(teil), `Smoke-Dokument ohne ${teil}`)
+    }
+    const skript = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke-compile.mjs`)
+    ok(/for \(const \{ name, dateien \} of DOKUMENTE\)/.test(skript) && skript.includes("file.path === 'output.pdf'"), 'Smoke kompiliert nicht jedes Dokument mit PDF-Prüfung')
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`
