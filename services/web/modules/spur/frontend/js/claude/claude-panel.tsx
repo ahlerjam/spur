@@ -29,8 +29,10 @@ type Status = {
 
 export default function ClaudePanel() {
   const { t } = useTranslation()
-  // Alle 2 s: Eine neue Verbindung soll binnen 5 s sichtbar sein, auch mit der Antwortzeit.
-  const { daten: status, fehler, setFehler, laden } = useAbfrage<Status>(projektPfad('/claude'), 2000)
+  // Ohne Verbindung alle 2 s: Eine neue Verbindung soll binnen 5 s sichtbar sein, auch mit der Antwortzeit.
+  const [takt, setTakt] = useState(2000)
+  const { daten: status, fehler, setFehler, laden } = useAbfrage<Status>(projektPfad('/claude'), takt)
+  useEffect(() => setTakt(status?.verbunden ? 5000 : 2000), [status?.verbunden])
   const [offenlegung, setOffenlegung] = useState(false)
 
   return (

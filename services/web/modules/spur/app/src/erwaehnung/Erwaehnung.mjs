@@ -17,11 +17,13 @@ const ERWAEHNT = /(^|[^\w@.])@claude(?![\w-])/i
 
 // Ein offenes Dokument liegt im document-updater und steht oft noch nicht in Mongo; dessen Ranges zuerst.
 async function alleRanges(projectId) {
-  const offen = await DocumentUpdaterHandler.promises.getProjectRanges(String(projectId)).catch(error => {
-    logger.warn({ err: error, projectId }, 'spur: document-updater ohne Ranges, nur Docstore')
-    return []
-  })
-  const gespeichert = await DocstoreManager.promises.getAllRanges(String(projectId))
+  const [offen, gespeichert] = await Promise.all([
+    DocumentUpdaterHandler.promises.getProjectRanges(String(projectId)).catch(error => {
+      logger.warn({ err: error, projectId }, 'spur: document-updater ohne Ranges, nur Docstore')
+      return []
+    }),
+    DocstoreManager.promises.getAllRanges(String(projectId)),
+  ])
   return [...offen.map(d => ({ docId: String(d.id), ranges: d.ranges })), ...gespeichert.map(d => ({ docId: String(d._id), ranges: d.ranges }))]
 }
 

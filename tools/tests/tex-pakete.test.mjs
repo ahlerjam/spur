@@ -30,8 +30,8 @@ function benoetigt(tex) {
 
 test('jedes Paket der Smoke-Dokumente steht in der Paketliste des Images', () => {
   const liste = installiert()
-  for (const { name, tex } of DOKUMENTE) {
-    const fehlend = benoetigt(tex).filter(p => !liste.has(p) && !IM_BASISSCHEMA.has(p))
+  for (const { name, dateien } of DOKUMENTE) {
+    const fehlend = benoetigt(dateien['main.tex']).filter(p => !liste.has(p) && !IM_BASISSCHEMA.has(p))
     assert.deepEqual(fehlend, [], `${name}: fehlt im Image`)
   }
 })
@@ -44,9 +44,9 @@ test('das Image hat die Pakete für deutsche und naturwissenschaftliche Texte un
 })
 
 test('ein Smoke-Dokument nutzt metropolis, ngerman, \\ce und \\qty', () => {
-  const beamer = DOKUMENTE.find(d => /\\usetheme\{metropolis\}/.test(d.tex))
+  const beamer = DOKUMENTE.map(d => d.dateien['main.tex']).find(tex => /\\usetheme\{metropolis\}/.test(tex))
   assert.ok(beamer, 'kein metropolis-Dokument')
-  assert.match(beamer.tex, /\\usepackage\[ngerman\]\{babel\}/)
-  assert.match(beamer.tex, /\\ce\{H2O\}/)
-  assert.match(beamer.tex, /\\qty\{0\.89\}\{\\liter\}/)
+  assert.match(beamer, /\\usepackage\[ngerman\]\{babel\}/)
+  assert.match(beamer, /\\ce\{H2O\}/)
+  assert.match(beamer, /\\qty\{0\.89\}\{\\liter\}/)
 })

@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 // Wie ERWAEHNT auf dem Server (Erwaehnung.mjs): @claude als eigenes Wort, nicht in mail@claude.de oder @claudette.
 const ERWAEHNT = /(^|[^\w@.])(@claude)(?![\w-])/gi
 
-export const erwaehnt = (text: string) => new RegExp(ERWAEHNT.source, 'i').test(text)
+const EINE_ERWAEHNUNG = new RegExp(ERWAEHNT.source, 'i')
+export const erwaehnt = (text: string) => EINE_ERWAEHNUNG.test(text)
 
 export function hervorheben(text: string): ReactNode[] {
   const teile: ReactNode[] = []

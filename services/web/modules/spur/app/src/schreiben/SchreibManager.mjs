@@ -197,7 +197,8 @@ async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
 
   // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt, in .bib-Dateien stehen nur Metadaten.
   const ohnePruefung = /(^|\/)ergebnisse\.tex$|\.bib$/.test(doc.pfad)
-  const zahlen = ohnePruefung ? [] : zahlenOhneBeleg(neu, await ergebnisZahlen(projectId))
+  const kandidaten = ohnePruefung ? [] : zahlenOhneBeleg(neu)
+  const zahlen = kandidaten.length ? zahlenOhneBeleg(neu, await ergebnisZahlen(projectId)) : []
   const op = opsFuer(start, alt, neu)
   const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
   let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot, zahlen_ohne_beleg: zahlen }

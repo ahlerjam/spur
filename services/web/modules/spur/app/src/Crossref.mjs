@@ -40,6 +40,10 @@ export function werkAuswerten(message) {
 const VERSUCHE = 4
 const MAX_PAUSE_MS = 5000
 const WIEDERHOLEN = new Set([429, 503])
+// Nach einem Abruf, der trotz aller Versuche gedrosselt blieb, versucht spur eine Minute lang je DOI nur einmal:
+// Sonst wartet ein Prüfbericht mit vielen DOIs bei einem Ausfall für jede DOI die vollen Pausen ab.
+const AUSFALL_MS = 60 * 1000
+let ausfallBis = 0
 
 function pauseMs(antwort, versuch) {
   const kopf = antwort.headers.get('retry-after')
@@ -55,13 +59,15 @@ async function abrufen(doi) {
   if (umgebung('CROSSREF_MAILTO')) {
     url.searchParams.set('mailto', umgebung('CROSSREF_MAILTO'))
   }
+  const versuche = Date.now() < ausfallBis ? 1 : VERSUCHE
   for (let versuch = 1; ; versuch++) {
     const antwort = await fetch(url, { signal: AbortSignal.timeout(10000) })
     if (antwort.status === 404) return { gefunden: false }
-    if (WIEDERHOLEN.has(antwort.status) && versuch < VERSUCHE) {
+    if (WIEDERHOLEN.has(antwort.status) && versuch < versuche) {
       await new Promise(weiter => setTimeout(weiter, pauseMs(antwort, versuch)))
       continue
     }
+    if (WIEDERHOLEN.has(antwort.status)) ausfallBis = Date.now() + AUSFALL_MS
     if (!antwort.ok) throw new Error(`Crossref antwortet ${antwort.status}`)
     const { message } = await antwort.json()
     return werkAuswerten(message)

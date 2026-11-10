@@ -7,7 +7,7 @@ import OLButton from '@/shared/components/ol/ol-button'
 import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
-import { type Bericht, pruefen, pruefenWennNoetig, pruefStore, type StellenStatus, Zeile } from './pruef-store'
+import { type Bericht, pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, Zeile } from './pruef-store'
 
 type Stufe = 'success' | 'warning' | 'danger' | 'info'
 
@@ -71,11 +71,9 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
   )
 }
 
-const STATUS: StellenStatus[] = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar']
-
 function Zaehlung({ zaehlung }: { zaehlung: Bericht['zaehlung'] }) {
   const { t } = useTranslation()
-  const teile = STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s] }))
+  const teile = STELLEN_STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s] }))
   return <p className="spur-zeile-meta">{t('spur_zitierstellen', { liste: teile.join(', ') })}</p>
 }
 

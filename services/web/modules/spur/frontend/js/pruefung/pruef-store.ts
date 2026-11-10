@@ -20,7 +20,8 @@ export type Zeile = {
   grund: string | null
 }
 
-export type StellenStatus = 'geprueft' | 'ohne_quelle' | 'ohne_seitenangabe' | 'nicht_pruefbar'
+export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar'] as const
+export type StellenStatus = (typeof STELLEN_STATUS)[number]
 
 export type Bericht = {
   zeilen: Zeile[]

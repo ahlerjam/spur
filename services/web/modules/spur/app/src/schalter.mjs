@@ -50,8 +50,9 @@ const FAKE_STANDARD = { UNPAYWALL_EMAIL: 'fake@example.org' }
 
 // Umgebungsvariable, im Dev-Stack über den Fake umschaltbar (leerer Text heißt: nicht gesetzt).
 export function umgebung(name) {
-  if (IST_DEV && name in devUeberschreibung) return devUeberschreibung[name]
-  return process.env[name] || (paperApiBasis() ? FAKE_STANDARD[name] : undefined)
+  const gesetzt = wert(name)
+  if (gesetzt === undefined && paperApiBasis()) return FAKE_STANDARD[name]
+  return gesetzt || undefined
 }
 
 export const semantikAn = () => wert('SPUR_SEMANTIC_SEARCH') === 'true'

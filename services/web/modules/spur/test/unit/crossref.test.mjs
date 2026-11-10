@@ -37,7 +37,7 @@ beforeEach(async () => {
   abrufe = []
   cache = new Map()
   schalter = schalterAttrappe()
-  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
   vi.setSystemTime(new Date('2026-11-07T10:00:00Z'))
   vi.resetModules()
   vi.doMock('../../app/src/schalter.mjs', () => schalter.modul)
@@ -136,8 +136,6 @@ describe('werk', () => {
 
   // Die Pausen laufen mit falschen Uhren; gemessen wird die vergangene Zeit.
   async function mitPausen(aufruf) {
-    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
-    vi.setSystemTime(new Date('2026-11-07T10:00:00Z'))
     const start = Date.now()
     const ergebnis = aufruf()
     await vi.runAllTimersAsync()
@@ -165,6 +163,17 @@ describe('werk', () => {
     const { ergebnis, ms } = await mitPausen(() => Crossref.werk('10.1/a'))
     expect(ergebnis.gefunden).toBe(true)
     expect(ms).toBe(5000)
+  })
+
+  it('versucht nach einem ganz gescheiterten Abruf eine Minute lang je DOI nur einmal', async () => {
+    antworten(json({}, 503))
+    await mitPausen(() => Crossref.werk('10.1/a'))
+    expect(abrufe).toHaveLength(4)
+    expect((await mitPausen(() => Crossref.werk('10.1/b'))).ergebnis).toBeNull()
+    expect(abrufe).toHaveLength(5)
+    vi.setSystemTime(Date.now() + 61 * 1000)
+    await mitPausen(() => Crossref.werk('10.1/c'))
+    expect(abrufe).toHaveLength(9)
   })
 
   it('wiederholt andere Fehler nicht', async () => {
