@@ -1,5 +1,6 @@
 import OError from '@overleaf/o-error'
 import metrics from '@overleaf/metrics'
+import Modules from '../../infrastructure/Modules.mjs'
 import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import mongodb from 'mongodb-legacy'
@@ -239,6 +240,8 @@ async function _createBlankProject(
   metrics.inc('project-creation')
   const timer = new metrics.Timer('project-creation')
   await ProjectDetailsHandler.promises.validateProjectName(projectName)
+  // spur: project limit per owner (new, template, ZIP and copy all pass here); throws when it is reached.
+  await Modules.promises.hooks.fire('beforeProjectCreated', ownerId)
 
   const rootFolder = new Folder({ name: 'rootFolder' })
 

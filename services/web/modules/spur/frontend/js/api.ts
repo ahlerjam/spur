@@ -3,7 +3,8 @@ import getMeta from '@/utils/meta'
 export class ApiFehler extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
+    readonly daten?: { fehler?: Record<string, string> }
   ) {
     super(message)
   }
@@ -25,7 +26,7 @@ export async function anfrage<T>(pfad: string, init: RequestInit = {}) {
   const typ = antwort.headers.get('Content-Type') ?? ''
   const inhalt = /json/.test(typ) ? await antwort.json() : null
   if (!antwort.ok) {
-    throw new ApiFehler(inhalt?.detail ?? antwort.statusText, antwort.status)
+    throw new ApiFehler(inhalt?.detail ?? antwort.statusText, antwort.status, inhalt)
   }
   return inhalt as T
 }

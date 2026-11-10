@@ -1,7 +1,12 @@
 // Nur mit SPUR_DEV=1 eingehängt (SpurRouter): Testseite für Web-Schnappschüsse und ein Schalter,
 // mit dem der E2E-Test SPUR_NOW für einen Schritt fest- und danach wieder freigibt.
 import { readFileSync } from 'node:fs'
+import { appendFile } from 'node:fs/promises'
+import { db } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { dateiPfad } from '../QuellenManager.mjs'
+import { quellen } from '../sammlungen.mjs'
 import { zeitFestlegen } from '../schalter.mjs'
+import { mailFakeAus } from './MailFake.mjs'
 
 const TESTSEITE = new URL('../../../test/fixtures/testseite.html', import.meta.url)
 
@@ -23,9 +28,21 @@ export function zeitSetzen(req, res) {
 export async function e2eVorbereiten(_req, res) {
   try {
     const { e2eDatenVorbereiten } = await import('../../../test/e2e/vorbereiten.mjs')
+    await mailFakeAus()
     await e2eDatenVorbereiten()
     res.sendStatus(204)
   } catch (error) {
     res.status(500).send(`E2E-Daten nicht bereit: ${error.message}`)
   }
+}
+
+// Ändert eine Quelldatei in der Ablage, ohne den gespeicherten Stand anzufassen: Der E2E-Test prüft damit
+// „Speicher neu berechnen“.
+export async function quelleVergroessern(req, res) {
+  const { projekt, bytes } = req.body ?? {}
+  const p = await db.projects.findOne({ name: projekt }, { projection: { _id: 1 } })
+  const quelle = p && (await (await quellen()).findOne({ projectId: p._id }))
+  if (!quelle || !(bytes > 0)) return res.status(422).json({ detail: 'Projekt mit Quelle und bytes > 0 nötig.' })
+  await appendFile(dateiPfad(quelle), Buffer.alloc(bytes))
+  res.sendStatus(204)
 }

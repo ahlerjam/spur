@@ -158,6 +158,7 @@ describe('UserActivateController', function () {
         .calledWith({
           email: ctx.email,
           setNewPasswordUrl: ctx.url,
+          emailConfigured: sinon.match.bool,
         })
         .should.equal(true)
     })

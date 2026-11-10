@@ -154,6 +154,11 @@ describe('ProjectUploadController', function () {
       })
     )
 
+    // spur: the storage hook before an upload; no limit in these tests.
+    vi.doMock('../../../../app/src/infrastructure/Modules.mjs', () => ({
+      default: { promises: { hooks: { fire: sinon.stub().resolves([]) } } },
+    }))
+
     vi.doMock('node:fs', () => ({
       default: (ctx.fs = {}),
     }))
@@ -367,7 +372,7 @@ describe('ProjectUploadController', function () {
     })
 
     describe('successfully', function () {
-      beforeEach(function (ctx) {
+      beforeEach(async function (ctx) {
         ctx.entity = {
           _id: '1234',
           type: 'file',
@@ -375,7 +380,7 @@ describe('ProjectUploadController', function () {
         ctx.FileSystemImportManager.addEntity = sinon
           .stub()
           .callsArgWith(6, null, ctx.entity)
-        ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
+        await ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
       })
 
       it('should insert the file', function (ctx) {
@@ -487,11 +492,11 @@ describe('ProjectUploadController', function () {
     })
 
     describe('when FileSystemImportManager.addEntity returns a generic error', function () {
-      beforeEach(function (ctx) {
+      beforeEach(async function (ctx) {
         ctx.FileSystemImportManager.addEntity = sinon
           .stub()
           .callsArgWith(6, new Error('Sorry something went wrong'))
-        ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
+        await ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
       })
 
       it('should return an unsuccessful response to the FileUploader client', function (ctx) {
@@ -508,11 +513,11 @@ describe('ProjectUploadController', function () {
     })
 
     describe('when FileSystemImportManager.addEntity returns a too many files error', function () {
-      beforeEach(function (ctx) {
+      beforeEach(async function (ctx) {
         ctx.FileSystemImportManager.addEntity = sinon
           .stub()
           .callsArgWith(6, new TooManyFilesError('project_has_too_many_files'))
-        ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
+        await ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
       })
 
       it('should return an unsuccessful response to the FileUploader client', function (ctx) {
@@ -530,9 +535,9 @@ describe('ProjectUploadController', function () {
     })
 
     describe('with an invalid filename', function () {
-      beforeEach(function (ctx) {
+      beforeEach(async function (ctx) {
         ctx.req.body.name = ''
-        ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
+        await ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
       })
 
       it('should return a non success response', function (ctx) {
@@ -550,9 +555,9 @@ describe('ProjectUploadController', function () {
     })
 
     describe('with a filename that is too long', function () {
-      beforeEach(function (ctx) {
+      beforeEach(async function (ctx) {
         ctx.req.body.name = 'a'.repeat(151)
-        ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
+        await ctx.ProjectUploadController.uploadFile(ctx.req, ctx.res)
       })
 
       it('should return a non success response', function (ctx) {

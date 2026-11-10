@@ -2,6 +2,7 @@ import Path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import UserGetter from '../../../../app/src/Features/User/UserGetter.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
+import { emailIsConfigured } from '../../../../app/src/Features/Email/EmailConfiguration.mjs'
 import ErrorController from '../../../../app/src/Features/Errors/ErrorController.mjs'
 import { expressify } from '@overleaf/promise-utils'
 import { z, parseReq } from '../../../../app/src/infrastructure/Validation.mjs'
@@ -31,6 +32,7 @@ async function register(req, res, next) {
   res.json({
     email: user.email,
     setNewPasswordUrl,
+    emailConfigured: emailIsConfigured(),
   })
 }
 

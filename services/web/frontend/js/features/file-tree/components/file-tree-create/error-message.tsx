@@ -99,6 +99,8 @@ export default function ErrorMessage({
         )
 
       default:
+        // spur: the server sends some errors as a sentence (storage limit), not as a key
+        if (error.includes(' ')) return <DangerMessage>{error}</DangerMessage>
         // TODO: convert error.response.data to an error key and try again?
         // return error
         return (

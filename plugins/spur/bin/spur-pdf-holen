@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Lädt ein PDF aus legalen freien Quellen (Unpaywall, arXiv). Gibt nur den Dateipfad aus.
+set -u
+
+hilfe() {
+  cat <<'TXT'
+Aufruf: spur-pdf-holen <DOI> [ziel]
+
+Lädt ein frei verfügbares PDF (Unpaywall, bei arXiv-DOIs direkt arXiv) in den Ordner
+[ziel] (Standard: .) und gibt den Pfad der Datei aus.
+
+Umgebung:
+  UNPAYWALL_EMAIL        Mail für die Unpaywall-API (sonst git config user.email)
+  SPUR_UNPAYWALL_BASE    Standard https://api.unpaywall.org
+  SPUR_ARXIV_BASE        Standard https://arxiv.org
+TXT
+}
+
+case "${1:-}" in
+  -h|--help) hilfe; exit 0 ;;
+  "") hilfe >&2; exit 2 ;;
+esac
+
+doi=$1
+ziel=${2:-.}
+unpaywall=${SPUR_UNPAYWALL_BASE:-https://api.unpaywall.org}
+arxiv=${SPUR_ARXIV_BASE:-https://arxiv.org}
+unpaywall=${unpaywall%/}
+arxiv=${arxiv%/}
+
+doi=${doi#https://doi.org/}
+doi=${doi#http://doi.org/}
+doi=${doi#doi:}
+
+mkdir -p "$ziel" || { echo "Zielordner nicht anlegbar: $ziel" >&2; exit 1; }
+name=$(printf '%s' "$doi" | sed 's/[^A-Za-z0-9._-]/_/g; s/^\.*//')
+[ -n "$name" ] || { echo "Ungültige DOI" >&2; exit 2; }
+datei="${ziel%/}/$name.pdf"
+tmp=$(mktemp "${ziel%/}/.spur-pdf.XXXXXX") || { echo "Keine temporäre Datei im Zielordner" >&2; exit 1; }
+trap 'rm -f "$tmp"' EXIT
+
+# Gibt 0 zurück, wenn die Datei geladen wurde und mit %PDF- beginnt.
+# Setzt $fehler auf "keine PDF-Datei" bzw. die Ursache des Abbruchs.
+laden() {
+  fehler=
+  if ! curl -sSL -f --max-time 120 -A "spur-pdf-holen" -o "$tmp" -- "$1" 2>/dev/null; then
+    fehler="Download fehlgeschlagen"
+    return 1
+  fi
+  if [ "$(head -c 5 "$tmp")" != "%PDF-" ]; then
+    fehler="keine PDF-Datei"
+    return 1
+  fi
+}
+
+fertig() {
+  mv "$tmp" "$datei" || exit 1
+  printf '%s\n' "$datei"
+  exit 0
+}
+
+fehler=
+case "$doi" in
+  10.48550/[aA][rR][xX][iI][vV].*)
+    id=${doi#10.48550/[aA][rR][xX][iI][vV].}
+    laden "$arxiv/pdf/$id" && fertig
+    ;;
+esac
+
+mail=${UNPAYWALL_EMAIL:-}
+[ -n "$mail" ] || mail=$(git config user.email 2>/dev/null || true)
+if [ -z "$mail" ]; then
+  echo "Keine Mail für Unpaywall: UNPAYWALL_EMAIL setzen oder git config user.email" >&2
+  exit 2
+fi
+
+# Nur Zeichen kodieren, die in einem Pfad oder einer Query stören
+doi_url=$(printf '%s' "$doi" | sed 's/%/%25/g; s/ /%20/g; s/?/%3F/g; s/#/%23/g')
+if ! antwort=$(curl -sS -f --max-time 60 -A "spur-pdf-holen" "$unpaywall/v2/$doi_url?email=$mail" 2>/dev/null); then
+  echo "keine freie Version gefunden (Unpaywall kennt die DOI nicht oder antwortet nicht)" >&2
+  exit 1
+fi
+flach=$(printf '%s' "$antwort" | tr -d '\n')
+best=$(printf '%s' "$flach" | grep -o '"best_oa_location": *{[^}]*}' | head -n 1)
+url=
+for quelle in "$best" "$flach"; do
+  url=$(printf '%s' "$quelle" | grep -o '"url_for_pdf": *"[^"]*"' | head -n 1 | sed 's/^"url_for_pdf": *"//; s/"$//')
+  [ -n "$url" ] && break
+done
+url=$(printf '%s' "$url" | sed 's/\\u0026/\&/g; s#\\/#/#g')
+if [ -z "$url" ]; then
+  echo "keine freie Version gefunden" >&2
+  exit 1
+fi
+
+laden "$url" && fertig
+echo "${fehler:-Download fehlgeschlagen}: $url" >&2
+exit 1

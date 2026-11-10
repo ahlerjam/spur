@@ -6,6 +6,8 @@ import * as QuellenManager from './app/src/QuellenManager.mjs'
 import * as ClaudeZugang from './app/src/ClaudeZugang.mjs'
 import { mcpJson } from './app/src/mcp/McpEndpunkt.mjs'
 import { beobachten } from './app/src/Beobachter.mjs'
+import { projektAnlegenPruefen } from './app/src/grenzen/Grenzen.mjs'
+import * as Speicher from './app/src/Speicher.mjs'
 
 const SpurModule = {
   router: SpurRouter,
@@ -16,6 +18,10 @@ const SpurModule = {
   hooks: {
     promises: {
       projectExpired: QuellenManager.projektAufraeumen,
+      beforeProjectCreated: projektAnlegenPruefen,
+      reserveProjectStorage: Speicher.reservieren,
+      beforeProjectOwnerChanged: projektAnlegenPruefen,
+      checkProjectStorage: Speicher.nichtVollPruefen,
       deleteUser: ClaudeZugang.kontoAufraeumen,
       expireDeletedUser: ClaudeZugang.kontoAufraeumen,
       // Der Hinweis im Klon ist ein Nebeneffekt: Er darf das Duplizieren nicht scheitern lassen.

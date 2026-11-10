@@ -1,4 +1,6 @@
 # Prüft jeden Pull Request auf spur: Stack aus dem Dev-Image, Unit-Tests und die E2E-Suite.
+# `test` und `upstream` sind Pflicht-Prüfungen und laufen deshalb immer als Job mit festem Namen; der Job
+# `changes` entscheidet nach tools/ci/aenderungen.mjs, ob die Schritte laufen oder der Job sofort Erfolg meldet.
 name: CI
 
 on:
@@ -14,26 +16,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Ermittelt die geänderten Dateien des Pull Requests. Kein `paths:` am Workflow: sonst bliebe die
+  # Pflicht-Prüfung bei Doku-Änderungen aus und der PR hinge.
+  changes:
+    runs-on: ${{ fromJSON(vars.RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    outputs:
+      test: ${{ steps.pfade.outputs.test }}
+      upstream: ${{ steps.pfade.outputs.upstream }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: pfade
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: node tools/ci/aenderungen.mjs
+
   test:
     # MongoDB 8 startet nicht auf Linux-Kerneln 6.19 bis 7.0.13 (SERVER-121912); daher dieser Runner.
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    needs: changes
+    # Läuft auch, wenn `changes` scheitert (dann ohne Ausgabe, also voll); ein übersprungener Job würde die Pflicht-Prüfung erfüllen.
+    if: ${{ !cancelled() }}
     steps:
+      - name: Prüfung gemeldet, nichts zu tun
+        if: needs.changes.outputs.test == 'leicht'
+        run: echo "Keine Änderung, die diese Prüfung braucht (tools/ci/aenderungen.mjs)."
       - uses: actions/checkout@v7
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
       - name: spur-dev einrichten
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
         run: |
           uname -r
           tools/spur-dev/spur-dev install
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
       - name: Stack starten
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
         run: spur-dev up
       - name: Werkzeuge im Container prüfen
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
         run: |
           docker exec spur-dev-web bash -lc 'set -e; qpdf --version | head -1; pdftotext -v 2>&1 | head -1; cd /overleaf/services/web/modules/spur/test/fixtures && qpdf smith2024.pdf --json --json-key=pagelabels | tr -d " \n"; echo; pdftotext -raw smith2024.pdf - | head -3'
       - name: Unit-Tests
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
         run: spur-dev test
       - name: Playwright einrichten
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
         working-directory: ${{ runner.temp }}
         run: |
           npm init -y >/dev/null
@@ -52,11 +83,12 @@ jobs:
           process.exit(/FEHLER/.test(ergebnis) ? 1 : 0)
           EOF
       - name: E2E
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
         run: |
           spur-dev run modules/spur/test/e2e/vorbereiten.mjs | tail -1
           node "$RUNNER_TEMP/e2e.mjs" services/web/modules/spur/test/e2e/spur-e2e.js
       - name: Logs bei Fehler
-        if: failure()
+        if: ${{ needs.changes.outputs.test != 'leicht' && failure() }}
         run: |
           for c in spur-dev-mongo spur-dev-redis spur-dev-web; do echo "== $c"; docker logs --tail 80 "$c" 2>&1 || true; done
           spur-dev logs web 200 || true
@@ -66,28 +98,39 @@ jobs:
   upstream:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    needs: changes
+    # Läuft auch, wenn `changes` scheitert (dann ohne Ausgabe, also voll); ein übersprungener Job würde die Pflicht-Prüfung erfüllen.
+    if: ${{ !cancelled() }}
     steps:
+      - name: Prüfung gemeldet, nichts zu tun
+        if: needs.changes.outputs.upstream == 'leicht'
+        run: echo "Keine Änderung, die diese Prüfung braucht (tools/ci/aenderungen.mjs)."
       - run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
+        if: ${{ needs.changes.outputs.upstream != 'leicht' }}
       - uses: actions/checkout@v7
+        if: ${{ needs.changes.outputs.upstream != 'leicht' }}
       - name: Auswertung testen
+        if: ${{ needs.changes.outputs.upstream != 'leicht' }}
         run: node --test tools/tests/upstream-auswertung.test.mjs tools/tests/befehlsnamen.test.mjs tools/tests/abhaengigkeiten.test.mjs
       - name: spur-dev einrichten
+        if: ${{ needs.changes.outputs.upstream != 'leicht' }}
         run: |
           tools/spur-dev/spur-dev install
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           docker pull -q ghcr.io/ahlerjam/spur-dev:amd64
       - name: web-Unit
+        if: ${{ needs.changes.outputs.upstream != 'leicht' }}
         run: spur-dev upstream web
       - name: Frontend
-        if: ${{ !cancelled() }}
+        if: ${{ needs.changes.outputs.upstream != 'leicht' && !cancelled() }}
         run: spur-dev upstream frontend
       - name: document-updater
-        if: ${{ !cancelled() }}
+        if: ${{ needs.changes.outputs.upstream != 'leicht' && !cancelled() }}
         run: spur-dev upstream du
       - name: Laufzeit
-        if: always()
+        if: ${{ needs.changes.outputs.upstream != 'leicht' && always() }}
         run: |
           echo "Laufzeit des Jobs: $(( ($(date +%s) - START) / 60 )) min $(( ($(date +%s) - START) % 60 )) s (Grenze 30 min)"
       - name: Protokolle bei Fehler
-        if: failure() || cancelled()
+        if: ${{ needs.changes.outputs.upstream != 'leicht' && (failure() || cancelled()) }}
         run: tail -n 60 ~/.cache/spur-dev/upstream/aktuell/*.log

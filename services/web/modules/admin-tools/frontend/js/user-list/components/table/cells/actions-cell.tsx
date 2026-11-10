@@ -6,6 +6,7 @@ import { FlagUserButtonTooltip } from './action-buttons/flag-user-button'
 import { UpdateUserButtonTooltip } from './action-buttons/update-user-button'
 import { ShowUserInfoButtonTooltip } from './action-buttons/show-user-info-button'
 import { SendRegEmailButtonTooltip } from './action-buttons/send-reg-email-button'
+import { NewInviteLinkButtonTooltip } from './action-buttons/new-invite-link-button'
 import { User } from '../../../../../../types/user/api'
 
 type ActionsCellProps = {
@@ -18,6 +19,7 @@ export default function ActionsCell({ user }: ActionsCellProps) {
     <div className="d-flex flex-wrap justify-content-end">
       <span style={isSelf ? { visibility: 'hidden' } : undefined} >
         <SendRegEmailButtonTooltip user={user} />
+        <NewInviteLinkButtonTooltip user={user} />
       </span>
       <span>
         <ShowUserInfoButtonTooltip user={user} />
