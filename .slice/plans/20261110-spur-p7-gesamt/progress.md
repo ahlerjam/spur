@@ -66,6 +66,9 @@
 ## Needs decision
 
 ## Vorschläge (außerhalb dieses Plans)
+- E2E (ältere Features): f10 wartet 65 s auf „Claude nicht verbunden“ (Herzschlag gilt nach 60 s als weg) und f13 auf
+  die Lauf-Karte; in einem von drei vollen Läufen dieses Plans liefen beide unter Last in die Wartezeit, einzeln und
+  im letzten vollen Lauf grün. Mehr Spielraum in diesen Wartezeiten würde die Suite stabiler machen.
 - Simplify (Altitude, nicht umgesetzt): ob Mail eingerichtet ist, könnte `EmailSender` selbst sagen statt der eigenen
   Heuristik in `EmailConfiguration.mjs`; die Speicher-Grenze könnte an einer gemeinsamen Stelle für alle Datei-Wege
   greifen (etwa `ProjectEntityUpdateHandler`) statt in Upload- und LinkedFiles-Controller; `/admin/register` und
