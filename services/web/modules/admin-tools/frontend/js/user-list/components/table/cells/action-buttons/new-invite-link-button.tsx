@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, type ReactElement, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLTooltip from '@/shared/components/ol/ol-tooltip'
 import OLIconButton from '@/shared/components/ol/ol-icon-button'
@@ -18,8 +18,15 @@ import { User } from '../../../../../../../types/user/api'
 
 type NewLinkResult = { activationUrl: string; emailConfigured: boolean }
 
-// spur: creates a fresh one-week activation link, also for accounts that are already active.
-function NewInviteLinkButton({ user }: { user: User }) {
+// spur: creates a fresh one-week activation link, also for accounts that are already active. Like the other
+// actions, the row icon (desktop) and the dropdown item (narrow screens) share one modal.
+function NewInviteLinkButton({
+  user,
+  children,
+}: {
+  user: User
+  children: (text: string, open: () => void) => ReactElement
+}) {
   const { t } = useTranslation()
   const text = t('spur_neuer_einladungslink')
   const [show, setShow] = useState(false)
@@ -35,19 +42,7 @@ function NewInviteLinkButton({ user }: { user: User }) {
 
   return (
     <>
-      <OLTooltip
-        id={`new-invite-link-${user.id}`}
-        description={text}
-        overlayProps={{ placement: 'top', trigger: ['hover', 'focus'] }}
-      >
-        <OLIconButton
-          onClick={open}
-          variant="link"
-          accessibilityLabel={text}
-          className="action-btn"
-          icon="link"
-        />
-      </OLTooltip>
+      {children(text, open)}
       {show && (
         <OLModal show animation onHide={() => setShow(false)} id="new-invite-link-modal">
           <OLModalHeader>
@@ -75,4 +70,20 @@ function NewInviteLinkButton({ user }: { user: User }) {
   )
 }
 
-export default memo(NewInviteLinkButton)
+export const NewInviteLinkButtonTooltip = memo(function NewInviteLinkButtonTooltip({ user }: { user: User }) {
+  return (
+    <NewInviteLinkButton user={user}>
+      {(text, open) => (
+        <OLTooltip
+          id={`new-invite-link-${user.id}`}
+          description={text}
+          overlayProps={{ placement: 'top', trigger: ['hover', 'focus'] }}
+        >
+          <OLIconButton onClick={open} variant="link" accessibilityLabel={text} className="action-btn" icon="link" />
+        </OLTooltip>
+      )}
+    </NewInviteLinkButton>
+  )
+})
+
+export default NewInviteLinkButton

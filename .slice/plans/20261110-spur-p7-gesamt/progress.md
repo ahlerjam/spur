@@ -39,6 +39,12 @@
 - f11: Eine Migration ist nicht nötig: Ohne Eintrag in `spurLimits` gilt unbegrenzt.
 - f9: Overleafs `ProjectUploadController.test.mjs` ruft `uploadFile` jetzt mit `await` auf und mockt `Modules`,
   weil der Speicher-Hook vor dem Upload asynchron läuft.
+- Abschluss: „Neuen Einladungslink erzeugen“ steht jetzt auch im ⋮-Menü der Nutzerliste; bei schmalen Bildschirmen
+  zeigt admin-tools dort statt der Symbolknöpfe nur dieses Menü (beim Screenshot bei 360 px aufgefallen).
+- Abschluss: `make setup` mit „nein“ zur Mail lässt vorhandene Mail-Werte stehen (Code-Review-Befund); so verlangt es
+  die Entscheidung „ändert vorhandene Werte nur nach Rückfrage“.
+- Abschluss: „Passwort vergessen“ ohne Mail antwortet mit 503; der Browser meldet die Antwort als Netzwerkfehler in
+  der Konsole (wie Overleaf bei 400/404). Kein JavaScript-Fehler.
 - Frontend-Suite: `notifications.test.tsx`, `survey-widget.test.tsx` und `project-tools-rename.test.tsx` scheitern
   auch mit dem Frontend-Stand der Basis, wenn man sie einzeln startet (Reihenfolge der Tests); im vollen Lauf
   bekannt bzw. grün.
@@ -60,6 +66,13 @@
 ## Needs decision
 
 ## Vorschläge (außerhalb dieses Plans)
+- Simplify (Altitude, nicht umgesetzt): ob Mail eingerichtet ist, könnte `EmailSender` selbst sagen statt der eigenen
+  Heuristik in `EmailConfiguration.mjs`; die Speicher-Grenze könnte an einer gemeinsamen Stelle für alle Datei-Wege
+  greifen (etwa `ProjectEntityUpdateHandler`) statt in Upload- und LinkedFiles-Controller; `/admin/register` und
+  `user-activate` könnten entfallen, wenn der Dialog in der Nutzerliste reicht.
+- Projektliste: „3 von 3 Projekten“ (Grenze) steht nahe an Overleafs „Es werden 3 von 3 Projekten angezeigt“;
+  eine eindeutigere Formulierung wie „3 von 3 erlaubten Projekten“ wäre klarer (Owner-Entscheidung zum Text).
+- Verknüpfte Dateien prüfen nur „schon voll“ und reservieren nichts, weil die Größe vorher unbekannt ist.
 - f5: Mit `docker-compose.sandbox.yml` kompiliert ein anderes TeX-Live-Image; „schon im Image“ prüft die
   Paketdatenbank des Web-Containers. Bei abweichenden Images müsste das Werkzeug die Datenbank des Compile-Images
   lesen.
