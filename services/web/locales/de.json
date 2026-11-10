@@ -2439,6 +2439,7 @@
   "some_works_could_not_be_fetched": "Einige Referenzen konnten nicht abgerufen werden",
   "some_works_could_not_be_imported": "Einige Publikationen konnten nicht importiert werden",
   "spur_claude_starten": "Starte Claude Code im Terminal mit diesem Befehl. Claude wartet danach von selbst auf Aufträge aus diesem Panel:",
+  "spur_claude_wird_benachrichtigt": "Claude wird benachrichtigt",
   "spur_schritt_starten_text": "Starte damit Claude Code im Terminal. Claude wartet dann von selbst auf Aufträge aus spur und darf dort schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.",
   "spur_start_prompt": "Warte mit wait_for_event auf Aufträge aus spur.",
   "untitled": "Ohne Titel",

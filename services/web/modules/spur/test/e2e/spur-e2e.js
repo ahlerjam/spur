@@ -2599,7 +2599,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
         return 'rgb(255, 255, 255)'
       }
       const schlecht = []
-      for (const el of wurzel.querySelectorAll('*')) {
+      for (const el of [wurzel, ...wurzel.querySelectorAll('*')]) {
         if (!el.offsetParent || el.closest('[disabled], .disabled, [aria-disabled=true]')) continue
         if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue
         const [a, b] = [hell(rgb(getComputedStyle(el).color)), hell(rgb(hinten(el)))]
@@ -3221,6 +3221,75 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       geschlossen.doc_id === kapitel.id && geschlossen.pfad === 'kapitel.tex' && geschlossen.stelle?.markiert === '81,2 Prozent' && geschlossen.stelle.zeile === 1,
       `Geschlossenes Dokument: ${JSON.stringify(geschlossen)}`
     )
+  }
+
+  features.p6f3 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E P6 Kommentar')
+    await imEditorMarkieren('Ergebnisse')
+    await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
+    const feld = page.locator('.review-panel-add-comment-editor .cm-content').first()
+    const formular = page.locator('form.review-panel-entry-content')
+    const hinweis = formular.getByText('Claude wird benachrichtigt', { exact: true })
+    await feld.waitFor()
+    await feld.click()
+    await page.keyboard.type('@claude bitte ansehen')
+    await hinweis.waitFor({ timeout: 5000 })
+    const hinweisKasten = formular.locator('.spur-claude-hinweis')
+    ok(!(await unlesbar(hinweisKasten)).length, `Hinweis schlecht lesbar: ${await unlesbar(hinweisKasten)}`)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('ControlOrMeta+Home')
+    for (let i = 0; i < '@claude '.length; i++) await page.keyboard.press('Delete')
+    await hinweis.waitFor({ state: 'detached', timeout: 5000 })
+    await page.keyboard.press('ControlOrMeta+End')
+    await page.keyboard.type(' an mail@claude.de')
+    await page.waitForTimeout(500)
+    ok(!(await hinweis.isVisible()), 'Hinweis bei mail@claude.de')
+    await page.keyboard.press('ControlOrMeta+Home')
+    await page.keyboard.type('@claude ')
+    await page.keyboard.press('Escape')
+    await hinweis.waitFor({ timeout: 5000 })
+    await formular.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click()
+
+    const thread = page.locator('.review-panel-entry', { hasText: 'bitte ansehen an mail@claude.de' })
+    const marken = thread.locator('.review-panel-comment-body .spur-claude-erwaehnung')
+    await marken.first().waitFor()
+    ok((await marken.allTextContents()).join() === '@claude', `Hervorgehoben: ${await marken.allTextContents()}`)
+    const farben = await thread.locator('.review-panel-comment-body').first().evaluate(el => {
+      const marke = el.querySelector('.spur-claude-erwaehnung')
+      return [getComputedStyle(marke).color, getComputedStyle(el).color]
+    })
+    ok(farben[0] !== farben[1], `@claude nicht farbig: ${farben}`)
+    const [r, g, b] = farben[0].match(/\d+/g).map(Number)
+    ok(b > r && b > g, `@claude nicht blau: ${farben[0]}`)
+
+    await thread.locator('.review-panel-comment-input .cm-content').click()
+    await page.keyboard.type('Und @claude auch hier.')
+    await thread.getByText('Claude wird benachrichtigt', { exact: true }).waitFor({ timeout: 5000 })
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await thread.locator('.review-panel-comment-body', { hasText: 'auch hier.' }).waitFor()
+    ok((await marken.count()) === 2, `Antwort ohne Hervorhebung: ${await marken.count()}`)
+
+    // Die Kommentar-Op geht gesammelt raus; vor dem Neuladen muss der Server sie kennen.
+    const pid = page.url().split('/').pop()
+    const gespeichert = async () =>
+      (await (await page.request.get(`${BASE}/project/${pid}/ranges`)).json()).some(doc => doc.ranges.comments?.length)
+    for (let ende = Date.now() + 20000; !(await gespeichert()); await page.waitForTimeout(250)) {
+      ok(Date.now() < ende, 'Kommentar nach 20 s nicht beim Server')
+    }
+    for (const thema of ['', 'light-']) {
+      await mitDesign(thema, async () => {
+        await page.reload()
+        await page.locator('.cm-content').first().waitFor()
+        const eintrag = page.locator('.review-panel-entry', { hasText: 'bitte ansehen an mail@claude.de' })
+        await panelSichern('Review panel', eintrag.locator('.review-panel-comment-body').first())
+        await eintrag.locator('.spur-claude-erwaehnung').first().waitFor()
+        const schlecht = await unlesbar(eintrag.locator('.review-panel-comment-body').first())
+        ok(schlecht.length === 0, `Kommentar im Design „${thema || 'dunkel'}“: ${schlecht}`)
+      })
+    }
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

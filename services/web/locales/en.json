@@ -4054,6 +4054,7 @@
   "some_works_could_not_be_fetched": "Some references could not be fetched",
   "some_works_could_not_be_imported": "Some works could not be imported",
   "spur_claude_starten": "Start Claude Code in your terminal with this command. Claude then waits for tasks from this panel on its own:",
+  "spur_claude_wird_benachrichtigt": "Claude will be notified",
   "spur_schritt_starten_text": "Run this to start Claude Code in your terminal. Claude then waits for tasks from spur on its own and can write there without asking at every step. You need it each time you start Claude Code. It is also in the Claude panel of your project.",
   "spur_start_prompt": "Use wait_for_event to wait for tasks from spur.",
   "untitled": "Untitled",

@@ -855,3 +855,19 @@
     margin: 0 0 var(--spacing-02);
   }
 }
+
+// @claude im Kommentar: blau wie Overleafs Erwähnungen (.mention-badge), in beiden Designs.
+.spur-claude-erwaehnung {
+  color: var(--content-info-themed);
+  font-weight: 600;
+}
+
+.spur-claude-hinweis {
+  margin-top: var(--spacing-02);
+  font-size: var(--font-size-02);
+  color: var(--content-secondary-themed);
+
+  &:empty {
+    display: none;
+  }
+}

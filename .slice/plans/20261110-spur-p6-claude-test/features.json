@@ -12,7 +12,7 @@
     "Ein Fake-Client, der mit `wait_for_event` wartet, erhält das Ereignis mit `doc_id` von main.tex, `pfad` „main.tex“ und `stelle.markiert` „75,7 Prozent“ sowie der richtigen Zeilennummer",
     "Derselbe Ablauf in einem Dokument, das seit mehr als 10 Minuten geschlossen ist, liefert ebenfalls Dokument, Pfad und Stelle"
   ]},
-  {"id": "f3", "title": "@claude ist im Kommentar hervorgehoben", "ui": true, "passes": false, "steps": [
+  {"id": "f3", "title": "@claude ist im Kommentar hervorgehoben", "ui": true, "passes": true, "steps": [
     "Nutzer tippt in das Kommentarfeld „@claude bitte ansehen“ und sieht unter dem Feld den Hinweis „Claude wird benachrichtigt“",
     "Er löscht „@claude“ wieder; der Hinweis verschwindet. „mail@claude.de“ zeigt keinen Hinweis",
     "Nach dem Absenden steht „@claude“ im Kommentar blau hervorgehoben, der Rest normal; Kontrast mindestens 4,5:1 im hellen und im dunklen Design",
