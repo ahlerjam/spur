@@ -21,7 +21,7 @@ Status: draft before run 0. Changes to names and error codes count as a breaking
 | `project_list`, `doc_list`, `doc_read` | P1 | Read projects and documents |
 | `sources_list`, `source_search`, `source_read` | P1 | Search sources and read sections |
 | `quote_mark` | P1 | Mark a passage in a source |
-| `check_report` | P1 | Check report of the project |
+| `check_report` | P1 | Check report of the project; `zaehlung` counts citations by `status` (`geprueft`, `ohne_quelle`, `ohne_seitenangabe`, `nicht_pruefbar`), and every citation that was not checked names its `grund` (P6) |
 | `bib_list` | P1 | References and their status |
 | `doc_edit` | P1 | Change as a track change, with the expected old text and an idempotency key |
 | `doc_create` | P1 | Create an empty document; content follows through `doc_edit` |
@@ -65,14 +65,16 @@ Unrecognized citation forms and DOIs that cannot be resolved are accepted, but m
 | `beschaffung_vorhanden` | The DOI is already on the acquisition list |
 | `nicht_frei` | `source_add`: no free full text; use `acquisition_add` instead |
 | `pdf_fehlt` | The free full text could not be loaded |
-| `dienst_fehlt` | Crossref does not respond |
+| `dienst_fehlt` | Crossref does not respond right now, even after waiting out a 429 or 503; try again later |
 | `spalte_fehlt` | `matrix_suggest`: the column does not exist in the matrix |
 | `kommentar_fehlt` | `reply` with `kommentar_id`: the comment thread does not exist in the project |
 | `vorschlaege_voll` | `suggest`: the panel already holds 100 open suggestions |
 
+`bib_list` gives each reference a `referenz` state: `gefunden`, `nicht_gefunden` (Crossref answers 404: the DOI is unknown), `ohne_doi`, or `nicht_pruefbar` with `grund` `crossref_nicht_erreichbar` (Crossref did not respond; this says nothing about the reference). spur waits out 429 and 503 from Crossref (`Retry-After`, otherwise a growing pause) for up to four attempts. The check report uses the same states.
+
 Every hit of `paper_search` carries `abstract` (from the first service that supplies one; otherwise empty).
 
-`paper_search` and `paper_citations` do not fail because of a single service: `fehler` names failed services, and the remaining hits still arrive.
+`paper_search` and `paper_citations` do not fail because of a single service: `fehler` names failed services with the reason, and the remaining hits still arrive. `dienste` lists every service asked with `antwort` `geantwortet`, `gedrosselt` or `nicht_erreichbar`. If no service answered, `hinweis` says so, so an empty list never looks like "no results". OpenAlex and Semantic Scholar work without an API key; a key only raises their limits.
 
 ## Events for `events_since`
 `task_created`, `chat_message`, `comment_mention`, `suggest_trigger`. Every event applies to exactly one bot.

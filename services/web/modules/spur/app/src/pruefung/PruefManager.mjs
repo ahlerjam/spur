@@ -8,7 +8,7 @@ import * as QuellenManager from '../QuellenManager.mjs'
 import { pruefCache, quotes } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { bibLesen } from './bib.mjs'
-import { istProblem, quelleZu, zeileBewerten } from './bewertung.mjs'
+import { istProblem, quelleZu, STELLEN_STATUS, stelleEinordnen, zeileBewerten } from './bewertung.mjs'
 import { zitateFinden } from './latex.mjs'
 
 const CROSSREF_PARALLEL = 5
@@ -141,7 +141,7 @@ export async function bereichPruefen(projectId, text, von, bis) {
   return await fundeBewerten(funde, kontext)
 }
 
-async function zeilenFuer(projectId, abschnittsListe, kontext, basis, statistik) {
+async function zeilenFuer(projectId, abschnittsListe, kontext, basis, nutzung) {
   const cache = await pruefCache()
   const schluessel = abschnittsListe.map(a => hash(basis, a.text))
   const vorhanden = new Map(
@@ -156,9 +156,9 @@ async function zeilenFuer(projectId, abschnittsListe, kontext, basis, statistik)
   for (const [i, abschnitt] of abschnittsListe.entries()) {
     let liste = vorhanden.get(schluessel[i])
     if (liste) {
-      statistik.wiederverwendet++
+      nutzung.uebernommen++
     } else {
-      statistik.geprueft++
+      nutzung.neu++
       liste = await abschnittBewerten(abschnitt, kontext)
       neu.push({ projectId, hash: schluessel[i], zeilen: liste, erstelltAm: jetzt() })
     }
@@ -182,14 +182,15 @@ async function zeilenFuer(projectId, abschnittsListe, kontext, basis, statistik)
 export async function bericht(projectId) {
   const docs = await dokumente(projectId)
   const kontext = await kontextLaden(projectId, docs)
-  const statistik = { geprueft: 0, wiederverwendet: 0 }
+  // Nur zur Diagnose: wie viele Abschnitte neu bewertet und wie viele aus dem Cache übernommen wurden.
+  const nutzung = { neu: 0, uebernommen: 0 }
   const basis = stempel(kontext)
   const zeilen = []
   for (const doc of docs) {
     if (!doc.pfad.endsWith('.tex')) continue
     const teile = abschnitte(doc.text)
     const starts = zeilenStarts(doc.text)
-    for (const { abschnitt, liste } of await zeilenFuer(projectId, teile, kontext, basis, statistik)) {
+    for (const { abschnitt, liste } of await zeilenFuer(projectId, teile, kontext, basis, nutzung)) {
       for (const z of liste) {
         const von = z.von + abschnitt.von
         zeilen.push({
@@ -203,9 +204,11 @@ export async function bericht(projectId) {
           zitatBis: z.zitatBis + abschnitt.von,
           zeile: zeileAn(starts, von),
           problem: istProblem(z),
+          ...stelleEinordnen(z),
         })
       }
     }
   }
-  return { zeilen, statistik, stand: jetzt() }
+  const zaehlung = Object.fromEntries(STELLEN_STATUS.map(status => [status, zeilen.filter(z => z.status === status).length]))
+  return { zeilen, zaehlung, abschnitte: nutzung, stand: jetzt() }
 }

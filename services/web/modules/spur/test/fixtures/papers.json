@@ -1,5 +1,7 @@
 {
   "werke": [
+    {"doi": "10.5555/spur.foodwaste", "openalex": "W3000000001", "s2": "f00d0a57e1", "arxiv": "2402.05555", "titel": "Food waste in private households: a cohort study", "abstract": "Households throw away a large share of the food they buy.", "autoren": [["Mara", "Kuehn"]], "jahr": 2023, "journal": "Waste Management", "seiten": "1-12", "frei": false, "dienste": ["arxiv", "openalex", "crossref", "s2"], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.3390/foods11223570", "titel": "Testwerk für gedrosseltes Crossref", "autoren": [["Fixture", "Drossel"]], "jahr": 2022, "journal": "Foods", "seiten": "3570", "frei": true, "pdf": "keller2014.pdf", "lizenz": "cc-by", "dienste": [], "zitiertVon": [], "zitiert": []},
     {
       "doi": "10.1038/nrn2762",
       "openalex": "W2101234567",

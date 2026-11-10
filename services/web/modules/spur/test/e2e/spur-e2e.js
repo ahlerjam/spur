@@ -651,7 +651,7 @@ async page => {
       )
       await zeigt('korrigiert', 'Korrektur vorhanden')
       await zeigt('Sleep supports […] declarative memory.', 'Keine Meldung in Crossref')
-      await zeigt('unbekannt', 'Referenz nicht gefunden')
+      await zeigt('unbekannt', 'DOI bei Crossref unbekannt')
       await zeigt('footfullcite', 'Nicht prüfbar')
 
       await panelOeffnen('Quellen')
@@ -675,8 +675,10 @@ async page => {
       )
       await page.getByLabel('Nur Probleme').uncheck()
 
+      // P6: Der Cache von Abschnitten erscheint nicht mehr; die Zählung der Zitierstellen bleibt gleich.
+      const zaehlung = await page.getByText(/^Zitierstellen: /).innerText()
       await editorErsetzen('\\section{Zwei}', '\\section{Zwei!}')
-      await sichtbar('Abschnitte geprüft: 1, unverändert übernommen: 3')
+      await page.getByText(zaehlung, { exact: true }).waitFor()
       await editorErsetzen('\\section{Zwei!}', '\\section{Zwei}')
 
       await texErsetzen('ersetzen/kapitel.tex')
@@ -2599,7 +2601,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
         return 'rgb(255, 255, 255)'
       }
       const schlecht = []
-      for (const el of wurzel.querySelectorAll('*')) {
+      for (const el of [wurzel, ...wurzel.querySelectorAll('*')]) {
         if (!el.offsetParent || el.closest('[disabled], .disabled, [aria-disabled=true]')) continue
         if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue
         const [a, b] = [hell(rgb(getComputedStyle(el).color)), hell(rgb(hinten(el)))]
@@ -2712,11 +2714,13 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ['spur mit deinem Konto verbinden', 'Der Befehl enthält deinen persönlichen Schlüssel. Gib ihn nicht weiter.'],
     [
       'Claude Code starten',
-      'Starte damit Claude Code im Terminal. Claude darf dann in spur schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.',
+      'Starte damit Claude Code im Terminal. Claude wartet dann von selbst auf Aufträge aus spur und darf dort schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.',
     ],
   ]
   const SCHREIBWERKZEUGE = ['quote_mark', 'doc_edit', 'doc_create', 'reply', 'run_finish', 'wait_for_event']
-  const START = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
+  const START_WERKZEUGE = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
+  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur."`
+  const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur."`
 
   // Kein Kasten ist breiter als sein Container, kein Befehl wird abgeschnitten.
   async function kaestenGanz(wo) {
@@ -3106,7 +3110,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     for (const name of ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln']) {
       ok(readme.includes(`/plugin:spur:spur:${name}`), `README ohne /plugin:spur:spur:${name}`)
     }
-    for (const befehl of ['claude plugin marketplace add ahlerjam/spur', 'claude plugin install spur@spur', START]) {
+    for (const befehl of ['claude plugin marketplace add ahlerjam/spur', 'claude plugin install spur@spur', START_EN]) {
       ok(readme.includes(befehl), `README ohne Schritt: ${befehl.slice(0, 40)}`)
     }
     for (const datei of ['README.md', 'CLAUDE.md', 'docs/backlog.md', 'docs/mcp-contract.md', 'plugins/spur/skills/spur/SKILL.md']) {
@@ -3119,6 +3123,452 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
     ok(eintraege === 35, `Backlog hat ${eintraege} Einträge statt 35`)
     ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /1616/.test(backlog), 'Backlog ohne Transformers, Tesseract oder 1616 Übersetzungen')
+  }
+
+  // P6: Befunde aus der ersten echten Claude-Session.
+  features.p6f1 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await page.goto(`${BASE}/user/settings`)
+    await page.getByRole('button', { name: 'Token erzeugen' }).click()
+    const neu = page.locator('.spur-token-neu')
+    const token = await neu.getAttribute('data-spur-token')
+    const schritt3 = (await neu.locator('ol > li').nth(2).locator('pre').textContent()).trim()
+    ok(schritt3.startsWith('claude --allowedTools "'), `Schritt 3 beginnt anders: ${schritt3}`)
+    ok(/ -- "[^"]*wait_for_event[^"]*"$/.test(schritt3), `Schritt 3 endet ohne Prompt mit wait_for_event: ${schritt3}`)
+    ok(schritt3 === START, `Schritt 3: ${schritt3}`)
+
+    await projektOeffnen('Demo')
+    await panelOeffnen('Claude')
+    // Ohne laufende Session; ein Herzschlag eines früheren Features gilt noch bis zu 45 s.
+    await claudePanel().getByText('Claude nicht verbunden').waitFor({ timeout: 50000 })
+    await claudePanel()
+      .getByText('Starte Claude Code im Terminal mit diesem Befehl. Claude wartet danach von selbst auf Aufträge aus diesem Panel:', { exact: true })
+      .waitFor()
+    const kasten = claudePanel().locator('.spur-befehl-kasten')
+    ok((await kasten.locator('pre').textContent()) === schritt3, 'Panel zeigt einen anderen Befehl als Schritt 3')
+    ok((await kasten.getByRole('button', { name: 'Kopieren' }).count()) === 1, 'Panel ohne Kopierknopf')
+
+    const start = Date.now()
+    await warteStarten(token)
+    await claudePanel().getByText('Claude verbunden', { exact: true }).waitFor({ timeout: 5000 })
+    ok(Date.now() - start <= 5000, `„Claude verbunden“ erst nach ${Date.now() - start} ms`)
+    await page.evaluate(() => window.__spur.abbruch.abort())
+  }
+
+  // Ergebnis des Long-Polls aus warteStarten: das zugestellte Ereignis oder null.
+  async function gewartetesEreignis(timeout = 20000) {
+    const handle = await page.waitForFunction(
+      () => window.__spur.log.find(e => e.fehler || e.msg?.result)?.msg?.result ?? null,
+      null,
+      { timeout }
+    )
+    const ergebnis = await handle.jsonValue()
+    return JSON.parse(ergebnis.content[0].text).ereignis
+  }
+
+  async function mitClaudeKommentieren(token, markieren, text) {
+    while ((await werkzeug(token, 'wait_for_event', { max_sekunden: 1 })).inhalt.ereignis);
+    await warteStarten(token)
+    await markieren()
+    await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
+    const eingabe = page.locator('.review-panel-add-comment-editor .cm-content').first()
+    await eingabe.waitFor()
+    await eingabe.click()
+    await page.keyboard.type(text)
+    await page.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click()
+    const ereignis = await gewartetesEreignis()
+    ok(ereignis?.typ === 'comment_mention', `Kein comment_mention: ${JSON.stringify(ereignis)}`)
+    return ereignis.daten
+  }
+
+  // Markiert `text` in der Zeile, die ihn enthält, per Tastatur wie ein Mensch.
+  async function imEditorMarkieren(text) {
+    await page.evaluate(gesucht => {
+      const view = window.overleaf.unstable.store.get('editor.view')
+      const ende = view.state.doc.toString().indexOf(gesucht) + gesucht.length
+      view.dispatch({ selection: { anchor: ende } })
+      view.focus()
+    }, text)
+    for (let i = 0; i < text.length; i++) await page.keyboard.press('Shift+ArrowLeft')
+  }
+
+  features.p6f2 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E P6 Kommentar')
+    const pid = page.url().split('/').pop()
+    await page.locator('.cm-line', { hasText: 'Ergebnisse.' }).click()
+    await page.keyboard.press('End')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type('Die Ausbeute lag bei 75,7 Prozent.')
+
+    const offen = await mitClaudeKommentieren(token, () => imEditorMarkieren('75,7 Prozent'), '@claude prüf die Zahl')
+    const docs = (await werkzeug(token, 'doc_list', { project_id: pid })).inhalt.eintraege
+    const main = docs.find(d => d.pfad === 'main.tex')
+    ok(
+      offen.doc_id === main.id && offen.pfad === 'main.tex' && offen.stelle?.markiert === '75,7 Prozent' && offen.stelle.zeile === 4,
+      `Offenes Dokument: ${JSON.stringify(offen)}`
+    )
+
+    // kapitel.tex war in diesem Lauf noch nie geladen, wie ein lange geschlossenes Dokument.
+    const eintrag = page.locator('.file-tree').getByRole('treeitem', { name: 'kapitel.tex' })
+    await panelSichern(DATEIBAUM, eintrag)
+    await eintrag.click()
+    await page.locator('.cm-content', { hasText: 'Im Kapitel' }).waitFor()
+    const geschlossen = await mitClaudeKommentieren(token, () => imEditorMarkieren('81,2 Prozent'), '@claude und diese?')
+    const kapitel = docs.find(d => d.pfad === 'kapitel.tex')
+    ok(
+      geschlossen.doc_id === kapitel.id && geschlossen.pfad === 'kapitel.tex' && geschlossen.stelle?.markiert === '81,2 Prozent' && geschlossen.stelle.zeile === 1,
+      `Geschlossenes Dokument: ${JSON.stringify(geschlossen)}`
+    )
+  }
+
+  features.p6f3 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E P6 Kommentar')
+    await imEditorMarkieren('Ergebnisse')
+    await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
+    const feld = page.locator('.review-panel-add-comment-editor .cm-content').first()
+    const formular = page.locator('form.review-panel-entry-content')
+    const hinweis = formular.getByText('Claude wird benachrichtigt', { exact: true })
+    await feld.waitFor()
+    await feld.click()
+    await page.keyboard.type('@claude bitte ansehen')
+    await hinweis.waitFor({ timeout: 5000 })
+    const hinweisKasten = formular.locator('.spur-claude-hinweis')
+    ok(!(await unlesbar(hinweisKasten)).length, `Hinweis schlecht lesbar: ${await unlesbar(hinweisKasten)}`)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('ControlOrMeta+Home')
+    for (let i = 0; i < '@claude '.length; i++) await page.keyboard.press('Delete')
+    await hinweis.waitFor({ state: 'detached', timeout: 5000 })
+    await page.keyboard.press('ControlOrMeta+End')
+    await page.keyboard.type(' an mail@claude.de')
+    await page.waitForTimeout(500)
+    ok(!(await hinweis.isVisible()), 'Hinweis bei mail@claude.de')
+    await page.keyboard.press('ControlOrMeta+Home')
+    await page.keyboard.type('@claude ')
+    await page.keyboard.press('Escape')
+    await hinweis.waitFor({ timeout: 5000 })
+    const pid = page.url().split('/').pop()
+    const kommentare = async () =>
+      (await (await page.request.get(`${BASE}/project/${pid}/ranges`)).json()).reduce((n, doc) => n + (doc.ranges.comments?.length ?? 0), 0)
+    const vorher = await kommentare()
+    await formular.getByRole('button', { name: /^(Kommentar|Comment)$/ }).click()
+
+    const thread = page.locator('.review-panel-entry', { hasText: 'bitte ansehen an mail@claude.de' })
+    const marken = thread.locator('.review-panel-comment-body .spur-claude-erwaehnung')
+    await marken.first().waitFor()
+    ok((await marken.allTextContents()).join() === '@claude', `Hervorgehoben: ${await marken.allTextContents()}`)
+    const farben = await thread.locator('.review-panel-comment-body').first().evaluate(el => {
+      const marke = el.querySelector('.spur-claude-erwaehnung')
+      return [getComputedStyle(marke).color, getComputedStyle(el).color]
+    })
+    ok(farben[0] !== farben[1], `@claude nicht farbig: ${farben}`)
+    const [r, g, b] = farben[0].match(/\d+/g).map(Number)
+    ok(b > r && b > g, `@claude nicht blau: ${farben[0]}`)
+
+    await thread.locator('.review-panel-comment-input .cm-content').click()
+    await page.keyboard.type('Und @claude auch hier.')
+    await thread.getByText('Claude wird benachrichtigt', { exact: true }).waitFor({ timeout: 5000 })
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Enter')
+    await thread.locator('.review-panel-comment-body', { hasText: 'auch hier.' }).waitFor()
+    ok((await marken.count()) === 2, `Antwort ohne Hervorhebung: ${await marken.count()}`)
+
+    // Die Kommentar-Op geht gesammelt raus; vor dem Neuladen muss der Server sie kennen.
+    for (let ende = Date.now() + 20000; (await kommentare()) <= vorher; await page.waitForTimeout(250)) {
+      ok(Date.now() < ende, 'Kommentar nach 20 s nicht beim Server')
+    }
+    for (const thema of ['', 'light-']) {
+      await mitDesign(thema, async () => {
+        await page.reload()
+        await page.locator('.cm-content').first().waitFor()
+        const eintrag = page.locator('.review-panel-entry', { hasText: 'bitte ansehen an mail@claude.de' })
+        await panelSichern('Review panel', eintrag.locator('.review-panel-comment-body').first())
+        await eintrag.locator('.spur-claude-erwaehnung').first().waitFor()
+        const schlecht = await unlesbar(eintrag.locator('.review-panel-comment-body').first())
+        ok(schlecht.length === 0, `Kommentar im Design „${thema || 'dunkel'}“: ${schlecht}`)
+      })
+    }
+  }
+
+  const FOODS = '10.3390/foods11223570'
+
+  features.p6f4 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    const NICHT_PRUEFBAR = 'nicht prüfbar – Crossref gerade nicht erreichbar'
+    try {
+      // Vor dem Öffnen: Overleaf stellt ein offenes Prüfbericht-Panel sofort wieder her.
+      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 429, retryAfter: 1, mal: 2 } }, cachesLeeren: true, protokollLeeren: true })
+      await projektOeffnen('E2E P6 Crossref')
+      const pid = page.url().split('/').pop()
+      await panelOeffnen('Prüfbericht')
+      await page.getByLabel('Nur Probleme').setChecked(false)
+      await zeile('foods2022').getByText('Keine Meldung in Crossref', { exact: true }).waitFor({ timeout: 30000 })
+      const foods = zeile('foods2022')
+      ok(!/unbekannt|nicht prüfbar/.test(await foods.innerText()), `Gedrosselte DOI: ${await foods.innerText()}`)
+      const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.pfad.includes(encodeURIComponent(FOODS)))
+      ok(abrufe.length === 3, `Crossref-Abrufe für die gedrosselte DOI: ${abrufe.length}`)
+      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+
+      await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 503 } }, cachesLeeren: true })
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await zeile('foods2022').getByText(NICHT_PRUEFBAR, { exact: true }).waitFor({ timeout: 30000 })
+      ok(!/unbekannt/.test(await zeile('foods2022').innerText()), 'Ausfall erscheint als unbekannt')
+      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+
+      const bib = (await werkzeug(token, 'bib_list', { project_id: pid })).inhalt.eintraege
+      const foodsBib = bib.find(e => e.key === 'foods2022')
+      ok(foodsBib.referenz === 'nicht_pruefbar' && foodsBib.grund === 'crossref_nicht_erreichbar', `bib_list: ${JSON.stringify(foodsBib)}`)
+      ok(bib.find(e => e.key === 'erfunden').referenz === 'nicht_gefunden', `bib_list erfunden: ${JSON.stringify(bib)}`)
+
+      const abgelehnt = await werkzeug(token, 'source_add', { project_id: pid, doi: FOODS })
+      ok(
+        abgelehnt.fehler && abgelehnt.inhalt.fehler !== 'doi_nicht_gefunden' && /antwortet gerade nicht/.test(abgelehnt.inhalt.detail) && /noch einmal/.test(abgelehnt.inhalt.detail),
+        `source_add bei 503: ${JSON.stringify(abgelehnt.inhalt)}`
+      )
+
+      await fakeSteuern({})
+      const aufgenommen = await werkzeug(token, 'source_add', { project_id: pid, doi: FOODS })
+      ok(!aufgenommen.fehler, `source_add nach Ausfall: ${JSON.stringify(aufgenommen.inhalt)}`)
+    } finally {
+      await fakeSteuern({})
+    }
+  }
+
+  features.p6f5 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P6 Crossref')
+    const antworten = ergebnis => Object.fromEntries(ergebnis.dienste.map(d => [d.dienst, d.antwort]))
+    try {
+      await fakeSteuern({ cachesLeeren: true })
+      const suche = (await werkzeug(token, 'paper_search', { project_id: pid, anfrage: 'food waste' })).inhalt
+      const quellen = new Set(suche.treffer.flatMap(t => t.dienste))
+      for (const dienst of ['OpenAlex', 'Semantic Scholar', 'Crossref', 'arXiv']) {
+        ok(quellen.has(dienst), `paper_search ohne Treffer aus ${dienst}: ${[...quellen]}`)
+        ok(antworten(suche)[dienst] === 'geantwortet', `paper_search: ${JSON.stringify(suche.dienste)}`)
+      }
+
+      for (const richtung of ['zitiert_von', 'zitiert']) {
+        const z = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung })).inhalt
+        ok(z.treffer.length > 0 && !z.hinweis, `paper_citations ${richtung}: ${JSON.stringify(z).slice(0, 300)}`)
+      }
+
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { s2: { status: 429 } } })
+      const gedrosselt = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })).inhalt
+      ok(gedrosselt.treffer.length > 0 && gedrosselt.treffer.every(t => t.dienste.includes('OpenAlex')), `Treffer ohne OpenAlex: ${JSON.stringify(gedrosselt.treffer)}`)
+      ok(antworten(gedrosselt)['Semantic Scholar'] === 'gedrosselt' && antworten(gedrosselt).OpenAlex === 'geantwortet', `Dienste: ${JSON.stringify(gedrosselt.dienste)}`)
+
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { s2: { trennen: true }, openalex: { trennen: true } } })
+      const keiner = (await werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })).inhalt
+      ok(keiner.treffer.length === 0 && /Keiner der Dienste hat geantwortet/.test(keiner.hinweis), `Kein Hinweis: ${JSON.stringify(keiner)}`)
+      ok(
+        keiner.fehler.length === 2 && keiner.fehler.every(f => f.art === 'nicht_erreichbar' && f.text) &&
+          Object.values(antworten(keiner)).every(a => a === 'nicht_erreichbar'),
+        `Gründe je Dienst: ${JSON.stringify(keiner)}`
+      )
+
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { s2: { status: 503 } } })
+      await projektOeffnen('E2E P6 Crossref')
+      await panelOeffnen('Recherche')
+      await paperSuchen('food waste')
+      await page.locator('.spur-panel').getByText('Semantic Scholar nicht erreichbar').waitFor({ timeout: 10000 })
+      await page.locator('.spur-panel').getByText('Food waste in private households').first().waitFor()
+    } finally {
+      await fakeSteuern({})
+    }
+  }
+
+  features.p6f6 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P6 Crossref')
+    const KELLER = '10.1371/journal.pone.0099999'
+    try {
+      await fakeSteuern({ cachesLeeren: true, protokollLeeren: true, schalter: { UNPAYWALL_EMAIL: '', CROSSREF_MAILTO: 'spur@example.org' } })
+      const aufgenommen = await werkzeug(token, 'source_add', { project_id: pid, doi: KELLER })
+      ok(!aufgenommen.fehler, `source_add mit CROSSREF_MAILTO: ${JSON.stringify(aufgenommen.inhalt)}`)
+      const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.dienst === 'unpaywall')
+      ok(abrufe.some(a => new URL(a.pfad, BASE).searchParams.get('email') === 'spur@example.org'), `Unpaywall ohne CROSSREF_MAILTO: ${JSON.stringify(abrufe)}`)
+      await projektOeffnen('E2E P6 Crossref')
+      await panelOeffnen('Quellen')
+      await page.locator('.spur-panel').getByRole('button', { name: aufgenommen.inhalt.dateiname }).waitFor({ timeout: 10000 })
+
+      await fakeSteuern({ cachesLeeren: true, schalter: { UNPAYWALL_EMAIL: '', CROSSREF_MAILTO: '' } })
+      const andere = await projektId(token, 'E2E P6 Kommentar')
+      const abgelehnt = await werkzeug(token, 'source_add', { project_id: andere, doi: FOODS })
+      ok(
+        abgelehnt.fehler && abgelehnt.inhalt.fehler === 'unpaywall_aus' &&
+          ['UNPAYWALL_EMAIL', 'CROSSREF_MAILTO', 'README'].every(w => abgelehnt.inhalt.detail.includes(w)),
+        `source_add ohne Adressen: ${JSON.stringify(abgelehnt.inhalt)}`
+      )
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
+  features.p6f7 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P6 Zahlen')
+    const lauf = Date.now()
+    const schreiben = async (pfad, neu, n) => {
+      const { fehler, inhalt } = await werkzeug(token, 'doc_edit', { project_id: pid, pfad, neu, idempotenz_schluessel: `p6f7-${lauf}-${n}` })
+      ok(!fehler, `doc_edit ${pfad}: ${JSON.stringify(inhalt)}`)
+      return inhalt.zahlen_ohne_beleg
+    }
+    const FOLIEN = String.raw`
+\documentclass[aspectratio=169,11pt]{beamer}
+\definecolor{eon}{RGB}{234,28,10}
+\begin{tikzpicture}
+  \draw (0,0) -- (3.5,2.25);
+  \fill[red!30] (0,0) rectangle (1,1);
+\end{tikzpicture}
+Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die Fläche $x^2$.`
+    const gemeldet = await schreiben('main.tex', FOLIEN, 1)
+    ok(JSON.stringify(gemeldet) === JSON.stringify(['0,89', '75.7']), `Gemeldet: ${JSON.stringify(gemeldet)}`)
+    const bib = await schreiben('quellen.bib', '@article{p6b,\n  volume = {11},\n  pages = {3570}\n}\n', 2)
+    ok(bib.length === 0, `.bib gemeldet: ${JSON.stringify(bib)}`)
+
+    await projektOeffnen('E2E P6 Zahlen')
+    await panelOeffnen('Claude')
+    const karte = claudePanel().locator('.spur-lauf-rot', { hasText: 'Zahl ohne Beleg' })
+    await karte.getByText('„0,89“ in main.tex', { exact: false }).waitFor({ timeout: 10000 })
+    await karte.getByText('„75.7“ in main.tex', { exact: false }).waitFor()
+    const text = await karte.innerText()
+    for (const zahl of ['169', '11', '3.5', '2.25', '30', '234', '28', '10', '2', '3570']) {
+      ok(!text.includes(`„${zahl}“`), `Lauf-Karte meldet ${zahl}`)
+    }
+
+    const neu = await werkzeug(token, 'doc_create', {
+      project_id: pid, pfad: 'ergebnisse.tex', inhalt: String.raw`\newcommand{\ausbeute}{\qty{75.7}{\percent}}`, idempotenz_schluessel: `p6f7-${lauf}-3`,
+    })
+    ok(!neu.fehler, `doc_create: ${JSON.stringify(neu.inhalt)}`)
+    const danach = await schreiben('main.tex', String.raw` Nochmals \qty{75.7}{\percent} und $0{,}89$.`, 4)
+    ok(JSON.stringify(danach) === JSON.stringify(['0,89']), `Mit ergebnisse.tex gemeldet: ${JSON.stringify(danach)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zahlen geprüft.' })
+  }
+
+  features.p6f8 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const ZAEHLUNG = 'Zitierstellen: 1 geprüft, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar'
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    try {
+      await fakeSteuern({ cachesLeeren: true, stoerungen: { [`crossref:${FOODS}`]: { status: 503 } } })
+      await projektOeffnen('E2E P6 Bericht')
+      const pid = page.url().split('/').pop()
+      await panelOeffnen('Prüfbericht')
+      await page.getByLabel('Nur Probleme').setChecked(false)
+      await page.getByText(ZAEHLUNG, { exact: true }).waitFor({ timeout: 60000 })
+      for (const key of ['ohneA', 'ohneB', 'ohneC', 'ohneD']) {
+        await zeile(key).getByText('keine Quelle aufgenommen', { exact: true }).waitFor()
+      }
+      await zeile('Sleep supports the consolidation').getByText('Seitenangabe fehlt', { exact: true }).waitFor()
+      await zeile('foods2022').getByText('nicht prüfbar – Crossref gerade nicht erreichbar', { exact: true }).waitFor()
+      ok(!/keine Quelle|Seitenangabe fehlt/.test(await zeile('hippocampus').innerText()), 'Geprüfte Stelle nennt einen Grund')
+
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await page.waitForTimeout(500)
+      await page.getByText(ZAEHLUNG, { exact: true }).waitFor({ timeout: 60000 })
+
+      const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
+      ok(
+        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, nicht_pruefbar: 1 }),
+        `check_report: ${JSON.stringify(bericht.zaehlung)}`
+      )
+      const gruende = bericht.eintraege.map(z => z.grund).filter(Boolean).sort()
+      ok(
+        JSON.stringify(gruende) === JSON.stringify(['crossref_nicht_erreichbar', 'keine_quelle', 'keine_quelle', 'keine_quelle', 'keine_quelle', 'seitenangabe_fehlt']),
+        `Gründe über MCP: ${JSON.stringify(gruende)}`
+      )
+    } finally {
+      await fakeSteuern({})
+    }
+  }
+
+  features.p6f9 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
+    const liste = new Set(dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0].split(/[\s\\]+/).filter(Boolean))
+    const fehlen = ['babel-german', 'hyphen-german', 'mhchem', 'siunitx', 'chemformula', 'beamertheme-metropolis', 'pgfopts'].filter(p => !liste.has(p))
+    ok(fehlen.length === 0, `Fehlt im Image: ${fehlen}`)
+    const smoke = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke-dokumente.mjs`)
+    for (const teil of ['\\usetheme{metropolis}', '\\usepackage[ngerman]{babel}', '\\ce{H2O}', '\\qty{0.89}{\\liter}']) {
+      ok(smoke.includes(teil), `Smoke-Dokument ohne ${teil}`)
+    }
+    const skript = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke-compile.mjs`)
+    ok(/for \(const \{ name, dateien \} of DOKUMENTE\)/.test(skript) && skript.includes("file.path === 'output.pdf'"), 'Smoke kompiliert nicht jedes Dokument mit PDF-Prüfung')
+  }
+
+  features.p6f10 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const make = await repoDatei(`${REPO}/Makefile`)
+    const ziel = name => make.split(`\n${name}:`)[1]?.split(/\n(?=\S)/)[0] ?? ''
+    const start = ziel('start')
+    ok(start.indexOf('pull') > 0 && start.indexOf('pull') < start.indexOf('up -d'), `make start holt nicht vorher: ${start}`)
+    const update = ziel('update')
+    const [holen, hinweis, neustart] = ['$(COMPOSE) pull', 'Backup', '$(COMPOSE) up -d'].map(t => update.indexOf(t))
+    ok(holen > 0 && hinweis > holen && neustart > hinweis && /echo .*docker compose/.test(update), `make update: ${update}`)
+
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const abschnitt = titel => readme.split(`### ${titel}\n`)[1]?.split(/\n#{2,3} /)[0] ?? ''
+    const mail = abschnitt('Email')
+    for (const v of ['OVERLEAF_EMAIL_FROM_ADDRESS', 'OVERLEAF_EMAIL_SMTP_HOST', 'OVERLEAF_EMAIL_SMTP_PORT', 'OVERLEAF_EMAIL_SMTP_USER', 'OVERLEAF_EMAIL_SMTP_PASS']) {
+      ok(mail.includes(v), `Abschnitt Email ohne ${v}`)
+    }
+    ok(/sends no email/.test(mail), 'Abschnitt Email ohne Hinweis, dass ohne Variablen keine Mails rausgehen')
+    const dienste = abschnitt('Research services')
+    for (const v of ['CROSSREF_MAILTO', 'UNPAYWALL_EMAIL', 'OPENALEX_API_KEY', 'SEMANTIC_SCHOLAR_API_KEY']) ok(dienste.includes(v), `Research services ohne ${v}`)
+    ok(/Optional/.test(dienste), 'Schlüssel nicht als optional beschrieben')
+    ok(abschnitt('Update').includes('make update'), 'Abschnitt Update ohne make update')
+    const proxy = abschnitt('Behind a corporate proxy')
+    ok(proxy.includes('docker-compose.override.yml') && /```yaml\nservices:\n  sharelatex:\n[\s\S]*NODE_EXTRA_CA_CERTS: \/[^\n]+\.crt\n```/.test(proxy) && /\.crt:\/[^\n]+\.crt:ro/.test(proxy), `Proxy-Beispiel unvollständig: ${proxy.slice(0, 300)}`)
+
+    const links = [...readme.matchAll(/\]\(([^)\s]+)\)/g)].map(m => m[1])
+    for (const link of links.filter(l => !/^https?:/.test(l))) await repoDatei(`${REPO}/${link}`)
+    const kaputt = []
+    for (const link of links.filter(l => /^https:/.test(l))) {
+      const antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
+      if (!(Number(antwort.status()) < 400)) kaputt.push(`${link}: ${antwort.status()}`)
+    }
+    ok(kaputt.length === 0, `Links: ${kaputt.join(' | ')}`)
+  }
+
+  features.p6f11 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E P6 Bericht')
+    await panelSichern('Quellen', page.getByRole('button', { name: 'smith2024.pdf' }))
+    await page.getByRole('button', { name: 'smith2024.pdf' }).click()
+    await page.locator('img.spur-seitenbild').waitFor()
+    const leiste = page.locator('.spur-panel-werkzeuge')
+    const knoepfe = ['Zurück', 'Vorherige Seite', 'Nächste Seite', 'Groß öffnen'].map(name => leiste.getByRole('button', { name }))
+    const masse = async () => await Promise.all(knoepfe.map(async k => await k.boundingBox()))
+    const bei1280 = await masse()
+    const oben = bei1280.map(b => b.y)
+    ok(Math.max(...oben) - Math.min(...oben) <= 1, `Oberkanten bei 1280 px: ${oben}`)
+    const hoehen = bei1280.map(b => b.height)
+    ok(Math.max(...hoehen) - Math.min(...hoehen) <= 1, `Höhen bei 1280 px: ${hoehen}`)
+
+    await breite(360)
+    await page.locator('img.spur-seitenbild').waitFor()
+    await ohneSeitlichesRollen('Quellen-Vorschau 360 px')
+    for (const [i, b] of (await masse()).entries()) {
+      ok(b && b.width >= 24 && b.height >= 24, `Knopf ${i + 1} bei 360 px: ${JSON.stringify(b)}`)
+    }
+    await breite(1280)
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

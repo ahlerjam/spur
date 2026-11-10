@@ -1,11 +1,10 @@
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import ClaudeVerbinden, {
-  startBefehl,
-} from '@modules/spur/frontend/js/claude/claude-verbinden'
+import ClaudeVerbinden from '@modules/spur/frontend/js/claude/claude-verbinden'
 import getMeta from '@/utils/meta'
 import { deutschAktivieren } from './helpers/deutsch'
+import { START } from './helpers/start'
 
 const TOKEN = 'geheimes-token-123'
 const ABLAUF = '2027-03-15T12:00:00.000Z'
@@ -67,12 +66,12 @@ describe('Claude verbinden', function () {
     const texte = [
       'Das brauchst du nur einmal pro Rechner.',
       'Der Befehl enthält deinen persönlichen Schlüssel. Gib ihn nicht weiter.',
-      'Starte damit Claude Code im Terminal. Claude darf dann in spur schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.',
+      'Starte damit Claude Code im Terminal. Claude wartet dann von selbst auf Aufträge aus spur und darf dort schreiben, ohne bei jedem Schritt nachzufragen. Den Befehl brauchst du bei jedem Start; er steht auch im Claude-Panel deines Projekts.',
     ]
     const befehle = [
       'claude plugin marketplace add ahlerjam/spur',
       `claude plugin install spur@spur --config server_url=${getMeta('ol-ExposedSettings').siteUrl}/spur/mcp --config token=${TOKEN}`,
-      startBefehl(),
+      START,
     ]
     schritte.forEach((schritt, i) => {
       expect(schritt.textContent).to.contain(titel[i])

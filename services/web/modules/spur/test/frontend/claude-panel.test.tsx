@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ClaudePanel from '@modules/spur/frontend/js/claude/claude-panel'
-import { startBefehl } from '@modules/spur/frontend/js/claude/claude-verbinden'
+import { START } from './helpers/start'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
 import { deutschAktivieren } from './helpers/deutsch'
 
@@ -55,9 +55,21 @@ describe('Claude-Panel', function () {
     fetchMock.get(STATUS, status({ verbunden: false }))
     zeigen()
     await screen.findByText('Claude nicht verbunden')
-    screen.getByText(/claude --allowedTools/)
+    screen.getByText(
+      'Starte Claude Code im Terminal mit diesem Befehl. Claude wartet danach von selbst auf Aufträge aus diesem Panel:'
+    )
+    screen.getByText(START)
     expect(screen.queryByLabelText('Auftrag an Claude')).to.equal(null)
     expect(screen.queryByRole('button', { name: 'Senden' })).to.equal(null)
+  })
+
+  it('zeigt eine neue Verbindung binnen 5 s, auch kurz nach einer Abfrage', async function () {
+    let verbunden = false
+    fetchMock.get(STATUS, () => status({ verbunden }))
+    zeigen()
+    await screen.findByText('Claude nicht verbunden')
+    verbunden = true
+    await screen.findByText('Claude verbunden', {}, { timeout: 3000 })
   })
 
   it('zeigt den Startbefehl im Befehlskasten und kopiert genau ihn', async function () {
@@ -72,7 +84,7 @@ describe('Claude-Panel', function () {
     expect(kasten).to.exist
     fireEvent.click(within(kasten as HTMLElement).getByRole('button', { name: 'Kopieren' }))
     await screen.findByRole('button', { name: 'Kopiert' })
-    expect(geschrieben).to.deep.equal([startBefehl()])
+    expect(geschrieben).to.deep.equal([START])
   })
 
   it('zeigt den Verlauf von alt nach neu als Log für Screenreader', async function () {

@@ -45,5 +45,15 @@ export function devSchalterSetzen(werte) {
 
 const wert = name => (IST_DEV && name in devUeberschreibung ? devUeberschreibung[name] : process.env[name])
 
+// Mit dem Paper-Fake gilt für Unpaywall eine Testadresse, solange die E2E-Suite sie nicht ausdrücklich leert.
+const FAKE_STANDARD = { UNPAYWALL_EMAIL: 'fake@example.org' }
+
+// Umgebungsvariable, im Dev-Stack über den Fake umschaltbar (leerer Text heißt: nicht gesetzt).
+export function umgebung(name) {
+  const gesetzt = wert(name)
+  if (gesetzt === undefined && paperApiBasis()) return FAKE_STANDARD[name]
+  return gesetzt || undefined
+}
+
 export const semantikAn = () => wert('SPUR_SEMANTIC_SEARCH') === 'true'
 export const fakeEmbeddings = () => wert('SPUR_FAKE_EMBEDDINGS') === '1'

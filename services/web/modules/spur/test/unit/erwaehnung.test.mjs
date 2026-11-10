@@ -48,6 +48,8 @@ beforeEach(async () => {
       sendComment: vi.fn(async (p, t, u, content) => ({ id: 'm-claude', content, user_id: u })),
     },
   }
+  m.offen = []
+  m.DocumentUpdaterHandler = { promises: { getProjectRanges: vi.fn(async id => (nurText(id), m.offen)) } }
   m.DocstoreManager = { promises: { getAllRanges: vi.fn(async id => (nurText(id), m.ranges)) } }
   m.PruefManager = { dokumente: vi.fn(async () => [{ docId: DOC, pfad: 'main.tex', text: TEXT }]) }
   m.EditorRealTimeController = { emitToRoom: vi.fn() }
@@ -58,6 +60,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/schalter.mjs', () => schalterAttrappe().modul)
   vi.doMock('../../../../app/src/Features/Chat/ChatApiHandler.mjs', () => ({ default: m.ChatApiHandler }))
   vi.doMock('../../../../app/src/Features/Docstore/DocstoreManager.mjs', () => ({ default: m.DocstoreManager }))
+  vi.doMock('../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs', () => ({ default: m.DocumentUpdaterHandler }))
   vi.doMock('../../../../app/src/Features/Editor/EditorRealTimeController.mjs', () => ({ default: m.EditorRealTimeController }))
   vi.doMock('../../../../app/src/Features/User/UserInfoManager.mjs', () => ({ default: m.UserInfoManager }))
   vi.doMock('../../../../app/src/Features/User/UserInfoController.mjs', () => ({ default: m.UserInfoController }))
@@ -121,6 +124,23 @@ describe('@claude im Kommentar', () => {
     m.DocstoreManager.promises.getAllRanges.mockImplementationOnce(async () => m.ranges).mockImplementation(async id => (nurText(id), spaeter))
     await gesendet(ada, '@claude prüfe diese Aussage')
     expect(m.DocstoreManager.promises.getAllRanges).toHaveBeenCalledTimes(2)
+    expect((await ereignisse())[0].daten.pfad).toBe('main.tex')
+  })
+
+  it('findet die Stelle in einem offenen Dokument, das noch nicht in Mongo steht', async () => {
+    m.offen = m.ranges.map(d => ({ id: d._id, ranges: d.ranges }))
+    m.ranges = [{ _id: DOC, ranges: {} }]
+    await gesendet(ada, '@claude prüfe diese Aussage', { versuche: 1, pauseMs: 1 })
+    expect((await ereignisse())[0].daten).toMatchObject({
+      doc_id: DOC,
+      pfad: 'main.tex',
+      stelle: { zeile: 2, markiert: 'Schlaf verdoppelt' },
+    })
+  })
+
+  it('sucht im Docstore weiter, wenn der document-updater nicht antwortet', async () => {
+    m.DocumentUpdaterHandler.promises.getProjectRanges.mockRejectedValue(new Error('ECONNREFUSED'))
+    await gesendet(ada, '@claude prüfe diese Aussage', { versuche: 1, pauseMs: 1 })
     expect((await ereignisse())[0].daten.pfad).toBe('main.tex')
   })
 

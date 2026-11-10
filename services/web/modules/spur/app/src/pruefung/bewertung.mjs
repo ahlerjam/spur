@@ -31,9 +31,10 @@ export function quelleZu(key, bibEintraege, quellen) {
   return nachDoi || quellen.find(q => q.key === key) || null
 }
 
-function referenzStatus(eintrag, doiWerk) {
+// Status einer .bib-Referenz bei Crossref; doiWerk null heißt, Crossref war nicht erreichbar.
+export function referenzStatus(eintrag, doiWerk) {
   if (!eintrag?.doi) return { referenz: 'ohne_doi', retraction: null }
-  if (!doiWerk) return { referenz: 'unbekannt', retraction: null }
+  if (!doiWerk) return { referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null }
   if (!doiWerk.gefunden) return { referenz: 'nicht_gefunden', retraction: null }
   return { referenz: 'gefunden', retraction: doiWerk.retraction }
 }
@@ -91,3 +92,16 @@ export function istProblem(zeile) {
     zeile.retraction === 'korrektur'
   )
 }
+
+// Ordnet eine Zitierstelle für die Zählung im Prüfbericht ein; jede nicht geprüfte Stelle bekommt einen Grund.
+// Ein Ausfall bei Crossref geht vor: Er sagt nichts über die Arbeit, auch wenn noch eine Quelle fehlt.
+export function stelleEinordnen(zeile) {
+  if (zeile.referenz === 'nicht_pruefbar') return { status: 'nicht_pruefbar', grund: zeile.grund }
+  if (!zeile.key) return { status: 'nicht_pruefbar', grund: 'zitierform_unbekannt' }
+  if (!zeile.quelleId) return { status: 'ohne_quelle', grund: 'keine_quelle' }
+  if (zeile.wortlaut && !seiteAusBeleg(zeile.seitenangabe)) return { status: 'ohne_seitenangabe', grund: 'seitenangabe_fehlt' }
+  if (zeile.wortlaut === 'nicht_pruefbar') return { status: 'nicht_pruefbar', grund: 'quelle_ohne_text' }
+  return { status: 'geprueft', grund: null }
+}
+
+export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar']

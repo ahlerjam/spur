@@ -21,5 +21,6 @@ export type SuchErgebnis = {
   treffer: PaperTreffer[]
   weiter: boolean
   fehler: DienstFehler[]
-  hinweise: string[]
+  // Gesetzt, wenn kein Dienst geantwortet hat: Die leere Liste heißt dann nicht „nichts gefunden“.
+  hinweis: string | null
 }

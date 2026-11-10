@@ -50,6 +50,16 @@ describe('Quelle groß öffnen', function () {
     fetchMock.removeRoutes().clearHistory()
   })
 
+  it('hat Zurück, Blättern und Groß öffnen in der Werkzeugleiste als gleichartige Knöpfe', async function () {
+    zeigen()
+    await screen.findByRole('button', { name: 'Groß öffnen' })
+    const leiste = document.querySelector('.spur-panel-werkzeuge') as HTMLElement
+    const knoepfe = ['Zurück', 'Vorherige Seite', 'Nächste Seite', 'Groß öffnen'].map(name =>
+      within(leiste).getByRole('button', { name })
+    )
+    expect(new Set(knoepfe.map(k => k.className)).size).to.equal(1)
+  })
+
   it('öffnet die große Ansicht mit Blättern und Zoom und gibt den Fokus zurück', async function () {
     zeigen()
     const oeffnen = await screen.findByRole('button', { name: 'Groß öffnen' })

@@ -21,6 +21,8 @@ const zeile = (id: string, problem: boolean) => ({
   wortlaut: problem ? 'abweichend' : 'exakt',
   seite: null,
   problem,
+  status: 'geprueft',
+  grund: null as string | null,
 })
 
 describe('Prüfbericht-Panel', function () {
@@ -29,8 +31,13 @@ describe('Prüfbericht-Panel', function () {
   beforeEach(async function () {
     fetchMock.removeRoutes().clearHistory()
     fetchMock.get(BERICHT, {
-      zeilen: [zeile('gruen', false), zeile('rot', true)],
-      statistik: { geprueft: 2, wiederverwendet: 0 },
+      zeilen: [
+        zeile('gruen', false),
+        { ...zeile('rot', true), wortlaut: 'quelle_fehlt', status: 'ohne_quelle', grund: 'keine_quelle' },
+        { ...zeile('seite', false), auszug: 'Ohne Seite', status: 'ohne_seitenangabe', grund: 'seitenangabe_fehlt' },
+        { ...zeile('ausfall', false), auszug: 'Ausfall', referenz: 'nicht_pruefbar', status: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar' },
+      ],
+      zaehlung: { geprueft: 1, ohne_quelle: 1, ohne_seitenangabe: 1, nicht_pruefbar: 1 },
     })
     // Der Prüf-Store ist ein Modul-Singleton: Andere Testdateien können ihn schon gefüllt oder eine
     // verzögerte Prüfung geplant haben. pruefen() bricht den Timer ab und lädt diesen Bericht.
@@ -53,5 +60,22 @@ describe('Prüfbericht-Panel', function () {
 
     fireEvent.click(screen.getByLabelText('Nur Probleme'))
     expect(screen.getByText('Ein stimmiges Zitat')).to.exist
+  })
+
+  it('zählt die Zitierstellen nach Status und nennt je nicht geprüfter Stelle den Grund', async function () {
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    await screen.findByText('Zitierstellen: 1 geprüft, 1 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar')
+    expect(screen.queryByText(/Abschnitte geprüft/)).to.not.exist
+    screen.getByText('keine Quelle aufgenommen')
+    screen.getByText('Seitenangabe fehlt')
+    screen.getByText('nicht prüfbar – Crossref gerade nicht erreichbar')
+  })
+
+  it('lässt Status mit null Stellen in der Zählung weg', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, { zeilen: [zeile('gruen', false)], zaehlung: { geprueft: 1, ohne_quelle: 0, ohne_seitenangabe: 0, nicht_pruefbar: 0 } })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    await screen.findByText('Zitierstellen: 1 geprüft')
   })
 })

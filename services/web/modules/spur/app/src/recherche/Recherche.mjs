@@ -6,7 +6,7 @@ import { meldung } from '../meldungen.mjs'
 import { suchprotokoll } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { DienstFehler } from './abruf.mjs'
-import { aktiv, PRO_SEITE, SUCHDIENSTE, ZITATIONSDIENSTE } from './dienste.mjs'
+import { PRO_SEITE, SUCHDIENSTE, ZITATIONSDIENSTE } from './dienste.mjs'
 
 const PROTOKOLL_SEITE = 50
 const CSV_MAX = 10000
@@ -59,18 +59,20 @@ export function auswerten(dienste, ergebnisse) {
   })
   // Ohne Abstract bleibt das Feld leer statt null. Gekürzt, damit eine Seite paper_search unter 10.000 Tokens bleibt.
   const treffer = [...sammlung.values()].map(t => ({ ...t, abstract: kuerzen(t.abstract ?? '') }))
-  return { treffer, fehler, gesamt }
+  const antworten = dienste.map(d => {
+    const fehlschlag = fehler.find(f => f.dienst === d.name)
+    return { dienst: d.anzeige, antwort: !fehlschlag ? 'geantwortet' : fehlschlag.art === 'limit' ? 'gedrosselt' : 'nicht_erreichbar' }
+  })
+  // Eine leere Liste heißt sonst „nichts gefunden“, obwohl niemand gefragt werden konnte.
+  const hinweis = gesamt.length ? null : meldung('spur_hinweis_kein_dienst')
+  return { treffer, fehler, gesamt, dienste: antworten, hinweis }
 }
 
 export async function suchen({ projectId, userId, anfrage, seite = 0 }) {
   const begriff = anfrage?.trim()
   if (!begriff) throw new Problem(400, 'anfrage_fehlt', 'spur_fehler_suchbegriff_fehlt')
-  const dienste = SUCHDIENSTE.filter(aktiv)
-  const hinweise = SUCHDIENSTE.filter(d => !aktiv(d)).map(
-    d => meldung('spur_fehler_suchdienst_aus', { dienst: d.anzeige, variable: d.keyVariable })
-  )
-  const ergebnisse = await Promise.allSettled(dienste.map(d => d.suchen(begriff, seite)))
-  const { treffer, fehler, gesamt } = auswerten(dienste, ergebnisse)
+  const ergebnisse = await Promise.allSettled(SUCHDIENSTE.map(d => d.suchen(begriff, seite)))
+  const { treffer, fehler, gesamt, dienste, hinweis } = auswerten(SUCHDIENSTE, ergebnisse)
   if (seite === 0 && gesamt.length) {
     const datum = jetzt()
     await (await suchprotokoll()).insertMany(
@@ -90,7 +92,8 @@ export async function suchen({ projectId, userId, anfrage, seite = 0 }) {
     treffer,
     weiter: gesamt.some(({ anzahl }) => (seite + 1) * PRO_SEITE < anzahl),
     fehler,
-    hinweise,
+    dienste,
+    hinweis,
   }
 }
 
@@ -122,10 +125,9 @@ export async function zitationen(doi, richtung) {
     throw new Problem(400, 'richtung_ungueltig', 'spur_fehler_richtung_ungueltig')
   }
   const wert = doiPruefen(doi)
-  const dienste = ZITATIONSDIENSTE.filter(aktiv)
-  const ergebnisse = await Promise.allSettled(dienste.map(d => d.zitationen(wert, richtung)))
-  const { treffer, fehler } = auswerten(dienste, ergebnisse)
-  return { doi: wert, richtung, treffer, fehler }
+  const ergebnisse = await Promise.allSettled(ZITATIONSDIENSTE.map(d => d.zitationen(wert, richtung)))
+  const { treffer, fehler, dienste, hinweis } = auswerten(ZITATIONSDIENSTE, ergebnisse)
+  return { doi: wert, richtung, treffer, fehler, dienste, hinweis }
 }
 
 export async function protokollCsv(projectId) {

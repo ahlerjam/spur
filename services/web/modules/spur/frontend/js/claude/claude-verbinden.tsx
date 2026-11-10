@@ -17,12 +17,13 @@ const SCHREIBWERKZEUGE = [
   'wait_for_event',
 ]
 
-export function startBefehl() {
+// `--` beendet die Werkzeugliste: --allowedTools nimmt mehrere Werte und schluckte sonst den Prompt.
+export function startBefehl(t: (schluessel: string) => string) {
   const regeln = SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')
-  return `claude --allowedTools "${regeln}"`
+  return `claude --allowedTools "${regeln}" -- "${t('spur_start_prompt')}"`
 }
 
-function schritte(token: string) {
+function schritte(token: string, t: (schluessel: string) => string) {
   const adresse = `${getMeta('ol-ExposedSettings').siteUrl}/spur/mcp`
   return [
     {
@@ -35,7 +36,7 @@ function schritte(token: string) {
       text: 'spur_schritt_konto_text',
       befehl: `claude plugin install spur@spur --config server_url=${adresse} --config token=${token}`,
     },
-    { titel: 'spur_schritt_starten', text: 'spur_schritt_starten_text', befehl: startBefehl() },
+    { titel: 'spur_schritt_starten', text: 'spur_schritt_starten_text', befehl: startBefehl(t) },
   ]
 }
 
@@ -94,7 +95,7 @@ export default function ClaudeVerbinden() {
             <h5>{t('spur_verbinden_anleitung')}</h5>
             <p className="small">{t('spur_token_einmalig')}</p>
             <ol className="spur-schritte">
-              {schritte(neu).map(schritt => (
+              {schritte(neu, t).map(schritt => (
                 // Neues Token: alle drei Kästen neu, jeder Knopf zeigt wieder „Kopieren“.
                 <li key={`${neu}-${schritt.titel}`}>
                   <h6>{t(schritt.titel)}</h6>

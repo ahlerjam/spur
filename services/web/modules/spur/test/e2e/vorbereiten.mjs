@@ -403,6 +403,57 @@ Schlaf verdoppelt die Gedächtnisleistung.
   for (const sammlung of [vorschlaege, workflows]) {
     await (await sammlung()).deleteMany({})
   }
+
+  // P6: @claude in einem offenen und in einem zuvor nie geladenen Dokument.
+  await neuAnlegen(a, 'E2E P6 Kommentar', {
+    'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Ergebnisse.
+\end{document}`,
+    'kapitel.tex': 'Im Kapitel steht die Ausbeute von 81,2 Prozent.\n',
+  })
+  // P6: eine DOI, die der Crossref-Fake drosselt oder abschaltet, und eine erfundene.
+  await neuAnlegen(a, 'E2E P6 Crossref', {
+    'main.tex': String.raw`\documentclass{article}
+\begin{document}
+Lebensmittelabfälle \cite{foods2022}. Eine erfundene Quelle \cite{erfunden}.
+\end{document}`,
+    'references.bib': `@article{foods2022,
+  author = {Drossel, Fixture},
+  title = {Testwerk für gedrosseltes Crossref},
+  journal = {Foods},
+  year = {2022},
+  doi = {10.3390/foods11223570}
+}
+@article{erfunden,
+  author = {Niemand, Nora},
+  title = {Gibt es nicht},
+  year = {2020},
+  doi = {10.9999/gibt-es-nicht}
+}`,
+  })
+  // P6: sieben Zitierstellen, je eine geprüft, ohne Seitenangabe und nicht prüfbar (Crossref), vier ohne Quelle.
+  const p6Bericht = await neuAnlegen(a, 'E2E P6 Bericht', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\begin{document}
+\enquote{During rest the hippocampus replays recent experience.} \autocite[349]{smith2024}
+\enquote{Sleep supports the consolidation} \autocite{smith2024}
+\parencite{ohneA} \parencite{ohneB} \parencite{ohneC} \parencite{ohneD}
+\parencite{foods2022}
+\end{document}`,
+    'references.bib': `@article{smith2024,
+  title = {Sleep and Memory},
+  doi = {10.5555/spur.2024.001}
+}
+@article{foods2022,
+  title = {Testwerk für gedrosseltes Crossref},
+  doi = {10.3390/foods11223570}
+}
+${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n}`).join('\n')}`,
+  })
+  await quelleAusFixture(p6Bericht._id, a._id, 'smith2024.pdf')
+  await neuAnlegen(a, 'E2E P6 Zahlen', { 'main.tex': LEER, 'quellen.bib': '@article{p6,\n  title = {Zahlen}\n}\n' })
 }
 
 // Als Skript läuft es als root; die Ablage muss danach dem Web-Prozess gehören.

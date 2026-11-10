@@ -119,11 +119,9 @@ export default function RecherchePanel() {
             {ergebnis.fehler.map(f => (
               <Notification key={f.dienst} type="warning" content={f.text} />
             ))}
-            {ergebnis.hinweise.map(h => (
-              <Notification key={h} type="info" content={h} />
-            ))}
+            {ergebnis.hinweis && <Notification type="warning" content={ergebnis.hinweis} />}
             {ergebnis.treffer.length === 0 ? (
-              <p className="spur-leer">{t('spur_keine_treffer')}</p>
+              !ergebnis.hinweis && <p className="spur-leer">{t('spur_keine_treffer')}</p>
             ) : (
               <ul className="spur-liste">
                 {ergebnis.treffer.map(treffer => (

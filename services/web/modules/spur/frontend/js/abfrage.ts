@@ -3,8 +3,8 @@ import { anfrage } from './api'
 
 const ABFRAGE_MS = 5000
 
-// Lädt sofort und dann alle 5 s, solange der Tab sichtbar ist.
-export function useAbfrage<T>(pfad: string) {
+// Lädt sofort und dann alle `takt` ms (Standard 5 s), solange der Tab sichtbar ist.
+export function useAbfrage<T>(pfad: string, takt = ABFRAGE_MS) {
   const [daten, setDaten] = useState<T | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
 
@@ -18,11 +18,11 @@ export function useAbfrage<T>(pfad: string) {
 
   useEffect(() => {
     laden()
-    const takt = setInterval(() => {
+    const intervall = setInterval(() => {
       if (!document.hidden) laden()
-    }, ABFRAGE_MS)
-    return () => clearInterval(takt)
-  }, [laden])
+    }, takt)
+    return () => clearInterval(intervall)
+  }, [laden, takt])
 
   return { daten, fehler, setFehler, laden }
 }

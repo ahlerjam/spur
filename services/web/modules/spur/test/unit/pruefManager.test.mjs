@@ -93,7 +93,7 @@ describe('dokumente', () => {
 
 describe('bericht', () => {
   it('bewertet jedes Zitat der .tex-Dateien mit Zeile, Position und Problemstatus', async () => {
-    const { zeilen, statistik, stand } = await PruefManager.bericht(projekt)
+    const { zeilen, abschnitte, stand } = await PruefManager.bericht(projekt)
     expect(zeilen).toHaveLength(2)
     expect(zeilen.every(z => z.pfad === 'main.tex' && z.docId === String(wurzelDoc))).toBe(true)
     expect(zeilen[0]).toMatchObject({
@@ -109,24 +109,24 @@ describe('bericht', () => {
     expect(zeilen[1]).toMatchObject({ wortlaut: 'abweichend', zeile: 5, problem: true })
     expect(zeilen[0].id).toMatch(/^[0-9a-f]{12}$/)
     expect(zeilen[0].id).not.toBe(zeilen[1].id)
-    expect(statistik).toEqual({ geprueft: 2, wiederverwendet: 0 })
+    expect(abschnitte).toEqual({ neu: 2, uebernommen: 0 })
     expect(stand).toEqual(schalter.zeit)
   })
 
   it('verwendet geprüfte Abschnitte wieder und prüft nur geänderte neu', async () => {
     await PruefManager.bericht(projekt)
-    expect((await PruefManager.bericht(projekt)).statistik).toEqual({ geprueft: 0, wiederverwendet: 2 })
+    expect((await PruefManager.bericht(projekt)).abschnitte).toEqual({ neu: 0, uebernommen: 2 })
     projektDocs['/main.tex'] = doc(MAIN.replace('Das steht nirgends.', 'Auch nicht.'), wurzelDoc)
-    expect((await PruefManager.bericht(projekt)).statistik).toEqual({ geprueft: 1, wiederverwendet: 1 })
+    expect((await PruefManager.bericht(projekt)).abschnitte).toEqual({ neu: 1, uebernommen: 1 })
   })
 
   it('prüft alles neu, wenn sich Quellen oder der Tag ändern', async () => {
     await PruefManager.bericht(projekt)
     const quelle = (await Quellen.alle(projekt))[0]
     await Quellen.aendern(quelle, { versatz: 100 })
-    expect((await PruefManager.bericht(projekt)).statistik.geprueft).toBe(2)
+    expect((await PruefManager.bericht(projekt)).abschnitte.neu).toBe(2)
     schalter.zeit = new Date('2026-11-08T10:00:00Z')
-    expect((await PruefManager.bericht(projekt)).statistik.geprueft).toBe(2)
+    expect((await PruefManager.bericht(projekt)).abschnitte.neu).toBe(2)
   })
 
   it('zeigt Zitate ohne Quelle als quelle_fehlt und fragt Crossref nur einmal je DOI', async () => {
@@ -136,6 +136,22 @@ describe('bericht', () => {
     const { zeilen } = await PruefManager.bericht(projekt)
     expect(zeilen.map(z => z.wortlaut)).toEqual(['quelle_fehlt', 'quelle_fehlt'])
     expect(crossref.abfragen).toEqual(['10.5555/spur.2024.001'])
+  })
+
+  it('zählt Zitierstellen nach Status, auch wenn Abschnitte aus dem Cache kommen', async () => {
+    projektDocs['/main.tex'] = doc(`${MAIN}\n\\enquote{X.} \\autocite{unbekannt}\n\\enquote{Sleep supports} \\autocite{smith2024}`, wurzelDoc)
+    const erster = await PruefManager.bericht(projekt)
+    const ZAEHLUNG = { geprueft: 2, ohne_quelle: 1, ohne_seitenangabe: 1, nicht_pruefbar: 0 }
+    expect(erster.zaehlung).toEqual(ZAEHLUNG)
+    expect(erster.zeilen.map(z => [z.status, z.grund])).toEqual([
+      ['geprueft', null],
+      ['geprueft', null],
+      ['ohne_quelle', 'keine_quelle'],
+      ['ohne_seitenangabe', 'seitenangabe_fehlt'],
+    ])
+    const zweiter = await PruefManager.bericht(projekt)
+    expect(zweiter.abschnitte.neu).toBe(0)
+    expect(zweiter.zaehlung).toEqual(ZAEHLUNG)
   })
 
   it('liefert keine Zeilen für ein Projekt ohne Zitate', async () => {
@@ -169,8 +185,8 @@ describe('bericht mit OCR-Quelle', () => {
       bestaetigt: { von: new ObjectId(), am: schalter.zeit },
     })
     await datenbank.db.collection('spurQuotes').insertOne({ projectId: new ObjectId(), quelleId: smith._id, text: 'fremd', bestaetigt: { am: schalter.zeit } })
-    const { zeilen, statistik } = await PruefManager.bericht(projekt)
+    const { zeilen, abschnitte } = await PruefManager.bericht(projekt)
     expect(zeilen[0]).toMatchObject({ wortlaut: 'bestaetigt', problem: false })
-    expect(statistik.geprueft).toBe(2)
+    expect(abschnitte.neu).toBe(2)
   })
 })
