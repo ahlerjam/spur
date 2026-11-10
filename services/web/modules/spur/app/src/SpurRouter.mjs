@@ -11,6 +11,7 @@ import * as SpurController from './SpurController.mjs'
 import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
 import * as GrenzenController from './grenzen/GrenzenController.mjs'
+import * as UploadLinkController from './hochladen/UploadLinkController.mjs'
 import { e2eVorbereiten, quelleVergroessern, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { mailFakeLesen, mailFakeSteuern } from './dev/MailFake.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
@@ -171,6 +172,9 @@ export default {
     webRouter.post('/spur/claude/tokens', angemeldet, SpurController.claudeTokenErzeugen)
     webRouter.delete('/spur/claude/tokens/:token_id', angemeldet, SpurController.claudeTokenWiderrufen)
     publicApiRouter.all('/spur/mcp', mcpAnfrage)
+    // Einmal-Link für PDFs vom Rechner: ohne Sitzung, das Token entscheidet.
+    publicApiRouter.post('/spur/hochladen', UploadLinkController.ohneToken)
+    publicApiRouter.post('/spur/hochladen/:token', UploadLinkController.linkPruefen, hochladenMitGrenze, UploadLinkController.hochladen)
     if (IST_DEV) {
       publicApiRouter.use('/spur/dev/crossref', paperFake)
       publicApiRouter.get('/spur/dev/web/testseite', testseite)

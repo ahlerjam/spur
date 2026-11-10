@@ -6,7 +6,8 @@ import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocat
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from '../probleme.mjs'
-import { einstellungen, laeufe } from '../sammlungen.mjs'
+import { einstellungen, laeufe, quellen } from '../sammlungen.mjs'
+import * as QuellenManager from '../QuellenManager.mjs'
 import * as LaufManager from './LaufManager.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
 import { rolleFuerClaude } from '../rechte.mjs'
@@ -100,6 +101,11 @@ async function statusSetzen(lauf, status) {
 // Entfernt, was der Lauf außerhalb der Dokumente angelegt hat. Von Hand schon Gelöschtes wird übergangen.
 async function angelegtEntfernen(projectId, lauf, userId) {
   for (const eintrag of lauf.angelegt ?? []) {
+    if (eintrag.art === 'quelle') {
+      const quelle = await (await quellen()).findOne({ _id: eintrag.quelleId, projectId })
+      if (quelle) await QuellenManager.loeschen(quelle)
+      continue
+    }
     try {
       await EditorController.promises.deleteEntityWithPath(projectId, `/${eintrag.pfad}`, 'spur', userId)
     } catch (error) {

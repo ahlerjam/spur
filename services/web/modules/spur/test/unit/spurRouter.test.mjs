@@ -54,6 +54,7 @@ async function laden({ dev = false } = {}) {
   vi.doMock('../../app/src/SpurController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/vorschlaege/VorschlaegeController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/grenzen/GrenzenController.mjs', handlerAttrappe)
+  vi.doMock('../../app/src/hochladen/UploadLinkController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
   vi.doMock('../../app/src/dev/TexLiveFake.mjs', () => ({ texLiveFake: Object.assign(() => {}, { handler: 'texLiveFake' }) }))
   vi.doMock('../../app/src/dev/MailFake.mjs', () => ({
@@ -168,6 +169,12 @@ describe('Rechte der Routen', () => {
     const r = route(methode, pfad)
     expect(prueferVon(r)).toEqual(pruefer)
     expect(handlerVon(r)).toBe(handler)
+  })
+
+  it('nimmt Uploads per Einmal-Link öffentlich an: erst Link prüfen, dann Datei, dann Aufnahme', () => {
+    const r = routen.find(x => x.methode === 'post' && x.pfad === '/spur/hochladen/:token')
+    expect(r.kette.map(f => f.handler ?? f.name)).toEqual(['linkPruefen', 'hochladenMitGrenze', 'hochladen'])
+    expect(handlerVon(routen.find(x => x.methode === 'post' && x.pfad === '/spur/hochladen'))).toBe('ohneToken')
   })
 
   it('führt MCP öffentlich, ohne Sitzung: Das Token entscheidet', () => {

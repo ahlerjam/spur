@@ -15,6 +15,7 @@ let acceptChanges
 let emitToRoom
 let geloeschtePfade
 let paketEntfernt
+let quelleGeloescht
 const projekt = new ObjectId()
 const bot = new ObjectId()
 const anna = new ObjectId()
@@ -43,6 +44,8 @@ beforeEach(async () => {
     default: { promises: { deleteEntityWithPath: async (_p, pfad) => geloeschtePfade.push(pfad) } },
   }))
   vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => ({ paketEntfernt }))
+  quelleGeloescht = vi.fn(async () => {})
+  vi.doMock('../../app/src/QuellenManager.mjs', () => ({ loeschen: quelleGeloescht }))
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   recht.anmelden(vi)
   vi.doMock('../../../../app/src/Features/Editor/EditorRealTimeController.mjs', () => ({ default: { emitToRoom } }))
@@ -336,6 +339,15 @@ describe('zuruecknehmen', () => {
     const l = await lauf({ docs: [], angelegt: [{ art: 'datei', pfad: 'latexmkrc' }] })
     await LaufAktionen.zuruecknehmen(projekt, l, anna)
     expect((await gespeichert(l)).status).toBe('zurueckgenommen')
+  })
+
+  it('entfernt hochgeladene Quellen des Laufs', async () => {
+    const quelleId = new ObjectId()
+    await datenbank.db.collection('spurSources').insertOne({ _id: quelleId, projectId: projekt, key: 'smith2024' })
+    const l = await lauf({ docs: [], angelegt: [{ art: 'quelle', quelleId, name: 'smith2024.pdf' }] })
+    await LaufAktionen.zuruecknehmen(projekt, l, anna)
+    expect(quelleGeloescht).toHaveBeenCalledWith(expect.objectContaining({ _id: quelleId }))
+    expect(geloeschtePfade).toEqual([])
   })
 
   it('Ganzen Lauf ablehnen entfernt auch Angelegtes', async () => {

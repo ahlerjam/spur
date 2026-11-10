@@ -347,6 +347,8 @@ Text davor.
 `,
   })
   await TexPakete.begrenzer.delete(String(a._id))
+  await neuAnlegen(a, 'E2E Hochladen', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E Hochladen B', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Semantik', {
     'main.tex': String.raw`\documentclass{article}
 \usepackage{csquotes}

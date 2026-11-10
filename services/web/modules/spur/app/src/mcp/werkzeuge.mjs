@@ -18,6 +18,7 @@ import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
 import * as TexPakete from '../kompilieren/TexPakete.mjs'
+import * as UploadLink from '../hochladen/UploadLink.mjs'
 import * as Erwaehnung from '../erwaehnung/Erwaehnung.mjs'
 import { meldung } from '../meldungen.mjs'
 import * as Vorschlaege from '../vorschlaege/Vorschlaege.mjs'
@@ -451,6 +452,18 @@ Object.assign(WERKZEUGE, {
     async ausfuehren({ project_id: pid }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
       return await Kompilieren.log({ projectId, botId })
+    },
+  },
+
+  source_upload_link: {
+    description:
+      'Einmal-Link, über den du PDFs vom Rechner direkt in dieses Projekt hochlädst (nicht über MCP): ' +
+      'curl -F datei=@paper.pdf [-F doi=…] [-F titel=…] <link> oder das Plugin-Skript spur-hochladen. ' +
+      `Gilt ${UploadLink.GUELTIG_MINUTEN} Minuten für bis zu ${UploadLink.MAX_DATEIEN} Dateien. Die Quellen gehören zum Lauf.`,
+    inputSchema: z.object({ project_id: id }),
+    async ausfuehren({ project_id: pid }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      return await UploadLink.erzeugen({ projectId, menschId, botId })
     },
   },
 

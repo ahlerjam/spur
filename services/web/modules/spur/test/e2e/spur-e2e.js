@@ -780,7 +780,7 @@ async page => {
       // P3: Vorschläge ins Panel.
       const P3 = ['suggest']
       // P7: Pakete pro Projekt.
-      const P7 = ['tex_package_add']
+      const P7 = ['tex_package_add', 'source_upload_link']
       const erwartet = [...P1, ...P2, ...P3, ...P7].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
@@ -4108,6 +4108,99 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const readme = await repoDatei(`${REPO}/README.md`)
     const betrieb = readme.split('### Limits\n')[1]?.split('\n### ')[0] ?? ''
     ok(betrieb.includes('Admin → Limits') && betrieb.includes('unlimited'), 'README ohne Abschnitt zu den Grenzen')
+  }
+
+  // Binärdatei aus dem Repo als Buffer (repoDatei liest Text).
+  async function repoBytes(pfad) {
+    await page.setContent('<input type="file">')
+    await page.locator('input').setInputFiles(pfad)
+    const base64 = await page.locator('input').evaluate(async el => {
+      const bytes = new Uint8Array(await el.files[0].arrayBuffer())
+      let text = ''
+      for (const b of bytes) text += String.fromCharCode(b)
+      return btoa(text)
+    })
+    return Buffer.from(base64, 'base64')
+  }
+
+  async function perLink(link, datei, felder = {}) {
+    const inhalt = typeof datei === 'string' ? { name: datei, mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/${datei}`) } : datei
+    const r = await page.request.post(link, { multipart: { datei: inhalt, ...felder } })
+    return { status: r.status(), daten: await r.json().catch(() => null) }
+  }
+
+  features.p7f12 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E Hochladen')
+    const andere = await projektId(token, 'E2E Hochladen B')
+    const eintrag = await werkzeug(token, 'acquisition_add', { project_id: pid, doi: '10.5555/spur.2024.001' })
+    ok(!eintrag.fehler, `acquisition_add: ${JSON.stringify(eintrag.inhalt)}`)
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    ok(link.gueltig_minuten === 15 && link.max_dateien === 50 && link.link.startsWith(`${BASE}/spur/hochladen/`), `Link: ${JSON.stringify(link)}`)
+
+    const smith = await perLink(link.link, 'smith2024.pdf', { project_id: andere })
+    ok(smith.status === 200 && smith.daten.status === 'angelegt' && /^[0-9a-f]{24}$/.test(smith.daten.quelle_id), `smith2024.pdf: ${JSON.stringify(smith)}`)
+    ok(smith.daten.beschaffung_id === eintrag.inhalt.eintrag_id, `Nicht der Beschaffungsliste zugeordnet: ${JSON.stringify(smith.daten)}`)
+    const bericht = await perLink(link.link, 'arxiv2401.01234.pdf', { titel: 'Testbericht' })
+    ok(bericht.status === 200 && bericht.daten.status === 'angelegt', `Zweite Datei: ${JSON.stringify(bericht)}`)
+    const nochmal = await perLink(link.link, 'smith2024.pdf')
+    ok(nochmal.daten?.status === 'vorhanden' && nochmal.daten.quelle_id === smith.daten.quelle_id, `Duplikat: ${JSON.stringify(nochmal)}`)
+    const text = { name: 'kein.pdf', mimeType: 'application/pdf', buffer: Buffer.from('nur Text, kein PDF') }
+    const falsch = await perLink(link.link, text)
+    ok(falsch.daten?.status === 'abgelehnt' && falsch.daten.grund.startsWith('Keine PDF-Datei'), `Text als PDF: ${JSON.stringify(falsch)}`)
+
+    const imAnderen = (await werkzeug(token, 'sources_list', { project_id: andere })).inhalt.eintraege
+    ok(imAnderen.length === 0, `Upload landete in Projekt B: ${JSON.stringify(imAnderen)}`)
+    const ohne = await page.request.post(`${BASE}/spur/hochladen`, { multipart: { datei: text } })
+    ok(ohne.status() === 401, `Ohne Token: ${ohne.status()}`)
+    const fremd = await page.request.post(`${BASE}/spur/hochladen/${'0'.repeat(64)}`, { multipart: { datei: text } })
+    ok(fremd.status() === 401, `Falsches Token: ${fremd.status()}`)
+
+    const { inhalt: kurz } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const spaeter = new Date(Date.now() + 16 * 60 * 1000).toISOString()
+    ok((await page.request.post(`${BASE}/spur/dev/zeit`, { data: { jetzt: spaeter } })).status() === 204, 'Zeit vorstellen')
+    try {
+      const abgelaufen = await perLink(kurz.link, text)
+      ok(abgelaufen.status === 410 && abgelaufen.daten.detail.startsWith('Link abgelaufen'), `Nach 15 Minuten: ${JSON.stringify(abgelaufen)}`)
+    } finally {
+      await page.request.post(`${BASE}/spur/dev/zeit`, { data: { jetzt: null } })
+    }
+    const { inhalt: voll } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    for (let i = 0; i < 50; i++) ok((await perLink(voll.link, text)).status === 200, `Upload ${i + 1}`)
+    const einundfuenfzig = await perLink(voll.link, text)
+    ok(einundfuenfzig.status === 410 && einundfuenfzig.daten.detail.startsWith('Link verbraucht'), `51. Upload: ${JSON.stringify(einundfuenfzig)}`)
+
+    await projektOeffnen('E2E Hochladen')
+    await panelOeffnen('Quellen')
+    for (const name of ['smith2024.pdf', 'arxiv2401.01234.pdf']) await page.getByRole('button', { name }).first().waitFor({ timeout: 20000 })
+    const liste = await jsonVon(`/spur/project/${pid}/beschaffung`)
+    const zugeordnet = (liste.eintraege ?? liste).find(e => e.doi === '10.5555/spur.2024.001')
+    ok(zugeordnet?.status === 'beschafft', `Beschaffungsliste: ${JSON.stringify(zugeordnet)}`)
+
+    await panelOeffnen('Claude')
+    for (const name of ['smith2024.pdf', 'arxiv2401.01234.pdf']) await karte().getByText(name, { exact: true }).waitFor({ timeout: 20000 })
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const danach = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    ok(danach.length === 0, `Nach „Lauf rückgängig“: ${danach.map(q => q.dateiname)}`)
+  }
+
+  // Die Skripte selbst prüft tools/tests/plugin-skripte.test.mjs gegen lokale Fakes.
+  features.p7f13 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    for (const skript of ['spur-pdf-holen', 'spur-hochladen']) {
+      const text = await repoDatei(`${REPO}/plugins/spur/bin/${skript}`)
+      ok(text.startsWith('#!/usr/bin/env bash') || text.startsWith('#!/bin/bash'), `${skript} ohne bash-Shebang`)
+      ok(text.includes('--help'), `${skript} ohne --help`)
+    }
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    const ablauf = skill.split('## PDFs from your computer\n')[1]?.split('\n## ')[0] ?? ''
+    for (const teil of ['spur-pdf-holen', 'Playwright', 'source_upload_link', 'spur-hochladen', 'paywall']) {
+      ok(ablauf.includes(teil), `SKILL.md: Ablauf ohne „${teil}“`)
+    }
+    const test = await repoDatei(`${REPO}/tools/tests/plugin-skripte.test.mjs`)
+    ok(test.includes('spur-pdf-holen') && test.includes('spur-hochladen'), 'Test der Plugin-Skripte fehlt')
   }
 
   // Die Paketliste prüft tools/tests/tex-pakete.test.mjs; der Smoke auf spur nach dem Merge ist Handprüfung.

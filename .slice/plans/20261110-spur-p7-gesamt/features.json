@@ -145,7 +145,7 @@
    "id": "f12",
    "title": "PDFs vom Rechner über einen Einmal-Link hochladen",
    "ui": true,
-   "passes": false,
+   "passes": true,
    "steps": [
     "Ein Fake-Client ruft über MCP `source_upload_link` für das Projekt „E2E Quellen“ auf und bekommt einen Link, eine Gültigkeit von 15 Minuten und die Höchstzahl 50",
     "Mit `curl -F datei=@smith2024.pdf <link>` und danach mit einer zweiten PDF-Datei ohne DOI und `-F titel=\"Testbericht\"` antwortet spur je Datei mit Quellen-ID",
@@ -159,7 +159,7 @@
   {
    "id": "f13",
    "title": "Plugin-Skripte holen PDFs auf dem Rechner und laden sie hoch",
-   "passes": false,
+   "passes": true,
    "steps": [
     "Das Plugin enthält ausführbare Skripte `spur-pdf-holen` und `spur-hochladen`; `spur-pdf-holen --help` und `spur-hochladen --help` zeigen die Aufrufe",
     "`spur-pdf-holen 10.1234/fake.oa ziel/` gegen einen Unpaywall- und Verlags-Fake legt `ziel/<datei>.pdf` an und gibt den Pfad aus; bei einer DOI ohne freie Version gibt es „keine freie Version gefunden“ und Exit-Code ungleich 0, und es entsteht keine Datei",

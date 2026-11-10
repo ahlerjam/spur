@@ -42,6 +42,11 @@
 - Frontend-Suite: `notifications.test.tsx`, `survey-widget.test.tsx` und `project-tools-rename.test.tsx` scheitern
   auch mit dem Frontend-Stand der Basis, wenn man sie einzeln startet (Reihenfolge der Tests); im vollen Lauf
   bekannt bzw. grün.
+- f12: Die E2E-Schritte nutzen das eigene Projekt „E2E Hochladen“ statt „E2E Quellen“, weil ältere Features dort
+  schon smith2024.pdf hochladen und der erste Upload sonst „vorhanden“ wäre. Der Link ist an das Projekt gebunden;
+  ein mitgeschicktes `project_id` wird ignoriert. Hochladen per Link gibt nur PDF (Anfang `%PDF-`) frei.
+- f13: Die Skripte liegen unter `plugins/spur/bin/`; Claude Code nimmt diesen Ordner laut Changelog v2.1.91 in den
+  PATH auf (per Context7 geprüft). Gegen den echten Server laufen sie erst nach dem Merge (Handprüfung).
 - f14: Welche Pakete chemformula außer `xfrac` und `chemgreek` lädt, ist ohne Netz und ohne chemformula im Dev-Image
   nicht verifiziert; der Test kennt nur diese beiden.
 
@@ -49,6 +54,7 @@
 - f3: `make setup` in einem echten Terminal (Passwort bleibt unsichtbar, Ablauf wie im Test).
 - f6: Der PR dieses Plans zeigt `test` und `upstream` als bestanden; ein reiner Doku-PR zeigt beide in unter 1 Minute
   grün.
+- f13: `spur-pdf-holen` mit einer echten OA-DOI und `spur-hochladen` gegen eine laufende Installation.
 - f14: Smoke auf spur ist grün, auch „Compile Folien“ (Image mit `xfrac`).
 
 ## Needs decision
