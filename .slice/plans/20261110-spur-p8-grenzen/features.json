@@ -1,0 +1,36 @@
+{"features": [
+  {"id": "f1", "title": "Admin setzt Standard-Grenzen und Ausnahmen", "ui": true, "passes": false, "steps": [
+    "Admin e2e-admin öffnet im Admin-Bereich „Grenzen“ und sieht „Projekte je Nutzer: unbegrenzt“ und „Speicher je Projekt: unbegrenzt“",
+    "Er setzt Projekte je Nutzer auf 3 und Speicher je Projekt auf 0,01 GB und speichert; nach Neuladen stehen die Werte da",
+    "In der Nutzerliste setzt er bei e2e-b die Ausnahme Projekte je Nutzer auf 5 und speichert; nach Neuladen steht 5 bei e2e-b",
+    "Eine ungültige Eingabe (−1, „abc“) zeigt einen Fehler am Feld und speichert nichts",
+    "Nutzer e2e-a ruft die Seite „Grenzen“ auf und bekommt 403"
+  ]},
+  {"id": "f2", "title": "Projekt-Grenze sperrt neue Projekte", "ui": true, "passes": false, "steps": [
+    "Standard 3 Projekte; e2e-a besitzt 2 aktive und 1 archiviertes Projekt",
+    "e2e-a sieht in der Projektliste „3 von 3 Projekten“; „Neues Projekt“ zeigt die Meldung „Du hast 3 von 3 Projekten. Lösche ein Projekt endgültig oder frag deinen Admin.“ und legt nichts an",
+    "Kopieren eines Projekts und Hochladen eines ZIP als Projekt liefern dieselbe Meldung; über die API bzw. direkte Anfrage kommt 403 mit Code `projekte_voll`",
+    "Ein Projekt in den Papierkorb verschieben ändert nichts; nach endgültigem Löschen kann e2e-a wieder ein Projekt anlegen",
+    "e2e-b mit Ausnahme 5 kann bei 3 eigenen Projekten ein viertes anlegen",
+    "Ein Projekt, das e2e-b mit e2e-a teilt, zählt bei e2e-a nicht"
+  ]},
+  {"id": "f3", "title": "Speicher-Grenze sperrt Uploads", "ui": true, "passes": false, "steps": [
+    "Standard 0,01 GB je Projekt; e2e-a öffnet ein Projekt und lädt eine 6-MB-Datei hoch; der Editor zeigt „0,01 GB von 0,01 GB“ bzw. den Stand in MB",
+    "Eine weitere 6-MB-Datei wird abgelehnt mit „Dieses Projekt nutzt … von 0,01 GB. Lösche Dateien oder Quellen oder frag deinen Admin.“",
+    "Eine PDF-Quelle im Quellen-Panel hochladen wird ebenso abgelehnt; über MCP liefert `source_add` den Code `speicher_voll`",
+    "Text im Editor schreiben und speichern funktioniert weiter",
+    "Nach Löschen der ersten Datei ist der Upload wieder möglich",
+    "Zwei gleichzeitige Uploads, die zusammen die Grenze überschreiten, werden nicht beide angenommen"
+  ]},
+  {"id": "f4", "title": "Übersicht für Admins", "ui": true, "passes": false, "steps": [
+    "Admin öffnet die Übersicht und sieht eine Tabelle Nutzer mit Projektzahl und Grenze (e2e-a „3 / 3“ markiert als erreicht)",
+    "Eine Tabelle Projekte zeigt Speicher, Grenze und Eigentümer; Projekte ab 80 % sind markiert",
+    "Beide Tabellen lassen sich nach Auslastung sortieren; bei 360 px gibt es kein horizontales Rollen der Seite",
+    "„Speicher neu berechnen“ aktualisiert die Werte eines Projekts nach einer Änderung im Dateisystem des Fakes"
+  ]},
+  {"id": "f5", "title": "Grenzen nach dem Update unbegrenzt, keine Sperre für Bestehendes", "passes": false, "steps": [
+    "Nach der Migration auf einer Installation mit vorhandenen Projekten sind beide Standards unbegrenzt; Nutzer können wie vorher Projekte anlegen",
+    "Ein Nutzer mit 5 Projekten bekommt eine Grenze von 3; seine 5 Projekte bleiben bearbeitbar, nur ein sechstes kann er nicht anlegen",
+    "README beschreibt die Grenzen kurz im Abschnitt Betrieb"
+  ]}
+]}
