@@ -43,7 +43,7 @@ trap 'rm -f "$tmp"' EXIT
 # Setzt $fehler auf "keine PDF-Datei" bzw. die Ursache des Abbruchs.
 laden() {
   fehler=
-  if ! curl -sSL -f --max-time 120 -A "spur-pdf-holen" -o "$tmp" "$1" 2>/dev/null; then
+  if ! curl -sSL -f --max-time 120 -A "spur-pdf-holen" -o "$tmp" -- "$1" 2>/dev/null; then
     fehler="Download fehlgeschlagen"
     return 1
   fi
