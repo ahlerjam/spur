@@ -315,6 +315,7 @@ describe('zuruecknehmen', () => {
   })
 
   it('entfernt bei einem fertigen Lauf angelegte Dateien und Ordner und lehnt seine Changes ab', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'owner' })
     docSetzen('Alt und neu.', [change('c1', { p: 8, i: 'neu' })])
     const l = await lauf({
       angelegt: [
@@ -330,6 +331,7 @@ describe('zuruecknehmen', () => {
   })
 
   it('übergeht schon gelöschte Dateien', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'owner' })
     vi.resetModules()
     vi.doMock('../../../../app/src/Features/Editor/EditorController.mjs', async () => {
       const { default: Errors } = await import('../../../../app/src/Features/Errors/Errors.js')
@@ -342,6 +344,7 @@ describe('zuruecknehmen', () => {
   })
 
   it('entfernt hochgeladene Quellen des Laufs', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'owner' })
     const quelleId = new ObjectId()
     await datenbank.db.collection('spurSources').insertOne({ _id: quelleId, projectId: projekt, key: 'smith2024' })
     const l = await lauf({ docs: [], angelegt: [{ art: 'quelle', quelleId, name: 'smith2024.pdf' }] })
@@ -351,11 +354,21 @@ describe('zuruecknehmen', () => {
   })
 
   it('Ganzen Lauf ablehnen entfernt auch Angelegtes', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
     docSetzen('Alt und neu.', [change('c1', { p: 8, i: 'neu' })])
     const l = await lauf({ angelegt: [{ art: 'datei', pfad: 'latexmkrc' }] })
     await LaufAktionen.ablehnen(projekt, l, anna)
     expect(geloeschtePfade).toEqual(['/latexmkrc'])
     expect((await gespeichert(l)).angelegt).toEqual([])
+  })
+
+  it('ein Reviewer lehnt nur die Changes ab, Dateien und Quellen bleiben', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'review' })
+    docSetzen('Alt und neu.', [change('c1', { p: 8, i: 'neu' })])
+    const l = await lauf({ angelegt: [{ art: 'datei', pfad: 'latexmkrc' }] })
+    await LaufAktionen.ablehnen(projekt, l, anna)
+    expect(geloeschtePfade).toEqual([])
+    expect(spurUpdate).toHaveBeenCalledTimes(1)
   })
 
   it('lässt nur angenommene Läufe zurücknehmen', async () => {

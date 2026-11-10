@@ -192,6 +192,14 @@ test('spur-hochladen lädt jede Datei einzeln hoch und meldet je Datei eine Zeil
   assert.deepEqual(uploads.map(u => u.datei), ['a.pdf', 'b.pdf'])
 })
 
+test('spur-hochladen lädt Dateien mit Komma und Semikolon im Namen als eine Datei', async () => {
+  const name = 'Mueller, 2020; final.pdf'
+  writeFileSync(join(arbeit, name), PDF)
+  const r = await laufAsync('spur-hochladen', [`${basis}/upload/ok`, name])
+  assert.equal(r.status, 0, r.stderr)
+  assert.deepEqual(uploads.map(u => u.datei), [name])
+})
+
 test('spur-hochladen nimmt Optionen vor den Dateien und gibt den Titel mit', async () => {
   writeFileSync(join(arbeit, 'a.pdf'), PDF)
   const r = await laufAsync('spur-hochladen', ['--titel', 'Ein Titel; mit @Zeichen', `${basis}/upload/ok`, 'a.pdf'])

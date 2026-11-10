@@ -50,7 +50,10 @@ for pfad in "${dateien[@]}"; do
     rc=1
     continue
   fi
-  args=(-F "datei=@$pfad")
+  # In Anführungszeichen, damit curl Komma, Semikolon und Anführungszeichen im Namen nicht als Syntax liest.
+  q=${pfad//\\/\\\\}
+  q=${q//\"/\\\"}
+  args=(-F "datei=@\"$q\"")
   [ -n "$doi" ] && args+=(--form-string "doi=$doi")
   [ -n "$titel" ] && args+=(--form-string "titel=$titel")
   : > "$antwort"

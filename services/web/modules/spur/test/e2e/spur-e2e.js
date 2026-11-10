@@ -3779,13 +3779,14 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(mitTheme.ergebnis.compile === 'success', `Compile mit Theme: ${JSON.stringify(mitTheme.ergebnis)}`)
 
     await panelOeffnen('Claude')
-    for (const datei of ['tex-pakete/beamertheme-spurtest', 'tex-pakete/spurfarben', 'latexmkrc']) {
+    // Die latexmkrc bleibt: Pakete späterer Läufe brauchen sie auch.
+    for (const datei of ['tex-pakete/beamertheme-spurtest', 'tex-pakete/spurfarben']) {
       await karte().getByText(datei, { exact: true }).waitFor({ timeout: 20000 })
     }
     await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
     await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
     const nachher = await pfade()
-    ok(!nachher.some(p => p.startsWith('/tex-pakete') || p === '/latexmkrc'), `Nach „Lauf rückgängig“: ${nachher}`)
+    ok(!nachher.some(p => p.startsWith('/tex-pakete')) && nachher.includes('/latexmkrc'), `Nach „Lauf rückgängig“: ${nachher}`)
     await nichtGefunden()
 
     const beamer = await paket('beamer')
@@ -3800,7 +3801,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const riesig = await paket('spurtest-riesig')
     ok(riesig.fehler && riesig.inhalt.fehler === 'paket_zu_gross' && riesig.inhalt.detail.includes('20 MB'), `Riesig: ${JSON.stringify(riesig.inhalt)}`)
     const danach = await pfade()
-    ok(!danach.some(p => p.startsWith('/tex-pakete') || p === '/latexmkrc'), `Nach Fehlern angelegt: ${danach}`)
+    ok(!danach.some(p => p.startsWith('/tex-pakete')), `Nach Fehlern angelegt: ${danach}`)
 
     await fakeSteuern({ schalter: { SPUR_TEX_PAKETE: 'aus' } })
     try {

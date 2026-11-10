@@ -40,10 +40,11 @@ export async function stand(projectId) {
   return await standVon(await projekt(projectId))
 }
 
+// Ohne Grenze wird der Stand nicht berechnet (bytes null): Er kostet eine Anfrage an history-v1.
 export async function info(projectId) {
   const p = await projekt(projectId)
-  const [bytes, grenze] = await Promise.all([standVon(p), speicherGrenzeBytes(p.owner_ref)])
-  return { bytes, grenze }
+  const grenze = await speicherGrenzeBytes(p.owner_ref)
+  return { bytes: grenze === null ? null : await standVon(p), grenze }
 }
 
 function vollFehler(bytes, grenze) {
@@ -83,6 +84,5 @@ export async function neuBerechnen(projectId, dateiPfad) {
     const groesse = await fs.stat(dateiPfad(q)).then(s => s.size, () => null)
     if (groesse !== null && groesse !== q.groesse) await (await quellen()).updateOne({ _id: q._id }, { $set: { groesse } })
   }
-  await (await speicher()).updateOne({ _id: new ObjectId(projectId) }, { $set: { reserviert: 0 } })
   return await stand(projectId)
 }

@@ -1,7 +1,6 @@
 // tex_package_add: holt ein Paket aus dem TeX-Live-Archiv des Spiegels, den das Image nutzt, und legt seine
 // Laufzeitdateien unter tex-pakete/<paket>/ ins Projekt. Eine latexmkrc im Projekt nimmt den Ordner in die Suchpfade.
 import { execFile } from 'node:child_process'
-import { createWriteStream } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import Path from 'node:path'
@@ -61,16 +60,16 @@ async function herunterladen(url, ziel) {
     await antwort.body?.cancel()
     throw zuGross()
   }
-  const datei = createWriteStream(ziel)
+  const datei = await fs.open(ziel, 'w')
   let gelesen = 0
   try {
     for await (const stueck of antwort.body) {
       gelesen += stueck.length
       if (gelesen > MAX_PAKET) throw zuGross()
-      if (!datei.write(stueck)) await new Promise(weiter => datei.once('drain', weiter))
+      await datei.write(stueck)
     }
   } finally {
-    await new Promise(fertig => datei.end(fertig))
+    await datei.close()
   }
 }
 
@@ -106,8 +105,8 @@ async function latexmkrcSichern({ projectId, menschId, botId, stand, ordner, lau
   }
   const datei = Path.join(ordner, 'latexmkrc')
   await fs.writeFile(datei, LATEXMKRC_BLOCK)
+  // Nicht als Teil des Laufs verbucht: Pakete späterer Läufe brauchen dieselbe Datei.
   await EditorController.promises.upsertFileWithPath(projectId, '/latexmkrc', datei, null, 'spur', menschId)
-  await LaufManager.angelegtMerken(lauf, [{ art: 'datei', pfad: 'latexmkrc' }])
 }
 
 // Abschalten per `SPUR_TEX_PAKETE=aus` oder in den spur-Einstellungen (Admin → Grenzen).
@@ -156,6 +155,8 @@ export async function hinzufuegen({ projectId, menschId, botId, paket }) {
 
     const freigeben = await Speicher.reservieren(projectId, bytes)
     const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
+    // Vor dem ersten Upload verbuchen: Bricht er mittendrin ab, entfernt „Lauf rückgängig“ trotzdem den Ordner.
+    await LaufManager.angelegtMerken(lauf, [{ art: 'ordner', pfad: `${ORDNER}/${paket}`, paket, bytes }])
     const angelegt = []
     try {
       for (const d of dateien) {
@@ -167,7 +168,6 @@ export async function hinzufuegen({ projectId, menschId, botId, paket }) {
       await freigeben()
     }
     await (await texPakete()).updateOne({ projectId, paket }, { $set: { bytes } }, { upsert: true })
-    await LaufManager.angelegtMerken(lauf, [{ art: 'ordner', pfad: `${ORDNER}/${paket}`, paket, bytes }])
     await latexmkrcSichern({ projectId, menschId, botId, stand, ordner, lauf })
 
     const imProjekt = new Set([...stand.pakete, paket])

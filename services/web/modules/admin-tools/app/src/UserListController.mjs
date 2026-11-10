@@ -154,7 +154,10 @@ async function sendActivationEmail(req, res, next) {
   if (!emailIsConfigured()) {
     return HttpErrorHandler.unprocessableEntity(req, res, req.i18n.translate('spur_keine_mail'))
   }
-  const { emailSent } = await inviteUser(userId)
+  const { emailSent } = await inviteUser(userId).catch(err => {
+    logger.warn({ err, userId }, 'failed to create activation link')
+    return { emailSent: false }
+  })
   if (!emailSent) {
     return HttpErrorHandler.unprocessableEntity(req, res, 'Error sending activation email. Please check your SMTP configuration.')
   }

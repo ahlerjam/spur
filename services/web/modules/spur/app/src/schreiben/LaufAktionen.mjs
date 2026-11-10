@@ -153,7 +153,10 @@ export async function ablehnen(projectId, lauf, userId, nurIds) {
     abgelehnt += changes.length
   }
   const rest = liste.reduce((n, d) => n + d.changes.length, 0) - abgelehnt
-  if (!nurIds) await angelegtEntfernen(projectId, lauf, userId)
+  // Dateien und Quellen löschen darf nur, wer schreiben darf; Reviewer lehnen nur die Changes ab.
+  if (!nurIds && ['readAndWrite', 'owner'].includes(await rolleFuerClaude(userId, projectId))) {
+    await angelegtEntfernen(projectId, lauf, userId)
+  }
   if (rest === 0) await statusSetzen(lauf, 'abgelehnt')
   return { abgelehnt, rest }
 }
