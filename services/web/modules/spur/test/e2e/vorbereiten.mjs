@@ -13,6 +13,7 @@ import { fetchNothing } from '@overleaf/fetch-utils'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
 import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
+import * as TexPakete from '../../app/src/kompilieren/TexPakete.mjs'
 import {
   ereignisse,
   herzschlaege,
@@ -333,6 +334,16 @@ Text davor.
 \end{document}`,
   })
   await neuAnlegen(a, 'E2E Folien', { 'main.tex': 'Folien folgen.\n' })
+  // P7: Theme aus dem TeX-Live-Fake, das nicht im Image ist.
+  await neuAnlegen(a, 'E2E Pakete', {
+    'main.tex': String.raw`\documentclass{beamer}
+\usetheme{spurtest}
+\begin{document}
+\begin{frame}{Pakete}Theme aus dem Projekt.\end{frame}
+\end{document}
+`,
+  })
+  await TexPakete.begrenzer.delete(String(a._id))
   await neuAnlegen(a, 'E2E Semantik', {
     'main.tex': String.raw`\documentclass{article}
 \usepackage{csquotes}

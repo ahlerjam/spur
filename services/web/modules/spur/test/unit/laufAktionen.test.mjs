@@ -13,6 +13,8 @@ let geloeschteDocs
 let spurUpdate
 let acceptChanges
 let emitToRoom
+let geloeschtePfade
+let paketEntfernt
 const projekt = new ObjectId()
 const bot = new ObjectId()
 const anna = new ObjectId()
@@ -34,7 +36,13 @@ beforeEach(async () => {
   spurUpdate = vi.fn(async () => {})
   acceptChanges = vi.fn(async () => {})
   emitToRoom = vi.fn()
+  geloeschtePfade = []
+  paketEntfernt = vi.fn(async () => {})
   vi.resetModules()
+  vi.doMock('../../../../app/src/Features/Editor/EditorController.mjs', () => ({
+    default: { promises: { deleteEntityWithPath: async (_p, pfad) => geloeschtePfade.push(pfad) } },
+  }))
+  vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => ({ paketEntfernt }))
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   recht.anmelden(vi)
   vi.doMock('../../../../app/src/Features/Editor/EditorRealTimeController.mjs', () => ({ default: { emitToRoom } }))
@@ -301,6 +309,41 @@ describe('zuruecknehmen', () => {
     const op = { p: 8, i: 'neu' }
     await LaufAktionen.zuruecknehmen(projekt, await lauf({ status: 'angenommen', angenommen: [{ docId: doc, op, ...kontextUm('Alt und neu.', op) }] }), anna)
     expect(spurUpdate.mock.calls[0][2]).toEqual([{ p: 8, d: 'neu' }])
+  })
+
+  it('entfernt bei einem fertigen Lauf angelegte Dateien und Ordner und lehnt seine Changes ab', async () => {
+    docSetzen('Alt und neu.', [change('c1', { p: 8, i: 'neu' })])
+    const l = await lauf({
+      angelegt: [
+        { art: 'ordner', pfad: 'tex-pakete/foo', paket: 'foo', bytes: 5 },
+        { art: 'datei', pfad: 'latexmkrc' },
+      ],
+    })
+    await LaufAktionen.zuruecknehmen(projekt, l, anna)
+    expect(geloeschtePfade).toEqual(['/tex-pakete/foo', '/latexmkrc'])
+    expect(paketEntfernt).toHaveBeenCalledWith(projekt, 'foo')
+    expect(spurUpdate).toHaveBeenCalledTimes(1)
+    expect(await gespeichert(l)).toMatchObject({ status: 'zurueckgenommen', angelegt: [] })
+  })
+
+  it('übergeht schon gelöschte Dateien', async () => {
+    vi.resetModules()
+    vi.doMock('../../../../app/src/Features/Editor/EditorController.mjs', async () => {
+      const { default: Errors } = await import('../../../../app/src/Features/Errors/Errors.js')
+      return { default: { promises: { deleteEntityWithPath: async () => { throw new Errors.NotFoundError('weg') } } } }
+    })
+    LaufAktionen = await import('../../app/src/schreiben/LaufAktionen.mjs')
+    const l = await lauf({ docs: [], angelegt: [{ art: 'datei', pfad: 'latexmkrc' }] })
+    await LaufAktionen.zuruecknehmen(projekt, l, anna)
+    expect((await gespeichert(l)).status).toBe('zurueckgenommen')
+  })
+
+  it('Ganzen Lauf ablehnen entfernt auch Angelegtes', async () => {
+    docSetzen('Alt und neu.', [change('c1', { p: 8, i: 'neu' })])
+    const l = await lauf({ angelegt: [{ art: 'datei', pfad: 'latexmkrc' }] })
+    await LaufAktionen.ablehnen(projekt, l, anna)
+    expect(geloeschtePfade).toEqual(['/latexmkrc'])
+    expect((await gespeichert(l)).angelegt).toEqual([])
   })
 
   it('lässt nur angenommene Läufe zurücknehmen', async () => {

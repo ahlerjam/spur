@@ -44,6 +44,7 @@ beforeEach(async () => {
       log: vi.fn(),
       status: vi.fn(),
     },
+    TexPakete: { hinzufuegen: vi.fn(async () => ({ paket: 'xfrac', dateien: [], fehlende_abhaengigkeiten: [] })) },
     Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
     Erwaehnung: { imThreadAntworten: vi.fn(async () => ({ nachricht_id: 'm1' })) },
     Vorschlaege: { ARTEN: ['compile_fehler', 'belegloses_argument'], vorschlagen: vi.fn(async () => ({ vorschlag_id: 'v1' })) },
@@ -63,6 +64,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/recherche/Recherche.mjs', () => m.Recherche)
   vi.doMock('../../app/src/recherche/Aufnahme.mjs', () => m.Aufnahme)
   vi.doMock('../../app/src/kompilieren/Kompilieren.mjs', () => m.Kompilieren)
+  vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => m.TexPakete)
   vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
   vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
   vi.doMock('../../app/src/erwaehnung/Erwaehnung.mjs', () => m.Erwaehnung)
@@ -462,5 +464,13 @@ describe('Recherche', () => {
     expect(await aufruf('page_image', { project_id: projekt, seite: 2 })).toEqual({
       content: [{ type: 'image', data: Buffer.from('PNG').toString('base64'), mimeType: 'image/png' }],
     })
+  })
+
+  it('tex_package_add verlangt Schreibrechte und holt das Paket als Person und Bot', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('tex_package_add', { project_id: projekt, paket: 'xfrac' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    await aufruf('tex_package_add', { project_id: projekt, paket: 'xfrac' })
+    expect(m.TexPakete.hinzufuegen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: 'xfrac' })
   })
 })

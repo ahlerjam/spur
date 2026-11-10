@@ -86,6 +86,10 @@ OVERLEAF_EMAIL_SMTP_PASS=your-password
 
 Without these variables spur sends no email, and it says so: the test email on `/launchpad` reports that no email is set up, and "Forgot password" tells people to ask an admin. Admins pass invitation links on themselves. After "Create account" in the user list (Admin → Manage Users) or on Admin → Register Users, spur shows the link with a copy button. For an existing account, the link icon in the user list creates a new one. A link works for one week.
 
+### TeX packages
+
+The image contains TeX Live with a fixed list of packages. If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. A package may have at most 20 MB, a project at most 50 MB in `tex-pakete/`, and each person can add 20 packages per hour. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
+
 ### Research services
 
 Literature search, citations and adding papers by DOI use Crossref, Unpaywall, OpenAlex, Semantic Scholar and arXiv. All of them work without an account.

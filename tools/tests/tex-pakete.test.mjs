@@ -9,6 +9,9 @@ const dockerfile = readFileSync(new URL('../../server-ce/Dockerfile-base', impor
 // Im Schema scheme-basic (collection-latex) enthalten, nicht in der tlmgr-Liste.
 const IM_BASISSCHEMA = new Set(['article', 'babel', 'amsmath', 'graphicx'])
 const SPRACHEN = { ngerman: ['babel-german', 'hyphen-german'], german: ['babel-german', 'hyphen-german'] }
+// Pakete, die ein Paket der Smoke-Dokumente selbst lädt und die nicht als tlmgr-Abhängigkeit mitkommen.
+// chemformula lädt xfrac.sty (Smoke nach P6: „Compile Folien“ scheiterte daran).
+const NACHGELADEN = { chemformula: ['chemgreek', 'xfrac'] }
 
 function installiert() {
   const teil = dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0]
@@ -19,7 +22,7 @@ function benoetigt(tex) {
   const namen = []
   for (const [, optionen = '', liste] of tex.matchAll(/\\usepackage(?:\[([^\]]*)\])?\{([^}]*)\}/g)) {
     for (const paket of liste.split(',').map(p => p.trim())) {
-      namen.push(paket)
+      namen.push(paket, ...(NACHGELADEN[paket] ?? []))
       if (paket === 'babel') namen.push(...optionen.split(',').flatMap(o => SPRACHEN[o.trim()] ?? []))
     }
   }
@@ -38,7 +41,7 @@ test('jedes Paket der Smoke-Dokumente steht in der Paketliste des Images', () =>
 
 test('das Image hat die Pakete für deutsche und naturwissenschaftliche Texte und metropolis', () => {
   const liste = installiert()
-  for (const paket of ['babel-german', 'hyphen-german', 'mhchem', 'siunitx', 'chemformula', 'beamertheme-metropolis', 'pgfopts']) {
+  for (const paket of ['babel-german', 'hyphen-german', 'mhchem', 'siunitx', 'chemformula', 'xfrac', 'beamertheme-metropolis', 'pgfopts']) {
     assert.ok(liste.has(paket), paket)
   }
 })
@@ -49,4 +52,8 @@ test('ein Smoke-Dokument nutzt metropolis, ngerman, \\ce und \\qty', () => {
   assert.match(beamer, /\\usepackage\[ngerman\]\{babel\}/)
   assert.match(beamer, /\\ce\{H2O\}/)
   assert.match(beamer, /\\qty\{0\.89\}\{\\liter\}/)
+})
+
+test('Pakete, die chemformula nachlädt, zählen mit', () => {
+  assert.deepEqual(benoetigt('\\usepackage{chemformula}'), ['chemformula', 'chemgreek', 'xfrac'])
 })

@@ -779,7 +779,9 @@ async page => {
       ]
       // P3: Vorschläge ins Panel.
       const P3 = ['suggest']
-      const erwartet = [...P1, ...P2, ...P3].sort()
+      // P7: Pakete pro Projekt.
+      const P7 = ['tex_package_add']
+      const erwartet = [...P1, ...P2, ...P3, ...P7].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
@@ -3741,6 +3743,92 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     } finally {
       await mailFake(false)
     }
+  }
+
+  features.p7f5 = async () => {
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Pakete')
+    const pid = page.url().split('/').pop()
+    const token = await neuesToken()
+    const paket = name => werkzeug(token, 'tex_package_add', { project_id: pid, paket: name })
+    const pfade = async () => (await jsonVon(`/project/${pid}/entities`)).entities.map(e => e.path)
+    // Der Editor kompiliert beim Öffnen selbst; ein Compile direkt danach meldet „too-recently-compiled“.
+    const kompilieren = async () => {
+      for (let i = 0; i < 10; i++) {
+        const job = await kompiliertBeiClaude(token, pid)
+        if (job.ergebnis?.compile !== 'too-recently-compiled') return job
+        await page.waitForTimeout(1500)
+      }
+      fail('Compile bleibt „too-recently-compiled“')
+    }
+    const nichtGefunden = async () => {
+      const job = await kompilieren()
+      ok(job.ergebnis.compile !== 'success', `Compile ohne Theme: ${JSON.stringify(job.ergebnis)}`)
+      const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: pid })
+      ok(JSON.stringify(log).includes('beamerthemespurtest.sty') && /not found/.test(JSON.stringify(log)), `Log ohne „not found“: ${JSON.stringify(log).slice(0, 300)}`)
+    }
+    await nichtGefunden()
+
+    const theme = await paket('beamertheme-spurtest')
+    ok(!theme.fehler && theme.inhalt.dateien.includes('tex-pakete/beamertheme-spurtest/beamerthemespurtest.sty'), `Theme: ${JSON.stringify(theme.inhalt)}`)
+    ok(!theme.inhalt.dateien.some(d => d.endsWith('README.md')), 'Doku-Datei mit angelegt')
+    ok(JSON.stringify(theme.inhalt.fehlende_abhaengigkeiten) === '["spurfarben"]', `Abhängigkeiten: ${theme.inhalt.fehlende_abhaengigkeiten}`)
+    const farben = await paket('spurfarben')
+    ok(!farben.fehler && farben.inhalt.fehlende_abhaengigkeiten.length === 0, `spurfarben: ${JSON.stringify(farben.inhalt)}`)
+    const mitTheme = await kompilieren()
+    ok(mitTheme.ergebnis.compile === 'success', `Compile mit Theme: ${JSON.stringify(mitTheme.ergebnis)}`)
+
+    await panelOeffnen('Claude')
+    for (const datei of ['tex-pakete/beamertheme-spurtest', 'tex-pakete/spurfarben', 'latexmkrc']) {
+      await karte().getByText(datei, { exact: true }).waitFor({ timeout: 20000 })
+    }
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const nachher = await pfade()
+    ok(!nachher.some(p => p.startsWith('/tex-pakete') || p === '/latexmkrc'), `Nach „Lauf rückgängig“: ${nachher}`)
+    await nichtGefunden()
+
+    const beamer = await paket('beamer')
+    ok(!beamer.fehler && beamer.inhalt.im_image === true && beamer.inhalt.dateien.length === 0, `beamer: ${JSON.stringify(beamer.inhalt)}`)
+    ok(beamer.inhalt.hinweis === 'schon im Image', `beamer: ${beamer.inhalt.hinweis}`)
+    for (const name of ['../x', 'zwei worte']) {
+      const falsch = await paket(name)
+      ok(falsch.fehler && falsch.inhalt.fehler === 'eingabe_ungueltig', `${name}: ${JSON.stringify(falsch.inhalt)}`)
+    }
+    const ausbruch = await paket('spurtest-ausbruch')
+    ok(ausbruch.fehler && ausbruch.inhalt.fehler === 'archiv_unsicher', `Ausbruch: ${JSON.stringify(ausbruch.inhalt)}`)
+    const riesig = await paket('spurtest-riesig')
+    ok(riesig.fehler && riesig.inhalt.fehler === 'paket_zu_gross' && riesig.inhalt.detail.includes('20 MB'), `Riesig: ${JSON.stringify(riesig.inhalt)}`)
+    const danach = await pfade()
+    ok(!danach.some(p => p.startsWith('/tex-pakete') || p === '/latexmkrc'), `Nach Fehlern angelegt: ${danach}`)
+
+    await fakeSteuern({ schalter: { SPUR_TEX_PAKETE: 'aus' } })
+    try {
+      const aus = await paket('spurfarben')
+      ok(aus.fehler && aus.inhalt.fehler === 'abgeschaltet' && aus.inhalt.detail.includes('Admin'), `Abgeschaltet: ${JSON.stringify(aus.inhalt)}`)
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+
+    const REPO = `${FIXTURES}/../../../../../..`
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    const ablauf = skill.split('## Missing LaTeX packages\n')[1]?.split('\n## ')[0] ?? ''
+    for (const teil of ['compile_log', 'not found', 'tex_package_add', 'compile', 'fehlende_abhaengigkeiten']) {
+      ok(ablauf.includes(teil), `SKILL.md: Ablauf ohne „${teil}“`)
+    }
+    for (const datei of ['README.md', 'docs/mcp-contract.md']) {
+      ok((await repoDatei(`${REPO}/${datei}`)).includes('tex_package_add'), `${datei} nennt tex_package_add nicht`)
+    }
+  }
+
+  // Die Paketliste prüft tools/tests/tex-pakete.test.mjs; der Smoke auf spur nach dem Merge ist Handprüfung.
+  features.p7f14 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
+    const liste = dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1]?.split('&&')[0] ?? ''
+    ok(/\sxfrac\s/.test(liste), 'xfrac fehlt in der Paketliste des Images')
+    const test = await repoDatei(`${REPO}/tools/tests/tex-pakete.test.mjs`)
+    ok(/chemformula: \[[^\]]*'xfrac'/.test(test), 'Der Paket-Test kennt die Pakete nicht, die chemformula nachlädt')
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

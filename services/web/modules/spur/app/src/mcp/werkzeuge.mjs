@@ -17,6 +17,7 @@ import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
+import * as TexPakete from '../kompilieren/TexPakete.mjs'
 import * as Erwaehnung from '../erwaehnung/Erwaehnung.mjs'
 import { meldung } from '../meldungen.mjs'
 import * as Vorschlaege from '../vorschlaege/Vorschlaege.mjs'
@@ -450,6 +451,19 @@ Object.assign(WERKZEUGE, {
     async ausfuehren({ project_id: pid }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
       return await Kompilieren.log({ projectId, botId })
+    },
+  },
+
+  tex_package_add: {
+    description:
+      'Holt ein TeX-Live-Paket (Name wie in TeX Live, etwa xfrac oder beamertheme-focus), das nicht im Image ist, ' +
+      'aus dem TeX-Live-Archiv ins Projekt unter tex-pakete/<paket>/. Danach neu kompilieren. ' +
+      'fehlende_abhaengigkeiten nennt Pakete, die du ebenso holen musst; im_image heißt, es ist schon da. ' +
+      'Die Dateien gehören zum Lauf; „Lauf rückgängig“ entfernt sie.',
+    inputSchema: z.object({ project_id: id, paket: z.string().min(1).max(200) }),
+    async ausfuehren({ project_id: pid, paket }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      return await TexPakete.hinzufuegen({ projectId, menschId, botId, paket })
     },
   },
 

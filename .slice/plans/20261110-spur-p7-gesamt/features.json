@@ -53,7 +53,7 @@
    "id": "f5",
    "title": "Claude holt ein fehlendes Paket ins Projekt",
    "ui": true,
-   "passes": false,
+   "passes": true,
    "steps": [
     "Ein Projekt enthält main.tex mit `\\documentclass{beamer}` und `\\usetheme{<Fixture-Theme>}` (ein Theme, das nicht im Image ist, als Fixture im TeX-Live-Fake); der Compile scheitert mit „not found“",
     "Ein Fake-Client ruft über MCP `tex_package_add` mit dem Paketnamen des Themes auf; die Antwort nennt die angelegten Dateien unter `tex-pakete/<paket>/` und fehlende Abhängigkeiten (Fixture-Abhängigkeit)",
@@ -171,7 +171,7 @@
   {
    "id": "f14",
    "title": "Folien-Dokument mit chemformula kompiliert im Image",
-   "passes": false,
+   "passes": true,
    "steps": [
     "Die Paketliste des Images enthält `xfrac`",
     "Der Test unter `tools/tests`, der die Pakete des Smoke-Dokuments in der Paketliste sucht, kennt auch Abhängigkeiten wie `xfrac` (Liste der von chemformula geladenen Pakete) und ist grün",

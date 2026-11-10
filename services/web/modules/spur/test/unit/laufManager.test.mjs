@@ -132,6 +132,18 @@ describe('laufFuerClient', () => {
       rot: [],
       zahlen: [],
       zusammenfassung: null,
+      angelegt: [],
     })
+  })
+
+  it('listet angelegte Dateien, Ordner und Quellen ohne interne Felder', async () => {
+    const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
+    await LaufManager.angelegtMerken(lauf, [{ art: 'ordner', pfad: 'tex-pakete/foo', paket: 'foo', bytes: 12 }])
+    await LaufManager.angelegtMerken(lauf, [{ art: 'quelle', name: 'smith2024.pdf', quelleId: new ObjectId() }])
+    const { angelegt } = LaufManager.laufFuerClient(await LaufManager.letzterLauf(projekt, bot))
+    expect(angelegt).toEqual([
+      { art: 'ordner', pfad: 'tex-pakete/foo', name: undefined },
+      { art: 'quelle', pfad: undefined, name: 'smith2024.pdf' },
+    ])
   })
 })

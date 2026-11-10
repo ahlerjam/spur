@@ -33,6 +33,7 @@ Status: draft before run 0. Changes to names and error codes count as a breaking
 | `job_status`, `compile`, `compile_log`, `page_image` | P2 | Compile and see the result |
 | `matrix_suggest` | P2 | Suggest a cell of the literature matrix; the person confirms (transitional until `suggest` arrives in P3) |
 | `suggest` | P3 | Put a suggestion (`art`, `titel`, `text`, optional `pfad`) into the suggestions panel; the text stays unchanged |
+| `tex_package_add` | P7 | Add a TeX Live package (`paket`, the TeX Live name) that is not in the image to the project under `tex-pakete/<paket>/`, from the TeX Live archive of the mirror the image uses. Returns `dateien`, `fehlende_abhaengigkeiten` and `im_image`. The files belong to the run. Errors: `eingabe_ungueltig`, `paket_unbekannt`, `archiv_unsicher`, `paket_zu_gross` (over 20 MB), `projekt_voll` (over 50 MB in `tex-pakete/`), `zu_viele_anfragen` (20 per hour), `abgeschaltet`, `spiegel_nicht_erreichbar` |
 
 ## MCP prompts
 

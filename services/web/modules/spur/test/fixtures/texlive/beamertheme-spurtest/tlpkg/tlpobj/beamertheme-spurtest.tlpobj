@@ -1,0 +1,8 @@
+name beamertheme-spurtest
+category Package
+revision 1
+shortdesc spur test theme
+depend spurfarben
+depend beamer
+runfiles size=1
+ texmf-dist/tex/latex/beamertheme-spurtest/beamerthemespurtest.sty

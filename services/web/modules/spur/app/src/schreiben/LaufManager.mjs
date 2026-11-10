@@ -59,6 +59,11 @@ export async function aenderungMerken(lauf, { docId, rot, zahlen = [] }) {
   )
 }
 
+// Was ein Lauf außerhalb der Dokumente anlegt (Dateien, Ordner, Quellen); „Lauf rückgängig“ entfernt es.
+export async function angelegtMerken(lauf, eintraege) {
+  await (await laeufe()).updateOne({ _id: lauf._id }, { $push: { angelegt: { $each: eintraege } } })
+}
+
 export async function letzterLauf(projectId, botId) {
   return await (await laeufe()).findOne({ projectId, botId }, { sort: { _id: -1 } })
 }
@@ -81,5 +86,6 @@ export function laufFuerClient(lauf) {
     rot: lauf.rot,
     zahlen: lauf.zahlen ?? [],
     zusammenfassung: lauf.zusammenfassung,
+    angelegt: (lauf.angelegt ?? []).map(({ art, pfad, name }) => ({ art, pfad, name })),
   }
 }

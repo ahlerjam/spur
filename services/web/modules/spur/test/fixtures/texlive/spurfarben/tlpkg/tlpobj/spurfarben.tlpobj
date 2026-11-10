@@ -1,0 +1,6 @@
+name spurfarben
+category Package
+revision 1
+depend xcolor
+runfiles size=1
+ texmf-dist/tex/latex/spurfarben/spurfarben.sty

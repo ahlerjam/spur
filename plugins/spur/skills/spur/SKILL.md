@@ -22,3 +22,15 @@ description: Works in a spur project with sources, citations and jobs from the b
 - Name the gap in the summary: which service was missing and for which searches, so the person knows the list may be incomplete.
 - A search that returns nothing because no service answered does not show that nothing exists.
 - When collecting sources ("Quellen sammeln"), work in stages: search, rate and add a few papers, then continue.
+
+## Missing LaTeX packages
+
+The server has a fixed TeX Live. If a package or Beamer theme is missing, you can add it to the project yourself:
+
+1. Read the result of `compile` with `compile_log`. A missing package shows up as "File `X.sty' not found" (for a theme `beamerthemeX.sty`).
+2. Find the TeX Live package that contains the file. The package name can differ from the file name; a theme `beamerthemefocus.sty`, for example, is in `beamertheme-focus`.
+3. Call `tex_package_add` with that name. spur puts the files under `tex-pakete/<package>/` and adds a `latexmkrc` so the compiler finds them. `im_image` means the package is already installed; then the cause is elsewhere.
+4. Compile again.
+5. Add every package in `fehlende_abhaengigkeiten` the same way, then compile again.
+
+The files belong to your run: the run card lists them, and "Lauf rückgängig" removes them. If the admin has turned the tool off or a package is too large, say so in the summary instead of looking for a workaround.
