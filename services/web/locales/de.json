@@ -1874,6 +1874,7 @@
   "resend_managed_user_invite": "Einladung zu Verwaltete Benutzer erneut senden",
   "resending_confirmation_code": "Bestätigungscode wird erneut gesendet",
   "reset_password": "Passwort zurücksetzen",
+  "reset_password_sentence_case": "Passwort zurücksetzen",
   "reset_your_password": "Dein Passwort zurücksetzen",
   "resolve": "Lösen",
   "resolved_comments": "Gelöste Kommentare",

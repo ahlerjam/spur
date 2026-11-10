@@ -82,7 +82,9 @@ OVERLEAF_EMAIL_SMTP_USER=spur@example.org
 OVERLEAF_EMAIL_SMTP_PASS=your-password
 ```
 
-`OVERLEAF_EMAIL_SMTP_SECURE=true` uses TLS from the start of the connection (usually port 465). Without these variables spur sends no email at all, even when the admin page says an email was sent. Run `make start` again after changing `.env`.
+`OVERLEAF_EMAIL_SMTP_SECURE=true` uses TLS from the start of the connection (usually port 465). Run `make start` again after changing `.env`.
+
+Without these variables spur sends no email, and it says so: the test email on `/launchpad` reports that no email is set up, and "Forgot password" tells people to ask an admin. Admins pass invitation links on themselves. After "Create account" in the user list (Admin → Manage Users) or on Admin → Register Users, spur shows the link with a copy button. For an existing account, the link icon in the user list creates a new one. A link works for one week.
 
 ### Research services
 

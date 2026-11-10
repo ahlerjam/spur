@@ -3611,6 +3611,138 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(/git tag v[\d.]+ && git push origin v[\d.]+/.test(readme), 'README ohne Release mit Tag')
   }
 
+  const OHNE_MAIL = 'E-Mail ist nicht eingerichtet – gib den Link selbst weiter.'
+
+  async function mailFake(an) {
+    const r = await page.request.post(`${BASE}/spur/dev/mail`, { data: { an } })
+    ok(r.status() === 204, `Mail-Fake: ${r.status()}`)
+  }
+
+  async function mailsAn(adresse) {
+    const { mails } = await (await page.request.get(`${BASE}/spur/dev/mail`)).json()
+    return mails.filter(m => m.an.includes(adresse))
+  }
+
+  // Liest Link, Hinweis und Kopierknopf eines Einladungslinks in `bereich`.
+  async function einladungslink(bereich) {
+    const feld = bereich.getByLabel('Einladungslink').last()
+    await feld.waitFor()
+    const link = await feld.inputValue()
+    ok(link.startsWith(`${BASE}/user/activate?token=`), `Link: ${link}`)
+    await bereich.getByRole('button', { name: 'Kopieren' }).last().click()
+    await bereich.getByRole('button', { name: 'Kopiert' }).last().waitFor()
+    return link
+  }
+
+  async function kontoAnlegen(email) {
+    await page.goto(`${BASE}/admin/user`)
+    await page.getByRole('button', { name: 'Konto erstellen' }).click()
+    const dialog = page.locator('.modal')
+    await dialog.getByLabel(/^E-Mail/).fill(email)
+    await dialog.getByLabel('Vorname').fill('Neu')
+    await dialog.getByLabel('Nachname').fill('P7')
+    await dialog.getByRole('button', { name: 'Erstellen' }).click()
+    return dialog
+  }
+
+  async function nutzerZeile(email) {
+    await page.goto(`${BASE}/admin/user`)
+    await page.getByRole('searchbox').or(page.getByLabel('Suchen…')).first().fill(email)
+    const zeile = page.getByRole('row', { name: new RegExp(email.replace('.', '\\.')) })
+    await zeile.waitFor()
+    return zeile
+  }
+
+  features.p7f1 = async () => {
+    await mailFake(false)
+    await anmelden('e2e-admin@example.org')
+    const dialog = await kontoAnlegen('neu-p7@example.org')
+    await dialog.getByText(OHNE_MAIL).waitFor()
+    const link = await einladungslink(dialog)
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+
+    const { seite, schliessen } = await zweiteSeite()
+    try {
+      await seite.goto(link)
+      await seite.getByLabel(/^(Neues Passwort|Passwort)/).first().fill('Test-Passwort-1234')
+      await seite.getByRole('button', { name: /Passwort (setzen|festlegen)|Aktivieren|Set password|Activate/i }).click()
+      await seite.waitForURL(/\/project/, { timeout: 20000 })
+      const angemeldet = await seite.evaluate(() => document.querySelector('meta[name="ol-usersEmail"]')?.content)
+      ok(angemeldet === 'neu-p7@example.org', `Angemeldet als ${angemeldet}`)
+    } finally {
+      await schliessen()
+    }
+
+    const zeile = await nutzerZeile('neu-p7@example.org')
+    await zeile.getByRole('button', { name: 'Neuen Einladungslink erzeugen' }).click()
+    const neuDialog = page.locator('.modal', { hasText: 'Neuen Einladungslink erzeugen' })
+    const neuerLink = await einladungslink(neuDialog)
+    ok(neuerLink !== link, 'Kein neuer Link')
+    await neuDialog.getByRole('button', { name: 'Schließen' }).click()
+
+    await page.goto(`${BASE}/project`)
+    await page.getByRole('menuitem', { name: 'Admin' }).click()
+    await page.getByRole('menuitem', { name: 'Register Users' }).click()
+    await page.waitForURL(`${BASE}/admin/register`)
+    await page.getByLabel('Emails to register new users').fill('zweit-p7@example.org')
+    await page.getByRole('button', { name: 'Register' }).click()
+    await sichtbar(OHNE_MAIL)
+    await einladungslink(page)
+
+    await anmelden('e2e-a@example.org')
+    // Overleaf leitet Nicht-Admins auf /restricted um, statt 403 zu senden.
+    const eigeneId = await page.evaluate(() => document.querySelector('meta[name="ol-user_id"]').content)
+    const csrf = await page.evaluate(() => document.querySelector('meta[name="ol-csrfToken"]').content)
+    for (const [methode, pfad] of [['get', '/admin/register'], ['post', `/admin/user/${eigeneId}/activation-link`]]) {
+      const r = await page.request[methode](`${BASE}${pfad}`, { maxRedirects: 0, headers: { 'X-Csrf-Token': csrf } })
+      const ziel = r.headers().location ?? ''
+      ok(r.status() === 403 || (r.status() === 302 && ziel.startsWith('/restricted')), `${pfad} für Nicht-Admin: ${r.status()} ${ziel}`)
+    }
+
+    await mailFake(true)
+    try {
+      await anmelden('e2e-admin@example.org')
+      const mitMail = await kontoAnlegen('dritt-p7@example.org')
+      await mitMail.getByText('Einladung per E-Mail verschickt').waitFor()
+      await einladungslink(mitMail)
+      ok((await mailsAn('dritt-p7@example.org')).length === 1, 'Fake-SMTP hat keine Einladung erhalten')
+    } finally {
+      await mailFake(false)
+    }
+  }
+
+  features.p7f2 = async () => {
+    await mailFake(false)
+    await anmelden('e2e-admin@example.org')
+    await page.goto(`${BASE}/launchpad`)
+    const testMail = async () => {
+      await page.getByLabel('Email', { exact: true }).fill('e2e-admin@example.org')
+      await page.getByRole('button', { name: 'Absenden' }).click()
+    }
+    await testMail()
+    await sichtbar('Keine E-Mail eingerichtet')
+    await sichtbar(/README/)
+    ok(!(await page.getByText(/E-Mail versendet|Email sent/i).isVisible()), 'Test-Mail meldet Versand ohne Einrichtung')
+
+    await page.goto('about:blank')
+    await page.context().clearCookies()
+    await page.goto(`${BASE}/user/password/reset`)
+    await page.getByLabel('E-Mail').fill('e2e-a@example.org')
+    await page.getByRole('button', { name: 'Passwort zurücksetzen' }).click()
+    await sichtbar('Bitte einen Admin, dir einen neuen Einladungslink zu erzeugen.')
+
+    await mailFake(true)
+    try {
+      await anmelden('e2e-admin@example.org')
+      await page.goto(`${BASE}/launchpad`)
+      await testMail()
+      await sichtbar(/E-Mail versendet|Email sent/i)
+      ok((await mailsAn('e2e-admin@example.org')).length === 1, 'Fake-SMTP hat die Test-Mail nicht erhalten')
+    } finally {
+      await mailFake(false)
+    }
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

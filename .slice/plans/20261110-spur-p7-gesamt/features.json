@@ -4,7 +4,7 @@
    "id": "f1",
    "title": "Einladungslink ohne Mail kopieren",
    "ui": true,
-   "passes": false,
+   "passes": true,
    "steps": [
     "Ohne `OVERLEAF_EMAIL_*` öffnet Admin e2e-admin die Nutzerliste der Admin-Seite und legt ein Konto für neu-p7@example.org an",
     "Er sieht den Hinweis „E-Mail ist nicht eingerichtet – gib den Link selbst weiter.“ und einen Link, der mit `/user/activate?token=` beginnt, mit Kopierknopf; nach Klick steht „Kopiert“",
@@ -19,7 +19,7 @@
    "id": "f2",
    "title": "Ehrliche Meldungen ohne Mail",
    "ui": true,
-   "passes": false,
+   "passes": true,
    "steps": [
     "Ohne Mail-Einrichtung klickt der Admin auf der Admin-Seite „Test-Mail senden“ und sieht „Keine E-Mail eingerichtet“ mit Verweis auf die README, nicht „E-Mail versendet“",
     "Ohne Mail-Einrichtung fordert ein abgemeldeter Nutzer unter „Passwort vergessen“ einen Link für e2e-a an und sieht den Hinweis, dass ein Admin einen neuen Link erzeugen kann",

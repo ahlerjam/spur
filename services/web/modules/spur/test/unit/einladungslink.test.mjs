@@ -65,6 +65,7 @@ describe('Einladungslink', () => {
 
   it('meldet ein unbekanntes Konto', async () => {
     nutzer = null
-    await expect(Link.createActivationLink(ID)).rejects.toThrow(/does not exist/)
+    const fehler = await Link.createActivationLink(ID).catch(e => e)
+    expect(fehler.message).toMatch(/does not exist/)
   })
 })

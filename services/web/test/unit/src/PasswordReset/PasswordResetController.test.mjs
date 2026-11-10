@@ -133,7 +133,7 @@ describe('PasswordResetController', function () {
       delete ctx.settings.email
       ctx.req.i18n.translate = key => key
       await ctx.PasswordResetController.requestReset(ctx.req, ctx.res)
-      expect(ctx.res.statusCode).to.equal(200)
+      expect(ctx.res.statusCode).to.equal(503)
       expect(ctx.res.json).toHaveBeenCalledWith({
         message: 'spur_passwort_admin_fragen',
       })

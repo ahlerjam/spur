@@ -296,7 +296,7 @@ Delta Satz.
   await testToken(weg, 'spur_e2e_weg', new Date(Date.now() + 24 * 3600 * 1000))
 
   // Ein Konto ohne Bot und ohne Token: f8 prüft das allererste Token eines neuen Nutzers.
-  for (const email of ['e2e-neu@example.org']) {
+  for (const email of ['e2e-neu@example.org', 'neu-p7@example.org', 'zweit-p7@example.org', 'dritt-p7@example.org']) {
     const alt = await db.users.findOne({ email })
     if (alt) {
       await kontoAufraeumen(alt._id)

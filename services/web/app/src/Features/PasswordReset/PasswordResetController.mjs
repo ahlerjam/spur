@@ -149,8 +149,9 @@ async function requestReset(req, res, next) {
     })
   }
   // spur: without email set up, no reset link would arrive; an admin creates a new invitation link instead.
+  // Not 200: the page would switch to "check your email".
   if (!emailIsConfigured()) {
-    return res.status(200).json({
+    return res.status(503).json({
       message: req.i18n.translate('spur_passwort_admin_fragen'),
     })
   }

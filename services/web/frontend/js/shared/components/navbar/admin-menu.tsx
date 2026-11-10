@@ -41,6 +41,10 @@ export default function AdminMenu({
           <NavDropdownLinkItem href="/admin/user">
             Manage Users
           </NavDropdownLinkItem>
+          {/* spur: the registration page shows invitation links to copy when email is not set up */}
+          <NavDropdownLinkItem href="/admin/register">
+            Register Users
+          </NavDropdownLinkItem>
         </>
       ) : null}
       {canDisplayProjectUrlLookup ? (
