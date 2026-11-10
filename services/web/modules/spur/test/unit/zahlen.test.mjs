@@ -64,8 +64,12 @@ $V = 0{,}89\,\mathrm{L}$, \qty{75.7}{\percent} und $x^2$.
     expect(zahlenOhneBeleg(text)).toEqual(['0,89', '75.7'])
   })
 
-  it('lässt Zahlen aus, die in ergebnisse.tex stehen, auch mit anderem Dezimalzeichen', () => {
+  it('lässt Werte in Formeln und \\qty aus, die in ergebnisse.tex stehen, auch mit anderem Dezimalzeichen', () => {
     expect(zahlenOhneBeleg(String.raw`\qty{75.7}{\percent} und $0{,}89$`, ['75,7'])).toEqual(['0,89'])
+  })
+
+  it('meldet eine im Fließtext getippte Zahl weiter, auch wenn ergebnisse.tex sie als Makro hat', () => {
+    expect(zahlenOhneBeleg('Davon waren 412 Personen erwachsen.', ['412'])).toEqual(['412'])
   })
 
   it('lässt Makros aus ergebnisse.tex, Kommentare, Befehle und Wortbestandteile aus', () => {

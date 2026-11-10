@@ -40,13 +40,16 @@ export function zahlenIn(text) {
   return dezimalzeichen(text).match(ZAHL) ?? []
 }
 
+// belegt: Zahlen aus ergebnisse.tex. Sie gelten in Formeln und siunitx-Werten als belegt; im Fließtext soll statt
+// der getippten Zahl das Makro stehen, dort bleibt sie gemeldet.
 export function zahlenOhneBeleg(text, belegt = []) {
   const bekannt = new Set(belegt.map(vergleichbar))
+  const unbelegt = zahlen => zahlen.filter(z => !bekannt.has(vergleichbar(z))).join(' ')
   let rest = text.replace(KOMMENTAR, ' ').replace(DEFINITION, ' ').replace(GRAFIK, ' ')
-  rest = rest.replace(SIUNITX, (_, befehl, a, b) => ` ${ZWEI_WERTE.has(befehl) ? `${a} ${b}` : a} `)
+  rest = rest.replace(SIUNITX, (_, befehl, a, b) => ` ${unbelegt(zahlenIn(ZWEI_WERTE.has(befehl) ? `${a} ${b}` : a))} `)
   rest = rest.replace(FARBDEFINITION, ' ').replace(FARBE, ' ').replace(FARBMISCHUNG, ' ').replace(OPTIONAL, '$1 ')
   // Formeln an Ort und Stelle durch ihre meldenswerten Zahlen ersetzen, damit die Reihenfolge bleibt.
-  for (const muster of MATHE) rest = rest.replace(muster, formel => ` ${formelZahlen(formel).join(' ')} `)
+  for (const muster of MATHE) rest = rest.replace(muster, formel => ` ${unbelegt(formelZahlen(formel))} `)
   rest = rest.replace(BEFEHL_ARGUMENTE, ' ').replace(SEITE, ' ').replace(JAHR, ' ')
-  return [...new Set(rest.match(ZAHL) ?? [])].filter(z => !bekannt.has(vergleichbar(z)))
+  return [...new Set(rest.match(ZAHL) ?? [])]
 }

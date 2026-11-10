@@ -36,3 +36,11 @@
 - f1: echter Start von Claude Code mit dem neuen Startbefehl.
 - f9: Workflow `Smoke` auf spur ist grün (kompiliert APA und Folien mit metropolis, ngerman, mhchem, chemformula,
   siunitx).
+
+## Needs decision
+- f7: Gilt eine Zahl, die in `ergebnisse.tex` steht, auch im Fließtext als belegt?
+  Interim: Nur in Formeln und siunitx-Werten (`\qty{75.7}{…}` mit 75.7 in `ergebnisse.tex` wird nicht gemeldet, wie
+  f7 Schritt 4 verlangt). Im Fließtext bleibt eine getippte Zahl gemeldet, auch wenn `ergebnisse.tex` sie als Makrowert
+  hat; das hält p2f8 („bitte als Makro einsetzen“) grün.
+  Options: A (empfohlen) so lassen, Fließtext soll das Makro nutzen | B überall als belegt werten und p2f8 anpassen |
+  C nirgends als belegt werten, nur Makros zählen (f7 Schritt 4 entfiele)
