@@ -58,3 +58,11 @@
     Übersetzungen ohne Sonderzeichen), 1.000/1,000, `\item [3 …]` (Spec: optionale Argumente nicht melden), Robustheit
     des Dev-Fakes.
 - /security-review: keine Befunde.
+
+## Abschluss: Screenshots (360 und 1280 px)
+Token-Dialog, Claude-Panel, Kommentar mit @claude, Prüfbericht, Recherche und Quellen-Vorschau, je 360 und 1280 px;
+kein seitliches Rollen, keine Seitenfehler. Gesamtlauf der E2E-Suite nach der letzten Code-Änderung: 53 von 53 ok.
+
+## Vorschläge (außerhalb dieses Plans)
+- Overleafs Review-Panel schneidet bei 360 px die Kommentare links an (Overleaf-Layout, nicht der spur-Patch).
+- Die Marke „Nicht frei“ in der Recherche (P2) hat im dunklen Design wenig Kontrast.
