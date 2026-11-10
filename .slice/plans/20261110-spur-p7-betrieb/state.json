@@ -1,5 +1,8 @@
 {
- "state": "parked",
+ "state": "running",
  "builderModel": "opus",
- "builderAdvisor": "opus"
+ "builderAdvisor": "opus",
+ "runBranch": "slice/run-20261110-spur-p7-betrieb",
+ "sessionId": "e59697e7-dfdb-48b3-bd79-4195454dd658",
+ "started": "2026-11-10T14:43:16Z"
 }
