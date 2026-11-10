@@ -1237,6 +1237,7 @@ module.exports = {
     'authentication/saml',
     'authentication/oidc',
     'admin-tools', // import after authentication
+    'user-activate', // spur: /admin/register; admin-tools' routes for /admin/user and /user/activate come first
     'registration-page', // import after authentication
     'template-gallery',
     'git-bridge',

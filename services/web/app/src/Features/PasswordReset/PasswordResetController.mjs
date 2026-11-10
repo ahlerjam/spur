@@ -10,6 +10,7 @@ import EmailsHelper from '../Helpers/EmailHelper.mjs'
 import { expressify } from '@overleaf/promise-utils'
 import { z, parseReq } from '../../infrastructure/Validation.mjs'
 import Features from '../../infrastructure/Features.mjs'
+import { emailIsConfigured } from '../Email/EmailConfiguration.mjs'
 
 const setNewUserPasswordSchema = z.object({
   body: z.strictObject({
@@ -145,6 +146,12 @@ async function requestReset(req, res, next) {
   if (!email) {
     return res.status(400).json({
       message: req.i18n.translate('must_be_email_address'),
+    })
+  }
+  // spur: without email set up, no reset link would arrive; an admin creates a new invitation link instead.
+  if (!emailIsConfigured()) {
+    return res.status(200).json({
+      message: req.i18n.translate('spur_passwort_admin_fragen'),
     })
   }
 

@@ -25,6 +25,10 @@ export default {
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
       UserListController.sendActivationEmail
     )
+    webRouter.post('/admin/user/:userId/activation-link',
+      AuthorizationMiddleware.ensureUserIsSiteAdmin,
+      UserListController.newActivationLink
+    )
     webRouter.get('/admin/user/:userId/info',
       AuthorizationMiddleware.ensureUserIsSiteAdmin,
       UserListController.getAdditionalUserInfo,

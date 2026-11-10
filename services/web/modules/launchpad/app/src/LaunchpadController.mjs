@@ -13,6 +13,7 @@ import AuthenticationController from '../../../../app/src/Features/Authenticatio
 import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import AdminAuthorizationHelper from '../../../../app/src/Features/Helpers/AdminAuthorizationHelper.mjs'
 import { z, parseReq } from '../../../../app/src/infrastructure/Validation.mjs'
+import { emailIsConfigured } from '../../../../app/src/Features/Email/EmailConfiguration.mjs'
 
 const { hasAdminAccess } = AdminAuthorizationHelper
 
@@ -94,6 +95,11 @@ async function sendTestEmail(req, res) {
     logger.debug({}, 'no email address supplied')
     return res.status(400).json({
       message: 'no email address supplied',
+    })
+  }
+  if (!emailIsConfigured()) {
+    return res.status(503).json({
+      message: { text: res.locals.translate('spur_keine_mail_readme') },
     })
   }
   logger.debug({ email }, 'sending test email')

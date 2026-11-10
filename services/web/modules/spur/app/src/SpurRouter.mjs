@@ -11,6 +11,7 @@ import * as SpurController from './SpurController.mjs'
 import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
 import { e2eVorbereiten, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
+import { mailFakeLesen, mailFakeSteuern } from './dev/MailFake.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
@@ -165,6 +166,8 @@ export default {
       publicApiRouter.get('/spur/dev/web/testseite', testseite)
       publicApiRouter.post('/spur/dev/zeit', zeitSetzen)
       publicApiRouter.post('/spur/dev/e2e/vorbereiten', e2eVorbereiten)
+      publicApiRouter.post('/spur/dev/mail', mailFakeSteuern)
+      publicApiRouter.get('/spur/dev/mail', mailFakeLesen)
     }
   },
 }
