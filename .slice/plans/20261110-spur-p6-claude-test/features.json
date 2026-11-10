@@ -57,7 +57,7 @@
     "`node --test tools/tests/*.test.mjs` enthält einen Test, der jedes vom Smoke-Dokument geladene Paket in der Paketliste findet, und ist grün",
     "Handprüfung nach dem Merge: Smoke auf spur ist grün"
   ]},
-  {"id": "f10", "title": "Betrieb: aktuelles Image, Update und README", "passes": false, "steps": [
+  {"id": "f10", "title": "Betrieb: aktuelles Image, Update und README", "passes": true, "steps": [
     "`make -n start` zeigt, dass vor dem Start das Image geholt wird; `make -n update` zeigt Holen und Neustart",
     "`make update` gibt vor dem Neustart einen Hinweis auf `docker compose` und Backup aus",
     "Die README (englisch) hat Abschnitte für E-Mail mit den Variablen `OVERLEAF_EMAIL_FROM_ADDRESS`, `OVERLEAF_EMAIL_SMTP_HOST`, `OVERLEAF_EMAIL_SMTP_PORT`, `OVERLEAF_EMAIL_SMTP_USER`, `OVERLEAF_EMAIL_SMTP_PASS` und dem Hinweis, dass ohne sie keine Mails rausgehen",

@@ -16,7 +16,7 @@ cd spur
 make start
 ```
 
-On the first start, `make start` creates a `.env` file with a random `OVERLEAF_INVITE_TOKEN_SECRET` and starts the published image. The container does not start without this secret. spur then runs on <http://localhost:8080>.
+On the first start, `make start` creates a `.env` file with a random `OVERLEAF_INVITE_TOKEN_SECRET`. Each `make start` first pulls the current published image and then starts it; without network access it starts the image you already have. The container does not start without this secret. spur then runs on <http://localhost:8080>.
 
 ### First admin account
 
@@ -59,11 +59,63 @@ spur.example.org {
 
 The repository ships no backup command. A backup covers the volume `spur_data` and the MongoDB data in the volume `spur_mongo`. With the sandbox override, the host directory `SPUR_DATA_DIR` takes the place of `spur_data`. `spur-dev dump` and `spur-dev restore` are for development only.
 
+### Update
+
+```sh
+git pull
+make update
+```
+
+`make update` pulls the current images and restarts spur with `docker compose up -d --wait`. Before it restarts, it reminds you of the backup: take one first if you want a way back.
+
+### Email
+
+spur sends invitations and password resets by email. Set these variables in `.env`:
+
+```sh
+OVERLEAF_EMAIL_FROM_ADDRESS=spur@example.org
+OVERLEAF_EMAIL_SMTP_HOST=smtp.example.org
+OVERLEAF_EMAIL_SMTP_PORT=587
+OVERLEAF_EMAIL_SMTP_USER=spur@example.org
+OVERLEAF_EMAIL_SMTP_PASS=your-password
+```
+
+`OVERLEAF_EMAIL_SMTP_SECURE=true` uses TLS from the start of the connection (usually port 465). Without these variables spur sends no email at all, even when the admin page says an email was sent. Run `make start` again after changing `.env`.
+
+### Research services
+
+Literature search, citations and adding papers by DOI use Crossref, Unpaywall, OpenAlex, Semantic Scholar and arXiv. All of them work without an account.
+
+| Variable | Purpose |
+|---|---|
+| `CROSSREF_MAILTO` | Your contact address. Crossref gives requests with an address more capacity. |
+| `UNPAYWALL_EMAIL` | Contact address for Unpaywall, which finds free full texts. If it is missing, spur uses `CROSSREF_MAILTO`. If both are missing, adding papers by DOI does not work. |
+| `OPENALEX_API_KEY` | Optional. Raises the OpenAlex limits. |
+| `SEMANTIC_SCHOLAR_API_KEY` | Optional. Without a key, Semantic Scholar shares one quota among all users and may refuse requests for a while. |
+
+If a service does not answer, spur says which one and why, and shows the results of the others.
+
+### Behind a corporate proxy
+
+Some company networks open TLS connections and sign them with their own certificate (Zscaler, for example). spur then cannot reach Crossref or the other services, and `curl` inside the container fails with error 60. Export the root certificate of your company in PEM format, save it as `corporate-ca.crt` next to `docker-compose.yml` and create `docker-compose.override.yml`:
+
+```yaml
+services:
+  sharelatex:
+    volumes:
+      - ./corporate-ca.crt:/usr/local/share/ca-certificates/corporate-ca.crt:ro
+    environment:
+      NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/corporate-ca.crt
+```
+
+Docker Compose reads this file together with `docker-compose.yml` on its own, so `make start` and `make update` pick it up. The repository ignores this file, so `git pull` leaves it alone.
+
 ## Make targets
 
 | Command | Effect |
 |---|---|
-| `make start` | Starts spur |
+| `make start` | Pulls the current image and starts spur |
+| `make update` | Pulls the current images and restarts spur |
 | `make stop` | Stops spur |
 | `make seed` | Creates demo data |
 | `make test` | Runs the unit tests |

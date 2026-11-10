@@ -3512,6 +3512,40 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(/for \(const \{ name, dateien \} of DOKUMENTE\)/.test(skript) && skript.includes("file.path === 'output.pdf'"), 'Smoke kompiliert nicht jedes Dokument mit PDF-Prüfung')
   }
 
+  features.p6f10 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const make = await repoDatei(`${REPO}/Makefile`)
+    const ziel = name => make.split(`\n${name}:`)[1]?.split(/\n(?=\S)/)[0] ?? ''
+    const start = ziel('start')
+    ok(start.indexOf('pull') > 0 && start.indexOf('pull') < start.indexOf('up -d'), `make start holt nicht vorher: ${start}`)
+    const update = ziel('update')
+    const [holen, hinweis, neustart] = ['$(COMPOSE) pull', 'Backup', '$(COMPOSE) up -d'].map(t => update.indexOf(t))
+    ok(holen > 0 && hinweis > holen && neustart > hinweis && /echo .*docker compose/.test(update), `make update: ${update}`)
+
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const abschnitt = titel => readme.split(`### ${titel}\n`)[1]?.split(/\n#{2,3} /)[0] ?? ''
+    const mail = abschnitt('Email')
+    for (const v of ['OVERLEAF_EMAIL_FROM_ADDRESS', 'OVERLEAF_EMAIL_SMTP_HOST', 'OVERLEAF_EMAIL_SMTP_PORT', 'OVERLEAF_EMAIL_SMTP_USER', 'OVERLEAF_EMAIL_SMTP_PASS']) {
+      ok(mail.includes(v), `Abschnitt Email ohne ${v}`)
+    }
+    ok(/sends no email/.test(mail), 'Abschnitt Email ohne Hinweis, dass ohne Variablen keine Mails rausgehen')
+    const dienste = abschnitt('Research services')
+    for (const v of ['CROSSREF_MAILTO', 'UNPAYWALL_EMAIL', 'OPENALEX_API_KEY', 'SEMANTIC_SCHOLAR_API_KEY']) ok(dienste.includes(v), `Research services ohne ${v}`)
+    ok(/Optional/.test(dienste), 'Schlüssel nicht als optional beschrieben')
+    ok(abschnitt('Update').includes('make update'), 'Abschnitt Update ohne make update')
+    const proxy = abschnitt('Behind a corporate proxy')
+    ok(proxy.includes('docker-compose.override.yml') && /```yaml\nservices:\n  sharelatex:\n[\s\S]*NODE_EXTRA_CA_CERTS: \/[^\n]+\.crt\n```/.test(proxy) && /\.crt:\/[^\n]+\.crt:ro/.test(proxy), `Proxy-Beispiel unvollständig: ${proxy.slice(0, 300)}`)
+
+    const links = [...readme.matchAll(/\]\(([^)\s]+)\)/g)].map(m => m[1])
+    for (const link of links.filter(l => !/^https?:/.test(l))) await repoDatei(`${REPO}/${link}`)
+    const kaputt = []
+    for (const link of links.filter(l => /^https:/.test(l))) {
+      const antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
+      if (!(Number(antwort.status()) < 400)) kaputt.push(`${link}: ${antwort.status()}`)
+    }
+    ok(kaputt.length === 0, `Links: ${kaputt.join(' | ')}`)
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`
