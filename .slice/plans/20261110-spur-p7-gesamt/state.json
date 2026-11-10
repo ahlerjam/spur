@@ -1,8 +1,9 @@
 {
- "state": "running",
+ "state": "done",
  "builderModel": "opus",
  "builderAdvisor": "opus",
  "runBranch": "slice/run-20261110-spur-p7-gesamt",
  "sessionId": "e002c78d-10a2-4924-bbee-08bb00cce2ab",
- "started": "2026-11-10T15:03:14Z"
+ "started": "2026-11-10T15:03:14Z",
+ "finished": "2026-11-10T20:56:42Z"
 }
