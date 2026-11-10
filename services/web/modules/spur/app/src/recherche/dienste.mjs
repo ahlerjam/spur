@@ -1,5 +1,6 @@
 import { parseStringPromise } from 'xml2js'
-import { paperApiBasis } from '../schalter.mjs'
+import { Problem } from '../probleme.mjs'
+import { paperApiBasis, umgebung } from '../schalter.mjs'
 import { abrufen } from './abruf.mjs'
 
 export const PRO_SEITE = 10
@@ -192,7 +193,7 @@ const crossref = {
     url.searchParams.set('rows', String(PRO_SEITE))
     url.searchParams.set('offset', String(seite * PRO_SEITE))
     url.searchParams.set('select', 'DOI,title,author,issued,abstract')
-    if (process.env.CROSSREF_MAILTO) url.searchParams.set('mailto', process.env.CROSSREF_MAILTO)
+    if (umgebung('CROSSREF_MAILTO')) url.searchParams.set('mailto', umgebung('CROSSREF_MAILTO'))
     const daten = await abrufen(this, url.toString())
     const items = daten?.message?.items ?? []
     return {
@@ -216,9 +217,9 @@ export const unpaywall = {
   abstandMs: 100,
   // Ergebnis: { frei, pdf, lizenz } oder null, wenn Unpaywall die DOI nicht kennt.
   async status(doi) {
-    // Unpaywall verlangt eine Kontaktadresse; ohne sie bleibt der Status unbekannt.
-    const email = process.env.UNPAYWALL_EMAIL ?? (paperApiBasis() && 'fake@example.org')
-    if (!email) return null
+    // Unpaywall verlangt eine Kontaktadresse; die von Crossref taugt auch dafür.
+    const email = umgebung('UNPAYWALL_EMAIL') || umgebung('CROSSREF_MAILTO')
+    if (!email) throw new Problem(503, 'unpaywall_aus', 'spur_fehler_unpaywall_aus')
     const url = new URL(`${basis('unpaywall')}/v2/${doiPfad(doi)}`)
     url.searchParams.set('email', email)
     const daten = await abrufen(this, url.toString(), { cacheSchluessel: `unpaywall:${doi}` })

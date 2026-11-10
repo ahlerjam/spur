@@ -1,6 +1,6 @@
 import logger from '@overleaf/logger'
 import { crossrefCache } from './sammlungen.mjs'
-import { jetzt, paperApiBasis } from './schalter.mjs'
+import { jetzt, paperApiBasis, umgebung } from './schalter.mjs'
 
 const BASIS = 'https://api.crossref.org'
 const TAG_MS = 24 * 60 * 60 * 1000
@@ -52,8 +52,8 @@ async function abrufen(doi) {
   const url = new URL(
     `${paperApiBasis() ?? BASIS}/works/${encodeURIComponent(doi)}`
   )
-  if (process.env.CROSSREF_MAILTO) {
-    url.searchParams.set('mailto', process.env.CROSSREF_MAILTO)
+  if (umgebung('CROSSREF_MAILTO')) {
+    url.searchParams.set('mailto', umgebung('CROSSREF_MAILTO'))
   }
   for (let versuch = 1; ; versuch++) {
     const antwort = await fetch(url, { signal: AbortSignal.timeout(10000) })

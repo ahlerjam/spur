@@ -150,7 +150,7 @@
   "spur_fehler_token_fehlt": "Dieses Token gibt es nicht mehr.",
   "spur_fehler_token_ungueltig": "Das Token fehlt, ist widerrufen oder abgelaufen. Bitte in spur unter Einstellungen ein neues erzeugen.",
   "spur_fehler_uebernahme_nur_mitglieder": "Quellen lassen sich nur aus Projekten holen, in denen du Mitglied bist.",
-  "spur_fehler_unpaywall_aus": "Unpaywall ist auf dieser Installation nicht eingerichtet (UNPAYWALL_EMAIL fehlt). Bitte den Betreiber fragen oder das PDF selbst hochladen.",
+  "spur_fehler_unpaywall_aus": "Für die Aufnahme per DOI fehlt eine Kontaktadresse für Unpaywall. Der Betreiber setzt dafür UNPAYWALL_EMAIL oder CROSSREF_MAILTO, siehe README, Abschnitt „Research services“. Bis dahin kannst du das PDF selbst hochladen.",
   "spur_fehler_versatz_nur_pdf": "Nur PDF-Quellen haben Seitenzahlen.",
   "spur_fehler_versatz_ungueltig": "Der Versatz muss eine ganze Zahl zwischen -100000 und 100000 sein.",
   "spur_fehler_volltext_laden": "Der freie Volltext ließ sich nicht laden. Bitte später erneut versuchen oder das PDF selbst hochladen.",

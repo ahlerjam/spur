@@ -384,3 +384,38 @@ describe('protokollCsv', () => {
     expect(zeilen).toHaveLength(5)
   })
 })
+
+describe('Unpaywall-Adresse', () => {
+  let dienste
+  beforeEach(async () => {
+    sonder = () => ({ doi: '10.1/x', is_oa: true, best_oa_location: { url_for_pdf: 'https://x.example/a.pdf' } })
+    dienste = await import('../../app/src/recherche/dienste.mjs')
+  })
+
+  const email = () => new URL(abrufe.at(-1).url).searchParams.get('email')
+
+  it('nimmt UNPAYWALL_EMAIL, wenn gesetzt', async () => {
+    vi.stubEnv('UNPAYWALL_EMAIL', 'unpaywall@example.org')
+    vi.stubEnv('CROSSREF_MAILTO', 'spur@example.org')
+    expect((await dienste.unpaywall.status('10.1/x')).frei).toBe(true)
+    expect(email()).toBe('unpaywall@example.org')
+  })
+
+  it('nimmt CROSSREF_MAILTO, wenn UNPAYWALL_EMAIL fehlt', async () => {
+    vi.stubEnv('UNPAYWALL_EMAIL', '')
+    vi.stubEnv('CROSSREF_MAILTO', 'spur@example.org')
+    expect((await dienste.unpaywall.status('10.1/x')).frei).toBe(true)
+    expect(email()).toBe('spur@example.org')
+  })
+
+  it('meldet ohne beide Adressen unpaywall_aus mit beiden Variablen und dem Verweis auf die README', async () => {
+    vi.stubEnv('UNPAYWALL_EMAIL', '')
+    vi.stubEnv('CROSSREF_MAILTO', '')
+    const fehler = await fehlerVon(dienste.unpaywall.status('10.1/x'))
+    expect(fehler).toMatchObject({ status: 503, typ: 'unpaywall_aus' })
+    expect(fehler.message).toMatch(/UNPAYWALL_EMAIL/)
+    expect(fehler.message).toMatch(/CROSSREF_MAILTO/)
+    expect(fehler.message).toMatch(/README/)
+    expect(abrufe).toHaveLength(0)
+  })
+})

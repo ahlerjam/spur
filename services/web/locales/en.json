@@ -151,7 +151,7 @@
   "spur_fehler_token_fehlt": "This token no longer exists.",
   "spur_fehler_token_ungueltig": "The token is missing, revoked or expired. Create a new one in spur under Settings.",
   "spur_fehler_uebernahme_nur_mitglieder": "Sources can only be taken from projects you are a member of.",
-  "spur_fehler_unpaywall_aus": "Unpaywall is not set up on this installation (UNPAYWALL_EMAIL is missing). Ask the operator or upload the PDF yourself.",
+  "spur_fehler_unpaywall_aus": "Adding a paper by DOI needs a contact address for Unpaywall. The operator sets UNPAYWALL_EMAIL or CROSSREF_MAILTO, see the README, section \"Research services\". Until then, upload the PDF yourself.",
   "spur_fehler_versatz_nur_pdf": "Only PDF sources have page numbers.",
   "spur_fehler_versatz_ungueltig": "The offset must be a whole number between -100000 and 100000.",
   "spur_fehler_volltext_laden": "The open full text could not be loaded. Try again later or upload the PDF yourself.",

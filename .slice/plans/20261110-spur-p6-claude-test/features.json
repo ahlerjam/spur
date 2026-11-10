@@ -34,7 +34,7 @@
     "Beide Zitationsdienste sind per Fake nicht erreichbar; `paper_citations` liefert keine stille leere Liste, sondern den Hinweis, dass keiner der Dienste geantwortet hat, mit Grund je Dienst",
     "Das Recherche-Panel im Browser zeigt bei einer Suche, bei der ein Dienst nicht antwortet, einen Hinweis mit dem Namen des Dienstes"
   ]},
-  {"id": "f6", "title": "Quellen per DOI aufnehmen ohne eigene Unpaywall-Adresse", "passes": false, "steps": [
+  {"id": "f6", "title": "Quellen per DOI aufnehmen ohne eigene Unpaywall-Adresse", "passes": true, "steps": [
     "Ohne `UNPAYWALL_EMAIL`, aber mit `CROSSREF_MAILTO=spur@example.org` nimmt `source_add` eine frei verfügbare DOI aus dem Fake auf; die Quelle erscheint in der Quellenliste",
     "Ohne beide Variablen liefert `source_add` eine Meldung, die `UNPAYWALL_EMAIL` und `CROSSREF_MAILTO` nennt und auf die README verweist; der Fehlercode bleibt `unpaywall_aus`"
   ]},

@@ -3385,6 +3385,35 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
   }
 
+  features.p6f6 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P6 Crossref')
+    const KELLER = '10.1371/journal.pone.0099999'
+    try {
+      await fakeSteuern({ cachesLeeren: true, protokollLeeren: true, schalter: { UNPAYWALL_EMAIL: '', CROSSREF_MAILTO: 'spur@example.org' } })
+      const aufgenommen = await werkzeug(token, 'source_add', { project_id: pid, doi: KELLER })
+      ok(!aufgenommen.fehler, `source_add mit CROSSREF_MAILTO: ${JSON.stringify(aufgenommen.inhalt)}`)
+      const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.dienst === 'unpaywall')
+      ok(abrufe.some(a => new URL(a.pfad, BASE).searchParams.get('email') === 'spur@example.org'), `Unpaywall ohne CROSSREF_MAILTO: ${JSON.stringify(abrufe)}`)
+      await projektOeffnen('E2E P6 Crossref')
+      await panelOeffnen('Quellen')
+      await page.locator('.spur-panel').getByRole('button', { name: aufgenommen.inhalt.dateiname }).waitFor({ timeout: 10000 })
+
+      await fakeSteuern({ cachesLeeren: true, schalter: { UNPAYWALL_EMAIL: '', CROSSREF_MAILTO: '' } })
+      const andere = await projektId(token, 'E2E P6 Kommentar')
+      const abgelehnt = await werkzeug(token, 'source_add', { project_id: andere, doi: FOODS })
+      ok(
+        abgelehnt.fehler && abgelehnt.inhalt.fehler === 'unpaywall_aus' &&
+          ['UNPAYWALL_EMAIL', 'CROSSREF_MAILTO', 'README'].every(w => abgelehnt.inhalt.detail.includes(w)),
+        `source_add ohne Adressen: ${JSON.stringify(abgelehnt.inhalt)}`
+      )
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

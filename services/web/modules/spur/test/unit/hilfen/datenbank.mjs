@@ -67,6 +67,7 @@ export function schalterAttrappe() {
     paperApiBasis: () => schalter.paperApiBasis,
     semantikAn: () => schalter.semantik ?? false,
     fakeEmbeddings: () => true,
+    umgebung: name => process.env[name],
   }
   return schalter
 }
