@@ -1,5 +1,8 @@
 {
- "state": "parked",
+ "state": "running",
  "builderModel": "opus",
- "builderAdvisor": "opus"
+ "builderAdvisor": "opus",
+ "runBranch": "slice/run-20261110-spur-p6-claude-test",
+ "sessionId": "11ad5087-0591-4a9c-90ee-8c5c217cc045",
+ "started": "2026-11-10T11:13:31Z"
 }
