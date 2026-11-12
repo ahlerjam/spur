@@ -7,6 +7,7 @@ import OLButton from '@/shared/components/ol/ol-button'
 import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
+import PruefEinstellungen from './pruef-einstellungen'
 import { type Bericht, pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, Zeile } from './pruef-store'
 
 type Stufe = 'success' | 'warning' | 'danger' | 'info'
@@ -121,6 +122,7 @@ export default function PruefberichtPanel() {
         <OLButton variant="secondary" size="sm" onClick={pruefen}>
           {t('spur_erneut_pruefen')}
         </OLButton>
+        <PruefEinstellungen />
       </div>
       <div className="spur-panel-inhalt" aria-live="polite">
         {status === 'laeuft' && <OLSpinner size="sm" />}
@@ -138,6 +140,9 @@ export default function PruefberichtPanel() {
           <p className="spur-leer">{t('spur_keine_probleme')}</p>
         )}
         {bericht && bericht.zeilen.length > 0 && <Zaehlung zaehlung={bericht.zaehlung} />}
+        {bericht && bericht.uebersprungen > 0 && (
+          <p className="spur-zeile-meta">{t('spur_uebersprungen', { count: bericht.uebersprungen })}</p>
+        )}
         <ul className="spur-liste">
           {zeilen.map(zeile => (
             <BerichtZeile key={zeile.id} zeile={zeile} />

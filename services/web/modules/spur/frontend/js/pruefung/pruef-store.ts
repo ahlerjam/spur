@@ -28,6 +28,7 @@ export type StellenStatus = (typeof STELLEN_STATUS)[number]
 export type Bericht = {
   zeilen: Zeile[]
   zaehlung: Record<StellenStatus, number> & { markiert: number }
+  uebersprungen: number
 }
 
 export type PruefZustand = {

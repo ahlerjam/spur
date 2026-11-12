@@ -475,6 +475,44 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
 }
 
 async function p8Vorbereiten(a) {
+  await neuAnlegen(a, 'E2E P8 Zahlen', { 'main.tex': LEER })
+  const leser = await konto('e2e-leser@example.org')
+  const makros = await neuAnlegen(a, 'E2E P8 Makros', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\usepackage{spurzitate}
+\newcommand{\zitat}[1]{\enquote{#1}}
+\begin{document}
+\zitat{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
+
+\zitat{Sleep invented the consolidation.} \autocite[347]{smith2024}
+
+\wort{Memory traces are strengthened during slow-wave sleep} \autocite[347]{smith2024}
+\end{document}`,
+    'spurzitate.sty': String.raw`\newcommand{\wort}[1]{\enquote{#1}}`,
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(makros._id, a._id, 'smith2024.pdf')
+  await db.projects.updateOne({ _id: makros._id }, { $set: { readOnly_refs: [leser._id] } })
+  const vermerke = await neuAnlegen(a, 'E2E P8 Vermerke', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\usepackage{xcolor}
+\newcommand{\note}[1]{}
+\begin{document}
+\enquote{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
+\note{\enquote{Erfunden.} \autocite{brown2005}}
+\iffalse \parencite{wider2023} \fi
+\end{document}`,
+    'references.bib': `${BERICHT_BIB}
+@article{brown2005,
+  title = {Brown}
+}
+@article{wider2023,
+  title = {Wider}
+}`,
+  })
+  await quelleAusFixture(vermerke._id, a._id, 'smith2024.pdf')
   const zaehlung = await neuAnlegen(a, 'E2E P8 Zählung', {
     'main.tex': String.raw`\documentclass{article}
 \usepackage{csquotes}

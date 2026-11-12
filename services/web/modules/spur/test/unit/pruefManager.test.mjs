@@ -195,3 +195,49 @@ describe('bericht mit OCR-Quelle', () => {
     expect(abschnitte.neu).toBe(2)
   })
 })
+
+describe('Makros', () => {
+  const PRAEAMBEL = '\\newcommand{\\zitat}[1]{\\enquote{#1}}\n\\newcommand{\\note}[1]{}\n'
+
+  it('prüft eigene Zitatmakros und überspringt ausgeblendete Stellen', async () => {
+    projektDocs['/main.tex'] = doc(
+      `${PRAEAMBEL}\\zitat{Sleep supports the consolidation of declarative memory.} \\autocite[347]{smith2024}\n` +
+        '\\zitat{Sleep invented the consolidation.} \\autocite[347]{smith2024}\n' +
+        '\\note{\\enquote{Erfunden.} \\autocite{brown2005}}\n\\iffalse \\parencite{wider2023} \\fi',
+      wurzelDoc
+    )
+    const bericht = await PruefManager.bericht(projekt)
+    expect(bericht.zeilen.map(z => [z.key, z.wortlaut])).toEqual([
+      ['smith2024', 'exakt'],
+      ['smith2024', 'abweichend'],
+    ])
+    expect(bericht.uebersprungen).toBe(2)
+    // Aus dem Cache: dieselbe Zahl.
+    expect((await PruefManager.bericht(projekt)).uebersprungen).toBe(2)
+  })
+
+  it('nimmt Einstellungen vor der Erkennung und prüft danach neu', async () => {
+    projektDocs['/main.tex'] = doc(`${PRAEAMBEL}\\wort{Sleep supports the consolidation of declarative memory.} \\autocite[347]{smith2024}`, wurzelDoc)
+    expect((await PruefManager.bericht(projekt)).zeilen.map(z => z.status)).toEqual(['beleg_ohne_wortlaut'])
+    await PruefManager.makroEinstellungSetzen(projekt, { zitat: ['\\wort'], ausgeblendet: [] })
+    expect((await PruefManager.bericht(projekt)).zeilen.map(z => z.wortlaut)).toEqual(['exakt'])
+    expect(await PruefManager.makroUebersicht(projekt)).toEqual({
+      zitat: ['wort'],
+      ausgeblendet: [],
+      erkannt: { zitat: ['zitat'], ausgeblendet: ['note'] },
+    })
+  })
+
+  it.each([[['wort 2']], [['2']], [['a-b']], [Array.from({ length: 31 }, () => 'a')]])('lehnt %j ab und speichert nichts', async zitat => {
+    const fehler = await PruefManager.makroEinstellungSetzen(projekt, { zitat, ausgeblendet: [] }).catch(e => e)
+    expect(fehler).toMatchObject({ status: 422, typ: 'makros_ungueltig' })
+    expect(await PruefManager.makroEinstellung(projekt)).toEqual({ zitat: [], ausgeblendet: [] })
+  })
+
+  it('bereichPruefen kennt die Makros der anderen Dokumente', async () => {
+    projektDocs['/main.tex'] = doc(PRAEAMBEL, wurzelDoc)
+    const text = '\\zitat{Erfundener Satz.} \\autocite[347]{smith2024}'
+    const [zeile] = await PruefManager.bereichPruefen(projekt, text, 0, text.length)
+    expect(zeile.wortlaut).toBe('abweichend')
+  })
+})

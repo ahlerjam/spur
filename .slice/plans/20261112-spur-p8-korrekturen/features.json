@@ -41,7 +41,7 @@
     "Ein Konto mit Leserecht sieht die Listen, kann sie aber nicht ändern; der Aufruf der Speichern-Route mit diesem Konto liefert 403",
     "Die erkannten Makros aus der Präambel stehen in den Einstellungen als „Automatisch erkannt: zitat“ (nur lesbar)"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

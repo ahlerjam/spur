@@ -12,6 +12,11 @@
   `status: "beleg_ohne_wortlaut"`, `grund: "kein_wortlaut"`. Die genaue Kopfzeile von „E2E Bericht“ prüft f7 gleich
   nach dem Öffnen (frische Daten, `ZAEHLUNG_BERICHT`, gezählt: 3 markiert); p8f2 vergleicht die Zahl mit dem Filter
   und `check_report`, weil f7 das Projekt danach ändert.
+- f3/f4: Erkannt werden `\newcommand`, `\renewcommand`, `\providecommand`, `\def` und `\NewDocumentCommand` in
+  allen `.tex`-Dateien des Projekts (nicht in `.sty`). Die Listen liegen in `spurSettings` als `pruefMakros` am
+  Projekt-Eintrag (`userId: null`), Route `GET|PUT /spur/project/:id/pruefbericht/makros` (PUT nur mit Schreibrecht).
+  Die Eingabe trennt Namen an Komma oder Leerraum. Die Schreibsperre lädt das Projekt jetzt, sobald der geänderte
+  Bereich einen Befehl oder „ enthält (vorher nur bei bekannten Zitatbefehlen), damit eigene Makros greifen.
 - E2E: Das run-code-Werkzeug bricht nach 60 s ab. Die Suite läuft darum im Hintergrund des Playwright-Prozesses
   (Wrapper mit `page.__e2e`, Ergebnis per zweitem Aufruf abgefragt); der Wrapper liegt im ignorierten
   `.playwright-mcp/`.

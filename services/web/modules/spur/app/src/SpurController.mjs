@@ -322,6 +322,14 @@ export const pruefbericht = mitProblemen(async (req, res) => {
   res.json(await PruefManager.bericht(projektId(req)))
 })
 
+export const pruefMakros = mitProblemen(async (req, res) => {
+  res.json(await PruefManager.makroUebersicht(projektId(req)))
+})
+
+export const pruefMakrosSetzen = mitProblemen(async (req, res) => {
+  res.json(await PruefManager.makroEinstellungSetzen(projektId(req), req.body))
+})
+
 export const claudeTokens = mitProblemen(async (req, res) => {
   res.json({ tokens: await ClaudeZugang.tokens(nutzerId(req)) })
 })

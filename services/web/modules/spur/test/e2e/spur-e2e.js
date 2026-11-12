@@ -4321,6 +4321,124 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(/markiert/.test(beschreibung) && /beleg_ohne_wortlaut/.test(beschreibung), `Beschreibung: ${beschreibung}`)
   }
 
+  const EINSTELLUNGEN = 'Einstellungen der Prüfung'
+
+  async function makrosSpeichern(feld, wert) {
+    const knopf = page.getByRole('button', { name: EINSTELLUNGEN })
+    if ((await knopf.getAttribute('aria-expanded')) !== 'true') await knopf.click()
+    await page.getByLabel(feld, { exact: true }).fill(wert)
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click()
+  }
+
+  features.p8f3 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    await projektOeffnen('E2E P8 Makros')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await page.getByLabel('Nur Probleme').setChecked(false)
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await zeile('Sleep supports the consolidation').getByText('Wortlaut: exakt', { exact: true }).waitFor({ timeout: 30000 })
+    const abweichend = zeile('Sleep invented').getByText('Wortlaut: abweichend', { exact: true })
+    await abweichend.waitFor()
+    ok(/bg-danger/.test(await abweichend.evaluate(el => el.closest('.badge').className)), 'Abweichender Wortlaut im Makro ist nicht rot')
+    const wort = page.locator('.spur-zeile', { has: page.locator('.badge', { hasText: 'Beleg ohne Wortlaut' }) })
+    await wort.waitFor()
+    ok((await wort.count()) === 1, `Beleg ohne Wortlaut: ${await wort.count()} Zeilen`)
+
+    const erfunden = await werkzeug(token, 'doc_edit', {
+      project_id: pid, pfad: 'main.tex', alt: '\\end{document}', neu: '\\zitat{Erfundener Satz.} \\autocite[347]{smith2024}\n\\end{document}', idempotenz_schluessel: `p8f3-${Date.now()}`,
+    })
+    ok(erfunden.fehler && erfunden.inhalt.fehler === 'zitat_abweichend', `doc_edit mit \\zitat: ${JSON.stringify(erfunden.inhalt)}`)
+
+    const knopf = page.getByRole('button', { name: EINSTELLUNGEN })
+    await knopf.click()
+    await page.getByText('Automatisch erkannt: zitat', { exact: true }).waitFor()
+    await makrosSpeichern('Zitatmakros', 'wort 2')
+    await page.getByText('Nur Buchstaben, ohne Backslash', { exact: true }).waitFor()
+    const nichts = await jsonVon(`/spur/project/${pid}/pruefbericht/makros`)
+    ok(nichts.zitat.length === 0, `Ungültige Eingabe gespeichert: ${JSON.stringify(nichts)}`)
+    await makrosSpeichern('Zitatmakros', '\\wort')
+    await knopf.and(page.locator(':focus')).waitFor()
+    await zeile('Memory traces').getByText('Wortlaut: exakt', { exact: true }).waitFor({ timeout: 30000 })
+    const gespeichert = await jsonVon(`/spur/project/${pid}/pruefbericht/makros`)
+    ok(JSON.stringify(gespeichert.zitat) === '["wort"]', `Gespeichert: ${JSON.stringify(gespeichert)}`)
+
+    await anmelden('e2e-leser@example.org')
+    await projektOeffnen('E2E P8 Makros')
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: EINSTELLUNGEN }).click()
+    const feld = page.getByLabel('Zitatmakros', { exact: true })
+    await page.getByText('Nur wer im Projekt schreiben darf, kann die Listen ändern.').waitFor()
+    ok((await feld.inputValue()) === 'wort' && !(await feld.isEditable()), 'Leser kann die Liste ändern')
+    ok((await page.getByRole('button', { name: 'Speichern', exact: true }).count()) === 0, 'Leser sieht Speichern')
+    const status = await page.evaluate(async url => {
+      const r = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': document.querySelector('meta[name="ol-csrfToken"]').content },
+        body: JSON.stringify({ zitat: [], ausgeblendet: [] }),
+      })
+      return r.status
+    }, `${BASE}/spur/project/${pid}/pruefbericht/makros`)
+    ok(status === 403, `Speichern als Leser: ${status}`)
+  }
+
+  features.p8f4 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const keys = async () => await page.locator('.spur-zeile .spur-zeile-key').allTextContents()
+    await projektOeffnen('E2E P8 Vermerke')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await page.getByLabel('Nur Probleme').setChecked(false)
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.getByText('2 Stellen in ausgeblendeten Bereichen übersprungen', { exact: true }).waitFor({ timeout: 30000 })
+    ok(JSON.stringify(await keys()) === '["smith2024"]', `Zeilen: ${JSON.stringify(await keys())}`)
+    const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
+    ok(
+      bericht.uebersprungen === 2 && !bericht.eintraege.some(z => ['brown2005', 'wider2023'].includes(z.key)),
+      `check_report: ${bericht.uebersprungen}, ${JSON.stringify(bericht.eintraege.map(z => z.key))}`
+    )
+
+    await editorErsetzen('\\newcommand{\\note}[1]{}', '\\newcommand{\\note}[1]{\\textcolor{red}{#1}}')
+    await gespeichert(token, pid, '\\textcolor{red}{#1}')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.getByText('1 Stelle in ausgeblendeten Bereichen übersprungen', { exact: true }).waitFor({ timeout: 30000 })
+    ok((await keys()).includes('brown2005'), `Nach sichtbarem \\note: ${JSON.stringify(await keys())}`)
+
+    await makrosSpeichern('Ausgeblendete Makros', 'note')
+    await page.getByText('2 Stellen in ausgeblendeten Bereichen übersprungen', { exact: true }).waitFor({ timeout: 30000 })
+    ok(!(await keys()).includes('brown2005'), `Nach der Einstellung: ${JSON.stringify(await keys())}`)
+  }
+
+  features.p8f5 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P8 Zahlen')
+    const lauf = Date.now()
+    const schreiben = async (neu, n) => {
+      const { fehler, inhalt } = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', neu, idempotenz_schluessel: `p8f5-${lauf}-${n}` })
+      ok(!fehler, `doc_edit: ${JSON.stringify(inhalt)}`)
+      return inhalt.zahlen_ohne_beleg
+    }
+    const datum = await schreiben('\nDie Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.\n', 1)
+    ok(!datum?.length, `Datum gemeldet: ${JSON.stringify(datum)}`)
+    await projektOeffnen('E2E P8 Zahlen')
+    await panelOeffnen('Claude')
+    await claudePanel().getByText('main.tex', { exact: false }).first().waitFor({ timeout: 10000 })
+    ok((await claudePanel().getByText('Zahl ohne Beleg').count()) === 0, 'Lauf-Karte meldet Datum als Zahl ohne Beleg')
+    const werte = await schreiben('\nVon 240 Befragten antworteten 37,5 Prozent am 12.11.2026.\n', 2)
+    ok(JSON.stringify(werte) === '["240","37,5"]', `Gemeldet: ${JSON.stringify(werte)}`)
+    const karte = claudePanel().locator('.spur-lauf-rot', { hasText: 'Zahl ohne Beleg' })
+    await karte.getByText('„240“ in main.tex', { exact: false }).waitFor({ timeout: 10000 })
+    ok(!/„(12|11|2026|14|30|1\.2\.3)“/.test(await karte.innerText()), `Lauf-Karte: ${await karte.innerText()}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Datum geprüft.' })
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

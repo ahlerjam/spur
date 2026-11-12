@@ -114,6 +114,8 @@ export default {
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)
     webRouter.patch(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleAendern)
     webRouter.get('/spur/project/:project_id/pruefbericht', ...lesen, SpurController.pruefbericht)
+    webRouter.get('/spur/project/:project_id/pruefbericht/makros', ...lesen, SpurController.pruefMakros)
+    webRouter.put('/spur/project/:project_id/pruefbericht/makros', ...schreiben, SpurController.pruefMakrosSetzen)
     webRouter.get('/spur/project/:project_id/claude', ...lesen, SpurController.claudeStatus)
     webRouter.post('/spur/project/:project_id/claude/auftrag', ...lesen, SpurController.claudeAuftrag)
     webRouter.get('/spur/project/:project_id/workflows', ...lesen, SpurController.workflows)

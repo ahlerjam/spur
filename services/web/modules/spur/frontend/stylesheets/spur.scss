@@ -974,3 +974,18 @@
 .spur-grenzen-admin .table-responsive {
   position: relative;
 }
+
+.spur-pruef-einstellungen {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-03);
+}
+
+.spur-pruef-einstellungen .btn {
+  align-self: flex-start;
+}
+
+.spur-pruef-feld .spur-zeile-meta {
+  margin: var(--spacing-02) 0 0;
+}

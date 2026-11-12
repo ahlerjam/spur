@@ -224,3 +224,18 @@ describe('zitateFinden mit Makros', () => {
     ])
   })
 })
+
+describe('Beamer-Notizen', () => {
+  const RUMPF = String.raw`\begin{document}
+\begin{frame}\note{\enquote{X.} \autocite{notiz}}\end{frame}
+\end{document}`
+  const keys = text => zitateFinden(text, makrosErkennen([text])).filter(z => !z.ausgeblendet).map(z => z.belege[0].key)
+
+  it('zählt ein Zitat in \\note ohne show notes nicht', () => {
+    expect(keys(`\\documentclass{beamer}\n${RUMPF}`)).toEqual([])
+  })
+
+  it('zählt es mit show notes', () => {
+    expect(keys(`\\documentclass{beamer}\n\\setbeameroption{show notes}\n${RUMPF}`)).toEqual(['notiz'])
+  })
+})
