@@ -104,6 +104,7 @@ export default function QuellenPanel() {
   const [quellen, setQuellen] = useState<Quelle[] | null>(null)
   const [gesamt, setGesamt] = useState(0)
   const [fehler, setFehler] = useState<string | null>(null)
+  const [ladeFehler, setLadeFehler] = useState<string | null>(null)
   const [laedtHoch, setLaedtHoch] = useState(false)
   const [transkript, setTranskript] = useState(false)
   const [offen, setOffen] = useState<{ quelle: Quelle; seite: number } | null>(null)
@@ -135,6 +136,7 @@ export default function QuellenPanel() {
 
   const laden = useCallback(async () => {
     setFehler(null)
+    setLadeFehler(null)
     try {
       const antwort = await anfrage<{ quellen: Quelle[]; gesamt: number }>(
         projektPfad('/quellen')
@@ -142,7 +144,7 @@ export default function QuellenPanel() {
       setQuellen(antwort.quellen)
       setGesamt(antwort.gesamt)
     } catch (error) {
-      setFehler((error as Error).message)
+      setLadeFehler((error as Error).message)
     }
   }, [])
 
@@ -346,11 +348,22 @@ export default function QuellenPanel() {
         />
       </form>
       <div className="spur-panel-inhalt">
+        {ladeFehler && (
+          <Notification
+            type="error"
+            content={ladeFehler}
+            action={
+              <OLButton variant="secondary" size="sm" onClick={() => laden()}>
+                {t('spur_erneut_versuchen')}
+              </OLButton>
+            }
+          />
+        )}
         {fehler && <Notification type="error" content={fehler} />}
         <div role="status">
           {meldung && <Notification type={meldung.typ} content={meldung.text} />}
         </div>
-        {quellen === null && !fehler && (
+        {quellen === null && !fehler && !ladeFehler && (
           <p className="spur-leer">
             <OLSpinner size="sm" /> {t('spur_quellen_laden')}
           </p>

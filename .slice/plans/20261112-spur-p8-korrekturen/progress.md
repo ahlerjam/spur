@@ -40,6 +40,12 @@
 - f9: `events_since` markiert gelesene Ereignisse als zugestellt; ohne Cursor liefert es die neuesten 100 (vorher die
   ältesten). Der Wecker hört jetzt ab Beginn des Wartens mit, vorher konnte ein Auftrag zwischen Abfrage und Schlaf
   bis zu 5 s liegen bleiben. Testschalter `SPUR_WARTEN_S` verkürzt die Standardzeit von 100 s.
+- f10: nginx liefert `output.pdf` selbst aus (`overleaf.conf.template`), web sieht die Anfrage nie. Der Testschalter
+  `SPUR_PROXY_PDF` (`403`, `200`, `kaputt`) setzt darum im Dev-Stack die PDF-Adresse der Compile-Antwort auf
+  `/spur/dev/proxy-pdf/output.pdf`, das die Sperrseite liefert; der Betrachter durchläuft denselben Weg. Für die
+  Quellenliste `SPUR_PROXY_API`. Der Betrachter fragt nach einem Ladefehler einmal mit `Range: bytes=0-1023` nach, ob
+  ein PDF kommt (`frontend/js/features/pdf-preview/util/proxy-sperre.ts`, Kern-Patch in `pdf-js-viewer.tsx` und
+  `pdf-preview-error.tsx`). Das Quellen-Panel zeigt Ladefehler mit „Erneut versuchen“.
 - E2E: Das run-code-Werkzeug bricht nach 60 s ab. Die Suite läuft darum im Hintergrund des Playwright-Prozesses
   (Wrapper mit `page.__e2e`, Ergebnis per zweitem Aufruf abgefragt); der Wrapper liegt im ignorierten
   `.playwright-mcp/`.

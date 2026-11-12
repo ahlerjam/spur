@@ -14,7 +14,7 @@ import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
 import * as GrenzenController from './grenzen/GrenzenController.mjs'
 import * as UploadLinkController from './hochladen/UploadLinkController.mjs'
-import { e2eVorbereiten, quelleVergroessern, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
+import { e2eVorbereiten, pdfUmleiten, proxySperre, quelleVergroessern, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { mailFakeLesen, mailFakeSteuern } from './dev/MailFake.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
@@ -83,6 +83,13 @@ const QUELLEN = '/spur/project/:project_id/quellen'
 
 export default {
   apply(webRouter, _privateApiRouter, publicApiRouter) {
+    if (IST_DEV) {
+      // Vor den echten Routen: Ahmt einen Proxy vor PDF-Auslieferung und Quellenliste nach (Testschalter).
+      // nginx liefert das PDF selbst aus; im Dev-Stack zeigt die Compile-Antwort darum auf eine Route von web.
+      webRouter.post('/project/:Project_id/compile', pdfUmleiten)
+      webRouter.get('/spur/dev/proxy-pdf/output.pdf', proxySperre('SPUR_PROXY_PDF'))
+      webRouter.get(QUELLEN, proxySperre('SPUR_PROXY_API'))
+    }
     webRouter.get(QUELLEN, ...lesen, SpurController.quellenListe)
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
     webRouter.post(`${QUELLEN}/web`, ...schreiben, SpurController.webQuelleAufnehmen)

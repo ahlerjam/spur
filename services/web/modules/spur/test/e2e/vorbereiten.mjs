@@ -493,6 +493,7 @@ async function p8Vorbereiten(a) {
   await p8GrenzenVorbereiten()
   await neuAnlegen(a, 'E2E P8 Anlegen', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E P8 Warten', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E P8 Proxy', { 'main.tex': LEER })
   const dateien = await neuAnlegen(a, 'E2E P8 Anlegen Dateien', { 'main.tex': LEER })
   await platzhalterDateien(dateien._id, ['abb', 'ergebnisse.tex'])
   const voll = await neuAnlegen(a, 'E2E P8 Anlegen Voll', { 'main.tex': LEER })

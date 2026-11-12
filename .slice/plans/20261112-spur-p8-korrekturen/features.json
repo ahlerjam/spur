@@ -140,7 +140,7 @@
     "Liefert eine spur-Route (Quellenliste) eine HTML-Seite mit 403 (Dev-Schalter), zeigt das Quellen-Panel dieselbe Proxy-Meldung statt „Forbidden“ oder einer leeren Meldung; mit 200 und HTML ebenso statt einer leeren Liste",
     "Nach dem Abschalten des Schalters und „Aktualisieren“ bzw. „Erneut versuchen“ erscheinen PDF und Quellenliste wieder; die Meldung ist per Tastatur erreichbar und wird als Status angesagt (`role=\"alert\"` oder gleichwertig)"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

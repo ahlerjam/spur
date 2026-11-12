@@ -4766,6 +4766,63 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
   }
 
+  features.p8f10 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const SPERRE = 'Ein Proxy oder Filter in deinem Netz blockiert diese Anfrage (Status 403). Das liegt nicht an deinem Dokument. Wende dich an deine IT oder versuch es in einem anderen Netz.'
+    const SPERRE_OHNE = SPERRE.replace(' (Status 403)', '')
+    const pdfBereich = () => page
+    // Der Editor kompiliert beim Öffnen; ein Klick direkt danach meldet „zu kurz nach dem letzten Kompilieren“.
+    const neuKompilieren = async () => {
+      await page.waitForTimeout(3000)
+      await page.getByRole('button', { name: KOMPILIEREN }).first().click()
+    }
+    try {
+      await projektOeffnen('E2E P8 Proxy')
+      await page.locator('.pdf-viewer .page canvas').first().waitFor({ timeout: 120000 })
+
+      await fakeSteuern({ schalter: { SPUR_PROXY_PDF: '403' } })
+      await neuKompilieren()
+      const meldung = pdfBereich().getByText(SPERRE, { exact: true })
+      await meldung.waitFor({ timeout: 60000 })
+      ok((await pdfBereich().getByText('PDF-Wiedergabe-Fehler').count()) === 0, 'Weiter „PDF-Wiedergabe-Fehler“')
+      ok((await meldung.getAttribute('role')) === 'alert', 'Meldung ohne role="alert"')
+      await meldung.focus()
+      ok(await meldung.evaluate(el => el === document.activeElement), 'Meldung nicht per Tastatur erreichbar')
+
+      await fakeSteuern({ schalter: { SPUR_PROXY_PDF: '200' } })
+      await neuKompilieren()
+      await pdfBereich().getByText(SPERRE_OHNE, { exact: true }).waitFor({ timeout: 60000 })
+
+      await fakeSteuern({ schalter: { SPUR_PROXY_PDF: 'kaputt' } })
+      await neuKompilieren()
+      await pdfBereich().getByText('PDF-Wiedergabe-Fehler').first().waitFor({ timeout: 60000 })
+      ok((await pdfBereich().getByText(SPERRE_OHNE).count()) === 0, 'Defektes PDF als Proxy-Sperre gemeldet')
+
+      await fakeSteuern({ schalter: {} })
+      await neuKompilieren()
+      await page.locator('.pdf-viewer .page canvas').first().waitFor({ timeout: 120000 })
+
+      for (const [art, text] of [['403', SPERRE], ['200', SPERRE_OHNE]]) {
+        await fakeSteuern({ schalter: { SPUR_PROXY_API: art } })
+        await page.reload()
+        await page.locator('.cm-content').first().waitFor()
+        await panelOeffnen('Quellen')
+        const quellenMeldung = page.locator('.spur-panel').getByText(text, { exact: true })
+        await quellenMeldung.waitFor({ timeout: 20000 })
+        ok(await quellenMeldung.evaluate(el => Boolean(el.closest('[role="alert"]'))), `Quellen-Meldung (${art}) ohne role="alert"`)
+        ok((await page.locator('.spur-panel').getByText(/^(Forbidden|Noch keine Quellen)$/).count()) === 0, `Quellen-Panel (${art}) zeigt Forbidden oder eine leere Liste`)
+      }
+      await fakeSteuern({ schalter: {} })
+      const nochmal = page.locator('.spur-panel').getByRole('button', { name: 'Erneut versuchen' })
+      await nochmal.focus()
+      await page.keyboard.press('Enter')
+      await page.locator('.spur-panel').getByText('Noch keine Quellen').waitFor({ timeout: 20000 })
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

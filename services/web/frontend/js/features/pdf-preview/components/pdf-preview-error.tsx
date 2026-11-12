@@ -6,6 +6,7 @@ import { useDetachCompileContext as useCompileContext } from '../../../shared/co
 import { useStopOnFirstError } from '../../../shared/hooks/use-stop-on-first-error'
 import getMeta from '../../../utils/meta'
 import { sendMB } from '@/infrastructure/event-tracking'
+import { PROXY_FEHLER } from '../util/proxy-sperre'
 
 function PdfPreviewError({
   error,
@@ -19,6 +20,22 @@ function PdfPreviewError({
   const { t } = useTranslation()
 
   const { startCompile } = useCompileContext()
+
+  // spur: Proxy-Sperre statt „PDF-Wiedergabe-Fehler“ (pdf-js-viewer.tsx, util/proxy-sperre.ts).
+  if (error.startsWith(PROXY_FEHLER)) {
+    const status = error.split(':')[1]
+    return (
+      includeErrors && (
+        <ErrorLogEntry title={t('spur_proxy_titel')}>
+          <div role="alert" tabIndex={0} className="spur-proxy-sperre">
+            {status
+              ? t('spur_proxy_sperre_status', { status })
+              : t('spur_proxy_sperre')}
+          </div>
+        </ErrorLogEntry>
+      )
+    )
+  }
 
   switch (error) {
     case 'rendering-error-expected':

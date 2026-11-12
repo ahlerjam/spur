@@ -71,6 +71,8 @@ async function laden({ dev = false } = {}) {
     zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
     e2eVorbereiten: Object.assign(() => {}, { handler: 'e2eVorbereiten' }),
     quelleVergroessern: Object.assign(() => {}, { handler: 'quelleVergroessern' }),
+    proxySperre: name => Object.assign(() => {}, { handler: `proxySperre:${name}` }),
+    pdfUmleiten: Object.assign(() => {}, { handler: 'pdfUmleiten' }),
   }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
@@ -215,6 +217,10 @@ describe('Rechte der Routen', () => {
     for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()
     await laden({ dev: true })
     for (const [methode, pfad, handler] of dev) expect(handlerVon(route(methode, pfad))).toBe(handler)
+    expect(handlerVon(route('get', '/spur/dev/proxy-pdf/output.pdf'))).toBe('proxySperre:SPUR_PROXY_PDF')
+    expect(handlerVon(route('post', '/project/:Project_id/compile'))).toBe('pdfUmleiten')
+    const quellen = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/quellen')
+    expect(quellen.map(handlerVon)).toEqual(['proxySperre:SPUR_PROXY_API', 'quellenListe'])
   })
 })
 
