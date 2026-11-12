@@ -3236,6 +3236,11 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await breite(1280)
     await anmelden('e2e-a@example.org')
     await projektOeffnen('E2E P6 Kommentar')
+    // p6f2 lässt kapitel.tex offen, und Overleaf öffnet die zuletzt offene Datei wieder.
+    const main = page.locator('.file-tree').getByRole('treeitem', { name: 'main.tex' })
+    await panelSichern(DATEIBAUM, main)
+    await main.click()
+    await page.locator('.cm-content', { hasText: 'Ergebnisse' }).waitFor()
     await imEditorMarkieren('Ergebnisse')
     await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
     const feld = page.locator('.review-panel-add-comment-editor .cm-content').first()
