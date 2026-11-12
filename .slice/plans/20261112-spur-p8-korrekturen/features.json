@@ -1,0 +1,160 @@
+{
+ "features": [
+  {
+   "id": "f1",
+   "title": "DOIs anderer Registrierstellen werden geprüft statt rot gemeldet",
+   "steps": [
+    "Für Forschende mit arXiv-Quellen, damit korrekte DOIs nicht als Fehler dastehen. Ausgangslage: Projekt „E2E P8 DOI“ mit einer `.bib`, die vier Einträge hat: `10.5555/spur.2024.001` (Crossref-Fake kennt sie), `10.48550/arXiv.2401.01234` (Crossref-Fake 404, doi.org-Fake nennt DataCite, DataCite-Fake liefert Titel „Sleep-like replay improves memory consolidation“, Jahr 2024), `10.9999/nirgends.1` (doi.org-Fake kennt sie nicht) und `10.3333/andere.1` (doi.org-Fake nennt eine dritte Registrierstelle); jeder Eintrag wird in `main.tex` einmal mit `\\parencite` zitiert",
+    "Die Nutzerin öffnet den Prüfbericht und klickt „Erneut prüfen“: Die Zeile zur arXiv-DOI zeigt ein nicht rotes Abzeichen „Registriert bei DataCite“ und den Hinweis, dass DataCite keine Rückzugsmeldungen liefert; im Editor hat die Stelle keine rote Markierung",
+    "Die Zeile zu `10.9999/nirgends.1` zeigt rot „DOI nicht registriert“; die Zeile zu `10.3333/andere.1` zeigt neutral „Registriert bei <Name>, Metadaten nicht geprüft“ und zählt nicht als Problem",
+    "Mit „Nur Probleme“ bleibt von den vier Zeilen nur die zu `10.9999/nirgends.1` sichtbar",
+    "`check_report` und `bib_list` über MCP liefern für die arXiv-DOI `registrierstelle: \"datacite\"`, Titel und Jahr aus dem Fake und kein `problem: true`; für `10.9999/nirgends.1` `referenz: \"nicht_gefunden\"`",
+    "Ist der doi.org-Fake abgeschaltet (Dev-Schalter), zeigt die arXiv-Zeile „nicht prüfbar“ mit dem Grund, dass die Registrierstelle nicht erreichbar ist, und ist nicht rot; nach dem Wiedereinschalten und „Erneut prüfen“ ist sie wieder grün",
+    "Ein Projekt, dessen arXiv-DOI vor dem Update als „bei Crossref unbekannt“ im Cache lag, zeigt nach „Erneut prüfen“ sofort das neue Ergebnis (Unit-Test mit vorbelegtem Cache)"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f2",
+   "title": "Die Zählung nennt markierte Stellen",
+   "steps": [
+    "Für alle, die der Kopfzeile des Berichts trauen. Im Projekt „E2E Bericht“ zeigt der Prüfbericht nach „Erneut prüfen“ die Zeile „Zitierstellen: 6 geprüft, davon 4 markiert, 2 ohne Quelle, 1 nicht prüfbar“ (die Zahl hinter „davon“ ist genau die Zahl der geprüften Zeilen, die mit „Nur Probleme“ sichtbar bleiben; der Builder zählt sie am Testprojekt nach und schreibt die echte Zahl in den Test)",
+    "`check_report` liefert in `zaehlung` zusätzlich `markiert` mit derselben Zahl; die bisherigen Schlüssel sind unverändert vorhanden",
+    "Ein Satz mit `\\parencite{smith2024}` ohne wörtliches Zitat erscheint im Bericht mit dem Abzeichen „Beleg ohne Wortlaut“, zählt in `zaehlung.beleg_ohne_wortlaut` und nicht mehr unter „geprüft“; die Kopfzeile nennt „1 Beleg ohne Wortlaut“",
+    "Ohne markierte Stellen lautet die Zeile „… geprüft, keine markiert“",
+    "Die Werkzeugbeschreibung von `check_report` erklärt `markiert` und `beleg_ohne_wortlaut` in einem Satz"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f3",
+   "title": "Eigene Zitatmakros werden geprüft",
+   "steps": [
+    "Für Forschende mit eigenen Makros, damit der Wortlaut nicht von Hand geprüft werden muss. Projekt „E2E P8 Makros“: Präambel mit `\\newcommand{\\zitat}[1]{\\enquote{#1}}`, im Text `\\zitat{Sleep supports the consolidation of declarative memory.} \\autocite[347]{smith2024}` (Wortlaut steht so in der Quelle) und `\\zitat{Sleep invented the consolidation.} \\autocite[347]{smith2024}` (steht nicht in der Quelle)",
+    "Der Prüfbericht zeigt die erste Stelle mit „Wortlaut: exakt“ und die zweite mit „Wortlaut: abweichend“, rot markiert",
+    "Über MCP lehnt `doc_edit` einen Text mit `\\zitat{Erfundener Satz.} \\autocite[347]{smith2024}` mit demselben Fehlercode ab wie bei `\\enquote` mit erfundenem Wortlaut",
+    "Im selben Projekt steht `\\wort{Memory traces are strengthened during slow-wave sleep} \\autocite[347]{smith2024}` mit einem Makro, das in einer eingebundenen `.sty` definiert ist: Der Bericht zeigt dafür zunächst „Beleg ohne Wortlaut“",
+    "Die Nutzerin öffnet im Prüfbericht „Einstellungen der Prüfung“, trägt unter „Zitatmakros“ `wort` ein und speichert: Der Bericht prüft neu und zeigt die Stelle mit „Wortlaut: exakt“; der Fokus liegt danach auf dem Knopf „Einstellungen der Prüfung“",
+    "Die Eingabe `\\wort` wird als `wort` gespeichert; `wort 2` wird mit „Nur Buchstaben, ohne Backslash“ am Feld abgelehnt und nichts wird gespeichert",
+    "Ein Konto mit Leserecht sieht die Listen, kann sie aber nicht ändern; der Aufruf der Speichern-Route mit diesem Konto liefert 403",
+    "Die erkannten Makros aus der Präambel stehen in den Einstellungen als „Automatisch erkannt: zitat“ (nur lesbar)"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f4",
+   "title": "Ausgeblendete Vermerke zählen im Bericht nicht",
+   "steps": [
+    "Für Forschende, die Vermerke im Quelltext führen, damit der Bericht nur zeigt, was im PDF steht. Projekt „E2E P8 Vermerke“: Präambel mit `\\newcommand{\\note}[1]{}`; im Text ein sichtbares Zitat aus smith2024, dazu `\\note{\\enquote{Erfunden.} \\autocite{brown2005}}` und ein Block `\\iffalse \\parencite{wider2023} \\fi`",
+    "Der Prüfbericht listet nur das sichtbare Zitat; `brown2005` und `wider2023` kommen in keiner Zeile vor; unter der Kopfzeile steht „2 Stellen in ausgeblendeten Bereichen übersprungen“",
+    "`check_report` liefert `uebersprungen: 2` und keine Stelle zu `brown2005` oder `wider2023`",
+    "Ändert die Nutzerin die Präambel zu `\\newcommand{\\note}[1]{\\textcolor{red}{#1}}` und prüft erneut, erscheint die Stelle zu `brown2005` im Bericht und der Hinweis nennt „1 Stelle“",
+    "Trägt sie danach in den Einstellungen unter „Ausgeblendete Makros“ `note` ein, verschwindet die Stelle wieder",
+    "In einem Beamer-Dokument ohne `\\setbeameroption{show notes}` zählt ein Zitat in `\\note{…}` nicht; mit `\\setbeameroption{show notes}` zählt es (Unit-Tests mit beiden Präambeln)"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f5",
+   "title": "Datum, Uhrzeit und Versionsnummern sind keine Zahl ohne Beleg",
+   "steps": [
+    "Für alle, die mit Claude schreiben, damit Läufe nicht wegen Datumsangaben offen bleiben. Über MCP schreibt `doc_edit` den Satz „Die Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.“: Das Ergebnis enthält kein `zahlen_ohne_beleg`, die Lauf-Karte zeigt keinen Hinweis „Zahl ohne Beleg“",
+    "Der Satz „Von 240 Befragten antworteten 37,5 Prozent am 12.11.2026.“ meldet genau `240` und `37,5`",
+    "Unit-Tests decken ab: `12.11.2026`, `12.11.26`, `12.11.`, `12. November 2026`, `November 12, 2026`, `2026-11-12`, `14:30`, `14:30:05`, `v2.0.1`, `Version 1.2.3` werden nicht gemeldet; `3.14`, `12,5` und `1.250` werden weiter gemeldet"
+   ],
+   "passes": false
+  },
+  {
+   "id": "f6",
+   "title": "Abgebrochene Paketinstallation hinterlässt nichts und lässt sich wiederholen",
+   "steps": [
+    "Für Forschende, die Schriften brauchen, damit ein Abbruch nicht das Projekt blockiert. Der TeX-Live-Fake antwortet für das Paket `carlito` beim ersten und zweiten Abruf mit 502, beim dritten mit dem Archiv: `tex_package_add carlito` gelingt, die Antwort nennt die angelegten Dateien",
+    "Antwortet der erste Spiegel-Fake dauerhaft mit 502 und der zweite mit dem Archiv, gelingt die Installation über den zweiten Spiegel",
+    "Antworten beide dauerhaft mit 502, kommt der Fehler `spiegel_nicht_erreichbar` mit dem Text „Die Paketquelle antwortet mit Fehler 502. Versuch es später erneut.“; im Projekt gibt es keinen Ordner `tex-pakete/carlito` (im Dateibaum geprüft) und die Lauf-Karte listet kein Paket",
+    "Der Fake liefert ein Archiv mit fünf Dateien und der Upload der dritten scheitert (Dev-Schalter): Der Aufruf meldet einen Fehler, danach sind alle Dateien und der Ordner `tex-pakete/carlito` wieder weg und der belegte Speicher des Projekts ist so groß wie vorher",
+    "Ein von Hand angelegter leerer Ordner `tex-pakete/carlito` und ein Ordner mit nur einer Datei ohne Eintrag als installiertes Paket blockieren nicht: `tex_package_add carlito` installiert vollständig, danach kompiliert ein Dokument mit `\\usepackage{carlito}` gegen den Fake",
+    "Ein zweiter Aufruf für ein vollständig installiertes Paket meldet „schon im Projekt“ und ändert nichts",
+    "Bricht der Client den Aufruf während des Uploads ab (Verbindung geschlossen), bleibt kein Teilstand zurück: Der Server stellt die Installation fertig oder rollt sie zurück; ein neuer Aufruf danach gelingt oder meldet „schon im Projekt“ mit vollständigen Dateien",
+    "Unit-Tests für `hinzufuegen` decken Erfolg, 404, 5xx mit Wiederholung, Spiegelwechsel, Upload-Fehler mit Zurückrollen und Rest-Ordner ab"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f7",
+   "title": "Paketgrenzen sind höher und im Admin einstellbar",
+   "steps": [
+    "Für Admins und für Forschende mit großen Schriftpaketen (Fira, Lato). Ohne Einstellung gelten 100 MB je Paket, 300 MB für alle Pakete eines Projekts und 60 gelungene Installationen je Stunde und Person: Ein Fake-Paket mit 30 MB entpackt wird installiert",
+    "Der Admin öffnet „Grenzen“, sieht unter „TeX-Pakete“ drei Felder „Größe je Paket (MB)“, „Pakete je Projekt (MB)“, „Installationen je Stunde“ mit den Standardwerten als Platzhalter, trägt `10`, `20`, `2` ein und speichert; die Seite zeigt die neuen Werte nach dem Neuladen",
+    "Danach meldet `tex_package_add` für das 30-MB-Paket `paket_zu_gross` mit dem Text „… ist entpackt 30 MB groß, erlaubt sind 10 MB.“",
+    "Zwei kleine Pakete gelingen, das dritte in derselben Stunde meldet die Drossel mit „2 Installationen je Stunde“; Aufrufe, die „schon im Image“, „schon im Projekt“ oder einen Fehler melden, verbrauchen kein Kontingent (fünf solche Aufrufe davor ändern nichts)",
+    "Eingaben wie `0`, `-5` oder `abc` werden am Feld mit „Bitte eine ganze Zahl ab 1 eingeben“ abgelehnt; ein leeres Feld stellt den Standardwert wieder her",
+    "Ist die Speicher-Grenze des Projekts kleiner als das Paket, kommt `speicher_voll` mit Stand und Grenze; hat das Projekt nach der Installation mehr als 2000 Einträge, kommt `projekt_zu_viele_dateien` und nichts bleibt zurück",
+    "Ein Konto ohne Admin-Rechte bekommt beim Speichern der Grenzen 403"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f8",
+   "title": "doc_create nennt die Ursache statt „interner Fehler“",
+   "steps": [
+    "Für Claude und die Person davor, damit ein Fehlschlag verständlich ist und der Text nicht in eine einzige Datei muss. Über MCP legt `doc_create` mit Pfad `kapitel/einleitung.tex` und Inhalt an: Der Ordner `kapitel` entsteht, die Datei erscheint im Dateibaum, der Inhalt steht als Änderung von Claude darin",
+    "Gibt es im Projekt eine Datei `abb` und der Pfad lautet `abb/x.tex`, kommt der Fehler `pfad_ist_datei` mit „`abb` ist eine Datei, kein Ordner. Wähl einen anderen Pfad.“; es entsteht nichts",
+    "In einem Projekt mit 2000 Einträgen (Testdaten) kommt `projekt_zu_viele_dateien` mit „Das Projekt hat 2000 von 2000 Dateien. Lösch Dateien, zum Beispiel nicht gebrauchte TeX-Pakete.“",
+    "Antwortet der document-updater mit 500 (Dev-Schalter), kommt `dienst_nicht_erreichbar` mit dem Hinweis, es gleich noch einmal zu versuchen; das angelegte leere Dokument ist wieder entfernt, und ein zweiter Aufruf mit demselben Pfad nach dem Abschalten des Schalters gelingt (kein `konflikt`)",
+    "Scheitert zusätzlich das Aufräumen (Dev-Schalter), bleibt die Antwort der erste Fehler, das Log enthält beide, und der zweite Aufruf mit demselben Pfad gelingt trotzdem",
+    "Ein absichtlich ausgelöster unbekannter Fehler (Dev-Schalter) liefert `interner_fehler` mit „… Fehler-ID “ und acht Zeichen; `spur-dev logs web` zeigt genau eine Zeile mit dieser ID, dem Werkzeugnamen `doc_create`, der Projekt-ID und dem Pfad, aber ohne den Inhalt des Dokuments",
+    "Enthält der Inhalt Zahlen und heißt im Projekt eine Binärdatei `ergebnisse.tex`, gelingt `doc_create` trotzdem (kein interner Fehler)",
+    "Derselbe Aufruf zweimal hintereinander: der erste gelingt, der zweite meldet `konflikt` mit dem Pfad"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f9",
+   "title": "Claude wartet auf Aufträge ohne Neustart von Hand",
+   "steps": [
+    "Für alle, die Claude Code neben spur laufen lassen. `wait_for_event` ohne Argumente kehrt ohne Auftrag nach 100 Sekunden (Test mit verkürzter Zeit über Dev-Schalter) mit `{ereignis: null, cursor: …, hinweis: \"Kein Auftrag. Ruf wait_for_event erneut auf.\"}` zurück",
+    "Stellt die Nutzerin im Claude-Panel einen Auftrag, während ein Aufruf wartet, kehrt der Aufruf innerhalb von 6 Sekunden mit dem Auftrag zurück; das Panel zeigt „Claude verbunden“",
+    "Startet derselbe Client einen zweiten Aufruf, während der erste noch wartet, endet der erste mit `{ereignis: null, abgeloest: true}` und einem Hinweis, nicht erneut aufzurufen; ein danach gestellter Auftrag kommt genau einmal an, beim zweiten Aufruf",
+    "Zehn Aufträge in Folge mit je einem neuen Aufruf nach jedem Auftrag: Jeder Auftrag kommt genau einmal an, keiner fehlt (Test mit dem Fake-Client)",
+    "`events_since` mit dem Cursor aus der letzten Antwort liefert nur neuere Ereignisse; ohne Cursor die neuesten; ein über `events_since` gelesenes Ereignis kommt über `wait_for_event` nicht noch einmal",
+    "Das Panel bleibt zwischen zwei Aufrufen „verbunden“ (kein Flackern auf „nicht verbunden“ innerhalb von 45 Sekunden)",
+    "MCP-Anweisungen, Werkzeugbeschreibung, `plugins/spur/skills/spur/SKILL.md` und der Startbefehl im Claude-Panel beschreiben denselben Ablauf: aufrufen, bei `ereignis: null` sofort erneut aufrufen, bei `abgeloest` nichts tun, Auftrag erledigen, erneut aufrufen"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f10",
+   "title": "Proxy-Sperre wird als solche gemeldet",
+   "steps": [
+    "Für Nutzer hinter einem Firmenproxy, damit sie nicht neu kompilieren, wenn das Netz blockiert. Ein Dev-Schalter lässt die PDF-Auslieferung mit Status 403 und einer HTML-Seite antworten: Nach „Aktualisieren“ zeigt der PDF-Bereich „Ein Proxy oder Filter in deinem Netz blockiert diese Anfrage (Status 403). Das liegt nicht an deinem Dokument. Wende dich an deine IT oder versuch es in einem anderen Netz.“ und nicht „PDF-Wiedergabe-Fehler“",
+    "Antwortet die Auslieferung mit Status 200 und einer HTML-Seite, erscheint dieselbe Meldung ohne Statusangabe",
+    "Ein wirklich defektes PDF (abgeschnittene Datei mit Content-Type `application/pdf`) zeigt weiter „PDF-Wiedergabe-Fehler“",
+    "Liefert eine spur-Route (Quellenliste) eine HTML-Seite mit 403 (Dev-Schalter), zeigt das Quellen-Panel dieselbe Proxy-Meldung statt „Forbidden“ oder einer leeren Meldung; mit 200 und HTML ebenso statt einer leeren Liste",
+    "Nach dem Abschalten des Schalters und „Aktualisieren“ bzw. „Erneut versuchen“ erscheinen PDF und Quellenliste wieder; die Meldung ist per Tastatur erreichbar und wird als Status angesagt (`role=\"alert\"` oder gleichwertig)"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f11",
+   "title": "Die Doku beschreibt, was der Code tut",
+   "steps": [
+    "Für alle, die spur betreiben oder Claude daran anschließen. `docs/mcp-contract.md` nennt jedes Werkzeug, das der Server anbietet, und keines, das es nicht gibt (`paper_lookup` ist entfernt); ein Test unter `tools/tests` vergleicht die Werkzeugnamen im Vertrag mit denen aus `werkzeuge.mjs` und ist grün",
+    "Der Vertrag beschreibt `doc_create` mit Inhalt, die neuen Fehlercodes (`pfad_ist_datei`, `projekt_zu_viele_dateien`, `dienst_nicht_erreichbar`), die Fehler-ID, `zaehlung.markiert`, `beleg_ohne_wortlaut`, `uebersprungen`, `registrierstelle`, die neuen Paketgrenzen und den Ablauf von `wait_for_event` mit `cursor` und `abgeloest`",
+    "README: Abschnitt zu Claude Code erklärt das Warten in 100-Sekunden-Schritten und nennt `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS`; Abschnitt zum Betrieb nennt die neuen Adressen `doi.org` und `api.datacite.org`, die einstellbaren Paketgrenzen und wie man eine Fehler-ID im Log findet; ein Abschnitt zum Prüfbericht erklärt Zitatmakros, ausgeblendete Vermerke und die Registrierstellen",
+    "ADR: ein neuer Eintrag zur DOI-Prüfung über mehrere Registrierstellen; ADR 0003 nennt kein `/spur:lauf` mehr und beschreibt den kurzen Poll; die Liste der Kern-Patches enthält den PDF-Betrachter mit Begründung",
+    "`plugins/spur/skills/spur/SKILL.md` beschreibt Warten, Paketinstallation mit Wiederholung und was bei den neuen Fehlercodes zu tun ist; englisch, mit humanizer geprüft",
+    "`docs/backlog.md` ist aktualisiert: erledigte Punkte entfernt, neu Zurückgestelltes (MCP-Tasks für das Warten, echte Ursache von `doc_create` auf dem Server anhand der Fehler-ID prüfen) ergänzt"
+   ],
+   "passes": false
+  }
+ ]
+}
