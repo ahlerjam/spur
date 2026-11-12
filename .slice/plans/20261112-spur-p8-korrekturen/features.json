@@ -96,7 +96,7 @@
     "Ist die Speicher-Grenze des Projekts kleiner als das Paket, kommt `speicher_voll` mit Stand und Grenze; hat das Projekt nach der Installation mehr als 2000 Einträge, kommt `projekt_zu_viele_dateien` und nichts bleibt zurück",
     "Ein Konto ohne Admin-Rechte bekommt beim Speichern der Grenzen 403"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

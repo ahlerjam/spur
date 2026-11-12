@@ -1,6 +1,8 @@
 import Settings from '@overleaf/settings'
 import AuthorizationMiddleware from '../../../../app/src/Features/Authorization/AuthorizationMiddleware.mjs'
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
+import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
+import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import { multerUploadHandler } from '../../../../app/src/infrastructure/Multer.mjs'
 import RateLimiterMiddleware from '../../../../app/src/Features/Security/RateLimiterMiddleware.mjs'
 import { RateLimiter } from '../../../../app/src/infrastructure/RateLimiter.mjs'
@@ -35,6 +37,18 @@ const schreiben = [
 
 const angemeldet = AuthenticationController.requireLogin()
 const admin = AuthorizationMiddleware.ensureUserIsSiteAdmin
+// Für Abrufe aus dem Formular: 403 mit Meldung statt Overleafs Umleitung auf /restricted, der ein PUT nicht folgen kann.
+const adminApi = [
+  angemeldet,
+  async (req, res, next) => {
+    try {
+      if (await AuthorizationManager.promises.isUserSiteAdmin(SessionManager.getLoggedInUserId(req.session))) return next()
+      problemSenden(res, new Problem(403, 'keine_rechte', 'spur_fehler_nur_admin'))
+    } catch (error) {
+      next(error)
+    }
+  },
+]
 
 // Begrenzt teure Aufrufe (Paper-Dienste mit installationsweiter Drossel, Einbetten mit dem Modell) je Anmeldung.
 const fremdDienste = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-recherche', { points: 30, duration: 60 }))
@@ -126,10 +140,10 @@ export default {
     webRouter.delete(`${ADMIN_WORKFLOWS}/:name`, admin, WorkflowsAdminController.zuruecksetzen)
     const ADMIN_GRENZEN = '/spur/admin/grenzen'
     webRouter.get(ADMIN_GRENZEN, admin, GrenzenController.seite)
-    webRouter.get(`${ADMIN_GRENZEN}.json`, admin, GrenzenController.daten)
-    webRouter.put(`${ADMIN_GRENZEN}/standard`, admin, GrenzenController.standardSetzen)
-    webRouter.put(`${ADMIN_GRENZEN}/nutzer/:user_id`, admin, GrenzenController.nutzerSetzen)
-    webRouter.post(`${ADMIN_GRENZEN}/projekt/:project_id/neu-berechnen`, admin, GrenzenController.neuBerechnen)
+    webRouter.get(`${ADMIN_GRENZEN}.json`, ...adminApi, GrenzenController.daten)
+    webRouter.put(`${ADMIN_GRENZEN}/standard`, ...adminApi, GrenzenController.standardSetzen)
+    webRouter.put(`${ADMIN_GRENZEN}/nutzer/:user_id`, ...adminApi, GrenzenController.nutzerSetzen)
+    webRouter.post(`${ADMIN_GRENZEN}/projekt/:project_id/neu-berechnen`, ...adminApi, GrenzenController.neuBerechnen)
     webRouter.get('/spur/grenzen/projekte', angemeldet, GrenzenController.meineProjekte)
     webRouter.get('/spur/project/:project_id/speicher', ...lesen, GrenzenController.projektSpeicher)
     const LAUF = '/spur/project/:project_id/laeufe/:lauf_id'

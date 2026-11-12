@@ -920,6 +920,11 @@
   gap: var(--spacing-05);
 }
 
+.spur-grenzen-unter {
+  font-size: var(--font-size-04);
+  margin: var(--spacing-07) 0 var(--spacing-04);
+}
+
 .spur-grenzen-feld {
   flex: 1 1 14rem;
   max-width: 20rem;

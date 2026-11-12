@@ -33,6 +33,12 @@ async function laden({ dev = false } = {}) {
       ensureUserIsSiteAdmin: marken.admin,
     },
   }))
+  vi.doMock('../../../../app/src/Features/Authorization/AuthorizationManager.mjs', () => ({
+    default: { promises: { isUserSiteAdmin: async userId => userId === 'admin-id' } },
+  }))
+  vi.doMock('../../../../app/src/Features/Authentication/SessionManager.mjs', () => ({
+    default: { getLoggedInUserId: session => session.userId },
+  }))
   vi.doMock('../../../../app/src/Features/Authentication/AuthenticationController.mjs', () => ({
     default: { requireLogin: () => marken.angemeldet },
   }))
@@ -56,7 +62,6 @@ async function laden({ dev = false } = {}) {
   vi.doMock('../../app/src/grenzen/GrenzenController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/hochladen/UploadLinkController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
-  vi.doMock('../../app/src/dev/TexLiveFake.mjs', () => ({ texLiveFake: Object.assign(() => {}, { handler: 'texLiveFake' }) }))
   vi.doMock('../../app/src/dev/MailFake.mjs', () => ({
     mailFakeSteuern: Object.assign(() => {}, { handler: 'mailFakeSteuern' }),
     mailFakeLesen: Object.assign(() => {}, { handler: 'mailFakeLesen' }),
@@ -159,16 +164,29 @@ describe('Rechte der Routen', () => {
 
   it.each([
     ['get', '/spur/admin/grenzen', ['admin'], 'seite'],
-    ['get', '/spur/admin/grenzen.json', ['admin'], 'daten'],
-    ['put', '/spur/admin/grenzen/standard', ['admin'], 'standardSetzen'],
-    ['put', '/spur/admin/grenzen/nutzer/:user_id', ['admin'], 'nutzerSetzen'],
-    ['post', '/spur/admin/grenzen/projekt/:project_id/neu-berechnen', ['admin'], 'neuBerechnen'],
+    ['get', '/spur/admin/grenzen.json', ['angemeldet'], 'daten'],
+    ['put', '/spur/admin/grenzen/standard', ['angemeldet'], 'standardSetzen'],
+    ['put', '/spur/admin/grenzen/nutzer/:user_id', ['angemeldet'], 'nutzerSetzen'],
+    ['post', '/spur/admin/grenzen/projekt/:project_id/neu-berechnen', ['angemeldet'], 'neuBerechnen'],
     ['get', '/spur/grenzen/projekte', ['angemeldet'], 'meineProjekte'],
     ['get', '/spur/project/:project_id/speicher', ['angemeldet', 'eingeschraenkt', 'lesen'], 'projektSpeicher'],
   ])('Grenzen: %s %s prüft %j', (methode, pfad, pruefer, handler) => {
     const r = route(methode, pfad)
     expect(prueferVon(r)).toEqual(pruefer)
     expect(handlerVon(r)).toBe(handler)
+  })
+
+  it('antwortet Nicht-Admins an den Grenzen-Routen mit 403 statt einer Umleitung', async () => {
+    for (const [methode, pfad] of [['put', '/spur/admin/grenzen/standard'], ['get', '/spur/admin/grenzen.json']]) {
+      const pruefung = route(methode, pfad).kette.at(-2)
+      const res = new Antwort()
+      const next = vi.fn()
+      await pruefung(anfrage({ session: { userId: 'nutzer-id' } }), res, next)
+      expect(res.statusCode, pfad).toBe(403)
+      expect(next).not.toHaveBeenCalled()
+      await pruefung(anfrage({ session: { userId: 'admin-id' } }), new Antwort(), next)
+      expect(next).toHaveBeenCalledWith()
+    }
   })
 
   it('nimmt Uploads per Einmal-Link öffentlich an: erst Link prüfen, dann Datei, dann Aufnahme', () => {
@@ -184,7 +202,7 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit, E2E-Daten, Mail-Fake, TeX-Live-Fake) nur in der Dev-Umgebung', async () => {
+  it('registriert die Dev-Routen (Paper-Fake mit TeX-Live-Fake, Testseite, Zeit, E2E-Daten, Mail-Fake) nur in der Dev-Umgebung', async () => {
     const dev = [
       ['use', '/spur/dev/crossref', 'paperFake'],
       ['get', '/spur/dev/web/testseite', 'testseite'],
@@ -192,7 +210,6 @@ describe('Rechte der Routen', () => {
       ['post', '/spur/dev/e2e/vorbereiten', 'e2eVorbereiten'],
       ['post', '/spur/dev/mail', 'mailFakeSteuern'],
       ['get', '/spur/dev/mail', 'mailFakeLesen'],
-      ['get', '/spur/dev/texlive/archive/:datei', 'texLiveFake'],
       ['post', '/spur/dev/quelle-vergroessern', 'quelleVergroessern'],
     ]
     for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()

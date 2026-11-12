@@ -142,6 +142,7 @@
   "spur_fehler_makros_zu_viele": "Höchstens __max__ Makros je Liste. Entfern einige.",
   "spur_fehler_nicht_angenommen": "Nur angenommene Läufe lassen sich zurücknehmen.",
   "spur_fehler_nicht_frei": "Kein freier Volltext gefunden. Bitte auf die Beschaffungsliste setzen.",
+  "spur_fehler_nur_admin": "Das dürfen nur Admins. Frag einen Admin dieser Installation.",
   "spur_fehler_nutzer_fehlt": "Dieses Konto gibt es nicht (mehr).",
   "spur_fehler_ocr_ausgelastet": "Gerade laufen schon zwei Texterkennungen. Bitte in einigen Minuten erneut starten.",
   "spur_fehler_ocr_laeuft": "Die Texterkennung läuft schon. Bitte kurz warten.",

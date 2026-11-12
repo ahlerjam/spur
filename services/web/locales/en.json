@@ -143,6 +143,7 @@
   "spur_fehler_makros_zu_viele": "At most __max__ macros per list. Remove some.",
   "spur_fehler_nicht_angenommen": "Only accepted runs can be reverted.",
   "spur_fehler_nicht_frei": "No open full text found. Add it to the procurement list.",
+  "spur_fehler_nur_admin": "Only admins can do this. Ask an admin of this installation.",
   "spur_fehler_nutzer_fehlt": "This account does not exist (anymore).",
   "spur_fehler_ocr_ausgelastet": "Two text recognition jobs are already running. Try again in a few minutes.",
   "spur_fehler_ocr_laeuft": "Text recognition is already running. Wait a moment.",
