@@ -154,7 +154,7 @@
     "`plugins/spur/skills/spur/SKILL.md` beschreibt Warten, Paketinstallation mit Wiederholung und was bei den neuen Fehlercodes zu tun ist; englisch, mit humanizer geprüft",
     "`docs/backlog.md` ist aktualisiert: erledigte Punkte entfernt, neu Zurückgestelltes (MCP-Tasks für das Warten, echte Ursache von `doc_create` auf dem Server anhand der Fehler-ID prüfen) ergänzt"
    ],
-   "passes": false
+   "passes": true
   }
  ]
 }

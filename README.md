@@ -90,11 +90,13 @@ Without these variables spur sends no email, and it says so: the test email on `
 
 Under Admin → Limits you set a default for everyone: projects per user and storage per project in GB. An empty field means unlimited, which is also the default after an update, so no installation is suddenly blocked. For each user you can set an exception (a number, 0, or unlimited); the storage exception applies to all projects the user owns. Limits apply to admins too.
 
+The same page has a "TeX-Pakete" part with three fields: size per package in MB (default 100), all packages of a project in MB (default 300) and installations per hour and person (default 60). An empty field restores the default; only whole numbers from 1 are accepted.
+
 Projects count when the user owns them, including archived ones and those in the trash. Storage counts uploaded files, sources and TeX packages, but not the history or the compile output. Anyone already above a limit keeps everything; only new projects and uploads are blocked, and writing in the editor keeps working. The page also lists projects per user and storage per project, marks those at 80 % or more, and can recalculate the storage of a project.
 
 ### TeX packages
 
-The image contains TeX Live with a fixed list of packages. If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. A package may have at most 20 MB, a project at most 50 MB in `tex-pakete/`, and each person can add 20 packages per hour. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
+The image contains TeX Live with a fixed list of packages. If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. By default a package may have 100 MB unpacked, all packages of a project together 300 MB, and each person can add 60 packages per hour; only successful installations count. Admins change these values under Admin → Limits. The storage limit of the project and Overleaf's 2000 files per project still apply. On a server error or a network problem spur tries three times, then the second mirror `https://mirror.ctan.org/systems/texlive/tlnet`. If an installation breaks off, spur removes what it had created, and the next call starts clean. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
 
 ### Research services
 
@@ -108,6 +110,16 @@ Literature search, citations and adding papers by DOI use Crossref, Unpaywall, O
 | `SEMANTIC_SCHOLAR_API_KEY` | Optional. Without a key, Semantic Scholar shares one quota among all users and may refuse requests for a while. |
 
 If a service does not answer, spur says which one and why, and shows the results of the others.
+
+The check report also contacts `doi.org` and `api.datacite.org`, without a key. When Crossref does not know a DOI, `doi.org` says where it is registered, and DataCite supplies title, authors and year for arXiv and other DataCite DOIs. If your firewall only lets through listed addresses, add both.
+
+### Error IDs
+
+When a Claude tool fails unexpectedly, the answer ends with "Fehler-ID" and eight characters, for example `a1b2c3d4`. The web log has exactly one line with this ID, the tool, the project, the path and the bot; it never holds document content or tokens. Find it with:
+
+```sh
+docker exec spur grep a1b2c3d4 /var/log/overleaf/web.log
+```
 
 ### Behind a corporate proxy
 
@@ -123,6 +135,8 @@ services:
 ```
 
 Docker Compose reads this file together with `docker-compose.yml` on its own, so `make start` and `make update` pick it up. The repository ignores this file, so `git pull` leaves it alone.
+
+Some proxies also block single requests and answer with their own HTML page. spur then says so ("Ein Proxy oder Filter in deinem Netz blockiert diese Anfrage") in the PDF area and in its panels. Recompiling will not change that; ask your IT department or try another network.
 
 ## Make targets
 
@@ -184,6 +198,8 @@ Under Settings, "Connect Claude" ("Claude verbinden" in the German interface), s
    claude --allowedTools "mcp__plugin_spur_spur__quote_mark mcp__plugin_spur_spur__doc_edit mcp__plugin_spur_spur__doc_create mcp__plugin_spur_spur__reply mcp__plugin_spur_spur__run_finish mcp__plugin_spur_spur__wait_for_event" -- "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again."
    ```
 
+Claude waits in steps of 100 seconds. Claude Code moves every tool call that runs longer than two minutes into the background, so `wait_for_event` returns after 100 seconds without a task, and Claude calls it again at once. You do not have to restart anything. The panel shows "Claude verbunden" the whole time. If you prefer one long call, set the environment variable `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS` for Claude Code to a higher value, for example `CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS=1800000` for 30 minutes; spur's short steps work either way.
+
 You start the four ready-made workflows in the Claude panel under "Workflows", or in Claude Code with these commands. For prompts of a plugin, Claude Code adds the prefix `/plugin:spur:spur:` and shows them in the menu with "(MCP)":
 
 | Command | Workflow |
@@ -198,6 +214,16 @@ An admin adjusts the texts under `/spur/admin/workflows`.
 Content that Claude reads goes to Anthropic. This includes documents and sources, interviews too. You are responsible for it.
 
 Transcripts are sent to the AI provider when Claude reads them. Ideally, pseudonymise interviews before uploading them. spur shows this notice when you upload any VTT file; there are no further rules for interviews.
+
+## The check report
+
+The check report in the editor lists every citation with its verdict: is the wording in the source, does the page match, is the reference registered, has the paper been retracted. The header counts them, for example "Zitierstellen: 74 geprüft, davon 13 markiert, 2 ohne Quelle, 1 nicht prüfbar"; "markiert" are the rows that stay visible with "Nur Probleme". A citation that names a source without quoting it counts as "Beleg ohne Wortlaut".
+
+- Quote macros: spur recognises your own macros for quotations when their definition in a `.tex` file of the project maps to `\enquote`, `\textquote`, `\blockquote` or quotation marks, and checks their wording like `\enquote`. Claude cannot write invented wording into them either. Macros from a `.sty` file you add under "Einstellungen der Prüfung" → "Zitatmakros".
+- Hidden notes: citations that do not appear in the PDF do not count. That covers macros defined as empty (such as `\newcommand{\note}[1]{}`), `\iffalse … \fi` and Beamer's `\note{…}` without `\setbeameroption{show notes}`. The report says how many it skipped. Further macros go under "Ausgeblendete Makros".
+- Registration agencies: DOIs from Crossref are checked there, including retractions. DataCite DOIs (arXiv, for example) show "Registriert bei DataCite"; DataCite does not report retractions. DOIs of other agencies show "Registriert bei <Name>, Metadaten nicht geprüft" and are no problem. Red means `doi.org` does not know the DOI. If `doi.org` or DataCite cannot be reached, the row says "nicht prüfbar" and is not red.
+
+Anyone who may write in the project can change both lists; anyone else can read them.
 
 ## Origin
 

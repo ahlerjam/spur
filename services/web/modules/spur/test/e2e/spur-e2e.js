@@ -4823,6 +4823,38 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
   }
 
+  // Der Namensabgleich Vertrag ↔ werkzeuge.mjs ist tools/tests/mcp-vertrag.test.mjs (node --test).
+  features.p8f11 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const enthaelt = (text, teile, wo) => {
+      for (const teil of teile) ok(text.includes(teil), `${wo} ohne „${teil}“`)
+    }
+    const vertrag = await repoDatei(`${REPO}/docs/mcp-contract.md`)
+    ok(!vertrag.includes('paper_lookup'), 'Vertrag nennt paper_lookup')
+    enthaelt(vertrag, ['`doc_create`', 'inhalt', 'pfad_ist_datei', 'projekt_zu_viele_dateien', 'dienst_nicht_erreichbar', 'Fehler-ID', 'zaehlung.markiert',
+      'beleg_ohne_wortlaut', 'uebersprungen', 'registrierstelle', '100 MB', '300 MB', '(60)', 'cursor', 'abgeloest'], 'Vertrag')
+    ok((await repoDatei(`${REPO}/tools/tests/mcp-vertrag.test.mjs`)).includes('werkzeuge.mjs'), 'Test des Vertrags fehlt')
+
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const claude = readme.split('## Claude and your data\n')[1]?.split('\n## ')[0] ?? ''
+    enthaelt(claude, ['100 seconds', 'CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS'], 'README, Claude')
+    const betrieb = readme.split('## Installation\n')[1]?.split('\n## Make targets')[0] ?? ''
+    enthaelt(betrieb, ['doi.org', 'api.datacite.org', 'TeX-Pakete', 'Fehler-ID', '/var/log/overleaf/web.log'], 'README, Betrieb')
+    const bericht = readme.split('## The check report\n')[1]?.split('\n## ')[0] ?? ''
+    enthaelt(bericht, ['Zitatmakros', 'Ausgeblendete Makros', 'DataCite', 'Registriert bei'], 'README, Prüfbericht')
+
+    const adr = await repoDatei(`${REPO}/docs/adr/0006-doi-check-across-registration-agencies.md`)
+    enthaelt(adr, ['doi.org', 'DataCite', '## Decision Outcome'], 'ADR 0006')
+    const adr3 = await repoDatei(`${REPO}/docs/adr/0003-own-claude-integration.md`)
+    ok(!adr3.includes('/spur:lauf') && adr3.includes('100 seconds'), 'ADR 0003 nennt /spur:lauf oder nicht den kurzen Poll')
+    enthaelt(await repoDatei(`${REPO}/docs/adr/0001-module-in-web-service.md`), ['pdf-js-viewer.tsx'], 'ADR 0001 (Kern-Patches)')
+
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    enthaelt(skill, ['## Waiting for jobs', 'abgeloest', 'spiegel_nicht_erreichbar', 'paket_abgebrochen', 'dienst_nicht_erreichbar', 'pfad_ist_datei', 'Fehler-ID'], 'SKILL.md')
+    const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
+    enthaelt(backlog, ['MCP tasks', 'error ID'], 'Backlog')
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

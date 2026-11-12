@@ -7,6 +7,7 @@ Deferred, not discarded. Check here before new plans.
 - Button starts a cloud session through a scheduled task with an API trigger
 - Server-side agent with its own API key
 - Other LLMs through MCP
+- MCP tasks (or a channel) for waiting instead of the 100-second short poll of `wait_for_event` (P8), once Claude Code keeps such calls in the foreground
 
 ## Proactivity
 - Five more switches: paper suggestions, pre-marking citations, style, PDF look, paraphrases
@@ -34,6 +35,9 @@ Deferred, not discarded. Check here before new plans.
 - Check semantic search with the real model (`multilingual-e5-small`) automatically; today it is only checked by hand
 
 ## Operations
+- Find the real cause of the "interner Fehler" from `doc_create` on the Hetzner server with the new error ID (P8 fixed every cause found in the code, without the server log)
+- Check `https://doi.org/doiRA/…` and `https://api.datacite.org/dois/…` against the real hosts (answer format, slash in the path); the tests use fakes
+- Retractions for DataCite DOIs; DataCite does not report them today
 - Semantic search over Postgres with pgvector, if brute force is no longer enough
 - Short-lived tokens with OAuth
 - Rate limits for web page capture and comments; OCR limit per project and page cap

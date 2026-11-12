@@ -45,6 +45,22 @@ The server has a fixed TeX Live. If a package or Beamer theme is missing, you ca
 
 The files belong to your run: the run card lists them, and "Lauf rückgängig" removes them. If the admin has turned the tool off or a package is too large, say so in the summary instead of looking for a workaround.
 
+Calling `tex_package_add` again is safe. spur already retries a failing mirror three times and then tries a second one, and it cleans up after a failed upload, so a leftover folder never blocks the next call.
+
+- `spiegel_nicht_erreichbar`: both mirrors failed. Wait a few minutes and call again once; if it fails again, name the package in the summary.
+- `paket_abgebrochen`: the upload broke off and spur removed everything. Call again.
+- `paket_zu_gross`, `projekt_voll`, `speicher_voll`, `projekt_zu_viele_dateien`: a limit is reached. Do not retry. Tell the person which limit, with the numbers from the message; deleting unused packages under `tex-pakete/` or asking the admin helps.
+- `zu_viele_anfragen`: the hourly limit is used up. Continue with other work and try later.
+- "schon im Projekt" means the package is complete; compile again.
+
+## When a tool fails
+
+- `dienst_nicht_erreichbar`: an internal spur service did not answer. Nothing was created; call the tool again in a moment.
+- `pfad_ist_datei` (`doc_create`): a part of the path is a file. Choose another path.
+- `projekt_zu_viele_dateien` (`doc_create`): the project has 2000 files. Do not create more; tell the person, for example to delete unused TeX packages.
+- `konflikt` (`doc_create`): a file exists at that path. Read it with `doc_read` and change it with `doc_edit`, or choose another path.
+- `interner_fehler`: something unexpected broke. Do not repeat the call in a loop. Give the person the "Fehler-ID" from the message; the admin finds the cause in the log with it.
+
 ## PDFs from your computer
 
 Use this when a source is not freely available through spur, or the publisher's server blocks the download (bot protection). The PDF is fetched on this computer and uploaded to spur directly, not through MCP.

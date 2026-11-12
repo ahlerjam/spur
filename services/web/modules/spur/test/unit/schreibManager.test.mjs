@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
-import { RequestFailedError } from '@overleaf/fetch-utils'
 import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
@@ -282,7 +281,8 @@ describe('docCreate', () => {
 describe('docCreate: Ursachen statt „interner Fehler“', () => {
   const anlegen = (felder = {}) =>
     SchreibManager.docCreate({ projectId: projekt, botId: bot, pfad: 'kapitel/einleitung.tex', inhalt: 'Text.', schluessel: `s-${Math.random()}`, ...felder })
-  const dienstFehler = () => new RequestFailedError('http://document-updater/x', { method: 'POST' }, new Response('', { status: 500 }), null)
+  // Wie RequestFailedError von @overleaf/fetch-utils: Die Antwort hängt am Fehler.
+  const dienstFehler = () => Object.assign(new Error('request failed'), { response: new Response('', { status: 500 }) })
 
   it('meldet pfad_ist_datei, wenn ein Pfadteil eine Datei ist, und legt nichts an', async () => {
     binaer.add('abb')

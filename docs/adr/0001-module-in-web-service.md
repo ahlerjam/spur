@@ -23,6 +23,8 @@ Limits for projects and storage need hooks where Overleaf creates projects and a
 - `ErrorController.mjs` answers errors with `spurGrenze` with 403 and the message, instead of the generic restricted page.
 - In the frontend, the clone dialog, the ZIP upload dialog and the file tree upload show that message (`clone-project-modal-content.tsx`, `upload-project-modal.tsx`, `error-message.tsx`). The project list shows "x of y projects" (`project-list-ds-nav.tsx`), and the admin menu links to the limits page.
 
+The PDF viewer tells a proxy block apart from a broken PDF (P8): behind company proxies the PDF request often returns an HTML page with 403, and Overleaf showed "PDF-Wiedergabe-Fehler", so people recompiled in vain. After a load error, `pdf-js-viewer.tsx` asks once with a small range request whether a PDF arrives (`util/proxy-sperre.ts`), and `pdf-preview-error.tsx` then shows the proxy message. spur cannot reach the viewer from the module, because nginx delivers the PDF and the error state lives in the core component.
+
 ### Consequences
 - No new database and no new service.
 - Compute-heavy work runs as a child process or job, not in the request.

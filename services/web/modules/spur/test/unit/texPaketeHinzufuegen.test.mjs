@@ -8,6 +8,7 @@ import { promisify } from 'node:util'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 const tar = promisify(echtesExecFile)
 const MB = 1024 * 1024
@@ -224,7 +225,7 @@ describe('TexPakete.hinzufuegen', () => {
     await holen()
     const fehler = await fehlerVon(holen('spurtestzwei'))
     expect(fehler).toMatchObject({ code: 'zu_viele_anfragen' })
-    expect(fehler.message).toContain('1 installations per hour')
+    expect(fehler.message).toBe(meldung('spur_fehler_tex_pakete_drossel', { anzahl: 1 }))
     expect((await holen()).hinweis).toBe('schon im Projekt')
   })
 
@@ -233,7 +234,7 @@ describe('TexPakete.hinzufuegen', () => {
     archive.spurtestgross = await archivBauen('spurtestgross', { 'fonts/opentype/x/gross.otf': Buffer.alloc(2 * MB) })
     const fehler = await fehlerVon(holen('spurtestgross'))
     expect(fehler).toMatchObject({ code: 'paket_zu_gross' })
-    expect(fehler.message).toContain('is 2 MB unpacked; the limit is 1 MB.')
+    expect(fehler.message).toBe(meldung('spur_fehler_tex_paket_gross', { paket: 'spurtestgross', groesse: 2, mb: 1 }))
   })
 
   it('meldet zu viele Einträge, bevor etwas angelegt wird', async () => {
