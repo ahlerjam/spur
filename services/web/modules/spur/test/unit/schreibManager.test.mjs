@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { RequestFailedError } from '@overleaf/fetch-utils'
 import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
@@ -14,6 +15,8 @@ let upsertDocWithPath
 let deleteEntity
 let bereichPruefen
 let laufManager
+let binaer
+let eintraege
 const projekt = new ObjectId()
 const bot = new ObjectId()
 const lauf = { _id: new ObjectId() }
@@ -28,6 +31,8 @@ beforeEach(async () => {
   await datenbank.leeren()
   schalter = schalterAttrappe()
   projektDateien = new Map([['kapitel.tex', KAPITEL]])
+  binaer = new Set()
+  eintraege = 10
   dokumente = new Map()
   spurUpdate = vi.fn(async () => {})
   bereichPruefen = vi.fn(async () => [])
@@ -66,14 +71,17 @@ beforeEach(async () => {
           return { element: { _id: id }, path: { fileSystem: `/${pfad}` } }
         },
         findElementByPath: async ({ path }) => {
-          const id = projektDateien.get(path.replace(/^\//, ''))
+          const pfad = path.replace(/^\//, '')
+          if (binaer.has(pfad)) return { element: { _id: new ObjectId(), name: pfad }, type: 'file' }
+          const id = projektDateien.get(pfad)
           if (!id) throw new Errors.NotFoundError('weg')
-          return { element: { _id: id } }
+          return { element: { _id: id }, type: 'doc' }
         },
       },
     },
   }))
   vi.doMock('../../app/src/schreiben/spurUpdate.mjs', () => ({ spurUpdate }))
+  vi.doMock('../../app/src/projektEintraege.mjs', () => ({ anzahlEintraege: async () => eintraege, maxEintraege: () => 2000 }))
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => laufManager)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ bereichPruefen }))
   SchreibManager = await import('../../app/src/schreiben/SchreibManager.mjs')
@@ -268,6 +276,72 @@ describe('docCreate', () => {
     const fehler = await fehlerVon(anlegen({ inhalt: '\\enquote{Falsch.} \\autocite{a}' }))
     expect(fehler).toMatchObject({ code: 'zitat_abweichend' })
     expect(deleteEntity).toHaveBeenCalledWith(projekt, expect.anything(), 'doc', 'spur', bot)
+  })
+})
+
+describe('docCreate: Ursachen statt „interner Fehler“', () => {
+  const anlegen = (felder = {}) =>
+    SchreibManager.docCreate({ projectId: projekt, botId: bot, pfad: 'kapitel/einleitung.tex', inhalt: 'Text.', schluessel: `s-${Math.random()}`, ...felder })
+  const dienstFehler = () => new RequestFailedError('http://document-updater/x', { method: 'POST' }, new Response('', { status: 500 }), null)
+
+  it('meldet pfad_ist_datei, wenn ein Pfadteil eine Datei ist, und legt nichts an', async () => {
+    binaer.add('abb')
+    const fehler = await fehlerVon(anlegen({ pfad: 'abb/x.tex' }))
+    expect(fehler).toMatchObject({ code: 'pfad_ist_datei', message: meldung('spur_fehler_pfad_ist_datei', { teil: 'abb' }) })
+    expect(upsertDocWithPath).not.toHaveBeenCalled()
+  })
+
+  it('meldet projekt_zu_viele_dateien bei 2000 Einträgen, bevor etwas entsteht', async () => {
+    eintraege = 2000
+    const fehler = await fehlerVon(anlegen())
+    expect(fehler).toMatchObject({ code: 'projekt_zu_viele_dateien', message: meldung('spur_fehler_projekt_zu_viele_dateien', { anzahl: 2000, grenze: 2000 }) })
+    expect(upsertDocWithPath).not.toHaveBeenCalled()
+  })
+
+  it('übersetzt TooManyFilesError von Overleaf in projekt_zu_viele_dateien', async () => {
+    upsertDocWithPath.mockRejectedValueOnce(new Errors.TooManyFilesError('voll'))
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'projekt_zu_viele_dateien' })
+  })
+
+  it('meldet dienst_nicht_erreichbar bei 500 des document-updater, räumt auf und lässt den zweiten Versuch zu', async () => {
+    spurUpdate.mockRejectedValueOnce(dienstFehler())
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'dienst_nicht_erreichbar' })
+    expect(deleteEntity).toHaveBeenCalledTimes(1)
+    projektDateien.delete('kapitel/einleitung.tex')
+    expect((await anlegen()).aenderung).toBe(true)
+  })
+
+  it('meldet bei gescheitertem Aufräumen den ersten Fehler, und der nächste Versuch nimmt das leere Dokument', async () => {
+    spurUpdate.mockRejectedValueOnce(dienstFehler())
+    deleteEntity.mockRejectedValueOnce(new Error('Aufräumen gescheitert'))
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'dienst_nicht_erreichbar' })
+    expect(upsertDocWithPath).toHaveBeenCalledTimes(1)
+    const ergebnis = await anlegen()
+    expect(ergebnis.aenderung).toBe(true)
+    expect(upsertDocWithPath).toHaveBeenCalledTimes(1)
+  })
+
+  it('lässt ein leeres Dokument eines anderen Bots oder mit Inhalt nicht überschreiben', async () => {
+    spurUpdate.mockRejectedValueOnce(dienstFehler())
+    deleteEntity.mockRejectedValueOnce(new Error('Aufräumen gescheitert'))
+    await fehlerVon(anlegen())
+    const fremd = await fehlerVon(SchreibManager.docCreate({ projectId: projekt, botId: new ObjectId(), pfad: 'kapitel/einleitung.tex', inhalt: 'x', schluessel: 'fremd-0001' }))
+    expect(fremd).toMatchObject({ code: 'konflikt' })
+    docSetzen(projektDateien.get('kapitel/einleitung.tex'), 'Jemand hat geschrieben.')
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'konflikt' })
+  })
+
+  it('nennt bei konflikt den Pfad', async () => {
+    await anlegen()
+    const fehler = await fehlerVon(anlegen())
+    expect(fehler).toMatchObject({ code: 'konflikt' })
+    expect(fehler.message).toContain('kapitel/einleitung.tex')
+  })
+
+  it('gelingt mit Zahlen, auch wenn ergebnisse.tex eine Binärdatei ist', async () => {
+    binaer.add('ergebnisse.tex')
+    const ergebnis = await anlegen({ inhalt: 'Es waren 412 Personen.' })
+    expect(ergebnis.zahlen_ohne_beleg).toEqual(['412'])
   })
 })
 

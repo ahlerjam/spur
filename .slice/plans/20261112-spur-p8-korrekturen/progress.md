@@ -29,6 +29,14 @@
   `spurtest-gross` (30 MB entpackt) und `carlito` (fünf Dateien).
 - f7: Die Drossel zählt gelungene Installationen in `spurDrossel` (`tex-pakete:<person>`, Zeitstempel der letzten
   Stunde) statt mit Overleafs RateLimiter, weil die Grenze einstellbar ist und Fehlversuche nicht zählen.
+- f7: Die Admin-API der Grenzen (`.json`, PUT, POST) antwortet Nicht-Admins mit 403 und Meldung statt mit Overleafs
+  Umleitung auf `/restricted` (der ein PUT nicht folgen kann, Ergebnis war 404). Die Seite selbst leitet weiter um.
+- f8: „Derselbe Aufruf zweimal“ heißt im E2E derselbe Pfad und Inhalt mit neuem Idempotenz-Schlüssel; mit demselben
+  Schlüssel liefert spur wie bisher das frühere Ergebnis (`wiederholt: true`). Ein leeres Dokument aus einem
+  gescheiterten Versuch wird als Rest in `spurEdits` (`schluessel: rest:<projekt>:<pfad>`) vermerkt und nur vom selben
+  Bot und nur leer übernommen. Testschalter: `SPUR_DOKUPDATER_500`, `SPUR_DOC_AUFRAEUMEN_FEHLER`,
+  `SPUR_DOC_CREATE_FEHLER`. Die Log-Zeile zur Fehler-ID prüft der Builder mit `spur-dev logs web` (eine Zeile mit
+  `fehlerId`, `werkzeug`, `projectId`, `pfad`, `botId`, ohne Inhalt; 2026-11-12 geprüft), nicht die E2E-Suite.
 - E2E: Das run-code-Werkzeug bricht nach 60 s ab. Die Suite läuft darum im Hintergrund des Playwright-Prozesses
   (Wrapper mit `page.__e2e`, Ergebnis per zweitem Aufruf abgefragt); der Wrapper liegt im ignorierten
   `.playwright-mcp/`.

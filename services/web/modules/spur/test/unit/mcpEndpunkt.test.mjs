@@ -40,6 +40,13 @@ const werkzeuge = () => ({
       throw new Problem(404, 'quelle_fehlt', 'spur_fehler_quelle_fehlt')
     },
   },
+  anlegen_absturz: {
+    description: 'Wirft einen unerwarteten Fehler mit Projekt und Pfad.',
+    inputSchema: z.object({ project_id: z.string(), pfad: z.string(), inhalt: z.string() }),
+    ausfuehren: async () => {
+      throw new Error('kaputt')
+    },
+  },
   abstuerzen: {
     description: 'Wirft einen unerwarteten Fehler.',
     inputSchema: z.object({}),
@@ -180,7 +187,7 @@ describe('Eingabe', () => {
 describe('Werkzeugaufrufe', () => {
   it('listet die Werkzeuge mit Beschreibung', async () => {
     const ergebnis = ergebnisVon(await senden({ method: 'tools/list' }))
-    expect(ergebnis.tools.map(t => t.name).sort()).toEqual(['abstuerzen', 'echo', 'problem', 'werkzeugfehler'])
+    expect(ergebnis.tools.map(t => t.name).sort()).toEqual(['abstuerzen', 'anlegen_absturz', 'echo', 'problem', 'werkzeugfehler'])
     expect(ergebnis.tools.find(t => t.name === 'echo').description).toBe('Gibt die Eingabe zurück.')
   })
 
@@ -212,6 +219,19 @@ describe('Werkzeugaufrufe', () => {
     expect(inhalt.fehler).toBe('interner_fehler')
     expect(ergebnis.content[0].text).not.toContain('hunter2')
     expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ werkzeug: 'abstuerzen' }), expect.any(String))
+  })
+
+  it('nennt bei internen Fehlern eine Fehler-ID und protokolliert sie mit Projekt, Pfad und Werkzeug, ohne Inhalt', async () => {
+    logger.error.mockClear?.()
+    const ergebnis = ergebnisVon(await aufruf('anlegen_absturz', { project_id: 'p1', pfad: 'kapitel/a.tex', inhalt: 'Geheimer Text' }))
+    const { fehler, detail } = JSON.parse(ergebnis.content[0].text)
+    const id = /Fehler-ID ([0-9a-f]{8})|error ID ([0-9a-f]{8})/.exec(detail)
+    expect(fehler).toBe('interner_fehler')
+    expect(id, detail).toBeTruthy()
+    const aufrufe = logger.error.mock.calls.filter(([daten]) => daten?.fehlerId === (id[1] ?? id[2]))
+    expect(aufrufe).toHaveLength(1)
+    expect(aufrufe[0][0]).toMatchObject({ werkzeug: 'anlegen_absturz', projectId: 'p1', pfad: 'kapitel/a.tex' })
+    expect(JSON.stringify(aufrufe[0])).not.toContain('Geheimer Text')
   })
 
   it('weist ungültige Argumente zurück, ohne das Werkzeug aufzurufen', async () => {

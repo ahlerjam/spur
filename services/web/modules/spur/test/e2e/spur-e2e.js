@@ -4601,6 +4601,66 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
   }
 
+  features.p8f8 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const lauf = Date.now()
+    let n = 0
+    const anlegen = async (projekt, pfad, inhalt = 'Die Einleitung beginnt hier.') =>
+      await werkzeug(token, 'doc_create', { project_id: await projektId(token, projekt), pfad, inhalt, idempotenz_schluessel: `p8f8-${lauf}-${n++}` })
+    const pfade = async projekt => (await jsonVon(`/project/${await projektId(token, projekt)}/entities`)).entities.map(e => e.path)
+    try {
+      const erstes = await anlegen('E2E P8 Anlegen', 'kapitel/einleitung.tex')
+      ok(!erstes.fehler && erstes.inhalt.aenderung === true, `doc_create: ${JSON.stringify(erstes.inhalt)}`)
+      const zweites = await anlegen('E2E P8 Anlegen', 'kapitel/einleitung.tex')
+      ok(zweites.fehler && zweites.inhalt.fehler === 'konflikt' && zweites.inhalt.detail.includes('kapitel/einleitung.tex'), `Zweiter Aufruf: ${JSON.stringify(zweites.inhalt)}`)
+
+      const datei = await anlegen('E2E P8 Anlegen Dateien', 'abb/x.tex')
+      ok(datei.fehler && datei.inhalt.fehler === 'pfad_ist_datei' && datei.inhalt.detail === '„abb“ ist eine Datei, kein Ordner. Wähl einen anderen Pfad.', `abb/x.tex: ${JSON.stringify(datei.inhalt)}`)
+      ok(!(await pfade('E2E P8 Anlegen Dateien')).some(p => p.startsWith('/abb/')), 'Unter abb entstand etwas')
+      const zahlen = await anlegen('E2E P8 Anlegen Dateien', 'zahlen.tex', 'Es antworteten 240 Personen.')
+      ok(!zahlen.fehler && JSON.stringify(zahlen.inhalt.zahlen_ohne_beleg) === '["240"]', `Mit binärer ergebnisse.tex: ${JSON.stringify(zahlen.inhalt)}`)
+
+      const voll = await anlegen('E2E P8 Anlegen Voll', 'neu.tex')
+      ok(
+        voll.fehler && voll.inhalt.fehler === 'projekt_zu_viele_dateien' &&
+          voll.inhalt.detail === 'Das Projekt hat 2000 von 2000 Dateien. Lösch Dateien, zum Beispiel nicht gebrauchte TeX-Pakete.',
+        `2000 Einträge: ${JSON.stringify(voll.inhalt)}`
+      )
+
+      await fakeSteuern({ schalter: { SPUR_DOKUPDATER_500: '1' } })
+      const dienst = await anlegen('E2E P8 Anlegen', 'kapitel/methoden.tex')
+      ok(dienst.fehler && dienst.inhalt.fehler === 'dienst_nicht_erreichbar' && /gleich noch einmal/.test(dienst.inhalt.detail), `500: ${JSON.stringify(dienst.inhalt)}`)
+      ok(!(await pfade('E2E P8 Anlegen')).includes('/kapitel/methoden.tex'), 'Leeres Dokument blieb liegen')
+      await fakeSteuern({ schalter: {} })
+      const nochmal = await anlegen('E2E P8 Anlegen', 'kapitel/methoden.tex')
+      ok(!nochmal.fehler, `Nach dem Abschalten: ${JSON.stringify(nochmal.inhalt)}`)
+
+      await fakeSteuern({ schalter: { SPUR_DOKUPDATER_500: '1', SPUR_DOC_AUFRAEUMEN_FEHLER: '1' } })
+      const doppelt = await anlegen('E2E P8 Anlegen', 'kapitel/ergebnisse-text.tex')
+      ok(doppelt.fehler && doppelt.inhalt.fehler === 'dienst_nicht_erreichbar', `Auch Aufräumen scheitert: ${JSON.stringify(doppelt.inhalt)}`)
+      await fakeSteuern({ schalter: {} })
+      const danach = await anlegen('E2E P8 Anlegen', 'kapitel/ergebnisse-text.tex')
+      ok(!danach.fehler, `Nach gescheitertem Aufräumen: ${JSON.stringify(danach.inhalt)}`)
+
+      // Die Log-Zeile zur Fehler-ID prüft der Builder mit spur-dev logs web (Handprüfung, siehe progress.md).
+      await fakeSteuern({ schalter: { SPUR_DOC_CREATE_FEHLER: '1' } })
+      const intern = await anlegen('E2E P8 Anlegen', 'kapitel/intern.tex', 'Geheimer Inhalt 4711')
+      ok(intern.fehler && intern.inhalt.fehler === 'interner_fehler' && /Fehler-ID [0-9a-f]{8}\.$/.test(intern.inhalt.detail), `Interner Fehler: ${JSON.stringify(intern.inhalt)}`)
+      await fakeSteuern({ schalter: {} })
+
+      await projektOeffnen('E2E P8 Anlegen')
+      const kapitel = page.locator('.file-tree').getByRole('treeitem', { name: 'kapitel' })
+      await panelSichern(DATEIBAUM, kapitel)
+      if ((await kapitel.getAttribute('aria-expanded')) !== 'true') await kapitel.click()
+      await page.locator('.file-tree').getByRole('treeitem', { name: 'einleitung.tex' }).click()
+      await page.locator('.cm-content .ol-cm-change-i', { hasText: 'Die Einleitung beginnt hier.' }).first().waitFor({ timeout: 20000 })
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

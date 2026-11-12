@@ -112,7 +112,7 @@
     "Enthält der Inhalt Zahlen und heißt im Projekt eine Binärdatei `ergebnisse.tex`, gelingt `doc_create` trotzdem (kein interner Fehler)",
     "Derselbe Aufruf zweimal hintereinander: der erste gelingt, der zweite meldet `konflikt` mit dem Pfad"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

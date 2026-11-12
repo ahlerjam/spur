@@ -491,6 +491,11 @@ async function p8Vorbereiten(a) {
   const eine = await neuAnlegen(a, 'E2E P8 Pakete Rest B', { 'main.tex': CARLITO })
   await ProjectEntityUpdateHandler.promises.upsertDocWithPath(eine._id, '/tex-pakete/carlito/carlito.sty', ['% Rest'], 'spur-seed', a._id)
   await p8GrenzenVorbereiten()
+  await neuAnlegen(a, 'E2E P8 Anlegen', { 'main.tex': LEER })
+  const dateien = await neuAnlegen(a, 'E2E P8 Anlegen Dateien', { 'main.tex': LEER })
+  await platzhalterDateien(dateien._id, ['abb', 'ergebnisse.tex'])
+  const voll = await neuAnlegen(a, 'E2E P8 Anlegen Voll', { 'main.tex': LEER })
+  await eintraegeAuffuellen(voll._id, 2000)
   const leser = await konto('e2e-leser@example.org')
   const makros = await neuAnlegen(a, 'E2E P8 Makros', {
     'main.tex': String.raw`\documentclass{article}
@@ -567,13 +572,18 @@ Andere \parencite{andere}.
   })
 }
 
-// Füllt ein Projekt mit Platzhalter-Dateien (nur Einträge im Baum, ohne Inhalt) bis auf `gesamt` Einträge.
-export async function eintraegeAuffuellen(projectId, gesamt) {
+// Binärdateien als reine Einträge im Baum, ohne Inhalt: genug für Pfad- und Zählprüfungen.
+async function platzhalterDateien(projectId, namen) {
+  const neu = namen.map(name => ({ _id: new ObjectId(), name, created: new Date() }))
+  await db.projects.updateOne({ _id: projectId }, { $push: { 'rootFolder.0.fileRefs': { $each: neu } }, $inc: { version: 1 } })
+}
+
+// Füllt ein Projekt mit Platzhalter-Dateien bis auf `gesamt` Einträge.
+async function eintraegeAuffuellen(projectId, gesamt) {
   const { rootFolder } = await db.projects.findOne({ _id: projectId }, { projection: { rootFolder: 1 } })
   const wurzel = rootFolder[0]
   const vorhanden = wurzel.docs.length + wurzel.fileRefs.length + wurzel.folders.length
-  const neu = Array.from({ length: gesamt - vorhanden }, (_, i) => ({ _id: new ObjectId(), name: `platzhalter-${i}.bin`, created: new Date() }))
-  await db.projects.updateOne({ _id: projectId }, { $push: { 'rootFolder.0.fileRefs': { $each: neu } }, $inc: { version: 1 } })
+  await platzhalterDateien(projectId, Array.from({ length: gesamt - vorhanden }, (_, i) => `platzhalter-${i}.bin`))
 }
 
 // P8 Paketgrenzen: eigene Konten ohne Admin-Rechte, damit die Drossel bei null beginnt.

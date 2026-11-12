@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { Readable } from 'node:stream'
 import express from 'express'
 import * as z from 'zod/v4'
@@ -65,8 +66,13 @@ function serverBauen({ authInfo }) {
         } catch (error) {
           if (error instanceof WerkzeugFehler) return fehlerVon(error.code, error.message)
           if (error instanceof Problem) return fehlerVon(error.typ, error.message)
-          logger.error({ err: error, werkzeug: name }, 'spur-MCP-Werkzeug fehlgeschlagen')
-          return fehlerVon('interner_fehler', meldung('spur_fehler_werkzeug_fehlgeschlagen'))
+          // Die ID steht in der Antwort und im Log; Inhalte und Tokens kommen nicht ins Log.
+          const fehlerId = randomBytes(4).toString('hex')
+          logger.error(
+            { err: error, fehlerId, werkzeug: name, projectId: args?.project_id, pfad: args?.pfad, botId: kontext.botId },
+            'spur-MCP-Werkzeug fehlgeschlagen'
+          )
+          return fehlerVon('interner_fehler', meldung('spur_fehler_werkzeug_fehlgeschlagen', { id: fehlerId }))
         }
       }
     )

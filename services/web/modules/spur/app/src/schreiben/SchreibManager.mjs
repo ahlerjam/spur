@@ -9,7 +9,8 @@ import EditorHttpController from '../../../../../app/src/Features/Editor/EditorH
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
 import { bereichPruefen } from '../pruefung/PruefManager.mjs'
 import { bearbeitungen } from '../sammlungen.mjs'
-import { jetzt } from '../schalter.mjs'
+import { anzahlEintraege, maxEintraege } from '../projektEintraege.mjs'
+import { jetzt, testSchalter } from '../schalter.mjs'
 import * as LaufManager from './LaufManager.mjs'
 import { zahlenIn, zahlenOhneBeleg } from './zahlen.mjs'
 import { opsFuer } from './ops.mjs'
@@ -44,12 +45,13 @@ async function docAufloesen(projectId, docId, pfad) {
       })
       return { docId: String(element._id), pfad: path.fileSystem.replace(/^\//, '') }
     }
-    const { element } = await ProjectLocator.promises.findElementByPath({
+    const { element, type } = await ProjectLocator.promises.findElementByPath({
       project_id: projectId,
       path: pfad,
       exactCaseMatch: true,
     })
-    if (element?._id) return { docId: String(element._id), pfad }
+    // Eine Binärdatei unter dem Pfad (etwa ergebnisse.tex hochgeladen) ist kein Dokument.
+    if (element?._id && type === 'doc') return { docId: String(element._id), pfad }
   } catch (error) {
     if (!(error instanceof Errors.NotFoundError)) throw error
   }
@@ -219,13 +221,72 @@ async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
   return ergebnis
 }
 
-async function pfadBelegt(projectId, pfad) {
+async function elementAn(projectId, pfad) {
   try {
-    await ProjectLocator.promises.findElementByPath({ project_id: projectId, path: pfad })
-    return true
+    return await ProjectLocator.promises.findElementByPath({ project_id: projectId, path: pfad })
   } catch (error) {
-    if (error instanceof Errors.NotFoundError) return false
+    if (error instanceof Errors.NotFoundError) return null
     throw error
+  }
+}
+
+// Fehler eines Dienstes (document-updater, project-history, docstore): 5xx, Zeitüberschreitung, keine Verbindung.
+function dienstNichtErreichbar(error) {
+  // RequestFailedError von @overleaf/fetch-utils trägt die Antwort.
+  if (typeof error?.response?.status === 'number') return error.response.status >= 500
+  return ['AbortError', 'TimeoutError'].includes(error?.name) || /^(ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|UND_ERR)/.test(error?.code ?? '')
+}
+
+function alsWerkzeugFehler(error) {
+  if (error instanceof Errors.TooManyFilesError) return zuVieleDateien(maxEintraege() + 1)
+  if (dienstNichtErreichbar(error)) return new WerkzeugFehler('dienst_nicht_erreichbar', 'spur_fehler_dienst_kurz_weg')
+  return error
+}
+
+const zuVieleDateien = anzahl =>
+  new WerkzeugFehler('projekt_zu_viele_dateien', 'spur_fehler_projekt_zu_viele_dateien', { anzahl, grenze: maxEintraege() })
+
+// Overleaf legt fehlende Ordner an, scheitert aber an einem Pfadteil, der eine Datei ist.
+async function ordnerPruefen(projectId, ziel) {
+  const teile = ziel.split('/').filter(Boolean).slice(0, -1)
+  for (let i = 1; i <= teile.length; i++) {
+    const gefunden = await elementAn(projectId, `/${teile.slice(0, i).join('/')}`)
+    if (!gefunden) return
+    if (gefunden.type !== 'folder') {
+      throw new WerkzeugFehler('pfad_ist_datei', 'spur_fehler_pfad_ist_datei', { teil: teile.slice(0, i).join('/') })
+    }
+  }
+}
+
+// Ein leeres Dokument, das ein gescheiterter Versuch desselben Bots hinterlassen hat, wird wiederverwendet.
+const restSchluessel = (projectId, ziel) => `rest:${projectId}:${ziel}`
+
+async function restUebernehmen(projectId, botId, ziel, gefunden) {
+  const rest = await (await bearbeitungen()).findOne({ botId, schluessel: restSchluessel(projectId, ziel) })
+  if (gefunden.type === 'doc' && rest && String(rest.docId) === String(gefunden.element._id)) {
+    const { lines } = await DocumentUpdaterHandler.promises.getDocument(projectId, String(gefunden.element._id), -1)
+    if (lines.join('\n') === '') return String(gefunden.element._id)
+  }
+  throw new WerkzeugFehler('konflikt', 'spur_fehler_pfad_belegt', { pfad: ziel.slice(1) })
+}
+
+// Kein leeres Dokument zurücklassen. Scheitert das, bleibt der erste Fehler die Antwort; das Dokument wird als Rest
+// vermerkt, damit der nächste Versuch es übernimmt statt an `konflikt` zu scheitern.
+async function aufraeumen({ projectId, botId, docId, ziel, ursache }) {
+  try {
+    if (testSchalter('SPUR_DOC_AUFRAEUMEN_FEHLER')) throw new Error('Testschalter: Aufräumen scheitert')
+    await EditorController.promises.deleteEntity(projectId, docId, 'doc', 'spur', botId)
+    await (await bearbeitungen()).deleteOne({ botId, schluessel: restSchluessel(projectId, ziel) })
+  } catch (error) {
+    logger.error(
+      { err: error, ursache: { name: ursache.name, message: ursache.message, status: ursache.response?.status }, projectId, botId, docId, pfad: ziel },
+      'spur: doc_create konnte das leere Dokument nicht entfernen'
+    )
+    await (await bearbeitungen()).updateOne(
+      { botId, schluessel: restSchluessel(projectId, ziel) },
+      { $set: { projectId, docId, am: jetzt() } },
+      { upsert: true }
+    )
   }
 }
 
@@ -234,26 +295,31 @@ export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) 
   const ziel = `/${pfad.replace(/^\//, '')}`
   const argumente = { werkzeug: 'doc_create', pfad, inhalt }
   return await mitSchluessel({ projectId, botId, schluessel, argumente }, async () => {
-    // upsertDocWithPath würde ein vorhandenes Dokument ungetrackt leeren.
-    if (await pfadBelegt(projectId, ziel)) {
-      throw new WerkzeugFehler(
-        'konflikt',
-        'spur_fehler_pfad_belegt'
-      )
+    await ordnerPruefen(projectId, ziel)
+    const gefunden = await elementAn(projectId, ziel)
+    let docId
+    if (gefunden) {
+      // upsertDocWithPath würde ein vorhandenes Dokument ungetrackt leeren.
+      docId = await restUebernehmen(projectId, botId, ziel, gefunden)
+    } else {
+      const anzahl = await anzahlEintraege(projectId)
+      if (anzahl >= maxEintraege()) throw zuVieleDateien(anzahl)
+      try {
+        const { doc } = await EditorController.promises.upsertDocWithPath(projectId, ziel, [''], 'spur', botId)
+        docId = String(doc._id)
+      } catch (error) {
+        if (error instanceof Errors.InvalidNameError) throw new WerkzeugFehler('pfad_ungueltig', 'spur_fehler_dateiname_ungueltig')
+        throw alsWerkzeugFehler(error)
+      }
     }
-    let doc
     try {
-      ;({ doc } = await EditorController.promises.upsertDocWithPath(projectId, ziel, [''], 'spur', botId))
+      if (testSchalter('SPUR_DOC_CREATE_FEHLER')) throw new Error('Testschalter: unbekannter Fehler in doc_create')
+      const ergebnis = await bearbeiten({ projectId, botId, docId, alt: '', neu: inhalt })
+      if (gefunden) await (await bearbeitungen()).deleteOne({ botId, schluessel: restSchluessel(projectId, ziel) })
+      return ergebnis
     } catch (error) {
-      if (!(error instanceof Errors.InvalidNameError)) throw error
-      throw new WerkzeugFehler('pfad_ungueltig', 'spur_fehler_dateiname_ungueltig')
-    }
-    try {
-      return await bearbeiten({ projectId, botId, docId: String(doc._id), alt: '', neu: inhalt })
-    } catch (error) {
-      // Kein leeres Dokument zurücklassen, das jede Wiederholung am belegten Pfad scheitern ließe.
-      await EditorController.promises.deleteEntity(projectId, doc._id, 'doc', 'spur', botId)
-      throw error
+      await aufraeumen({ projectId, botId, docId, ziel, ursache: error })
+      throw alsWerkzeugFehler(error)
     }
   })
 }
