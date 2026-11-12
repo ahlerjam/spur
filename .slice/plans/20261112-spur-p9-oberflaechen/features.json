@@ -1,0 +1,174 @@
+{
+ "features": [
+  {
+   "id": "f1",
+   "title": "Dialoge und Panels folgen dem Farbschema des Editors",
+   "steps": [
+    "Für alle, die im dunklen Editor arbeiten, damit kein weißes Fenster blendet. Im Projekt „E2E Bericht“ mit dunklem Farbschema öffnet die Nutzerin nacheinander „Importieren“, „Aus anderem Projekt holen“, „Literaturmatrix“, „KI-Offenlegung“ und „Quelle löschen“: Jeder Dialog hat denselben dunklen Hintergrund und dieselbe Textfarbe wie Overleafs Dialog „Projekt teilen“ (berechnete Hintergrundfarbe des Dialogs ist gleich)",
+    "Nach dem Umschalten auf das helle Farbschema sind dieselben Dialoge hell wie „Projekt teilen“",
+    "In allen fünf Panels (Quellen, Recherche, Prüfbericht, Vorschläge, Claude) beginnt der Inhalt mit demselben Abstand zum Rand wie die Kopfzeile des Panels; Überschriften folgen ohne Sprung auf den Panel-Titel",
+    "Jeder Dialog schließt mit Esc und mit einem Knopf, der überall „Schließen“ heißt (bei Rückfragen „Abbrechen“); danach liegt der Fokus auf dem Knopf, der den Dialog geöffnet hat",
+    "Bei 360 px Breite hat keine der Flächen horizontales Rollen (`document.documentElement.scrollWidth` gleich Fensterbreite); die Konsole bleibt ohne Fehler",
+    "`spur.scss` enthält keine Farbe als Zahlenwert außerhalb eines Blocks mit benannten Werten und keine doppelt definierte Klasse (Test unter `tools/tests` prüft beides und ist grün)"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f2",
+   "title": "Quellen-Panel mit einer Hauptaktion und lesbarer Liste",
+   "steps": [
+    "Für Forschende mit vielen Quellen. Im Projekt „E2E Bericht“ zeigt das Quellen-Panel oben einen Knopf „Quelle hinzufügen“ und daneben ein Menü „Weitere Aktionen“; im Menü stehen „Webseite aufnehmen“, „Aus anderem Projekt holen“, „Importieren“, „Quellen exportieren“ und „Literaturmatrix“",
+    "„Quelle hinzufügen“ öffnet die Dateiauswahl für PDFs; nach dem Hochladen von `smith2024.pdf` in ein leeres Projekt steht die Quelle oben in der Liste und der Fokus liegt auf ihrem Eintrag",
+    "Die Liste zeigt je Quelle den Titel „Sleep and Memory“, darunter „A. Smith · 2024“ und „8 Seiten · Text erkannt“; eine Quelle ohne Metadaten zeigt ihren Dateinamen als Titel",
+    "„Webseite aufnehmen“ aus dem Menü öffnet einen Dialog mit dem Feld „Adresse der Webseite“; eine ungültige Adresse zeigt die Meldung am Feld und behält die Eingabe",
+    "Im Projekt „E2E Viele“ (mehr als 100 Quellen) zeigt die Liste 100 Einträge und „Weitere Quellen laden“; ein Klick lädt die nächsten und der Zähler nennt „200 von <Gesamtzahl>“; ein Suchtreffer zu einer Quelle jenseits der ersten 100 lässt sich öffnen",
+    "Ein leeres Projekt zeigt „Noch keine Quellen. Lade ein PDF hoch oder nimm eine Webseite auf.“ mit dem Knopf „Quelle hinzufügen“; während des Ladens stehen Platzhalter in Form der Listeneinträge; scheitert das Laden (Dev-Schalter), steht dort die Meldung mit „Erneut versuchen“",
+    "Bei 240 px Panelbreite bleiben Knopf, Menü und Suchfeld vollständig sichtbar"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f3",
+   "title": "Großansicht einer Quelle: scharf, bedienbar, vollständig",
+   "steps": [
+    "Für alle, die Quellen am Bildschirm lesen und daraus zitieren. Im Projekt „E2E Bericht“ öffnet die Nutzerin `smith2024.pdf` und klickt „Groß öffnen“: Die Ansicht hat im dunklen Farbschema einen dunklen Rahmen, die Seite selbst bleibt weiß; links die Seite, rechts eine Seitenleiste mit Angaben zur Quelle, Notiz und gespeicherten Zitaten; der Seitentext steht nicht als zweite Kopie daneben",
+    "„Vergrößern“ bis 200 %: Die Seite wird breiter als ihr Bereich, der Bereich rollt waagerecht und senkrecht, nichts wird von der Seitenleiste verdeckt; die Schrift ist scharf (das geladene Seitenbild ist mindestens so breit wie seine Darstellung in Gerätepixeln); „An Breite anpassen“ stellt die volle Seite wieder her",
+    "Pfeil rechts blättert auf „Seite 346 (PDF-Seite 2 von 8)“, Pfeil links zurück; `+` und `-` zoomen; beim Blättern bleibt die Werkzeugleiste an ihrem Platz, die alte Seite bleibt sichtbar, bis die neue geladen ist, und die neue beginnt oben; Blättern- und Zoom-Knöpfe stehen auf einer Linie",
+    "Die Nutzerin markiert auf der Seite „Participants completed the task over two consecutive nights.“ und klickt „Zitat speichern“: Das Zitat erscheint unter „Gespeicherte Zitate“ mit Seite 345; „Einfügen“ ist für Schreibende aktiv und fügt an der Cursorstelle im Editor `\\enquote{…} \\autocite[345]{smith2024}` ein; der Text „Keine Schreibrechte“ erscheint nur für Konten ohne Schreibrecht",
+    "Die Seitenleiste lässt sich einklappen, die Seite nutzt dann die ganze Breite; nach Schließen und erneutem Öffnen ist sie weiter eingeklappt",
+    "„Original herunterladen“ lädt die PDF-Datei mit ihrem Namen; in der kleinen Vorschau gibt es denselben Knopf",
+    "Nach dem Schließen auf Seite 346 zeigt die Vorschau im Panel ebenfalls Seite 346; der Fokus liegt auf „Groß öffnen“",
+    "Bei einer Scan-Quelle (Projekt „E2E Scan“) zeigt die Großansicht den Hinweis auf unsicheren Text wie die Vorschau und „Seitenzahl bestätigen“; bei einer Webseite (Projekt „E2E Web“) steht der Text einspaltig in voller Breite mit der Adresse des Schnappschusses, ohne leere Werkzeugleiste",
+    "Scheitert das Laden eines Seitenbilds (Dev-Schalter), steht an seiner Stelle „Die Seite ließ sich nicht laden.“ mit „Erneut versuchen“, der Text der Seite bleibt lesbar; während des Ladens steht ein Platzhalter in Seitengröße",
+    "Bei 768 px und 360 px ist die Ansicht einspaltig, die Seitenleiste ein ausklappbarer Bereich unter der Seite, ohne horizontales Rollen der ganzen Ansicht; auf dem Handy passt sie in die sichtbare Höhe (kein Inhalt hinter der Adressleiste)"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f4",
+   "title": "Prüfbericht nach Datei und Befund",
+   "steps": [
+    "Für alle, die viele Zitierstellen prüfen. Im Projekt „E2E Bericht“ zeigt der Prüfbericht zwei Gruppen, „main.tex“ und „kapitel.tex“, je mit der Zahl der Stellen und der markierten; eine Gruppe lässt sich ein- und ausklappen",
+    "Über der Liste stehen die Filter „Alle“, „Markiert“, „Ohne Quelle“, „Nicht prüfbar“ mit Zahlen; „Markiert“ zeigt nur Stellen mit Problem; ein Filter ohne Treffer zeigt „Keine Stellen mit diesem Befund.“",
+    "Nach „Erneut prüfen“ steht unter der Kopfzeile „Zuletzt geprüft: heute, HH:MM“; während der Prüfung bleibt der alte Bericht sichtbar und ein Text „Prüfung läuft …“ erscheint",
+    "Je Stelle stehen die Abzeichen in einer Zeile nebeneinander und brechen als Ganzes um; kein Abzeichen ist breiter als sein Text; jedes Abzeichen hat in beiden Farbschemata einen Kontrast von mindestens 4,5:1",
+    "Im Editor zeigt die rot markierte Stelle in Zeile 8 beim Überfahren und beim Fokus per Tastatur einen Tooltip „Wortlaut: abweichend“; ein Klick auf „main.tex:8“ im Bericht springt zur Stelle",
+    "Der Knopf „Einstellungen der Prüfung“ (aus P8) und die Zählung mit „davon … markiert“ sind weiter vorhanden"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f5",
+   "title": "Alles von Claude automatisch annehmen",
+   "steps": [
+    "Für alle, die Claude schreiben lassen und nicht jede Änderung einzeln bestätigen wollen. Im Projekt „E2E Lauf“ zeigt das Claude-Panel oben, noch bevor es einen Lauf gibt, den Schalter „Alles von Claude automatisch annehmen“ mit dem Satz „Rote Zitate bleiben offen.“; das alte Häkchen in der Lauf-Karte gibt es nicht mehr",
+    "Schalter an, dann schreibt Claude über MCP (`doc_edit`) den Satz „Von 240 Befragten antworteten 90.“ ohne `run_finish`: Innerhalb von 5 Sekunden steht der Satz ohne Änderungsmarkierung im Editor; die Lauf-Karte zeigt die Änderung als „automatisch angenommen“ und den Hinweis „Zahl ohne Beleg: 240, 90“",
+    "Schalter an, Claude schreibt ein wörtliches Zitat mit einer Zitierform, die der Bericht rot meldet (Vorgabe wie im Projekt „E2E Schreiben“: `\\footfullcite{smith2024}`): Diese Änderung bleibt als offene Änderung stehen und steht oben in der Lauf-Karte unter „Bitte prüfen“; die übrigen Änderungen desselben Laufs sind angenommen",
+    "Schalter aus: Neue Änderungen bleiben offen wie bisher",
+    "Der Knopf „Alles Offene jetzt annehmen“ zeigt einen Dialog „12 Änderungen in 2 Dateien annehmen? Rote Zitate bleiben offen.“ (Zahlen aus dem Testprojekt); „Annehmen“ nimmt sie an, die Karte zeigt die verbleibenden roten; „Abbrechen“ ändert nichts; ohne offene Änderungen ist der Knopf deaktiviert mit dem Text „Nichts offen“",
+    "„Lauf rückgängig“ entfernt auch automatisch angenommene Änderungen dieses Laufs wieder",
+    "Ein Konto, das das alte Häkchen gesetzt hatte (Testdaten), sieht den Schalter an; die Einstellung gilt nur in diesem Projekt: In „E2E Schreiben“ ist der Schalter desselben Kontos aus",
+    "Ein Reviewer-Konto und ein Lese-Konto sehen weder Schalter noch Knopf; der Aufruf der Routen mit diesen Konten liefert 403; wird der Person mit eingeschaltetem Schalter das Schreibrecht entzogen, bleibt die nächste Änderung ihres Claude offen",
+    "Der Schalter ist per Tastatur bedienbar, sagt seinen Zustand an und zeigt beim Speichern keinen Sprung im Layout; scheitert das Speichern (Dev-Schalter), springt er zurück und eine Meldung nennt den Grund"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f6",
+   "title": "Claude-Panel: Verbindung und Verlauf",
+   "steps": [
+    "Für alle, die Claude täglich verbinden. Im Zustand „nicht verbunden“ zeigt das Panel den Status, den Startbefehl mit „Kopieren“ und einen Link „Token verwalten“ zu den Kontoeinstellungen (Abschnitt KI-Funktionen); nach „Kopieren“ steht kurz „Kopiert“",
+    "Sobald Claude verbunden ist (Fake-Client), ist der Startbefehl eingeklappt hinter „Startbefehl anzeigen“; die Lauf-Karte beginnt direkt unter der Statuszeile und ist vollständig sichtbar, nichts ist abgeschnitten",
+    "Nach drei Läufen (Testdaten) zeigt das Panel den neuesten ausgeklappt und zwei ältere eingeklappt mit Status und „2 offen“; ein älterer Lauf lässt sich aufklappen und seine Änderungen lassen sich annehmen oder ablehnen",
+    "Mit mehr als 20 Läufen erscheint „Ältere laden“",
+    "Scheitert die Abfrage des Panels einmal (Dev-Schalter) und klappt danach wieder, verschwindet die Fehlermeldung von selbst",
+    "In den Kontoeinstellungen erzeugt ein schneller Doppelklick auf „Token erzeugen“ genau ein Token; „Widerrufen“ fragt in einem Dialog nach",
+    "Ohne Aufträge zeigt das Panel „Noch keine Aufträge. Schreib unten, was Claude tun soll.“ direkt über dem Eingabefeld, nicht am unteren Rand einer leeren Fläche; nicht verbunden ist das Eingabefeld sichtbar, aber deaktiviert mit dem Hinweis „Verbinde zuerst Claude“"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f7",
+   "title": "Recherche in schmalen Panels benutzbar",
+   "steps": [
+    "Für alle, die neben Editor und PDF recherchieren. Im Projekt „E2E Recherche“ nach der Suche „sleep memory“: Das Abzeichen „Nicht frei“ ist in beiden Farbschemata lesbar (Kontrast mindestens 4,5:1)",
+    "Je Treffer gibt es eine Hauptaktion („Aufnehmen“ bei frei verfügbaren, sonst „Auf die Beschaffungsliste“) und ein Menü mit „Zitiert von“ und „Zitiert“; die DOI ist ein Link",
+    "Die Reiter „Treffer“, „Suchprotokoll“, „Beschaffung“ lassen sich mit den Pfeiltasten wechseln und sind als Reiter ausgezeichnet; bei 240 px Panelbreite stehen sie in einer Zeile oder rollen waagerecht, ohne zu stapeln, und das Suchfeld samt Knopf „Suchen“ bleibt vollständig sichtbar",
+    "Während der Suche stehen Platzhalter in Form der Treffer; eine Suche ohne Treffer zeigt „Keine Treffer für „xyzxyz“. Prüf die Schreibweise oder such nach der DOI.“",
+    "In „Beschaffung“ steht „PDF hochladen“ als Hauptaktion, die Exporte `.bib`, `.ris`, `CSV` liegen in einem Menü „Liste exportieren“; die leere Liste erklärt den nächsten Schritt"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f8",
+   "title": "Vorschläge und Dialoge im selben Stil",
+   "steps": [
+    "Für alle Nutzer, damit sich jede Fläche gleich bedient. Das Vorschläge-Panel trennt „Für mich“ und „Standard für alle im Projekt“ sichtbar; die beiden Auslöser stehen je als Zeile mit Namen und Auswahl; „Standard für alle“ sieht nur, wer ihn ändern darf",
+    "Das Tageslimit zeigt „Heute 0 von 50 Auslösern“ neben dem Feld; eine Eingabe wie `0` oder `abc` zeigt die Meldung am Feld; während des Ladens steht ein Platzhalter",
+    "Literaturmatrix: Das Feld für eine neue Spalte zeigt seinen Platzhalter vollständig; nach dem Ändern einer Zelle erscheint an der Zelle „Gespeichert“; scheitert das Speichern (Dev-Schalter), steht dort die Meldung und der Text bleibt erhalten",
+    "Import: Während die Zotero-Sammlungen laden, steht ein Ladehinweis; zwei Dateien mit gleichem Namen erscheinen als zwei Zeilen mit eigenem Status; Schließen während eines laufenden Uploads fragt nach",
+    "Quelle löschen: Die Zahl betroffener Zitate lädt sichtbar; scheitert das Laden, steht „Die betroffenen Zitate ließen sich nicht ermitteln.“ und Löschen bleibt möglich",
+    "Der Einladungslink zeigt „Kopiert“ nur, wenn das Kopieren gelungen ist, sonst „Kopieren nicht möglich. Markier den Link und kopier ihn von Hand.“",
+    "Alle Texte für „Schließen“, „Speichern“ und „Kopieren“ kommen je aus einem einzigen Sprachschlüssel (Test prüft, dass die doppelten Schlüssel entfernt sind)"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f9",
+   "title": "Admin-Seiten einheitlich und erreichbar",
+   "steps": [
+    "Für Admins. Das Admin-Menü zeigt in der deutschen Oberfläche „Grenzen“ und „Workflows“; beide Einträge führen auf die jeweilige Seite",
+    "Beide Seiten haben dieselbe Inhaltsbreite und denselben Aufbau (Titel, einleitender Satz, Abschnitte); Tabellen auf „Grenzen“ haben bei einer leeren Installation den Text „Noch keine Projekte“ bzw. „Noch keine Nutzer“",
+    "Auf „Grenzen“ lässt sich die Nutzertabelle über ein Suchfeld nach Name oder Adresse filtern; mit mehr als 50 Zeilen wird geblättert",
+    "Auf „Workflows“ zeigt jeder Text nach „Speichern“ die Bestätigung „Gespeichert“ am Knopf; ein Text über 20 000 Zeichen zeigt die Meldung am Feld und behält die Eingabe",
+    "Bei 360 px haben beide Seiten kein horizontales Rollen der Seite; breite Tabellen rollen in ihrem eigenen Bereich"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f10",
+   "title": "Editor und Projektliste durchgehend deutsch",
+   "steps": [
+    "Für alle mit deutscher Oberfläche. Im Editor heißt die Menüleiste „Datei“, „Bearbeiten“, „Einfügen“, „Ansicht“, „Format“, „Hilfe“; jedes Menü aufgeklappt zeigt nur deutsche Einträge",
+    "Die Leiste links nennt „Dateibaum“, „Projektsuche“, „Überprüfung“, „Chat“ (als zugängliche Namen und Tooltips); das Review-Panel zeigt deutsche Knöpfe zum Annehmen und Ablehnen",
+    "In der Projektliste steht „vor 2 Tagen von Dir“ statt „2 days ago von Du“ (Wortlaut nach Sprachdatei, aber deutsch), „Stichwörter organisieren“ ist nicht abgeschnitten, der Papierkorb heißt „Papierkorb“",
+    "Ein Test führt die Liste der Sprachschlüssel, die Menüleiste, Leiste, Review-Panel, PDF-Bereich, Editor-Einstellungen, Projektliste und Kontomenü verwenden, und ist grün, wenn jeder davon in `de.json` steht",
+    "Mit `OVERLEAF_SITE_LANGUAGE=en` sind dieselben Flächen englisch wie bisher"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f11",
+   "title": "Ladebildschirm: Schriftzug und Füllung decken sich",
+   "steps": [
+    "Für alle, bei jedem Öffnen eines Projekts. Beim Laden des Editors (Netz gedrosselt, damit der Bildschirm sichtbar bleibt) liegt die dunkle Füllung des Schriftzugs „spur“ genau über dem grauen Schriftzug: gleiche Grundlinie, gleiche Höhe, gleiche linke Kante (die Rahmen beider Elemente weichen höchstens 1 px ab, per Playwright gemessen)",
+    "Bei 0 %, etwa 50 % und 100 % Fortschritt ist kein Versatz zu sehen (drei Screenshots); der Text unter dem Schriftzug steht mittig darunter",
+    "Dasselbe gilt für den Ladebildschirm der Projektliste und beim Zugang über einen Freigabelink sowie bei 360 px Breite und im dunklen Farbschema"
+   ],
+   "passes": false,
+   "ui": true
+  },
+  {
+   "id": "f12",
+   "title": "Die Doku beschreibt die neue Bedienung",
+   "steps": [
+    "Für Nutzer und Betreiber. README: Der Abschnitt zu Claude beschreibt den Schalter „Alles von Claude automatisch annehmen“, die Ausnahme für rote Zitate, „Alles Offene jetzt annehmen“ und „Lauf rückgängig“; der Abschnitt zu Quellen beschreibt Großansicht, Tasten und „Original herunterladen“; der Abschnitt zum Prüfbericht beschreibt Gruppen, Filter und Tooltips",
+    "ADR 0002 ist ergänzt: automatische Annahme als Einstellung des Menschen, sofort nach dem Schreiben, rote Zitate ausgenommen, Claude weiter ohne Werkzeug zum Annehmen; `docs/mcp-contract.md` nennt dieselbe Regel an der Stelle, die bisher „nie automatisch“ sagte",
+    "Die Liste der Kern-Patches nennt Ladebildschirm, Sprachdatei und Menü mit Begründung",
+    "`docs/backlog.md`: erledigte Punkte unter „Interface“ sind entfernt (Kontrast „Nicht frei“, schmales Recherche-Panel, gemischte Menüsprachen); neu steht dort der Rest der fehlenden deutschen Schlüssel mit Zahl",
+    "Kein Text in README oder Doku nennt eine Beschriftung, die es in der Oberfläche nicht mehr gibt (Suche nach den alten Texten „Automatisch annehmen, wenn ein Lauf ohne Probleme endet“ und „Limits“ findet nichts)"
+   ],
+   "passes": false
+  }
+ ]
+}
