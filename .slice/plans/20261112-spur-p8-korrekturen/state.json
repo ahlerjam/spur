@@ -1,1 +1,1 @@
-{"state": "running", "builderModel": "opus", "builderAdvisor": "opus", "where": "cloud", "cloudSession": "https://claude.ai/code/session_01XpJUcfm5Anuxa7VuPqebRR", "started": "2026-11-12T14:15:55Z"}
+{"state": "queued", "builderModel": "opus", "builderAdvisor": "opus", "where": "cloud", "runBranch": "slice/run-20261112-spur-p8-korrekturen"}
