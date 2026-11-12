@@ -127,7 +127,7 @@
     "Das Panel bleibt zwischen zwei Aufrufen „verbunden“ (kein Flackern auf „nicht verbunden“ innerhalb von 45 Sekunden)",
     "MCP-Anweisungen, Werkzeugbeschreibung, `plugins/spur/skills/spur/SKILL.md` und der Startbefehl im Claude-Panel beschreiben denselben Ablauf: aufrufen, bei `ereignis: null` sofort erneut aufrufen, bei `abgeloest` nichts tun, Auftrag erledigen, erneut aufrufen"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

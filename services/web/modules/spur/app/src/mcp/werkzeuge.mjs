@@ -247,12 +247,14 @@ export const WERKZEUGE = {
 
   wait_for_event: {
     description:
-      'Wartet auf den nächsten Auftrag (Long-Poll, Fortschritt alle 30 Sekunden). Nach jedem Auftrag erneut aufrufen.',
+      'Wartet bis zu 100 Sekunden auf den nächsten Auftrag. Bei ereignis: null rufst du wait_for_event sofort erneut auf; ' +
+      'bei abgeloest: true tust du nichts, ein neuerer Aufruf wartet schon; einen Auftrag erledigst du und rufst danach ' +
+      'wait_for_event erneut auf. cursor ist für events_since.',
     inputSchema: z.object({ max_sekunden: z.number().int().min(1).max(3600).optional() }),
-    async ausfuehren({ max_sekunden: max = 1800 }, { botId }, ctx) {
+    async ausfuehren({ max_sekunden: max = Inbox.standardWarteSekunden() }, { botId }, ctx) {
       const token = ctx.mcpReq._meta?.progressToken
       let schritt = 0
-      const ereignis = await Inbox.warteAufEreignis(botId, {
+      const { ereignis, abgeloest } = await Inbox.warteAufEreignis(botId, {
         signal: ctx.mcpReq.signal,
         maxMs: max * 1000,
         fortschritt: async sekunden => {
@@ -263,12 +265,17 @@ export const WERKZEUGE = {
           })
         },
       })
-      return ereignis ? { ereignis } : { ereignis: null, hinweis: meldung('spur_fehler_kein_auftrag') }
+      if (ereignis) return { ereignis, cursor: ereignis.id }
+      const cursor = await Inbox.letzterCursor(botId)
+      if (abgeloest) return { ereignis: null, abgeloest: true, cursor, hinweis: meldung('spur_warten_abgeloest') }
+      return { ereignis: null, cursor, hinweis: meldung('spur_warten_kein_auftrag') }
     },
   },
 
   events_since: {
-    description: 'Ereignisse nach einem Cursor, für verpasste Aufträge.',
+    description:
+      'Ereignisse nach dem cursor aus der letzten Antwort von wait_for_event oder events_since; ohne cursor die neuesten. ' +
+      'Gelesene Ereignisse kommen über wait_for_event nicht noch einmal.',
     inputSchema: z.object({ cursor: z.string().optional() }),
     async ausfuehren({ cursor }, { botId }) {
       return await Inbox.seit(botId, cursor)

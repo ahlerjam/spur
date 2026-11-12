@@ -2725,8 +2725,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   ]
   const SCHREIBWERKZEUGE = ['quote_mark', 'doc_edit', 'doc_create', 'reply', 'run_finish', 'wait_for_event']
   const START_WERKZEUGE = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
-  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur."`
-  const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur."`
+  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur. Bei ereignis: null rufst du es sofort erneut auf, bei abgeloest tust du nichts; einen Auftrag erledigst du und rufst danach wait_for_event erneut auf."`
+  const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again."`
 
   // Kein Kasten ist breiter als sein Container, kein Befehl wird abgeschnitten.
   async function kaestenGanz(wo) {
@@ -4656,6 +4656,111 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       if ((await kapitel.getAttribute('aria-expanded')) !== 'true') await kapitel.click()
       await page.locator('.file-tree').getByRole('treeitem', { name: 'einleitung.tex' }).click()
       await page.locator('.cm-content .ol-cm-change-i', { hasText: 'Die Einleitung beginnt hier.' }).first().waitFor({ timeout: 20000 })
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
+  // wait_for_event aus dem Browser wie ein MCP-Client; Ergebnis und Dauer landen in window.__warten[name].
+  async function wartenStarten(token, name, args = {}) {
+    await page.evaluate(([t, n, a]) => {
+      window.__warten ??= {}
+      const start = Date.now()
+      const eintrag = { ergebnis: null }
+      window.__warten[n] = eintrag
+      fetch('/spur/mcp', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${t}`, Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'wait_for_event', arguments: a } }),
+      })
+        .then(r => r.text())
+        .then(text => {
+          const zeilen = text.split('\n').filter(z => z.startsWith('data:')).map(z => JSON.parse(z.slice(5)))
+          const antwort = (zeilen.length ? zeilen : [JSON.parse(text)]).find(d => d.result || d.error)
+          eintrag.ergebnis = antwort.result ? JSON.parse(antwort.result.content[0].text) : antwort
+          eintrag.dauer = Date.now() - start
+        })
+        .catch(e => (eintrag.ergebnis = { fehler: e.message }))
+    }, [token, name, args])
+  }
+
+  async function gewartet(name, timeout = 20000) {
+    const handle = await page.waitForFunction(n => window.__warten?.[n]?.ergebnis && window.__warten[n], name, { timeout })
+    return await handle.jsonValue()
+  }
+
+  features.p8f9 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E P8 Warten')
+    const pid = page.url().split('/').pop()
+    const auftrag = async text => ok((await seitenPost(`/spur/project/${pid}/claude/auftrag`, { text })).status === 201, `Auftrag ${text}`)
+    // Ältere Aufträge dieses Kontos sind für diesen Schritt gelesen.
+    await werkzeug(token, 'events_since', {})
+    try {
+      await fakeSteuern({ schalter: { SPUR_WARTEN_S: '2' } })
+      const leer = (await werkzeug(token, 'wait_for_event', {})).inhalt
+      ok(leer.ereignis === null && 'cursor' in leer && leer.hinweis === 'Kein Auftrag. Ruf wait_for_event erneut auf.' && !leer.abgeloest, `Ohne Auftrag: ${JSON.stringify(leer)}`)
+
+      // Zwischen zwei Aufrufen bleibt das Panel verbunden (kurze Aufrufe von 2 s, Pausen von 3 s, 45 s lang).
+      await panelOeffnen('Claude')
+      await wartenStarten(token, 'takt0')
+      await claudePanel().getByText('Claude verbunden', { exact: true }).waitFor({ timeout: 10000 })
+      const ende = Date.now() + 45000
+      for (let i = 1; Date.now() < ende; i++) {
+        ok((await claudePanel().getByText('Claude nicht verbunden').count()) === 0, `Flackern nach ${45 - Math.round((ende - Date.now()) / 1000)} s`)
+        if (i % 10 === 0) await wartenStarten(token, `takt${i}`)
+        await page.waitForTimeout(500)
+      }
+      await fakeSteuern({ schalter: {} })
+
+      await wartenStarten(token, 'panel')
+      await page.waitForTimeout(500)
+      const feld = claudePanel().getByLabel('Auftrag an Claude')
+      await feld.fill('Bitte Abschnitt 1 glätten')
+      const gesendet = Date.now()
+      await feld.press('Control+Enter')
+      const panel = await gewartet('panel', 10000)
+      ok(panel.ergebnis.ereignis?.daten?.text === 'Bitte Abschnitt 1 glätten' && panel.ergebnis.cursor === panel.ergebnis.ereignis.id, `Aus dem Panel: ${JSON.stringify(panel.ergebnis)}`)
+      ok(Date.now() - gesendet <= 6000, `Auftrag kam nach ${Date.now() - gesendet} ms`)
+
+      await wartenStarten(token, 'erster')
+      await page.waitForTimeout(1000)
+      await wartenStarten(token, 'zweiter')
+      const erster = await gewartet('erster', 10000)
+      ok(erster.ergebnis.ereignis === null && erster.ergebnis.abgeloest === true && /nicht erneut auf/.test(erster.ergebnis.hinweis), `Abgelöst: ${JSON.stringify(erster.ergebnis)}`)
+      await auftrag('Für den zweiten Aufruf')
+      const zweiter = await gewartet('zweiter', 10000)
+      ok(zweiter.ergebnis.ereignis?.daten?.text === 'Für den zweiten Aufruf', `Zweiter Aufruf: ${JSON.stringify(zweiter.ergebnis)}`)
+      ok(erster.ergebnis.ereignis === null, 'Erster Aufruf bekam den Auftrag')
+
+      const angekommen = []
+      for (let i = 0; i < 10; i++) {
+        await wartenStarten(token, `folge${i}`)
+        await auftrag(`Auftrag ${i}`)
+        angekommen.push((await gewartet(`folge${i}`, 10000)).ergebnis.ereignis?.daten?.text)
+      }
+      ok(JSON.stringify(angekommen) === JSON.stringify(Array.from({ length: 10 }, (_, i) => `Auftrag ${i}`)), `Zehn Aufträge: ${JSON.stringify(angekommen)}`)
+
+      const cursor = zweiter.ergebnis.cursor
+      const neuere = (await werkzeug(token, 'events_since', { cursor })).inhalt
+      ok(JSON.stringify(neuere.ereignisse.map(e => e.daten.text)) === JSON.stringify(angekommen), `events_since mit Cursor: ${JSON.stringify(neuere.ereignisse.map(e => e.daten.text))}`)
+      await auftrag('Nur über events_since')
+      const neueste = (await werkzeug(token, 'events_since', {})).inhalt.ereignisse
+      ok(neueste.at(-1).daten.text === 'Nur über events_since', `events_since ohne Cursor: ${neueste.at(-1)?.daten?.text}`)
+      ok((await werkzeug(token, 'wait_for_event', { max_sekunden: 2 })).inhalt.ereignis === null, 'Über events_since Gelesenes kam erneut')
+
+      const REPO = `${FIXTURES}/../../../../../..`
+      const { daten } = await mcp(token, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } })
+      const beschreibung = (await mcp(token, 'tools/list')).daten.result.tools.find(w => w.name === 'wait_for_event').description
+      const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+      // Der Startbefehl im Panel ist claude … -- "<spur_start_prompt>" (claude-verbinden.tsx, Frontend-Test).
+      const startbefehl = JSON.parse(await repoDatei(`${REPO}/services/web/locales/de.json`)).spur_start_prompt
+      const texte = { anweisungen: daten.result.instructions, beschreibung, skill, startbefehl }
+      for (const [name, text] of Object.entries(texte)) {
+        for (const teil of ['wait_for_event', 'ereignis: null', 'abgeloest']) ok(text.includes(teil), `${name} ohne „${teil}“: ${text}`)
+      }
     } finally {
       await fakeSteuern({ schalter: {} })
     }

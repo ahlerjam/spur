@@ -181,7 +181,7 @@ Under Settings, "Connect Claude" ("Claude verbinden" in the German interface), s
 3. Start Claude Code. Run this to start Claude Code in your terminal. Claude then waits for tasks from spur on its own and can write there without asking at every step. You need this command each time you start Claude Code; it is also in the Claude panel of your project.
 
    ```sh
-   claude --allowedTools "mcp__plugin_spur_spur__quote_mark mcp__plugin_spur_spur__doc_edit mcp__plugin_spur_spur__doc_create mcp__plugin_spur_spur__reply mcp__plugin_spur_spur__run_finish mcp__plugin_spur_spur__wait_for_event" -- "Use wait_for_event to wait for tasks from spur."
+   claude --allowedTools "mcp__plugin_spur_spur__quote_mark mcp__plugin_spur_spur__doc_edit mcp__plugin_spur_spur__doc_create mcp__plugin_spur_spur__reply mcp__plugin_spur_spur__run_finish mcp__plugin_spur_spur__wait_for_event" -- "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again."
    ```
 
 You start the four ready-made workflows in the Claude panel under "Workflows", or in Claude Code with these commands. For prompts of a plugin, Claude Code adds the prefix `/plugin:spur:spur:` and shows them in the menu with "(MCP)":

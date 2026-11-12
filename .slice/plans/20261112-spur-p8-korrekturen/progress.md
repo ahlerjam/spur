@@ -37,6 +37,9 @@
   Bot und nur leer übernommen. Testschalter: `SPUR_DOKUPDATER_500`, `SPUR_DOC_AUFRAEUMEN_FEHLER`,
   `SPUR_DOC_CREATE_FEHLER`. Die Log-Zeile zur Fehler-ID prüft der Builder mit `spur-dev logs web` (eine Zeile mit
   `fehlerId`, `werkzeug`, `projectId`, `pfad`, `botId`, ohne Inhalt; 2026-11-12 geprüft), nicht die E2E-Suite.
+- f9: `events_since` markiert gelesene Ereignisse als zugestellt; ohne Cursor liefert es die neuesten 100 (vorher die
+  ältesten). Der Wecker hört jetzt ab Beginn des Wartens mit, vorher konnte ein Auftrag zwischen Abfrage und Schlaf
+  bis zu 5 s liegen bleiben. Testschalter `SPUR_WARTEN_S` verkürzt die Standardzeit von 100 s.
 - E2E: Das run-code-Werkzeug bricht nach 60 s ab. Die Suite läuft darum im Hintergrund des Playwright-Prozesses
   (Wrapper mit `page.__e2e`, Ergebnis per zweitem Aufruf abgefragt); der Wrapper liegt im ignorierten
   `.playwright-mcp/`.
