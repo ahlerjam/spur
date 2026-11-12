@@ -56,6 +56,21 @@
 - f1: `https://doi.org/doiRA/10.48550/arXiv.2401.01234` und `https://api.datacite.org/dois/10.48550/arXiv.2401.01234`
   gegen die echten Hosts (Antwortformat und Schrägstrich im Pfad; offline nicht prüfbar).
 
+- f10: Proxy-Meldung hinter einem echten Firmenproxy ansehen (nginx liefert das PDF; der Dev-Schalter lenkt nur die
+  Adresse um).
+
+## Abschluss
+- /simplify: eine Lesung der Grenzen je Aufruf, `timers/promises`, `projektStand` löscht nichts mehr, `events_since`
+  schreibt nur offene Ereignisse. Übersprungen: Drossel zurück auf RateLimiter (die Grenze ist einstellbar, Punkte
+  liegen bei RateLimiter fest), `_countElements` aus Overleaf exportieren (Kern-Patch), Status als String im
+  PDF-Fehler (kleiner Kern-Patch bewusst), gemeinsamer Fehler für zu viele Dateien (zwei Texte gewollt).
+- /code-review: behoben Schreibsperre bei Änderungen nur am Wortlaut (Regression aus f3), `12.5.` am Satzende als
+  Datum, `\iffalse … \else`, `\iff`/`\ifthenelse`/`\newif`, leere Makros ohne Argument, Rückrollen auch nach dem
+  Upload, Sperre mit Besitzer. Übersprungen (Backlog): 404 beim ersten Spiegel, DataCite-404.
+- Security (Subagent, kein `origin/HEAD` für /security-review): quadratische Laufzeit der Makro-Erkennung behoben.
+
 ## Needs decision
 
 ## Vorschläge (außerhalb dieses Plans)
+- Die übrigen Admin-API-Routen (Workflows) antworten Nicht-Admins wie früher die Grenzen mit einer Umleitung; mit
+  `adminApi` bekämen sie ebenfalls 403 mit Meldung.
