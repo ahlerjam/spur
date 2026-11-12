@@ -3809,7 +3809,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const ausbruch = await paket('spurtest-ausbruch')
     ok(ausbruch.fehler && ausbruch.inhalt.fehler === 'archiv_unsicher', `Ausbruch: ${JSON.stringify(ausbruch.inhalt)}`)
     const riesig = await paket('spurtest-riesig')
-    ok(riesig.fehler && riesig.inhalt.fehler === 'paket_zu_gross' && riesig.inhalt.detail.includes('20 MB'), `Riesig: ${JSON.stringify(riesig.inhalt)}`)
+    ok(riesig.fehler && riesig.inhalt.fehler === 'paket_zu_gross' && riesig.inhalt.detail.includes('100 MB'), `Riesig: ${JSON.stringify(riesig.inhalt)}`)
     const danach = await pfade()
     ok(!danach.some(p => p.startsWith('/tex-pakete')), `Nach Fehlern angelegt: ${danach}`)
 
@@ -4437,6 +4437,168 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await karte.getByText('„240“ in main.tex', { exact: false }).waitFor({ timeout: 10000 })
     ok(!/„(12|11|2026|14|30|1\.2\.3)“/.test(await karte.innerText()), `Lauf-Karte: ${await karte.innerText()}`)
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Datum geprüft.' })
+  }
+
+  const CARLITO_DATEIEN = ['carlito-optionen.sty', 'carlito.sty', 'ly1carlito.fd', 'ot1carlito.fd', 't1carlito.fd'].map(d => `/tex-pakete/carlito/${d}`)
+
+  async function paketPfade(pid) {
+    return (await jsonVon(`/project/${pid}/entities`)).entities.map(e => e.path).filter(p => p.startsWith('/tex-pakete/')).sort()
+  }
+
+  features.p8f6 = async () => {
+    await breite(1280)
+    // Speicher wird nur mit einer Grenze berechnet; 1 GB stört die übrigen Schritte nicht.
+    await grenzenSetzen({ projekte: '', speicherGb: '1' })
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const carlito = pid => werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'carlito' })
+    const vollstaendig = async pid => ok(JSON.stringify(await paketPfade(pid)) === JSON.stringify(CARLITO_DATEIEN), `Dateien: ${await paketPfade(pid)}`)
+    try {
+      const pid = await projektId(token, 'E2E P8 Pakete')
+      await fakeSteuern({ stoerungen: { texlive: { status: 502, mal: 2 } }, schalter: {} })
+      const nachZwei = await carlito(pid)
+      ok(!nachZwei.fehler && JSON.stringify([...nachZwei.inhalt.dateien].sort()) === JSON.stringify(CARLITO_DATEIEN.map(p => p.slice(1))), `Nach zwei 502: ${JSON.stringify(nachZwei.inhalt)}`)
+      const zweimal = await carlito(pid)
+      ok(!zweimal.fehler && zweimal.inhalt.hinweis === 'schon im Projekt' && zweimal.inhalt.dateien.length === 0, `Zweiter Aufruf: ${JSON.stringify(zweimal.inhalt)}`)
+      await vollstaendig(pid)
+
+      const pidB = await projektId(token, 'E2E P8 Pakete B')
+      await fakeSteuern({ stoerungen: { texlive: { status: 502 }, 'texlive-b': { status: 502 } } })
+      const beide = await carlito(pidB)
+      ok(
+        beide.fehler && beide.inhalt.fehler === 'spiegel_nicht_erreichbar' && beide.inhalt.detail === 'Die Paketquelle antwortet mit Fehler 502. Versuch es später erneut.',
+        `Beide Spiegel 502: ${JSON.stringify(beide.inhalt)}`
+      )
+      await projektOeffnen('E2E P8 Pakete B')
+      await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name: 'main.tex' }))
+      ok((await page.locator('.file-tree').getByRole('treeitem', { name: 'tex-pakete' }).count()) === 0, 'Ordner tex-pakete im Dateibaum')
+      await panelOeffnen('Claude')
+      ok((await claudePanel().getByText('tex-pakete/carlito').count()) === 0, 'Lauf-Karte listet das Paket')
+
+      await fakeSteuern({ schalter: { SPUR_TEX_UPLOAD_FEHLER: '3' } })
+      const vorher = (await jsonVon(`/spur/project/${pidB}/speicher`)).bytes
+      const abbruch = await carlito(pidB)
+      ok(abbruch.fehler && abbruch.inhalt.fehler === 'paket_abgebrochen', `Upload-Fehler: ${JSON.stringify(abbruch.inhalt)}`)
+      ok((await paketPfade(pidB)).length === 0, `Nach dem Upload-Fehler: ${await paketPfade(pidB)}`)
+      const ordner = (await jsonVon(`/project/${pidB}/entities`)).entities.filter(e => e.path.startsWith('/tex-pakete'))
+      ok(ordner.length === 0, `Rest: ${JSON.stringify(ordner)}`)
+      const nachher = (await jsonVon(`/spur/project/${pidB}/speicher`)).bytes
+      ok(Number.isInteger(vorher) && nachher === vorher, `Speicher vorher ${vorher}, nachher ${nachher}`)
+
+      await fakeSteuern({ stoerungen: { texlive: { status: 502 } }, schalter: {} })
+      const zweiter = await carlito(pidB)
+      ok(!zweiter.fehler && zweiter.inhalt.dateien.length === 5, `Zweiter Spiegel: ${JSON.stringify(zweiter.inhalt)}`)
+      await vollstaendig(pidB)
+      await fakeSteuern({ schalter: {} })
+
+      for (const name of ['E2E P8 Pakete Rest', 'E2E P8 Pakete Rest B']) {
+        const pidRest = await projektId(token, name)
+        const rest = await carlito(pidRest)
+        ok(!rest.fehler && rest.inhalt.dateien.length === 5, `${name}: ${JSON.stringify(rest.inhalt)}`)
+        await vollstaendig(pidRest)
+      }
+      const pidRest = await projektId(token, 'E2E P8 Pakete Rest')
+      let job
+      for (let i = 0; i < 10; i++) {
+        job = await kompiliertBeiClaude(token, pidRest)
+        if (job.ergebnis?.compile !== 'too-recently-compiled') break
+        await page.waitForTimeout(1500)
+      }
+      ok(job.ergebnis.compile === 'success', `Compile mit carlito: ${JSON.stringify(job.ergebnis)}`)
+
+      // Abbruch beim Client mitten im Upload: Der Server stellt fertig, der neue Aufruf wartet darauf.
+      const pidAbbruch = await projektId(token, 'E2E P8 Pakete Abbruch')
+      await fakeSteuern({ schalter: { SPUR_TEX_UPLOAD_PAUSE_MS: '600' } })
+      const abgebrochen = await page.request
+        .post(`${BASE}/spur/mcp`, {
+          headers: { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          data: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'tex_package_add', arguments: { project_id: pidAbbruch, paket: 'carlito' } } },
+          timeout: 1500,
+        })
+        .then(() => 'fertig', () => 'abgebrochen')
+      ok(abgebrochen === 'abgebrochen', `Aufruf nicht abgebrochen: ${abgebrochen}`)
+      const danach = await carlito(pidAbbruch)
+      ok(!danach.fehler && (danach.inhalt.hinweis === 'schon im Projekt' || danach.inhalt.dateien.length === 5), `Nach dem Abbruch: ${JSON.stringify(danach.inhalt)}`)
+      await vollstaendig(pidAbbruch)
+    } finally {
+      await fakeSteuern({ schalter: {} })
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+    }
+  }
+
+  features.p8f7 = async () => {
+    await breite(1280)
+    const TEX_FELDER = ['Größe je Paket (MB)', 'Pakete je Projekt (MB)', 'Installationen je Stunde']
+    const texFeld = name => standardBereich().getByLabel(name, { exact: true })
+    try {
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+      await anmelden('e2e-pakete@example.org')
+      const token = await neuesToken()
+      const paket = async (projekt, name) => await werkzeug(token, 'tex_package_add', { project_id: await projektId(token, projekt), paket: name })
+      const gross = await paket('E2E P8 Grenzen A', 'spurtest-gross')
+      ok(!gross.fehler && gross.inhalt.dateien.length === 1, `30 MB mit Standardgrenzen: ${JSON.stringify(gross.inhalt)}`)
+
+      await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-pakete@example.org': { projekte: '', speicherGb: '0,01' } })
+      await anmelden('e2e-pakete@example.org')
+      const voll = await paket('E2E P8 Grenzen B', 'spurtest-gross')
+      ok(voll.fehler && voll.inhalt.fehler === 'speicher_voll' && /GB von 0,01 GB/.test(voll.inhalt.detail), `Speicher-Grenze: ${JSON.stringify(voll.inhalt)}`)
+      const zuViele = await paket('E2E P8 Grenzen Voll', 'carlito')
+      ok(zuViele.fehler && zuViele.inhalt.fehler === 'projekt_zu_viele_dateien' && zuViele.inhalt.detail.includes('erlaubt sind 2000'), `2000 Einträge: ${JSON.stringify(zuViele.inhalt)}`)
+      const pidVoll = await projektId(token, 'E2E P8 Grenzen Voll')
+      ok((await paketPfade(pidVoll)).length === 0, `Nach projekt_zu_viele_dateien: ${await paketPfade(pidVoll)}`)
+
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+      await page.goto(GRENZEN)
+      await standardBereich().getByRole('heading', { name: 'TeX-Pakete' }).waitFor()
+      const platzhalter = await Promise.all(TEX_FELDER.map(f => texFeld(f).getAttribute('placeholder')))
+      ok(JSON.stringify(platzhalter) === '["100","300","60"]', `Platzhalter: ${platzhalter}`)
+      for (const [feld, wert] of [['Größe je Paket (MB)', '0'], ['Pakete je Projekt (MB)', '-5'], ['Installationen je Stunde', 'abc']]) await texFeld(feld).fill(wert)
+      await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+      await standardBereich().getByText('Bitte eine ganze Zahl ab 1 eingeben', { exact: false }).first().waitFor()
+      ok((await standardBereich().getByText('Bitte eine ganze Zahl ab 1 eingeben', { exact: false }).count()) === 3, 'Nicht jedes Feld meldet den Fehler')
+      ok((await texFeld('Installationen je Stunde').getAttribute('aria-invalid')) === 'true', 'Feld nicht als ungültig markiert')
+      for (const [feld, wert] of [['Größe je Paket (MB)', '10'], ['Pakete je Projekt (MB)', '20'], ['Installationen je Stunde', '2']]) await texFeld(feld).fill(wert)
+      await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+      await standardBereich().getByText('Gespeichert').waitFor()
+      await page.reload()
+      await texFeld('Installationen je Stunde').waitFor()
+      const werte = await Promise.all(TEX_FELDER.map(f => texFeld(f).inputValue()))
+      ok(JSON.stringify(werte) === '["10","20","2"]', `Nach dem Neuladen: ${werte}`)
+
+      await anmelden('e2e-pakete@example.org')
+      const zuGross = await paket('E2E P8 Grenzen C', 'spurtest-gross')
+      ok(zuGross.fehler && zuGross.inhalt.fehler === 'paket_zu_gross' && zuGross.inhalt.detail.includes('ist entpackt 30 MB groß, erlaubt sind 10 MB.'), `10 MB: ${JSON.stringify(zuGross.inhalt)}`)
+
+      await anmelden('e2e-pakete-b@example.org')
+      const tokenB = await neuesToken()
+      const pidD = await projektId(tokenB, 'E2E P8 Drossel')
+      const holen = name => werkzeug(tokenB, 'tex_package_add', { project_id: pidD, paket: name })
+      for (const name of ['beamer', 'spurtestgibtsnicht', '../x', 'spurtest-ausbruch', 'spurtest-gross']) {
+        const r = await holen(name)
+        ok(r.inhalt.hinweis === 'schon im Image' || r.fehler, `${name}: ${JSON.stringify(r.inhalt)}`)
+      }
+      ok(!(await holen('spurfarben')).fehler, 'Erstes kleines Paket')
+      ok((await holen('spurfarben')).inhalt.hinweis === 'schon im Projekt', 'Zweiter Aufruf')
+      ok(!(await holen('beamertheme-spurtest')).fehler, 'Zweites kleines Paket')
+      const drittes = await holen('carlito')
+      ok(drittes.fehler && drittes.inhalt.fehler === 'zu_viele_anfragen' && drittes.inhalt.detail.includes('2 Installationen je Stunde'), `Drittes: ${JSON.stringify(drittes.inhalt)}`)
+
+      await page.goto(`${BASE}/project`)
+      const fremd = await seitenAnfrage('PUT', '/spur/admin/grenzen/standard', { texPaketMb: '500' })
+      ok(fremd.status === 403, `Speichern ohne Admin-Rechte: ${fremd.status}`)
+
+      await anmelden('e2e-admin@example.org')
+      await page.goto(GRENZEN)
+      await texFeld('Größe je Paket (MB)').waitFor()
+      for (const f of TEX_FELDER) await texFeld(f).fill('')
+      await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+      await standardBereich().getByText('Gespeichert').waitFor()
+      await page.reload()
+      await texFeld('Größe je Paket (MB)').waitFor()
+      ok((await texFeld('Größe je Paket (MB)').inputValue()) === '' && (await texFeld('Größe je Paket (MB)').getAttribute('placeholder')) === '100', 'Leeres Feld stellt den Standard nicht her')
+    } finally {
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+    }
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

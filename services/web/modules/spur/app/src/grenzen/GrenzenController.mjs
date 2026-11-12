@@ -43,6 +43,7 @@ export const daten = mitProblemen(async (_req, res) => {
   const email = new Map(nutzer.map(u => [String(u._id), u.email]))
   res.json({
     standard,
+    texStandard: Grenzen.TEX_STANDARD,
     nutzer: nutzer.map(u => {
       const id = String(u._id)
       const eigene = ausnahmen.get(id) ?? {}
@@ -67,9 +68,12 @@ export const daten = mitProblemen(async (_req, res) => {
 })
 
 export const standardSetzen = mitProblemen(async (req, res) => {
-  const { werte, fehler } = felderLesen(req.body ?? {}, ['projekte', 'speicherGb'], Grenzen.wertLesen)
+  const body = req.body ?? {}
+  const allgemein = felderLesen(body, ['projekte', 'speicherGb'], Grenzen.wertLesen)
+  const tex = felderLesen(body, Grenzen.TEX_FELDER, Grenzen.texWertLesen)
+  const fehler = { ...allgemein.fehler, ...tex.fehler }
   if (Object.keys(fehler).length) return res.status(422).json({ fehler })
-  await Grenzen.standardSetzen({ ...werte, texPaketeAus: req.body?.texPaketeAus === true })
+  await Grenzen.standardSetzen({ ...allgemein.werte, ...tex.werte, texPaketeAus: body.texPaketeAus === true })
   res.sendStatus(204)
 })
 

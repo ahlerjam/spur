@@ -81,7 +81,7 @@
     "Bricht der Client den Aufruf während des Uploads ab (Verbindung geschlossen), bleibt kein Teilstand zurück: Der Server stellt die Installation fertig oder rollt sie zurück; ein neuer Aufruf danach gelingt oder meldet „schon im Projekt“ mit vollständigen Dateien",
     "Unit-Tests für `hinzufuegen` decken Erfolg, 404, 5xx mit Wiederholung, Spiegelwechsel, Upload-Fehler mit Zurückrollen und Rest-Ordner ab"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

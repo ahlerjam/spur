@@ -61,8 +61,29 @@ describe('Werte', () => {
 
 describe('Standard und Ausnahmen', () => {
   it('ist ohne Einstellung unbegrenzt', async () => {
-    expect(await Grenzen.standard()).toEqual({ projekte: null, speicherGb: null, texPaketeAus: false })
+    expect(await Grenzen.standard()).toEqual({
+      projekte: null,
+      speicherGb: null,
+      texPaketeAus: false,
+      texPaketMb: null,
+      texProjektMb: null,
+      texProStunde: null,
+    })
     expect(await Grenzen.projektGrenze(anna)).toBe(null)
+  })
+
+  it('TeX-Pakete: 100 MB, 300 MB und 60 je Stunde ohne Einstellung, sonst die eingestellten Werte', async () => {
+    expect(await Grenzen.texGrenzen()).toEqual({ texPaketMb: 100, texProjektMb: 300, texProStunde: 60 })
+    await Grenzen.standardSetzen({ projekte: null, speicherGb: null, texPaketMb: 10, texProjektMb: 20, texProStunde: 2 })
+    expect(await Grenzen.texGrenzen()).toEqual({ texPaketMb: 10, texProjektMb: 20, texProStunde: 2 })
+    await Grenzen.standardSetzen({ projekte: null, speicherGb: null, texPaketMb: 10 })
+    expect(await Grenzen.texGrenzen()).toEqual({ texPaketMb: 10, texProjektMb: 300, texProStunde: 60 })
+  })
+
+  it('TeX-Grenzen nehmen nur ganze Zahlen ab 1, leer heißt Standard', () => {
+    expect(Grenzen.texWertLesen('10')).toBe(10)
+    expect(Grenzen.texWertLesen(' ')).toBe(null)
+    for (const falsch of ['0', '-5', 'abc', '1,5']) expect(() => Grenzen.texWertLesen(falsch), falsch).toThrow()
   })
 
   it('Ausnahme: fehlt = Standard, null = unbegrenzt, Zahl (auch 0) = Zahl', async () => {

@@ -10,7 +10,10 @@ import OLFormSelect from '@/shared/components/ol/ol-form-select'
 import Notification from '@/shared/components/notification'
 import { anfrage, ApiFehler, jsonAnfrage } from '../api'
 
-type Standard = { projekte: number | null; speicherGb: number | null; texPaketeAus: boolean }
+type TexGrenzen = { texPaketMb: number; texProjektMb: number; texProStunde: number }
+type Standard = { projekte: number | null; speicherGb: number | null; texPaketeAus: boolean } & {
+  [F in keyof TexGrenzen]: number | null
+}
 type Nutzer = {
   id: string
   email: string
@@ -20,8 +23,8 @@ type Nutzer = {
   ausnahme: { projekte?: number | null; speicherGb?: number | null }
 }
 type Projekt = { id: string; name: string; eigentuemer: string; bytes: number; grenze: number | null }
-type Daten = { standard: Standard; nutzer: Nutzer[]; projekte: Projekt[] }
-type Feld = 'projekte' | 'speicherGb'
+type Daten = { standard: Standard; texStandard: TexGrenzen; nutzer: Nutzer[]; projekte: Projekt[] }
+type Feld = 'projekte' | 'speicherGb' | keyof TexGrenzen
 
 const PFAD = '/spur/admin/grenzen'
 const GB = 1024 ** 3
@@ -79,7 +82,7 @@ export default function GrenzenAdmin() {
       {!daten && !fehler && <p aria-busy="true">{t('loading')}</p>}
       {daten && (
         <>
-          <StandardFormular standard={daten.standard} neuLaden={laden} />
+          <StandardFormular standard={daten.standard} texStandard={daten.texStandard} neuLaden={laden} />
           <NutzerTabelle nutzer={daten.nutzer} neuLaden={laden} />
           <ProjektTabelle projekte={daten.projekte} neuLaden={laden} />
         </>
@@ -88,12 +91,26 @@ export default function GrenzenAdmin() {
   )
 }
 
-function StandardFormular({ standard, neuLaden }: { standard: Standard; neuLaden: () => Promise<void> }) {
+function StandardFormular({
+  standard,
+  texStandard,
+  neuLaden,
+}: {
+  standard: Standard
+  texStandard: TexGrenzen
+  neuLaden: () => Promise<void>
+}) {
   const { t } = useTranslation()
   const zahl = useZahl()
   const id = useId()
   const alsText = (wert: number | null) => (wert === null ? '' : zahl(wert))
-  const [werte, setWerte] = useState({ projekte: alsText(standard.projekte), speicherGb: alsText(standard.speicherGb) })
+  const [werte, setWerte] = useState<Record<Feld, string>>({
+    projekte: alsText(standard.projekte),
+    speicherGb: alsText(standard.speicherGb),
+    texPaketMb: alsText(standard.texPaketMb),
+    texProjektMb: alsText(standard.texProjektMb),
+    texProStunde: alsText(standard.texProStunde),
+  })
   const [texPaketeErlaubt, setTexPaketeErlaubt] = useState(!standard.texPaketeAus)
   const [feldFehler, setFeldFehler] = useState<Record<string, string>>({})
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'error'; text: string } | null>(null)
@@ -116,14 +133,14 @@ function StandardFormular({ standard, neuLaden }: { standard: Standard; neuLaden
     }
   }
 
-  const feld = (name: Feld, label: string) => (
+  const feld = (name: Feld, label: string, platzhalter = t('spur_unbegrenzt')) => (
     <div className="spur-grenzen-feld">
       <OLFormLabel htmlFor={`${id}-${name}`}>{label}</OLFormLabel>
       <OLFormControl
         id={`${id}-${name}`}
-        inputMode="decimal"
+        inputMode={name.startsWith('tex') ? 'numeric' : 'decimal'}
         value={werte[name]}
-        placeholder={t('spur_unbegrenzt')}
+        placeholder={platzhalter}
         isInvalid={Boolean(feldFehler[name])}
         aria-invalid={Boolean(feldFehler[name])}
         aria-describedby={feldFehler[name] ? `${id}-${name}-fehler` : undefined}
@@ -152,12 +169,19 @@ function StandardFormular({ standard, neuLaden }: { standard: Standard; neuLaden
           {feld('speicherGb', t('spur_speicher_je_projekt_gb'))}
         </div>
         <p className="form-text">{t('spur_grenzen_leer_hinweis')}</p>
+        <h3 className="spur-grenzen-unter">{t('spur_tex_pakete')}</h3>
         <OLFormCheckbox
           id={`${id}-tex`}
           label={t('spur_tex_pakete_erlaubt')}
           checked={texPaketeErlaubt}
           onChange={e => setTexPaketeErlaubt(e.target.checked)}
         />
+        <div className="spur-grenzen-felder mt-2">
+          {feld('texPaketMb', t('spur_tex_paket_mb'), zahl(texStandard.texPaketMb))}
+          {feld('texProjektMb', t('spur_tex_projekt_mb'), zahl(texStandard.texProjektMb))}
+          {feld('texProStunde', t('spur_tex_pro_stunde'), zahl(texStandard.texProStunde))}
+        </div>
+        <p className="form-text">{t('spur_tex_grenzen_hinweis')}</p>
         <OLButton type="submit" variant="primary" isLoading={laeuft} className="mt-3">
           {t('save')}
         </OLButton>

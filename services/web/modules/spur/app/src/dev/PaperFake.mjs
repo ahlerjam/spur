@@ -6,6 +6,7 @@ import express from 'express'
 import { crossrefCache, paperCache } from '../sammlungen.mjs'
 import { devSchalterSetzen } from '../schalter.mjs'
 import { modellOrdner } from '../semantik/einbetten.mjs'
+import { texLiveFake } from './TexLiveFake.mjs'
 
 const FIXTURES = new URL('../../../test/fixtures/', import.meta.url)
 const KATALOG = JSON.parse(readFileSync(new URL('papers.json', FIXTURES), 'utf8'))
@@ -145,7 +146,7 @@ paperFake.get('/_semantik', (req, res) => res.json({ modellVorhanden: existsSync
 paperFake.get('/_protokoll', (req, res) => res.json({ abrufe: zustand.protokoll }))
 
 paperFake.use((req, res, next) => {
-  const dienst = /^\/(arxiv|openalex|s2|unpaywall|pdf|doiorg|datacite)\//.exec(req.path)?.[1] ?? 'crossref'
+  const dienst = /^\/(arxiv|openalex|s2|unpaywall|pdf|doiorg|datacite|texlive|texlive-b)\//.exec(req.path)?.[1] ?? 'crossref'
   zustand.protokoll.push({ dienst, pfad: req.originalUrl, zeit: Date.now() })
   zustand.protokoll = zustand.protokoll.slice(-500)
   if (zustand.ausfall.has(dienst)) return res.status(503).send('Service unavailable')
@@ -158,6 +159,9 @@ paperFake.use((req, res, next) => {
   if (stoerung.retryAfter != null) res.set('Retry-After', String(stoerung.retryAfter))
   res.status(stoerung.status).send(stoerung.status === 429 ? 'Too Many Requests' : 'Service unavailable')
 })
+
+// Zwei TeX-Live-Spiegel, damit Tests Störungen je Spiegel setzen können (stoerungen.texlive, stoerungen['texlive-b']).
+paperFake.get(['/texlive/archive/:datei', '/texlive-b/archive/:datei'], texLiveFake)
 
 paperFake.get('/pdf/:datei', (req, res) => {
   if (!WERKE.some(w => w.pdf === req.params.datei)) return res.sendStatus(404)

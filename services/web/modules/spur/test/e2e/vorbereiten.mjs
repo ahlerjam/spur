@@ -3,10 +3,11 @@
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import logger from '@overleaf/logger'
-import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
+import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
 import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.mjs'
 import ProjectEntityHandler from '../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
+import ProjectEntityUpdateHandler from '../../../../app/src/Features/Project/ProjectEntityUpdateHandler.mjs'
 import DocumentUpdaterHandler from '../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import Settings from '@overleaf/settings'
 import { fetchNothing } from '@overleaf/fetch-utils'
@@ -346,7 +347,7 @@ Text davor.
 \end{document}
 `,
   })
-  await TexPakete.begrenzer.delete(String(a._id))
+  await TexPakete.drosselZuruecksetzen(a._id)
   await neuAnlegen(a, 'E2E Hochladen', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Hochladen B', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Semantik', {
@@ -474,8 +475,22 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await p8Vorbereiten(a)
 }
 
+const CARLITO = String.raw`\documentclass{article}
+\usepackage{carlito}
+\begin{document}
+\carlitoaktiv
+\end{document}
+`
+
 async function p8Vorbereiten(a) {
   await neuAnlegen(a, 'E2E P8 Zahlen', { 'main.tex': LEER })
+  for (const name of ['E2E P8 Pakete', 'E2E P8 Pakete B', 'E2E P8 Pakete Abbruch']) await neuAnlegen(a, name, { 'main.tex': CARLITO })
+  // Reste eines abgebrochenen Versuchs: ein leerer Ordner und ein Ordner mit einer Datei, beide ohne Eintrag.
+  const leer = await neuAnlegen(a, 'E2E P8 Pakete Rest', { 'main.tex': CARLITO })
+  await ProjectEntityUpdateHandler.promises.mkdirp(leer._id, '/tex-pakete/carlito', a._id)
+  const eine = await neuAnlegen(a, 'E2E P8 Pakete Rest B', { 'main.tex': CARLITO })
+  await ProjectEntityUpdateHandler.promises.upsertDocWithPath(eine._id, '/tex-pakete/carlito/carlito.sty', ['% Rest'], 'spur-seed', a._id)
+  await p8GrenzenVorbereiten()
   const leser = await konto('e2e-leser@example.org')
   const makros = await neuAnlegen(a, 'E2E P8 Makros', {
     'main.tex': String.raw`\documentclass{article}
@@ -550,6 +565,25 @@ Andere \parencite{andere}.
   doi = {10.3333/andere.1}
 }`,
   })
+}
+
+// Füllt ein Projekt mit Platzhalter-Dateien (nur Einträge im Baum, ohne Inhalt) bis auf `gesamt` Einträge.
+export async function eintraegeAuffuellen(projectId, gesamt) {
+  const { rootFolder } = await db.projects.findOne({ _id: projectId }, { projection: { rootFolder: 1 } })
+  const wurzel = rootFolder[0]
+  const vorhanden = wurzel.docs.length + wurzel.fileRefs.length + wurzel.folders.length
+  const neu = Array.from({ length: gesamt - vorhanden }, (_, i) => ({ _id: new ObjectId(), name: `platzhalter-${i}.bin`, created: new Date() }))
+  await db.projects.updateOne({ _id: projectId }, { $push: { 'rootFolder.0.fileRefs': { $each: neu } }, $inc: { version: 1 } })
+}
+
+// P8 Paketgrenzen: eigene Konten ohne Admin-Rechte, damit die Drossel bei null beginnt.
+async function p8GrenzenVorbereiten() {
+  const [p, pb] = await Promise.all(['e2e-pakete', 'e2e-pakete-b'].map(n => konto(`${n}@example.org`)))
+  for (const name of ['A', 'B', 'C']) await neuAnlegen(p, `E2E P8 Grenzen ${name}`, { 'main.tex': LEER })
+  const voll = await neuAnlegen(p, 'E2E P8 Grenzen Voll', { 'main.tex': LEER })
+  await eintraegeAuffuellen(voll._id, 1997)
+  await neuAnlegen(pb, 'E2E P8 Drossel', { 'main.tex': LEER })
+  await Promise.all([p, pb].map(k => TexPakete.drosselZuruecksetzen(k._id)))
 }
 
 // P7 Grenzen: eigene Konten ohne Admin-Rechte, damit die Projektzahlen klein und bekannt sind.

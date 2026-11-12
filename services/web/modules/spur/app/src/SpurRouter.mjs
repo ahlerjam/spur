@@ -15,7 +15,6 @@ import * as UploadLinkController from './hochladen/UploadLinkController.mjs'
 import { e2eVorbereiten, quelleVergroessern, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { mailFakeLesen, mailFakeSteuern } from './dev/MailFake.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
-import { texLiveFake } from './dev/TexLiveFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
 const lesen = [
@@ -184,7 +183,6 @@ export default {
       publicApiRouter.post('/spur/dev/e2e/vorbereiten', e2eVorbereiten)
       publicApiRouter.post('/spur/dev/mail', mailFakeSteuern)
       publicApiRouter.get('/spur/dev/mail', mailFakeLesen)
-      publicApiRouter.get('/spur/dev/texlive/archive/:datei', texLiveFake)
       publicApiRouter.post('/spur/dev/quelle-vergroessern', quelleVergroessern)
     }
   },

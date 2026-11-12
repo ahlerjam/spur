@@ -17,6 +17,18 @@
   Projekt-Eintrag (`userId: null`), Route `GET|PUT /spur/project/:id/pruefbericht/makros` (PUT nur mit Schreibrecht).
   Die Eingabe trennt Namen an Komma oder Leerraum. Die Schreibsperre lädt das Projekt jetzt, sobald der geänderte
   Bereich einen Befehl oder „ enthält (vorher nur bei bekannten Zitatbefehlen), damit eigene Makros greifen.
+- f6: Installiert ist ein Paket, wenn es einen Eintrag in `spurTexPackages` hat und sein Ordner Dateien enthält; der
+  Eintrag und der Eintrag am Lauf entstehen erst nach dem letzten Upload. Ein Ordner ohne Eintrag ist ein Rest und wird
+  vor der Installation entfernt. Je Projekt und Paket läuft ein Aufruf (Sperre in `spurDrossel`, `_id`
+  `tex-sperre:<projekt>:<paket>`, nach 10 min veraltet); ein zweiter wartet und sieht das Ergebnis. Upload-Fehler
+  rollen zurück (auch `tex-pakete/`, wenn sonst leer) und melden `paket_abgebrochen`. Ein Abbruch beim Client bricht
+  die Installation nicht ab. Die Testschalter `SPUR_TEX_UPLOAD_FEHLER` und `SPUR_TEX_UPLOAD_PAUSE_MS` gelten nur im
+  Dev-Stack über die Fake-Steuerung (`testSchalter`), nie aus der Umgebung.
+- f6: Der TeX-Live-Fake hängt jetzt unter dem Paper-Fake (`/spur/dev/crossref/texlive` und `/texlive-b`), damit
+  `stoerungen` je Spiegel greifen. `spurtest-riesig` ist jetzt 101 MB (p7f5 erwartet „100 MB“), neu sind
+  `spurtest-gross` (30 MB entpackt) und `carlito` (fünf Dateien).
+- f7: Die Drossel zählt gelungene Installationen in `spurDrossel` (`tex-pakete:<person>`, Zeitstempel der letzten
+  Stunde) statt mit Overleafs RateLimiter, weil die Grenze einstellbar ist und Fehlversuche nicht zählen.
 - E2E: Das run-code-Werkzeug bricht nach 60 s ab. Die Suite läuft darum im Hintergrund des Playwright-Prozesses
   (Wrapper mit `page.__e2e`, Ergebnis per zweitem Aufruf abgefragt); der Wrapper liegt im ignorierten
   `.playwright-mcp/`.
