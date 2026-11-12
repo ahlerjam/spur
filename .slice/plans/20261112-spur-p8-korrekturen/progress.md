@@ -8,6 +8,13 @@
 - f1: DOIs werden je Pfadteil kodiert (der Schrägstrich bleibt), Teile `.`/`..` werden ohne Abruf als nicht
   registriert behandelt. Ältere E2E-Schritte (f7, p6f4) erwarten jetzt „DOI nicht registriert“ statt „DOI bei
   Crossref unbekannt“.
+- f2: `markiert` = geprüfte Stellen mit `problem: true`; eine Stelle mit Quelle, aber ohne Wortlaut, bekommt
+  `status: "beleg_ohne_wortlaut"`, `grund: "kein_wortlaut"`. Die genaue Kopfzeile von „E2E Bericht“ prüft f7 gleich
+  nach dem Öffnen (frische Daten, `ZAEHLUNG_BERICHT`, gezählt: 3 markiert); p8f2 vergleicht die Zahl mit dem Filter
+  und `check_report`, weil f7 das Projekt danach ändert.
+- E2E: Das run-code-Werkzeug bricht nach 60 s ab. Die Suite läuft darum im Hintergrund des Playwright-Prozesses
+  (Wrapper mit `page.__e2e`, Ergebnis per zweitem Aufruf abgefragt); der Wrapper liegt im ignorierten
+  `.playwright-mcp/`.
 - Einzelne Testdateien laufen mit `spur-dev upstream web|frontend modules/spur/test/...` (Ergebnis in
   `/root/.cache/spur-dev/upstream/aktuell/*.json`).
 

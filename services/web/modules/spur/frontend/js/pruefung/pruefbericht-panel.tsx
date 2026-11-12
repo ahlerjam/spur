@@ -24,6 +24,8 @@ function useBadges(zeile: Zeile) {
   if (zeile.wortlaut === 'ocr_unbestaetigt') add(t('spur_wortlaut_ocr'), 'warning')
   if (zeile.wortlaut === 'bestaetigt') add(t('spur_wortlaut_bestaetigt'), 'success')
 
+  if (zeile.status === 'beleg_ohne_wortlaut') add(t('spur_beleg_ohne_wortlaut'), 'info')
+
   if (zeile.seite === 'stimmt') add(t('spur_seite_stimmt'), 'success')
   if (zeile.seite === 'bestaetigt') add(t('spur_seite_bestaetigt'), 'success')
   if (zeile.seite === 'nicht_pruefbar') add(t('spur_seite_nicht_pruefbar'), 'warning')
@@ -63,8 +65,8 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
       </OLButton>
       {zeile.key && <span className="spur-zeile-key">{zeile.key}</span>}
       {zeile.auszug && <p className="spur-zeile-auszug">{zeile.auszug}</p>}
-      {/* Den Crossref-Ausfall nennt schon die Marke darunter. */}
-      {zeile.grund && zeile.referenz !== 'nicht_pruefbar' && (
+      {/* Den Ausfall und den Beleg ohne Wortlaut nennt schon die Marke darunter. */}
+      {zeile.grund && zeile.referenz !== 'nicht_pruefbar' && zeile.status !== 'beleg_ohne_wortlaut' && (
         <p className="spur-zeile-meta">{t(`spur_grund_${zeile.grund}`)}</p>
       )}
       {zeile.registrierstelle === 'datacite' && zeile.referenz === 'gefunden' && (
@@ -83,7 +85,10 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
 
 function Zaehlung({ zaehlung }: { zaehlung: Bericht['zaehlung'] }) {
   const { t } = useTranslation()
-  const teile = STELLEN_STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s] }))
+  const teile = STELLEN_STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s], count: zaehlung[s] }))
+  if (zaehlung.geprueft > 0) {
+    teile[0] += zaehlung.markiert > 0 ? `, ${t('spur_stellen_markiert', { anzahl: zaehlung.markiert })}` : `, ${t('spur_stellen_keine_markiert')}`
+  }
   return <p className="spur-zeile-meta">{t('spur_zitierstellen', { liste: teile.join(', ') })}</p>
 }
 

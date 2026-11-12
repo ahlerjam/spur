@@ -37,7 +37,7 @@ describe('Prüfbericht-Panel', function () {
         { ...zeile('seite', false), auszug: 'Ohne Seite', status: 'ohne_seitenangabe', grund: 'seitenangabe_fehlt' },
         { ...zeile('ausfall', false), auszug: 'Ausfall', referenz: 'nicht_pruefbar', status: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar' },
       ],
-      zaehlung: { geprueft: 1, ohne_quelle: 1, ohne_seitenangabe: 1, nicht_pruefbar: 1 },
+      zaehlung: { geprueft: 1, markiert: 0, ohne_quelle: 1, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 0, nicht_pruefbar: 1 },
     })
     // Der Prüf-Store ist ein Modul-Singleton: Andere Testdateien können ihn schon gefüllt oder eine
     // verzögerte Prüfung geplant haben. pruefen() bricht den Timer ab und lädt diesen Bericht.
@@ -64,7 +64,7 @@ describe('Prüfbericht-Panel', function () {
 
   it('zählt die Zitierstellen nach Status und nennt je nicht geprüfter Stelle den Grund', async function () {
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
-    await screen.findByText('Zitierstellen: 1 geprüft, 1 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar')
+    await screen.findByText('Zitierstellen: 1 geprüft, keine markiert, 1 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar')
     expect(screen.queryByText(/Abschnitte geprüft/)).to.not.exist
     screen.getByText('keine Quelle aufgenommen')
     screen.getByText('Seitenangabe fehlt')
@@ -90,11 +90,26 @@ describe('Prüfbericht-Panel', function () {
     screen.getByText('nicht prüfbar – die Registrierstelle ist gerade nicht erreichbar')
   })
 
-  it('lässt Status mit null Stellen in der Zählung weg', async function () {
+  it('nennt markierte Stellen und Belege ohne Wortlaut', async function () {
     fetchMock.removeRoutes()
-    fetchMock.get(BERICHT, { zeilen: [zeile('gruen', false)], zaehlung: { geprueft: 1, ohne_quelle: 0, ohne_seitenangabe: 0, nicht_pruefbar: 0 } })
+    fetchMock.get(BERICHT, {
+      zeilen: [
+        zeile('rot', true),
+        { ...zeile('gruen', false), auszug: 'Nur Beleg', wortlaut: null, status: 'beleg_ohne_wortlaut', grund: 'kein_wortlaut' },
+      ],
+      zaehlung: { geprueft: 6, markiert: 4, ohne_quelle: 2, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 2, nicht_pruefbar: 1 },
+    })
     await pruefen()
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
-    await screen.findByText('Zitierstellen: 1 geprüft')
+    await screen.findByText('Zitierstellen: 6 geprüft, davon 4 markiert, 2 ohne Quelle, 2 Belege ohne Wortlaut, 1 nicht prüfbar')
+    screen.getByText('Beleg ohne Wortlaut')
+  })
+
+  it('lässt Status mit null Stellen in der Zählung weg', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, { zeilen: [zeile('gruen', false)], zaehlung: { geprueft: 1, markiert: 0, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 } })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    await screen.findByText('Zitierstellen: 1 geprüft, keine markiert')
   })
 })

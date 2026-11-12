@@ -22,12 +22,12 @@ export type Zeile = {
   grund: string | null
 }
 
-export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar'] as const
+export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'beleg_ohne_wortlaut', 'nicht_pruefbar'] as const
 export type StellenStatus = (typeof STELLEN_STATUS)[number]
 
 export type Bericht = {
   zeilen: Zeile[]
-  zaehlung: Record<StellenStatus, number>
+  zaehlung: Record<StellenStatus, number> & { markiert: number }
 }
 
 export type PruefZustand = {

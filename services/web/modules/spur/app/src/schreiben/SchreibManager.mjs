@@ -7,7 +7,6 @@ import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocat
 import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
 import EditorHttpController from '../../../../../app/src/Features/Editor/EditorHttpController.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
-import { zitateFinden } from '../pruefung/latex.mjs'
 import { bereichPruefen } from '../pruefung/PruefManager.mjs'
 import { bearbeitungen } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
@@ -77,8 +76,8 @@ function vorkommen(text, teil) {
 }
 
 async function pruefSperre(projectId, neuerText, von, bis) {
-  const beruehrt = zitateFinden(neuerText).some(f => f.von <= bis && f.bis >= von)
-  if (!beruehrt) return []
+  // Ohne Zitatbefehl im Bereich kein Laden des Projekts; eigene Zitatmakros kennt erst bereichPruefen.
+  if (!/\\[a-zA-Z@]|„/.test(neuerText.slice(von, bis))) return []
   const zeilen = await bereichPruefen(projectId, neuerText, von, bis)
   const rot = []
   for (const z of zeilen) {

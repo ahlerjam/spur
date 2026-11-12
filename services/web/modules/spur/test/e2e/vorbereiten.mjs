@@ -475,6 +475,16 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
 }
 
 async function p8Vorbereiten(a) {
+  const zaehlung = await neuAnlegen(a, 'E2E P8 Zählung', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\begin{document}
+\enquote{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
+Schlaf hilft dem Gedächtnis \parencite{smith2024}.
+\end{document}`,
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(zaehlung._id, a._id, 'smith2024.pdf')
   await neuAnlegen(a, 'E2E P8 DOI', {
     'main.tex': String.raw`\documentclass{article}
 \usepackage[backend=biber]{biblatex}

@@ -305,6 +305,8 @@ async page => {
     return await page.locator('.spur-paper-doi').allTextContents()
   }
 
+  const ZAEHLUNG_BERICHT = 'Zitierstellen: 6 geprüft, davon 3 markiert, 2 ohne Quelle, 1 nicht prüfbar'
+
   const features = {
     async f1() {
       await page.context().clearCookies()
@@ -631,6 +633,8 @@ async page => {
         await zeile(text).getByText(status, { exact: true }).waitFor({ timeout: 30000 })
       }
       await zeigt('kapitel.tex', 'Wortlaut: exakt')
+      // P8 f2: Kopfzeile auf den frischen Testdaten, bevor dieser Schritt das Projekt ändert.
+      await page.getByText(ZAEHLUNG_BERICHT, { exact: true }).waitFor({ timeout: 30000 })
       await zeigt('Sleep supports […] declarative memory.', 'Wortlaut: exakt')
       await zeigt('Sleep strongly supports', 'Wortlaut: abweichend')
       await zeigt('hippocampus replays', 'Wortlaut: mit Trennungstoleranz')
@@ -3465,7 +3469,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await breite(1280)
     await anmelden('e2e-a@example.org')
     const token = await neuesToken()
-    const ZAEHLUNG = 'Zitierstellen: 1 geprüft, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar'
+    const ZAEHLUNG = 'Zitierstellen: 1 geprüft, keine markiert, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar'
     const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
     try {
       await fakeSteuern({ cachesLeeren: true, stoerungen: { [`crossref:${FOODS}`]: { status: 503 } } })
@@ -3487,7 +3491,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
       const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
       ok(
-        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, nicht_pruefbar: 1 }),
+        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 0, nicht_pruefbar: 1, markiert: 0 }),
         `check_report: ${JSON.stringify(bericht.zaehlung)}`
       )
       const gruende = bericht.eintraege.map(z => z.grund).filter(Boolean).sort()
@@ -4277,6 +4281,44 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     } finally {
       await fakeSteuern({})
     }
+  }
+
+  features.p8f2 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    // Die genaue Kopfzeile auf frischen Daten prüft f7 (ZAEHLUNG_BERICHT); hier die Zahl hinter „davon“ gegen den Filter.
+    await projektOeffnen('E2E Bericht')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await page.getByLabel('Nur Probleme').setChecked(false)
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    const kopf = page.getByText(/^Zitierstellen: /)
+    await kopf.waitFor({ timeout: 30000 })
+    const markiert = Number(/davon (\d+) markiert/.exec(await kopf.innerText())?.[1])
+    const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
+    const geprueftProbleme = bericht.eintraege.filter(z => z.status === 'geprueft' && z.problem).length
+    ok(markiert > 0 && markiert === geprueftProbleme && bericht.zaehlung.markiert === markiert, `davon ${markiert} markiert, Filter ${geprueftProbleme}, MCP ${JSON.stringify(bericht.zaehlung)}`)
+    for (const schluessel of ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar']) {
+      ok(Number.isInteger(bericht.zaehlung[schluessel]), `zaehlung.${schluessel} fehlt: ${JSON.stringify(bericht.zaehlung)}`)
+    }
+    await page.getByLabel('Nur Probleme').check()
+    const sichtbar = await page.locator('.spur-zeile').count()
+    const problemeGesamt = bericht.eintraege.filter(z => z.problem).length
+    ok(sichtbar === problemeGesamt, `Nur Probleme zeigt ${sichtbar}, MCP ${problemeGesamt}`)
+    await page.getByLabel('Nur Probleme').uncheck()
+
+    await projektOeffnen('E2E P8 Zählung')
+    const pid2 = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.getByText('Zitierstellen: 1 geprüft, keine markiert, 1 Beleg ohne Wortlaut', { exact: true }).waitFor({ timeout: 30000 })
+    await page.locator('.spur-zeile .badge').getByText('Beleg ohne Wortlaut', { exact: true }).waitFor()
+    const zweiter = (await werkzeug(token, 'check_report', { project_id: pid2 })).inhalt.zaehlung
+    ok(zweiter.beleg_ohne_wortlaut === 1 && zweiter.geprueft === 1 && zweiter.markiert === 0, `check_report: ${JSON.stringify(zweiter)}`)
+    const { daten } = await mcp(token, 'tools/list')
+    const beschreibung = daten.result.tools.find(w => w.name === 'check_report').description
+    ok(/markiert/.test(beschreibung) && /beleg_ohne_wortlaut/.test(beschreibung), `Beschreibung: ${beschreibung}`)
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

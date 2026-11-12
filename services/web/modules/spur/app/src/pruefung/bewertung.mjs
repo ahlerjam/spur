@@ -107,9 +107,10 @@ export function stelleEinordnen(zeile) {
   if (zeile.referenz === 'nicht_pruefbar') return { status: 'nicht_pruefbar', grund: zeile.grund }
   if (!zeile.key) return { status: 'nicht_pruefbar', grund: 'zitierform_unbekannt' }
   if (!zeile.quelleId) return { status: 'ohne_quelle', grund: 'keine_quelle' }
+  if (!zeile.wortlaut) return { status: 'beleg_ohne_wortlaut', grund: 'kein_wortlaut' }
   if (zeile.wortlaut && !seiteAusBeleg(zeile.seitenangabe)) return { status: 'ohne_seitenangabe', grund: 'seitenangabe_fehlt' }
   if (zeile.wortlaut === 'nicht_pruefbar') return { status: 'nicht_pruefbar', grund: 'quelle_ohne_text' }
   return { status: 'geprueft', grund: null }
 }
 
-export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar']
+export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'beleg_ohne_wortlaut', 'nicht_pruefbar']

@@ -183,7 +183,8 @@ describe('stelleEinordnen', () => {
   it.each([
     [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'exakt', seitenangabe: 'S. 3', referenz: 'gefunden' }, 'geprueft', null],
     [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'abweichend', seitenangabe: '3' }, 'geprueft', null],
-    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: null, seitenangabe: null, referenz: 'ohne_doi' }, 'geprueft', null],
+    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: null, seitenangabe: null, referenz: 'ohne_doi' }, 'beleg_ohne_wortlaut', 'kein_wortlaut'],
+    [{ key: 'a', quelleId: QUELLE_ID, wortlaut: null, seitenangabe: '3', referenz: 'gefunden' }, 'beleg_ohne_wortlaut', 'kein_wortlaut'],
     [{ key: 'a', quelleId: null, wortlaut: 'quelle_fehlt' }, 'ohne_quelle', 'keine_quelle'],
     [{ key: 'a', quelleId: null, wortlaut: null }, 'ohne_quelle', 'keine_quelle'],
     [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'exakt', seitenangabe: null }, 'ohne_seitenangabe', 'seitenangabe_fehlt'],

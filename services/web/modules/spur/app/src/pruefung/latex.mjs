@@ -190,8 +190,90 @@ function unbekannteForm(text, name, start, pos) {
 const IST_UNBEKANNT = name =>
   !NICHT_ZITATE.has(name) && (/cite/i.test(name) || /quote$/i.test(name))
 
-export function zitateFinden(quelltext) {
+const DEFINITIONEN = [
+  /\\(?:(?:re)?newcommand|providecommand)\*?\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*(?:\[\d\]\s*)?(?:\[[^\]]*\]\s*)?(?=\{)/g,
+  /\\def\s*\\([a-zA-Z@]+)\s*(?:#\d\s*)*(?=\{)/g,
+  /\\(?:New|Renew|Provide|Declare)DocumentCommand\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*\{[^{}]*\}\s*(?=\{)/g,
+]
+const ZITAT_RUMPF = [
+  /^\\(?:enquote|textquote|blockquote)\*?\s*(?:\[[^\]]*\]\s*)?\{\s*#1\s*\}$/,
+  /^„\s*#1\s*“$/,
+  /^“\s*#1\s*”$/,
+  /^``\s*#1\s*''$/,
+  /^"\s*#1\s*"$/,
+]
+const BEAMER = /\\documentclass\s*(?:\[[^\]]*\])?\s*\{beamer\}/
+const BEAMER_NOTIZEN = /\\setbeameroption\s*\{\s*show notes/
+
+// Zitatmakros (Rumpf ist ein Zitat von #1) und ausgeblendete Makros (leerer Rumpf, Beamer-\note ohne show notes)
+// aus den Definitionen der Dokumente.
+export function makrosErkennen(texte) {
+  const zitat = new Set()
+  const ausgeblendet = new Set()
+  for (const roh of texte) {
+    const text = maskieren(roh)
+    for (const muster of DEFINITIONEN) {
+      for (const m of text.matchAll(muster)) {
+        const rumpf = argument(text, m.index + m[0].length)
+        if (!rumpf) continue
+        const inhalt = rumpf.text.trim()
+        if (!inhalt) ausgeblendet.add(m[1])
+        else if (ZITAT_RUMPF.some(r => r.test(inhalt))) zitat.add(m[1])
+      }
+    }
+    if (BEAMER.test(text) && !BEAMER_NOTIZEN.test(text)) ausgeblendet.add('note')
+  }
+  return { zitat: [...zitat].sort(), ausgeblendet: [...ausgeblendet].sort() }
+}
+
+// Die Einstellung des Projekts geht vor: Ein Name in einer Liste nimmt ihn aus der anderen.
+export function makrosWirksam(erkannt, einstellung = {}) {
+  const zitat = einstellung.zitat ?? []
+  const aus = einstellung.ausgeblendet ?? []
+  return {
+    zitat: [...new Set([...erkannt.zitat, ...zitat])].filter(n => !aus.includes(n)).sort(),
+    ausgeblendet: [...new Set([...erkannt.ausgeblendet.filter(n => !zitat.includes(n)), ...aus])].sort(),
+  }
+}
+
+const BEDINGUNG = /\\(if[a-zA-Z@]*|fi)(?![a-zA-Z@])/g
+
+function ausgeblendeteBereiche(text, ausgeblendet) {
+  const bereiche = []
+  for (const m of text.matchAll(/\\([a-zA-Z@]+)\*?/g)) {
+    if (!ausgeblendet.has(m[1])) continue
+    const { pos } = optionen(text, m.index + m[0].length)
+    const arg = argument(text, pos)
+    if (arg) bereiche.push({ von: m.index, bis: arg.pos })
+  }
+  BEDINGUNG.lastIndex = 0
+  let start = -1
+  let tiefe = 0
+  for (const m of text.matchAll(BEDINGUNG)) {
+    if (start < 0) {
+      if (m[1] === 'iffalse') {
+        start = m.index
+        tiefe = 1
+      }
+    } else if (m[1] === 'fi') {
+      if (--tiefe === 0) {
+        bereiche.push({ von: start, bis: m.index + m[0].length })
+        start = -1
+      }
+    } else {
+      tiefe++
+    }
+  }
+  return bereiche
+}
+
+const KEINE_MAKROS = { zitat: [], ausgeblendet: [] }
+
+// Zeilen in ausgeblendeten Bereichen tragen `ausgeblendet: true`; Aufrufer zählen sie nur als übersprungen.
+export function zitateFinden(quelltext, makros = KEINE_MAKROS) {
   const text = maskieren(quelltext)
+  const zitatMakros = new Set(makros.zitat)
+  const bereiche = ausgeblendeteBereiche(text, new Set(makros.ausgeblendet))
   const zeilen = []
   const muster = /\\([a-zA-Z]+)\*?|„/g
   for (let m = muster.exec(text); m; m = muster.exec(text)) {
@@ -203,6 +285,9 @@ export function zitateFinden(quelltext) {
       treffer = anfuehrung(text, start)
     } else if (ZITAT_BEFEHLE.has(name)) {
       treffer = zitatBefehl(text, name, start, pos)
+    } else if (zitatMakros.has(name)) {
+      treffer = zitatBefehl(text, 'enquote', start, pos)
+      if (treffer?.form) treffer.form = name
     } else if (name === 'begin' && text.startsWith('{quote}', pos)) {
       treffer = quoteUmgebung(text, start, pos + '{quote}'.length)
     } else if (BELEG_BEFEHLE.has(name)) {
@@ -222,7 +307,11 @@ export function zitateFinden(quelltext) {
       treffer = unbekannteForm(text, name, start, pos)
     }
     if (!treffer) continue
-    if (treffer.form) zeilen.push(treffer)
+    if (treffer.form) {
+      if (bereiche.some(b => treffer.von >= b.von && treffer.von < b.bis)) treffer.ausgeblendet = true
+      zeilen.push(treffer)
+    }
+    // In einem ausgeblendeten Makro weitersuchen: Das Zitat darin soll als übersprungen zählen.
     muster.lastIndex = treffer.ende ?? treffer.bis
   }
   return zeilen

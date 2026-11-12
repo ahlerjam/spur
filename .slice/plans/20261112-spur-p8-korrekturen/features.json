@@ -25,7 +25,7 @@
     "Ohne markierte Stellen lautet die Zeile „… geprüft, keine markiert“",
     "Die Werkzeugbeschreibung von `check_report` erklärt `markiert` und `beleg_ohne_wortlaut` in einem Satz"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

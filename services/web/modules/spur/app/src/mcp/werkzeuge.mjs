@@ -212,12 +212,15 @@ export const WERKZEUGE = {
   check_report: {
     description:
       'Prüfbericht des Projekts wie im Browser. zaehlung zählt die Zitierstellen nach status (geprueft, ohne_quelle, ' +
-      'ohne_seitenangabe, nicht_pruefbar); jede nicht geprüfte Stelle nennt ihren grund.',
+      'ohne_seitenangabe, beleg_ohne_wortlaut, nicht_pruefbar); jede nicht geprüfte Stelle nennt ihren grund. ' +
+      'markiert zählt die geprüften Stellen mit problem: true, beleg_ohne_wortlaut die Stellen, die eine Quelle nur ' +
+      'zitieren, ohne ihren Wortlaut wiederzugeben. uebersprungen zählt Stellen in ausgeblendeten Bereichen ' +
+      '(leer definierte Makros, \\iffalse, Beamer-Notizen, Einstellung „Ausgeblendete Makros“).',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
-      const { zeilen, zaehlung } = await PruefManager.bericht(projectId)
-      return { ...blatt(zeilen, cursor), zaehlung }
+      const { zeilen, zaehlung, uebersprungen } = await PruefManager.bericht(projectId)
+      return { ...blatt(zeilen, cursor), zaehlung, uebersprungen }
     },
   },
 

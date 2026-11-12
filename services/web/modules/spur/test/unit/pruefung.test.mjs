@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   latexZuText,
+  makrosErkennen,
+  makrosWirksam,
   seiteAusBeleg,
   zitateFinden,
   zitierpaket,
@@ -138,5 +140,87 @@ describe('doiNormal', () => {
     expect(doiNormal('doi: 10.5/y')).toBe('10.5/y')
     expect(doiNormal('10.5555/spur')).toBe('10.5555/spur')
     expect(doiNormal('  ')).toBeNull()
+  })
+})
+
+describe('makrosErkennen', () => {
+  it.each([
+    [String.raw`\newcommand{\zitat}[1]{\enquote{#1}}`, ['zitat']],
+    [String.raw`\newcommand*{\zitat}[1]{\textquote{#1}}`, ['zitat']],
+    [String.raw`\renewcommand\zit[1]{\blockquote{#1}}`, ['zit']],
+    [String.raw`\providecommand{\qq}[1]{„#1“}`, ['qq']],
+    ["\\def\\qq#1{``#1''}", ['qq']],
+    [String.raw`\NewDocumentCommand{\qq}{m}{\enquote{#1}}`, ['qq']],
+    [String.raw`\newcommand{\fett}[1]{\textbf{#1}}`, []],
+  ])('erkennt Zitatmakros in %s', (text, zitat) => {
+    expect(makrosErkennen([text]).zitat).toEqual(zitat)
+  })
+
+  it('erkennt leer definierte Makros als ausgeblendet, nicht aber sichtbare', () => {
+    expect(makrosErkennen([String.raw`\newcommand{\note}[1]{}`]).ausgeblendet).toEqual(['note'])
+    expect(makrosErkennen([String.raw`\newcommand{\note}[1]{ }`]).ausgeblendet).toEqual(['note'])
+    expect(makrosErkennen([String.raw`\newcommand{\note}[1]{\textcolor{red}{#1}}`]).ausgeblendet).toEqual([])
+  })
+
+  it('blendet Beamer-Notizen nur ohne show notes aus', () => {
+    const ohne = String.raw`\documentclass[11pt]{beamer}
+\begin{document}`
+    const mit = String.raw`\documentclass{beamer}
+\setbeameroption{show notes}
+\begin{document}`
+    expect(makrosErkennen([ohne]).ausgeblendet).toEqual(['note'])
+    expect(makrosErkennen([mit]).ausgeblendet).toEqual([])
+    expect(makrosErkennen([String.raw`\documentclass{beamer}\setbeameroption{show notes on second screen=right}`]).ausgeblendet).toEqual([])
+    expect(makrosErkennen([String.raw`\documentclass{article}`]).ausgeblendet).toEqual([])
+  })
+
+  it('übersieht auskommentierte Definitionen', () => {
+    expect(makrosErkennen(['% \\newcommand{\\zitat}[1]{\\enquote{#1}}']).zitat).toEqual([])
+  })
+})
+
+describe('makrosWirksam', () => {
+  it('lässt die Einstellung vor der Erkennung gelten', () => {
+    const erkannt = { zitat: ['zitat', 'zwei'], ausgeblendet: ['note'] }
+    expect(makrosWirksam(erkannt, { zitat: ['wort', 'note'], ausgeblendet: ['zwei'] })).toEqual({
+      zitat: ['note', 'wort', 'zitat'],
+      ausgeblendet: ['zwei'],
+    })
+  })
+})
+
+describe('zitateFinden mit Makros', () => {
+  const makros = { zitat: ['zitat'], ausgeblendet: ['note'] }
+
+  it('liest eigene Zitatmakros wie enquote', () => {
+    const [z] = zitateFinden(String.raw`\zitat{Sleep supports.} \autocite[347]{smith2024}`, makros)
+    expect(z).toMatchObject({ roh: 'Sleep supports.', belege: [{ befehl: 'autocite', key: 'smith2024', seite: '347' }] })
+  })
+
+  it('kennzeichnet Zitate in ausgeblendeten Makros und in \\iffalse … \\fi', () => {
+    const text = String.raw`\enquote{A.} \autocite{smith2024}
+\note{\enquote{Erfunden.} \autocite{brown2005}}
+\note[item]{\parencite{x}}
+\iffalse \parencite{wider2023} \fi
+\iftrue \parencite{sichtbar} \fi
+\parencite{danach}`
+    const zeilen = zitateFinden(text, makros)
+    expect(zeilen.map(z => [z.belege[0]?.key, Boolean(z.ausgeblendet)])).toEqual([
+      ['smith2024', false],
+      ['brown2005', true],
+      ['x', true],
+      ['wider2023', true],
+      ['sichtbar', false],
+      ['danach', false],
+    ])
+  })
+
+  it('blendet bis zum passenden \\fi aus, auch mit inneren Bedingungen', () => {
+    const text = String.raw`\iffalse \ifdefined\x \parencite{a} \fi \parencite{b} \fi \parencite{c}`
+    expect(zitateFinden(text, makros).map(z => [z.belege[0].key, Boolean(z.ausgeblendet)])).toEqual([
+      ['a', true],
+      ['b', true],
+      ['c', false],
+    ])
   })
 })

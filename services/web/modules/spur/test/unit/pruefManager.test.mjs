@@ -139,15 +139,20 @@ describe('bericht', () => {
   })
 
   it('zählt Zitierstellen nach Status, auch wenn Abschnitte aus dem Cache kommen', async () => {
-    projektDocs['/main.tex'] = doc(`${MAIN}\n\\enquote{X.} \\autocite{unbekannt}\n\\enquote{Sleep supports} \\autocite{smith2024}`, wurzelDoc)
+    projektDocs['/main.tex'] = doc(
+      `${MAIN}\n\\enquote{X.} \\autocite{unbekannt}\n\\enquote{Sleep supports} \\autocite{smith2024}\nBeleg \\parencite{smith2024}.`,
+      wurzelDoc
+    )
     const erster = await PruefManager.bericht(projekt)
-    const ZAEHLUNG = { geprueft: 2, ohne_quelle: 1, ohne_seitenangabe: 1, nicht_pruefbar: 0 }
+    // markiert: geprüfte Stellen mit Problem (hier „Das steht nirgends.“); die übrigen Schlüssel bleiben.
+    const ZAEHLUNG = { geprueft: 2, markiert: 1, ohne_quelle: 1, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 1, nicht_pruefbar: 0 }
     expect(erster.zaehlung).toEqual(ZAEHLUNG)
     expect(erster.zeilen.map(z => [z.status, z.grund])).toEqual([
       ['geprueft', null],
       ['geprueft', null],
       ['ohne_quelle', 'keine_quelle'],
       ['ohne_seitenangabe', 'seitenangabe_fehlt'],
+      ['beleg_ohne_wortlaut', 'kein_wortlaut'],
     ])
     const zweiter = await PruefManager.bericht(projekt)
     expect(zweiter.abschnitte.neu).toBe(0)

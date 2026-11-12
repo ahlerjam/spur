@@ -5,11 +5,12 @@ import ProjectEntityHandler from '../../../../../app/src/Features/Project/Projec
 import ProjectGetter from '../../../../../app/src/Features/Project/ProjectGetter.mjs'
 import * as Crossref from '../Crossref.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
-import { pruefCache, quotes } from '../sammlungen.mjs'
+import { Problem } from '../probleme.mjs'
+import { einstellungen, pruefCache, quotes } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { bibLesen } from './bib.mjs'
 import { istProblem, quelleZu, STELLEN_STATUS, stelleEinordnen, zeileBewerten } from './bewertung.mjs'
-import { zitateFinden } from './latex.mjs'
+import { makrosErkennen, makrosWirksam, zitateFinden } from './latex.mjs'
 
 const CROSSREF_PARALLEL = 5
 const ABSCHNITT = /^[ \t]*\\(part|chapter|section)\*?\s*[[{]/gm
@@ -68,7 +69,46 @@ export async function dokumente(projectId) {
     })
 }
 
-async function kontextLaden(projectId, docs) {
+const MAKRO_LISTEN = ['zitat', 'ausgeblendet']
+const MAX_MAKROS = 30
+const projektFilter = projectId => ({ projectId, userId: null })
+
+export async function makroEinstellung(projectId) {
+  const eintrag = await (await einstellungen()).findOne(projektFilter(projectId), { projection: { pruefMakros: 1 } })
+  return { zitat: eintrag?.pruefMakros?.zitat ?? [], ausgeblendet: eintrag?.pruefMakros?.ausgeblendet ?? [] }
+}
+
+// Namen ohne Backslash, nur Buchstaben und @; ein vorangestellter Backslash wird entfernt.
+export async function makroEinstellungSetzen(projectId, eingabe) {
+  const neu = {}
+  for (const liste of MAKRO_LISTEN) {
+    const namen = eingabe?.[liste] ?? []
+    if (!Array.isArray(namen) || namen.length > MAX_MAKROS) {
+      throw new Problem(422, 'makros_ungueltig', 'spur_fehler_makros_zu_viele', { max: MAX_MAKROS })
+    }
+    const bereinigt = namen.map(n => String(n).trim().replace(/^\\/, ''))
+    const falsch = bereinigt.find(n => !/^[a-zA-Z@]+$/.test(n))
+    if (falsch !== undefined) throw new Problem(422, 'makros_ungueltig', 'spur_fehler_makro_name', { name: falsch })
+    neu[liste] = [...new Set(bereinigt)]
+  }
+  await (await einstellungen()).updateOne(projektFilter(projectId), { $set: { pruefMakros: neu } }, { upsert: true })
+  return neu
+}
+
+function texte(docs) {
+  return docs.filter(d => d.pfad.endsWith('.tex')).map(d => d.text)
+}
+
+export async function makroUebersicht(projectId) {
+  const [docs, einstellung] = await Promise.all([dokumente(projectId), makroEinstellung(projectId)])
+  return { ...einstellung, erkannt: makrosErkennen(texte(docs)) }
+}
+
+async function kontextLaden(projectId, docs, weitererText = null) {
+  const makros = makrosWirksam(
+    makrosErkennen([...texte(docs), ...(weitererText ? [weitererText] : [])]),
+    await makroEinstellung(projectId)
+  )
   const bibEintraege = new Map()
   for (const doc of docs) {
     if (!doc.pfad.endsWith('.bib')) continue
@@ -98,7 +138,7 @@ async function kontextLaden(projectId, docs) {
     if (!bestaetigt.has(key)) bestaetigt.set(key, [])
     bestaetigt.get(key).push(z.text)
   }
-  return { bibEintraege, quellen, werke, bestaetigt, seitenJeQuelle: new Map() }
+  return { bibEintraege, quellen, werke, bestaetigt, makros, seitenJeQuelle: new Map() }
 }
 
 function stempel(kontext) {
@@ -110,6 +150,7 @@ function stempel(kontext) {
       .map(([d, w]) => [d, w?.gefunden, w?.retraction, w?.registrierstelle, w?.nichtPruefbar]),
     quellen: kontext.quellen.map(q => [q._id, q.key, q.doi, q.versatz, q.versatzQuelle, q.status]),
     bestaetigt: [...kontext.bestaetigt.entries()].sort(([a], [b]) => a.localeCompare(b)),
+    makros: kontext.makros,
   })
 }
 
@@ -130,14 +171,16 @@ async function fundeBewerten(funde, kontext) {
 }
 
 async function abschnittBewerten(abschnitt, kontext) {
-  return await fundeBewerten(zitateFinden(abschnitt.text), kontext)
+  const funde = zitateFinden(abschnitt.text, kontext.makros)
+  const sichtbar = funde.filter(f => !f.ausgeblendet)
+  return { zeilen: await fundeBewerten(sichtbar, kontext), uebersprungen: funde.length - sichtbar.length }
 }
 
 // Prüft nur Zitate, die den Bereich [von, bis) im Text berühren.
 export async function bereichPruefen(projectId, text, von, bis) {
   const docs = await dokumente(projectId)
-  const kontext = await kontextLaden(projectId, docs)
-  const funde = zitateFinden(text).filter(f => f.von <= bis && f.bis >= von)
+  const kontext = await kontextLaden(projectId, docs, text)
+  const funde = zitateFinden(text, kontext.makros).filter(f => !f.ausgeblendet && f.von <= bis && f.bis >= von)
   return await fundeBewerten(funde, kontext)
 }
 
@@ -149,20 +192,20 @@ async function zeilenFuer(projectId, abschnittsListe, kontext, basis, nutzung) {
       await cache
         .find({ projectId, hash: { $in: schluessel } })
         .toArray()
-    ).map(e => [e.hash, e.zeilen])
+    ).map(e => [e.hash, e])
   )
   const neu = []
   const zeilen = []
   for (const [i, abschnitt] of abschnittsListe.entries()) {
-    let liste = vorhanden.get(schluessel[i])
-    if (liste) {
+    let bewertet = vorhanden.get(schluessel[i])
+    if (bewertet) {
       nutzung.uebernommen++
     } else {
       nutzung.neu++
-      liste = await abschnittBewerten(abschnitt, kontext)
-      neu.push({ projectId, hash: schluessel[i], zeilen: liste, erstelltAm: jetzt() })
+      bewertet = await abschnittBewerten(abschnitt, kontext)
+      neu.push({ projectId, hash: schluessel[i], ...bewertet, erstelltAm: jetzt() })
     }
-    zeilen.push({ abschnitt, liste })
+    zeilen.push({ abschnitt, liste: bewertet.zeilen, uebersprungen: bewertet.uebersprungen ?? 0 })
   }
   // Parallele Prüfungen desselben Projekts schreiben dieselben Abschnitte.
   if (neu.length) {
@@ -186,11 +229,13 @@ export async function bericht(projectId) {
   const nutzung = { neu: 0, uebernommen: 0 }
   const basis = stempel(kontext)
   const zeilen = []
+  let uebersprungen = 0
   for (const doc of docs) {
     if (!doc.pfad.endsWith('.tex')) continue
     const teile = abschnitte(doc.text)
     const starts = zeilenStarts(doc.text)
-    for (const { abschnitt, liste } of await zeilenFuer(projectId, teile, kontext, basis, nutzung)) {
+    for (const { abschnitt, liste, uebersprungen: weg } of await zeilenFuer(projectId, teile, kontext, basis, nutzung)) {
+      uebersprungen += weg
       for (const z of liste) {
         const von = z.von + abschnitt.von
         zeilen.push({
@@ -210,5 +255,7 @@ export async function bericht(projectId) {
     }
   }
   const zaehlung = Object.fromEntries(STELLEN_STATUS.map(status => [status, zeilen.filter(z => z.status === status).length]))
-  return { zeilen, zaehlung, abschnitte: nutzung, stand: jetzt() }
+  // Markiert: geprüfte Stellen, die „Nur Probleme“ weiter zeigt.
+  zaehlung.markiert = zeilen.filter(z => z.status === 'geprueft' && z.problem).length
+  return { zeilen, zaehlung, uebersprungen, abschnitte: nutzung, stand: jetzt() }
 }
