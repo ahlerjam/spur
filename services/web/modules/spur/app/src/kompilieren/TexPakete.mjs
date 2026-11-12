@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import Path from 'node:path'
+import { setTimeout as warten } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
 import ProjectEntityHandler from '../../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
@@ -114,7 +115,7 @@ async function herunterladen(paket, ziel, grenze) {
         if (!(error instanceof Wiederholen)) throw error
         letzter = error
         logger.warn({ spiegel, paket, versuch, status: error.status }, 'TeX-Paketquelle antwortet nicht')
-        if (versuch < VERSUCHE_JE_SPIEGEL) await new Promise(weiter => setTimeout(weiter, PAUSE_MS * versuch))
+        if (versuch < VERSUCHE_JE_SPIEGEL) await warten(PAUSE_MS * versuch)
       }
     }
   }
@@ -125,14 +126,13 @@ async function herunterladen(paket, ziel, grenze) {
 }
 
 // Ein Paket gilt als installiert, wenn es einen Eintrag hat (der entsteht erst nach dem letzten Upload) und sein
-// Ordner Dateien enthält. Ein Eintrag ohne Dateien (Ordner von Hand gelöscht) wird entfernt.
+// Ordner Dateien enthält. Ein Eintrag ohne Dateien (Ordner von Hand gelöscht) zählt nicht; eine neue Installation
+// überschreibt ihn.
 async function projektStand(projectId) {
   const { docs, files } = await ProjectEntityHandler.promises.getAllEntities(projectId)
   const pfade = [...docs, ...files].map(e => e.path.replace(/^\//, ''))
   const mitDateien = new Set(pfade.filter(p => p.startsWith(`${ORDNER}/`)).map(p => p.split('/')[1]))
   const alle = await (await texPakete()).find({ projectId }).toArray()
-  const verwaist = alle.filter(e => !mitDateien.has(e.paket)).map(e => e.paket)
-  if (verwaist.length) await (await texPakete()).deleteMany({ projectId, paket: { $in: verwaist } })
   const rc = docs.find(d => d.path === '/latexmkrc')
   return {
     pfade,
@@ -166,8 +166,8 @@ async function latexmkrcSichern({ projectId, menschId, botId, stand, ordner, lau
 }
 
 // Abschalten per `SPUR_TEX_PAKETE=aus` oder in den spur-Einstellungen (Admin → Grenzen).
-export async function abgeschaltet() {
-  return umgebung('SPUR_TEX_PAKETE') === 'aus' || (await standard()).texPaketeAus
+export async function abgeschaltet(einstellung) {
+  return umgebung('SPUR_TEX_PAKETE') === 'aus' || (einstellung ?? (await standard())).texPaketeAus
 }
 
 // Gezählt werden nur gelungene Installationen der letzten Stunde.
@@ -205,7 +205,7 @@ async function gesperrt(projectId, paket, arbeit) {
       break
     } catch (error) {
       if (error.code !== 11000) throw error
-      await new Promise(weiter => setTimeout(weiter, 500))
+      await warten(500)
     }
   }
   try {
@@ -246,7 +246,7 @@ async function dateienAnlegen({ projectId, menschId, paket, dateien, ziel }) {
   try {
     for (const [i, d] of dateien.entries()) {
       const pause = Number(testSchalter('SPUR_TEX_UPLOAD_PAUSE_MS'))
-      if (pause > 0) await new Promise(weiter => setTimeout(weiter, pause))
+      if (pause > 0) await warten(pause)
       if (Number(testSchalter('SPUR_TEX_UPLOAD_FEHLER')) === i + 1) throw new Error(`Testschalter: Upload ${i + 1} scheitert`)
       const pfad = `${ORDNER}/${paket}/${d.name}`
       await EditorController.promises.upsertFileWithPath(projectId, `/${pfad}`, Path.join(ziel, d.pfad), null, 'spur', menschId)
@@ -263,9 +263,10 @@ async function dateienAnlegen({ projectId, menschId, paket, dateien, ziel }) {
 }
 
 export async function hinzufuegen({ projectId, menschId, botId, paket }) {
-  if (await abgeschaltet()) throw new WerkzeugFehler('abgeschaltet', 'spur_fehler_tex_pakete_aus')
+  const einstellung = await standard()
+  if (await abgeschaltet(einstellung)) throw new WerkzeugFehler('abgeschaltet', 'spur_fehler_tex_pakete_aus')
   paketNamePruefen(paket)
-  const grenzen = await texGrenzen()
+  const grenzen = texGrenzen(einstellung)
   const lokal = await lokaleDatenbank()
   if (lokal.namen.has(paket)) {
     return { paket, im_image: true, dateien: [], fehlende_abhaengigkeiten: [], hinweis: 'schon im Image' }

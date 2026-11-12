@@ -45,19 +45,21 @@ export function texWertLesen(eingabe) {
   return Number(text)
 }
 
+const texWerte = (quelle, ersatz) => Object.fromEntries(TEX_FELDER.map(f => [f, quelle[f] ?? ersatz(f)]))
+
 export async function standard() {
   const eintrag = (await (await grenzen()).findOne({ _id: STANDARD })) ?? {}
   return {
     projekte: eintrag.projekte ?? null,
     speicherGb: eintrag.speicherGb ?? null,
     texPaketeAus: Boolean(eintrag.texPaketeAus),
-    ...Object.fromEntries(TEX_FELDER.map(f => [f, eintrag[f] ?? null])),
+    ...texWerte(eintrag, () => null),
   }
 }
 
-export async function texGrenzen() {
-  const eintrag = await standard()
-  return Object.fromEntries(TEX_FELDER.map(f => [f, eintrag[f] ?? TEX_STANDARD[f]]))
+// Die geltenden TeX-Grenzen aus einem Ergebnis von standard().
+export function texGrenzen(einstellung) {
+  return texWerte(einstellung, f => TEX_STANDARD[f])
 }
 
 export async function standardSetzen({ projekte, speicherGb, texPaketeAus = false, ...tex }) {
@@ -68,7 +70,7 @@ export async function standardSetzen({ projekte, speicherGb, texPaketeAus = fals
         projekte,
         speicherGb,
         texPaketeAus: Boolean(texPaketeAus),
-        ...Object.fromEntries(TEX_FELDER.map(f => [f, tex[f] ?? null])),
+        ...texWerte(tex, () => null),
       },
     },
     { upsert: true }

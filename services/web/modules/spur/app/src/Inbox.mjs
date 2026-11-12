@@ -70,7 +70,8 @@ export async function seit(botId, cursor) {
     cursor && ObjectId.isValid(cursor)
       ? await sammlung.find({ botId, _id: { $gt: new ObjectId(cursor) } }).sort({ _id: 1 }).limit(100).toArray()
       : (await sammlung.find({ botId }).sort({ _id: -1 }).limit(100).toArray()).reverse()
-  if (liste.length) await sammlung.updateMany({ _id: { $in: liste.map(e => e._id) } }, { $set: { zugestellt: true } })
+  const offen = liste.filter(e => !e.zugestellt).map(e => e._id)
+  if (offen.length) await sammlung.updateMany({ _id: { $in: offen } }, { $set: { zugestellt: true } })
   return {
     ereignisse: liste.map(fuerClient),
     cursor: liste.at(-1)?._id ?? cursor ?? null,

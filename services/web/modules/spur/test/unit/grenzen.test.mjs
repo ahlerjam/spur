@@ -73,11 +73,11 @@ describe('Standard und Ausnahmen', () => {
   })
 
   it('TeX-Pakete: 100 MB, 300 MB und 60 je Stunde ohne Einstellung, sonst die eingestellten Werte', async () => {
-    expect(await Grenzen.texGrenzen()).toEqual({ texPaketMb: 100, texProjektMb: 300, texProStunde: 60 })
+    expect(Grenzen.texGrenzen(await Grenzen.standard())).toEqual({ texPaketMb: 100, texProjektMb: 300, texProStunde: 60 })
     await Grenzen.standardSetzen({ projekte: null, speicherGb: null, texPaketMb: 10, texProjektMb: 20, texProStunde: 2 })
-    expect(await Grenzen.texGrenzen()).toEqual({ texPaketMb: 10, texProjektMb: 20, texProStunde: 2 })
+    expect(Grenzen.texGrenzen(await Grenzen.standard())).toEqual({ texPaketMb: 10, texProjektMb: 20, texProStunde: 2 })
     await Grenzen.standardSetzen({ projekte: null, speicherGb: null, texPaketMb: 10 })
-    expect(await Grenzen.texGrenzen()).toEqual({ texPaketMb: 10, texProjektMb: 300, texProStunde: 60 })
+    expect(Grenzen.texGrenzen(await Grenzen.standard())).toEqual({ texPaketMb: 10, texProjektMb: 300, texProStunde: 60 })
   })
 
   it('TeX-Grenzen nehmen nur ganze Zahlen ab 1, leer heißt Standard', () => {
