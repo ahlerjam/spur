@@ -56,3 +56,8 @@ Deferred, not discarded. Check here before new plans.
 
 ## Translations
 - Overleaf's German language file lacks 1616 keys that the English one has (`services/web/locales/de.json` has 2445 keys, `en.json` has 4060; one key exists only in `de.json`)
+
+## Ideas for P10 (owner, 2026-11-12)
+- Claim check: also check paraphrased statements against the source. For every sentence with a citation, find the passage in the source and show "supported (p. 347)", "passage not found" or "source says something else", with a jump to the passage. Always show the passage found, never a verdict without evidence, because a language model judges this and can be wrong. Extends the "paraphrases" switch under Proactivity.
+- Claude without a terminal: the connector for claude.ai, desktop and mobile instead of the start command in the terminal. Biggest hurdle for people who do not use Claude Code. Needs OAuth and a publicly reachable server; a plan of its own because it concerns operations and security. Same item as "Connector" under Claude integration.
+- Click a citation in the PDF: a click on a citation in the compiled PDF opens the source on the right page with the passage highlighted. Makes the check visible to readers and supervisors. Related: "Also highlight markings in the page text of the source preview" under Interface.
