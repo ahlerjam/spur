@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { istProblem, quelleZu, stelleEinordnen, zeileBewerten } from '../../app/src/pruefung/bewertung.mjs'
+import { istProblem, quelleZu, referenzStatus, stelleEinordnen, zeileBewerten } from '../../app/src/pruefung/bewertung.mjs'
 
 const SEITEN = [
   { label: '345', text: 'Anfang der Studie.' },
@@ -192,5 +192,47 @@ describe('stelleEinordnen', () => {
     [{ key: 'a', quelleId: QUELLE_ID, wortlaut: 'nicht_pruefbar', seitenangabe: '3' }, 'nicht_pruefbar', 'quelle_ohne_text'],
   ])('%o ist %s', (zeile, status, grund) => {
     expect(stelleEinordnen(zeile)).toEqual({ status, grund })
+  })
+})
+
+describe('referenzStatus (Registrierstellen)', () => {
+  const eintrag = { key: 'k', doi: '10.48550/x' }
+
+  it('meldet eine DataCite-DOI als gefunden, mit Titel und Jahr, ohne Problem', () => {
+    const status = referenzStatus(eintrag, {
+      gefunden: true,
+      registrierstelle: 'datacite',
+      registrierstelleName: 'DataCite',
+      titel: 'T',
+      jahr: 2024,
+      retraction: null,
+    })
+    expect(status).toEqual({ referenz: 'gefunden', registrierstelle: 'datacite', titel: 'T', jahr: 2024, retraction: null })
+    expect(istProblem(status)).toBe(false)
+  })
+
+  it('meldet eine andere Registrierstelle als registriert, ohne Problem', () => {
+    const status = referenzStatus(eintrag, {
+      gefunden: true,
+      registrierstelle: 'medra',
+      registrierstelleName: 'mEDRA',
+      metadaten: false,
+      retraction: null,
+    })
+    expect(status).toEqual({ referenz: 'registriert', registrierstelle: 'medra', registrierstelleName: 'mEDRA', retraction: null })
+    expect(istProblem(status)).toBe(false)
+  })
+
+  it('meldet eine nicht registrierte DOI als nicht gefunden', () => {
+    const status = referenzStatus(eintrag, { gefunden: false, registrierstelle: null })
+    expect(status).toEqual({ referenz: 'nicht_gefunden', registrierstelle: null, retraction: null })
+    expect(istProblem(status)).toBe(true)
+  })
+
+  it('meldet eine nicht erreichbare Registrierstelle als nicht prüfbar, ohne Problem', () => {
+    const status = referenzStatus(eintrag, { nichtPruefbar: 'registrierstelle_nicht_erreichbar' })
+    expect(status).toEqual({ referenz: 'nicht_pruefbar', grund: 'registrierstelle_nicht_erreichbar', retraction: null })
+    expect(istProblem(status)).toBe(false)
+    expect(stelleEinordnen({ ...status, key: 'k', quelleId: 'q' })).toEqual({ status: 'nicht_pruefbar', grund: 'registrierstelle_nicht_erreichbar' })
   })
 })

@@ -31,12 +31,20 @@ export function quelleZu(key, bibEintraege, quellen) {
   return nachDoi || quellen.find(q => q.key === key) || null
 }
 
-// Status einer .bib-Referenz bei Crossref; doiWerk null heißt, Crossref war nicht erreichbar.
+// Status einer .bib-Referenz (Crossref.pruefen); doiWerk null heißt, Crossref war nicht erreichbar.
 export function referenzStatus(eintrag, doiWerk) {
   if (!eintrag?.doi) return { referenz: 'ohne_doi', retraction: null }
   if (!doiWerk) return { referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null }
-  if (!doiWerk.gefunden) return { referenz: 'nicht_gefunden', retraction: null }
-  return { referenz: 'gefunden', retraction: doiWerk.retraction }
+  if (doiWerk.nichtPruefbar) return { referenz: 'nicht_pruefbar', grund: doiWerk.nichtPruefbar, retraction: null }
+  const { registrierstelle } = doiWerk
+  if (!doiWerk.gefunden) return { referenz: 'nicht_gefunden', registrierstelle, retraction: null }
+  if (doiWerk.metadaten === false) {
+    return { referenz: 'registriert', registrierstelle, registrierstelleName: doiWerk.registrierstelleName, retraction: null }
+  }
+  if (registrierstelle === 'datacite') {
+    return { referenz: 'gefunden', registrierstelle, titel: doiWerk.titel, jahr: doiWerk.jahr, retraction: null }
+  }
+  return { referenz: 'gefunden', registrierstelle, retraction: doiWerk.retraction }
 }
 
 export function zeileBewerten(fund, kontext) {

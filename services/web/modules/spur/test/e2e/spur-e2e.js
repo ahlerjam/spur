@@ -651,7 +651,7 @@ async page => {
       )
       await zeigt('korrigiert', 'Korrektur vorhanden')
       await zeigt('Sleep supports […] declarative memory.', 'Keine Meldung in Crossref')
-      await zeigt('unbekannt', 'DOI bei Crossref unbekannt')
+      await zeigt('unbekannt', 'DOI nicht registriert')
       await zeigt('footfullcite', 'Nicht prüfbar')
 
       await panelOeffnen('Quellen')
@@ -3317,13 +3317,13 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       ok(!/unbekannt|nicht prüfbar/.test(await foods.innerText()), `Gedrosselte DOI: ${await foods.innerText()}`)
       const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.pfad.includes(encodeURIComponent(FOODS)))
       ok(abrufe.length === 3, `Crossref-Abrufe für die gedrosselte DOI: ${abrufe.length}`)
-      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+      await zeile('erfunden').getByText('DOI nicht registriert', { exact: true }).waitFor()
 
       await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 503 } }, cachesLeeren: true })
       await page.getByRole('button', { name: 'Erneut prüfen' }).click()
       await zeile('foods2022').getByText(NICHT_PRUEFBAR, { exact: true }).waitFor({ timeout: 30000 })
       ok(!/unbekannt/.test(await zeile('foods2022').innerText()), 'Ausfall erscheint als unbekannt')
-      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+      await zeile('erfunden').getByText('DOI nicht registriert', { exact: true }).waitFor()
 
       const bib = (await werkzeug(token, 'bib_list', { project_id: pid })).inhalt.eintraege
       const foodsBib = bib.find(e => e.key === 'foods2022')
@@ -4218,6 +4218,65 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(/\sxfrac\s/.test(liste), 'xfrac fehlt in der Paketliste des Images')
     const test = await repoDatei(`${REPO}/tools/tests/tex-pakete.test.mjs`)
     ok(/chemformula: \[[^\]]*'xfrac'/.test(test), 'Der Paket-Test kennt die Pakete nicht, die chemformula nachlädt')
+  }
+
+  features.p8f1 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    const badge = (text, status) => zeile(text).locator('.badge', { hasText: status }).first()
+    const istRot = async loc =>
+      await loc.evaluate(el => {
+        const [r, g, b] = getComputedStyle(el).backgroundColor.match(/\d+/g).map(Number)
+        return r > 150 && g < 100 && b < 100
+      })
+    try {
+      await fakeSteuern({ cachesLeeren: true })
+      await projektOeffnen('E2E P8 DOI')
+      const pid = page.url().split('/').pop()
+      await panelOeffnen('Prüfbericht')
+      await page.getByLabel('Nur Probleme').setChecked(false)
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await badge('arxiv2024', 'Registriert bei DataCite').waitFor({ timeout: 30000 })
+      ok(!(await istRot(badge('arxiv2024', 'Registriert bei DataCite'))), 'DataCite-Abzeichen ist rot')
+      await zeile('arxiv2024').getByText('DataCite liefert keine Rückzugsmeldungen.', { exact: true }).waitFor()
+      ok(!/nicht registriert|unbekannt/.test(await zeile('arxiv2024').innerText()), `arXiv-Zeile: ${await zeile('arxiv2024').innerText()}`)
+      const nirgends = badge('nirgends', 'DOI nicht registriert')
+      await nirgends.waitFor()
+      ok(await istRot(nirgends), 'Nicht registrierte DOI ist nicht rot')
+      const andere = badge('andere', 'Registriert bei mEDRA, Metadaten nicht geprüft')
+      await andere.waitFor()
+      ok(!(await istRot(andere)), 'Andere Registrierstelle ist rot')
+      const roteMarken = (await page.locator('.cm-content .spur-marke-rot').allTextContents()).join('')
+      ok(roteMarken.includes('nirgends') && !/arxiv2024|andere|smith2024/.test(roteMarken), `Rote Markierungen im Editor: ${roteMarken}`)
+
+      await page.getByLabel('Nur Probleme').check()
+      const sichtbar = await page.locator('.spur-zeile .spur-zeile-key').allTextContents()
+      ok(JSON.stringify(sichtbar) === JSON.stringify(['nirgends']), `Nur Probleme: ${JSON.stringify(sichtbar)}`)
+      await page.getByLabel('Nur Probleme').uncheck()
+
+      for (const name of ['check_report', 'bib_list']) {
+        const liste = (await werkzeug(token, name, { project_id: pid })).inhalt.eintraege
+        const arxiv = liste.find(e => e.key === 'arxiv2024')
+        ok(
+          arxiv.registrierstelle === 'datacite' && arxiv.titel?.startsWith('Sleep-like replay improves memory consolidation') && arxiv.jahr === 2024 && arxiv.problem !== true,
+          `${name} arXiv: ${JSON.stringify(arxiv)}`
+        )
+        ok(liste.find(e => e.key === 'nirgends').referenz === 'nicht_gefunden', `${name} nirgends: ${JSON.stringify(liste)}`)
+      }
+
+      await fakeSteuern({ ausfall: ['doiorg'], cachesLeeren: true })
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      const ausfall = badge('arxiv2024', 'nicht prüfbar – die Registrierstelle ist gerade nicht erreichbar')
+      await ausfall.waitFor({ timeout: 30000 })
+      ok(!(await istRot(ausfall)), 'Ausfall der Registrierstelle ist rot')
+      await fakeSteuern({ cachesLeeren: true })
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await badge('arxiv2024', 'Registriert bei DataCite').waitFor({ timeout: 30000 })
+    } finally {
+      await fakeSteuern({})
+    }
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

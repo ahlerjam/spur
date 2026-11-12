@@ -35,7 +35,7 @@ beforeEach(async () => {
     },
     LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
     Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
-    Crossref: { werk: vi.fn() },
+    Crossref: { pruefen: vi.fn() },
     Beschaffung: { hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })) },
     Literatur: { vorschlagen: vi.fn(async () => ({ quelle_id: 'q', spalte: 'Methode' })) },
     Kompilieren: {
@@ -272,8 +272,8 @@ describe('Lesen im Projekt', () => {
     expect(ergebnis).not.toHaveProperty('abschnitte')
   })
 
-  it('bib_list nennt den Crossref-Status je Eintrag', async () => {
-    m.Crossref.werk.mockImplementation(async doi =>
+  it('bib_list nennt den Status der DOI je Eintrag', async () => {
+    m.Crossref.pruefen.mockImplementation(async doi =>
       ({ '10.1/a': { gefunden: true, retraction: 'zurueckgezogen' }, '10.1/c': { gefunden: false }, '10.1/d': null })[doi]
     )
     const { eintraege } = await aufruf('bib_list', { project_id: projekt })

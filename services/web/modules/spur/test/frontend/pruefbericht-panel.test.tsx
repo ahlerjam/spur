@@ -71,6 +71,25 @@ describe('Prüfbericht-Panel', function () {
     screen.getByText('nicht prüfbar – Crossref gerade nicht erreichbar')
   })
 
+  it('zeigt Registrierstellen: DataCite grün mit Hinweis, andere neutral, nicht erreichbar als nicht prüfbar', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, {
+      zeilen: [
+        { ...zeile('gruen', false), auszug: 'arXiv', wortlaut: null, referenz: 'gefunden', registrierstelle: 'datacite', retraction: null },
+        { ...zeile('rot', false), auszug: 'mEDRA', wortlaut: null, referenz: 'registriert', registrierstelle: 'medra', registrierstelleName: 'mEDRA' },
+        { ...zeile('weg', false), auszug: 'Weg', wortlaut: null, referenz: 'nicht_pruefbar', grund: 'registrierstelle_nicht_erreichbar', status: 'nicht_pruefbar' },
+      ],
+      zaehlung: { geprueft: 2, ohne_quelle: 0, ohne_seitenangabe: 0, nicht_pruefbar: 1 },
+    })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    const datacite = await screen.findByText('Registriert bei DataCite')
+    expect(datacite.closest('.badge')?.className).to.include('bg-success')
+    screen.getByText('DataCite liefert keine Rückzugsmeldungen.')
+    expect(screen.getByText('Registriert bei mEDRA, Metadaten nicht geprüft').closest('.badge')?.className).to.include('bg-info')
+    screen.getByText('nicht prüfbar – die Registrierstelle ist gerade nicht erreichbar')
+  })
+
   it('lässt Status mit null Stellen in der Zählung weg', async function () {
     fetchMock.removeRoutes()
     fetchMock.get(BERICHT, { zeilen: [zeile('gruen', false)], zaehlung: { geprueft: 1, ohne_quelle: 0, ohne_seitenangabe: 0, nicht_pruefbar: 0 } })

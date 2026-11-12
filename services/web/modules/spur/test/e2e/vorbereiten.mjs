@@ -471,6 +471,37 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await quelleAusFixture(p6Bericht._id, a._id, 'smith2024.pdf')
   await neuAnlegen(a, 'E2E P6 Zahlen', { 'main.tex': LEER, 'quellen.bib': '@article{p6,\n  title = {Zahlen}\n}\n' })
   await grenzenVorbereiten()
+  await p8Vorbereiten(a)
+}
+
+async function p8Vorbereiten(a) {
+  await neuAnlegen(a, 'E2E P8 DOI', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage[backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Crossref \parencite{smith2024}.
+arXiv \parencite{arxiv2024}.
+Nirgends \parencite{nirgends}.
+Andere \parencite{andere}.
+\end{document}`,
+    'references.bib': `@article{smith2024,
+  title = {Sleep and Memory},
+  doi = {10.5555/spur.2024.001}
+}
+@article{arxiv2024,
+  title = {Sleep-like replay improves memory consolidation},
+  doi = {10.48550/arXiv.2401.01234}
+}
+@article{nirgends,
+  title = {Gibt es nirgends},
+  doi = {10.9999/nirgends.1}
+}
+@article{andere,
+  title = {Bei einer anderen Registrierstelle},
+  doi = {10.3333/andere.1}
+}`,
+  })
 }
 
 // P7 Grenzen: eigene Konten ohne Admin-Rechte, damit die Projektzahlen klein und bekannt sind.

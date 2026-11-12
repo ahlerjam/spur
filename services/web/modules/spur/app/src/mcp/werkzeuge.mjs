@@ -222,7 +222,8 @@ export const WERKZEUGE = {
   },
 
   bib_list: {
-    description: 'Referenzen aus den .bib-Dateien mit Status in Crossref.',
+    description:
+      'Referenzen aus den .bib-Dateien mit Status der DOI: Crossref, sonst die Registrierstelle laut doi.org (registrierstelle).',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
@@ -233,7 +234,7 @@ export const WERKZEUGE = {
       const teil = blatt(eintraege, cursor)
       teil.eintraege = await Promise.all(
         teil.eintraege.map(async e => {
-          const werk = e.doi ? await Crossref.werk(e.doi) : null
+          const werk = e.doi ? await Crossref.pruefen(e.doi) : null
           return { key: e.key, doi: e.doi, ...referenzStatus(e, werk) }
         })
       )

@@ -14,6 +14,8 @@ export type Zeile = {
   seite: string | null
   gefundenAuf?: string
   referenz?: string
+  registrierstelle?: string | null
+  registrierstelleName?: string
   retraction?: string | null
   problem: boolean
   status: StellenStatus

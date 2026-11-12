@@ -89,7 +89,7 @@ async function kontextLaden(projectId, docs) {
           .toArray()
       : [],
     promiseMapWithLimit(CROSSREF_PARALLEL, [...new Set(dois)], async doi => {
-      werke.set(doi.toLowerCase(), await Crossref.werk(doi))
+      werke.set(doi.toLowerCase(), await Crossref.pruefen(doi))
     }),
   ])
   const bestaetigt = new Map()
@@ -107,7 +107,7 @@ function stempel(kontext) {
     bib: [...kontext.bibEintraege.values()],
     werke: [...kontext.werke.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([d, w]) => [d, w?.gefunden, w?.retraction]),
+      .map(([d, w]) => [d, w?.gefunden, w?.retraction, w?.registrierstelle, w?.nichtPruefbar]),
     quellen: kontext.quellen.map(q => [q._id, q.key, q.doi, q.versatz, q.versatzQuelle, q.status]),
     bestaetigt: [...kontext.bestaetigt.entries()].sort(([a], [b]) => a.localeCompare(b)),
   })

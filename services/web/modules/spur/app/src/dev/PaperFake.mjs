@@ -145,7 +145,7 @@ paperFake.get('/_semantik', (req, res) => res.json({ modellVorhanden: existsSync
 paperFake.get('/_protokoll', (req, res) => res.json({ abrufe: zustand.protokoll }))
 
 paperFake.use((req, res, next) => {
-  const dienst = /^\/(arxiv|openalex|s2|unpaywall|pdf)\//.exec(req.path)?.[1] ?? 'crossref'
+  const dienst = /^\/(arxiv|openalex|s2|unpaywall|pdf|doiorg|datacite)\//.exec(req.path)?.[1] ?? 'crossref'
   zustand.protokoll.push({ dienst, pfad: req.originalUrl, zeit: Date.now() })
   zustand.protokoll = zustand.protokoll.slice(-500)
   if (zustand.ausfall.has(dienst)) return res.status(503).send('Service unavailable')
@@ -238,4 +238,35 @@ paperFake.get('/works/:doi', (req, res) => {
   const message = CROSSREF[doi] ?? (w?.dienste.includes('crossref') ? crossrefWerk(w) : null)
   if (!message) return res.status(404).send('Resource not found.')
   res.json({ status: 'ok', 'message-type': 'work', message })
+})
+
+// doi.org nennt die Registrierstelle; ohne Eintrag „DOI does not exist“. 10.3333/ steht für eine dritte Stelle.
+function registrierstelle(doi) {
+  if (doi.startsWith('10.3333/')) return 'mEDRA'
+  if (CROSSREF[doi] || nachDoi(doi)?.dienste.includes('crossref')) return 'Crossref'
+  if (nachDoi(doi)?.arxiv) return 'DataCite'
+  return null
+}
+
+paperFake.get(/^\/doiorg\/doiRA\/(.+)$/, (req, res) => {
+  const doi = req.params[0]
+  const ra = registrierstelle(doi.toLowerCase())
+  res.json([ra ? { DOI: doi, RA: ra } : { DOI: doi, status: 'DOI does not exist' }])
+})
+
+paperFake.get(/^\/datacite\/dois\/(.+)$/, (req, res) => {
+  const w = nachDoi(req.params[0])
+  if (!w?.arxiv) return res.status(404).json({ errors: [{ status: '404', title: 'The resource you are looking for doesn\'t exist.' }] })
+  res.json({
+    data: {
+      id: w.doi,
+      type: 'dois',
+      attributes: {
+        doi: w.doi,
+        titles: [{ title: w.titel }],
+        creators: w.autoren.map(([givenName, familyName]) => ({ name: `${familyName}, ${givenName}`, givenName, familyName })),
+        publicationYear: w.jahr,
+      },
+    },
+  })
 })

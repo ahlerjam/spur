@@ -12,7 +12,7 @@
     "Ist der doi.org-Fake abgeschaltet (Dev-Schalter), zeigt die arXiv-Zeile „nicht prüfbar“ mit dem Grund, dass die Registrierstelle nicht erreichbar ist, und ist nicht rot; nach dem Wiedereinschalten und „Erneut prüfen“ ist sie wieder grün",
     "Ein Projekt, dessen arXiv-DOI vor dem Update als „bei Crossref unbekannt“ im Cache lag, zeigt nach „Erneut prüfen“ sofort das neue Ergebnis (Unit-Test mit vorbelegtem Cache)"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

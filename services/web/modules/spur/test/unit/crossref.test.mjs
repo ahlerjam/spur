@@ -202,3 +202,105 @@ describe('werk', () => {
     expect((await Crossref.werk('10.1/a')).titel).toBe('Sleep and Memory')
   })
 })
+
+describe('pruefen (Registrierstellen)', () => {
+  const nichtGefunden = json({}, 404)
+  const ra = name => json([{ DOI: '10.48550/arXiv.2401.01234', RA: name }])
+  const DATACITE = {
+    data: {
+      attributes: {
+        titles: [{ title: 'Sleep-like replay improves memory consolidation' }],
+        creators: [{ familyName: 'Smith', givenName: 'Alice', name: 'Smith, Alice' }, { name: 'arXiv Team' }],
+        publicationYear: 2024,
+      },
+    },
+  }
+
+  it('nimmt Crossref, wenn Crossref die DOI kennt', async () => {
+    antworten(json(ANTWORT))
+    const ergebnis = await Crossref.pruefen('10.5555/x')
+    expect(ergebnis).toMatchObject({ gefunden: true, registrierstelle: 'crossref', titel: 'Sleep and Memory' })
+    expect(abrufe).toHaveLength(1)
+  })
+
+  it('fragt bei 404 doi.org nach der Registrierstelle und holt Titel, Autoren und Jahr bei DataCite', async () => {
+    antworten(nichtGefunden, ra('DataCite'), json(DATACITE))
+    const ergebnis = await Crossref.pruefen('10.48550/arXiv.2401.01234')
+    expect(abrufe.slice(1)).toEqual([
+      'https://doi.org/doiRA/10.48550/arXiv.2401.01234',
+      'https://api.datacite.org/dois/10.48550/arXiv.2401.01234',
+    ])
+    expect(ergebnis).toEqual({
+      gefunden: true,
+      registrierstelle: 'datacite',
+      registrierstelleName: 'DataCite',
+      titel: 'Sleep-like replay improves memory consolidation',
+      autoren: [
+        { family: 'Smith', given: 'Alice' },
+        { family: 'arXiv Team', given: '' },
+      ],
+      jahr: 2024,
+      retraction: null,
+    })
+  })
+
+  it('kodiert Sonderzeichen der DOI in jedem Pfadteil', async () => {
+    antworten(nichtGefunden, json([{ RA: 'mEDRA' }]))
+    await Crossref.pruefen('10.1000/a?b#c d')
+    expect(abrufe[1]).toBe('https://doi.org/doiRA/10.1000/a%3Fb%23c%20d')
+  })
+
+  it('lehnt DOIs mit Pfadsprüngen ab, ohne doi.org zu fragen', async () => {
+    antworten(nichtGefunden)
+    expect(await Crossref.pruefen('10.1000/../../x')).toEqual({ gefunden: false, registrierstelle: null })
+    expect(abrufe).toHaveLength(1)
+  })
+
+  it('meldet eine andere Registrierstelle neutral ohne Metadaten', async () => {
+    antworten(nichtGefunden, json([{ DOI: '10.3333/andere.1', RA: 'mEDRA' }]))
+    expect(await Crossref.pruefen('10.3333/andere.1')).toEqual({
+      gefunden: true,
+      registrierstelle: 'medra',
+      registrierstelleName: 'mEDRA',
+      metadaten: false,
+      retraction: null,
+    })
+  })
+
+  it('meldet eine DOI, die doi.org nicht kennt, als nicht registriert und merkt sich das einen Tag', async () => {
+    antworten(nichtGefunden, json([{ DOI: '10.9999/nirgends.1', status: 'DOI does not exist' }]))
+    expect(await Crossref.pruefen('10.9999/nirgends.1')).toEqual({ gefunden: false, registrierstelle: null })
+    await Crossref.pruefen('10.9999/nirgends.1')
+    expect(abrufe).toHaveLength(2)
+  })
+
+  it('gibt nicht prüfbar zurück, wenn doi.org nicht antwortet, und merkt sich das nicht', async () => {
+    antworten(nichtGefunden, json('Service unavailable', 503))
+    expect(await Crossref.pruefen('10.48550/arXiv.2401.01234')).toEqual({ nichtPruefbar: 'registrierstelle_nicht_erreichbar' })
+    // Die Antwort von Crossref liegt schon im Cache.
+    antworten(ra('DataCite'), json(DATACITE))
+    expect((await Crossref.pruefen('10.48550/arXiv.2401.01234')).registrierstelle).toBe('datacite')
+  })
+
+  it('gibt nicht prüfbar zurück, wenn DataCite nicht antwortet', async () => {
+    antworten(nichtGefunden, ra('DataCite'), new Error('ECONNRESET'))
+    expect(await Crossref.pruefen('10.48550/arXiv.2401.01234')).toEqual({ nichtPruefbar: 'registrierstelle_nicht_erreichbar' })
+  })
+
+  it('fragt neu, wenn vor dem Update „bei Crossref unbekannt“ im Cache lag', async () => {
+    cache.set('10.48550/arxiv.2401.01234', { werk: { gefunden: false }, abgerufenAm: new Date() })
+    antworten(ra('DataCite'), json(DATACITE))
+    const ergebnis = await Crossref.pruefen('10.48550/arXiv.2401.01234')
+    expect(ergebnis).toMatchObject({ gefunden: true, registrierstelle: 'datacite', jahr: 2024 })
+  })
+
+  it('leitet doi.org und DataCite im Test auf den Fake um', async () => {
+    schalter.paperApiBasis = 'http://127.0.0.1/spur/dev/crossref'
+    antworten(nichtGefunden, ra('DataCite'), json(DATACITE))
+    await Crossref.pruefen('10.48550/x')
+    expect(abrufe.slice(1)).toEqual([
+      'http://127.0.0.1/spur/dev/crossref/doiorg/doiRA/10.48550/x',
+      'http://127.0.0.1/spur/dev/crossref/datacite/dois/10.48550/x',
+    ])
+  })
+})

@@ -32,8 +32,15 @@ function useBadges(zeile: Zeile) {
   }
 
   if (zeile.referenz === 'nicht_gefunden') add(t('spur_referenz_nicht_gefunden'), 'danger')
-  // Ein Ausfall bei Crossref ist kein Befund über die Arbeit: neutral, nicht als Fehler.
-  if (zeile.referenz === 'nicht_pruefbar') add(t('spur_referenz_nicht_pruefbar'), 'info')
+  // Ein Ausfall bei Crossref oder der Registrierstelle ist kein Befund über die Arbeit: neutral, nicht als Fehler.
+  if (zeile.referenz === 'nicht_pruefbar') {
+    add(
+      t(zeile.grund === 'registrierstelle_nicht_erreichbar' ? 'spur_referenz_registrierstelle_nicht_erreichbar' : 'spur_referenz_nicht_pruefbar'),
+      'info'
+    )
+  }
+  if (zeile.registrierstelle === 'datacite' && zeile.referenz === 'gefunden') add(t('spur_referenz_datacite'), 'success')
+  if (zeile.referenz === 'registriert') add(t('spur_referenz_registriert', { name: zeile.registrierstelleName }), 'info')
   if (zeile.retraction === 'zurueckgezogen') add(t('spur_zurueckgezogen'), 'danger')
   if (zeile.retraction === 'korrektur') add(t('spur_korrektur'), 'warning')
   if (zeile.retraction === 'keine_meldung') add(t('spur_keine_meldung'), 'info')
@@ -59,6 +66,9 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
       {/* Den Crossref-Ausfall nennt schon die Marke darunter. */}
       {zeile.grund && zeile.referenz !== 'nicht_pruefbar' && (
         <p className="spur-zeile-meta">{t(`spur_grund_${zeile.grund}`)}</p>
+      )}
+      {zeile.registrierstelle === 'datacite' && zeile.referenz === 'gefunden' && (
+        <p className="spur-zeile-meta">{t('spur_referenz_datacite_hinweis')}</p>
       )}
       <div className="spur-badges" aria-label={t('spur_status')}>
         {badges.map(b => (
