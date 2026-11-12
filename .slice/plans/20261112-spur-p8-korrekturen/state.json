@@ -1,1 +1,1 @@
-{"state": "running", "builderModel": "opus", "builderAdvisor": "opus", "where": "cloud", "cloudSession": "https://claude.ai/code/session_01XpJUceFeb85oz5yhQ9xYkM", "started": "2026-11-12T13:39:16Z"}
+{"state": "queued", "builderModel": "opus", "builderAdvisor": "opus", "where": "cloud"}
