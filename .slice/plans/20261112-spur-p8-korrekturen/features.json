@@ -55,7 +55,7 @@
     "Trägt sie danach in den Einstellungen unter „Ausgeblendete Makros“ `note` ein, verschwindet die Stelle wieder",
     "In einem Beamer-Dokument ohne `\\setbeameroption{show notes}` zählt ein Zitat in `\\note{…}` nicht; mit `\\setbeameroption{show notes}` zählt es (Unit-Tests mit beiden Präambeln)"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
