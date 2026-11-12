@@ -181,6 +181,12 @@ describe('makrosErkennen', () => {
     expect(makrosErkennen([String.raw`\documentclass{article}`]).ausgeblendet).toEqual([])
   })
 
+  it('braucht für lange Leerraum-Folgen ohne Rumpf keine quadratische Zeit', () => {
+    const start = Date.now()
+    makrosErkennen([`\\newcommand\\a${' '.repeat(80000)}x`, `\\NewDocumentCommand\\b${' '.repeat(80000)}x`])
+    expect(Date.now() - start).toBeLessThan(500)
+  })
+
   it('übersieht auskommentierte Definitionen', () => {
     expect(makrosErkennen(['% \\newcommand{\\zitat}[1]{\\enquote{#1}}']).zitat).toEqual([])
   })

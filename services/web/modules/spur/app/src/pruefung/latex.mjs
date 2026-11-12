@@ -191,10 +191,11 @@ const IST_UNBEKANNT = name =>
   !NICHT_ZITATE.has(name) && (/cite/i.test(name) || /quote$/i.test(name))
 
 // Gruppe 2: die Argumente ([n], #1#2 oder die xparse-Angabe); ohne Argument blendet ein leerer Rumpf nichts aus.
+// Kein Leerraum steht neben einem anderen optionalen Leerraum: Sonst wächst die Laufzeit quadratisch (Nutzertext).
 const DEFINITIONEN = [
-  /\\(?:(?:re)?newcommand|providecommand)\*?\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*(?:\[(\d)\]\s*)?(?:\[[^\]]*\]\s*)?(?=\{)/g,
+  /\\(?:(?:re)?newcommand|providecommand)\*?\s*(?:\{\s*)?\\([a-zA-Z@]+)\s*(?:\}\s*)?(?:\[(\d)\]\s*)?(?:\[[^\]]*\]\s*)?(?=\{)/g,
   /\\def\s*\\([a-zA-Z@]+)\s*((?:#\d\s*)*)(?=\{)/g,
-  /\\(?:New|Renew|Provide|Declare)DocumentCommand\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*\{([^{}]*)\}\s*(?=\{)/g,
+  /\\(?:New|Renew|Provide|Declare)DocumentCommand\s*(?:\{\s*)?\\([a-zA-Z@]+)\s*(?:\}\s*)?\{([^{}]*)\}\s*(?=\{)/g,
 ]
 const mitArgument = angabe => Boolean(angabe?.trim()) && angabe.trim() !== '0'
 const ZITAT_RUMPF = [
