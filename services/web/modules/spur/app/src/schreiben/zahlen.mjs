@@ -31,7 +31,9 @@ const MONAT =
   '(?:Januar|Jänner|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|' +
   'March|May|June|July|October|December|Jan|Feb|Mär|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Okt|Oct|Nov|Dez|Dec)\\.?'
 const DATUM = [
-  /(?<![\d.,])(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.(?:\d{4}|\d{2})?(?![\d,]|\.\d)/g,
+  /(?<![\d.,])(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.(?:\d{4}|\d{2})(?![\d,]|\.\d)/g,
+  // Ohne Jahr nur zweistellig (12.11.), sonst wäre „bei 12.5.“ am Satzende ein Datum.
+  /(?<![\d.,])(?:0[1-9]|[12]\d|3[01])\.(?:0[1-9]|1[0-2])\.(?![\d,]|\.\d)/g,
   /(?<![\d.,-])\d{4}-\d{2}-\d{2}(?![\d-])/g,
   new RegExp(`(?<![\\d.,])\\d{1,2}\\.?\\s*${MONAT}(?:\\s+\\d{4})?(?![\\p{L}\\d])`, 'gu'),
   new RegExp(`${MONAT}\\s+\\d{1,2}(?:st|nd|rd|th)?,?(?:\\s+\\d{4})?(?![\\d])`, 'g'),

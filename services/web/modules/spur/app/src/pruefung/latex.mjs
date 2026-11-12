@@ -190,11 +190,13 @@ function unbekannteForm(text, name, start, pos) {
 const IST_UNBEKANNT = name =>
   !NICHT_ZITATE.has(name) && (/cite/i.test(name) || /quote$/i.test(name))
 
+// Gruppe 2: die Argumente ([n], #1#2 oder die xparse-Angabe); ohne Argument blendet ein leerer Rumpf nichts aus.
 const DEFINITIONEN = [
-  /\\(?:(?:re)?newcommand|providecommand)\*?\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*(?:\[\d\]\s*)?(?:\[[^\]]*\]\s*)?(?=\{)/g,
-  /\\def\s*\\([a-zA-Z@]+)\s*(?:#\d\s*)*(?=\{)/g,
-  /\\(?:New|Renew|Provide|Declare)DocumentCommand\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*\{[^{}]*\}\s*(?=\{)/g,
+  /\\(?:(?:re)?newcommand|providecommand)\*?\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*(?:\[(\d)\]\s*)?(?:\[[^\]]*\]\s*)?(?=\{)/g,
+  /\\def\s*\\([a-zA-Z@]+)\s*((?:#\d\s*)*)(?=\{)/g,
+  /\\(?:New|Renew|Provide|Declare)DocumentCommand\s*\{?\s*\\([a-zA-Z@]+)\s*\}?\s*\{([^{}]*)\}\s*(?=\{)/g,
 ]
+const mitArgument = angabe => Boolean(angabe?.trim()) && angabe.trim() !== '0'
 const ZITAT_RUMPF = [
   /^\\(?:enquote|textquote|blockquote)\*?\s*(?:\[[^\]]*\]\s*)?\{\s*#1\s*\}$/,
   /^„\s*#1\s*“$/,
@@ -217,7 +219,9 @@ export function makrosErkennen(texte) {
         const rumpf = argument(text, m.index + m[0].length)
         if (!rumpf) continue
         const inhalt = rumpf.text.trim()
-        if (!inhalt) ausgeblendet.add(m[1])
+        if (!inhalt) {
+          if (mitArgument(m[2])) ausgeblendet.add(m[1])
+        }
         else if (ZITAT_RUMPF.some(r => r.test(inhalt))) zitat.add(m[1])
       }
     }
@@ -236,7 +240,9 @@ export function makrosWirksam(erkannt, einstellung = {}) {
   }
 }
 
-const BEDINGUNG = /\\(if[a-zA-Z@]*|fi)(?![a-zA-Z@])/g
+// Bedingungen von TeX; \iff (Logik), \ifthenelse (ifthen) und \newif\ifname öffnen keine.
+const BEDINGUNG = /\\(if(?!f(?![a-zA-Z@])|thenelse(?![a-zA-Z@]))[a-zA-Z@]*|fi|else)(?![a-zA-Z@])/g
+const NACH_NEWIF = /\\newif\s*$/
 
 function ausgeblendeteBereiche(text, ausgeblendet) {
   const bereiche = []
@@ -246,22 +252,28 @@ function ausgeblendeteBereiche(text, ausgeblendet) {
     const arg = argument(text, pos)
     if (arg) bereiche.push({ von: m.index, bis: arg.pos })
   }
-  BEDINGUNG.lastIndex = 0
+  // Ausgeblendet ist der Zweig von \iffalse bis zum passenden \else oder \fi.
   let start = -1
   let tiefe = 0
   for (const m of text.matchAll(BEDINGUNG)) {
-    if (start < 0) {
-      if (m[1] === 'iffalse') {
-        start = m.index
-        tiefe = 1
+    if (m[1] === 'else') {
+      if (tiefe === 1 && start >= 0) {
+        bereiche.push({ von: start, bis: m.index })
+        start = -1
       }
     } else if (m[1] === 'fi') {
-      if (--tiefe === 0) {
+      if (tiefe === 0) continue
+      if (--tiefe === 0 && start >= 0) {
         bereiche.push({ von: start, bis: m.index + m[0].length })
         start = -1
       }
-    } else {
+    } else if (NACH_NEWIF.test(text.slice(Math.max(0, m.index - 12), m.index))) {
+      continue
+    } else if (tiefe > 0) {
       tiefe++
+    } else if (m[1] === 'iffalse') {
+      start = m.index
+      tiefe = 1
     }
   }
   return bereiche

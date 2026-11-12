@@ -114,6 +114,10 @@ describe('Datum, Uhrzeit und Versionsnummern', () => {
     expect(zahlenOhneBeleg(`Der Wert ist ${zahl} Einheiten.`)).toEqual(erwartet)
   })
 
+  it.each(['12.5', '4.2'])('meldet die Dezimalzahl %s am Satzende', zahl => {
+    expect(zahlenOhneBeleg(`Der Mittelwert liegt bei ${zahl}.`)).toEqual([zahl])
+  })
+
   it('meldet im Satz aus der Spec nur die Messwerte', () => {
     expect(
       zahlenOhneBeleg('Die Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.')

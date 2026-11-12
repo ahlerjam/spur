@@ -126,7 +126,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/Speicher.mjs', () => ({ nichtVollPruefen: vi.fn(async () => {}), reservieren: vi.fn(async () => async () => {}) }))
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => ({
     laufFuerSchreiben: async () => lauf,
-    angelegtMerken: async (_l, eintraege) => lauf.angelegt.push(...eintraege),
+    angelegtMerken: async (l, eintraege) => l.angelegt.push(...eintraege),
   }))
   vi.doMock('../../app/src/schreiben/SchreibManager.mjs', () => ({ docEdit: vi.fn() }))
   vi.doMock('../../app/src/schalter.mjs', async () => ({
@@ -189,6 +189,15 @@ describe('TexPakete.hinzufuegen', () => {
     expect(lauf.angelegt).toEqual([])
     uploadFehlerBei = null
     expect((await holen()).dateien).toHaveLength(5)
+  })
+
+  it('rollt auch zurück, wenn nach dem Upload das Vermerken am Lauf scheitert', async () => {
+    const echt = lauf
+    lauf = null
+    expect(await fehlerVon(holen())).toMatchObject({ code: 'paket_abgebrochen' })
+    expect(paketDateien()).toEqual([])
+    expect(await eintrag()).toBe(null)
+    lauf = echt
   })
 
   it('räumt einen Rest-Ordner ohne Eintrag ab und installiert vollständig', async () => {

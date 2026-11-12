@@ -38,6 +38,8 @@ Deferred, not discarded. Check here before new plans.
 - Find the real cause of the "interner Fehler" from `doc_create` on the Hetzner server with the new error ID (P8 fixed every cause found in the code, without the server log)
 - Check `https://doi.org/doiRA/…` and `https://api.datacite.org/dois/…` against the real hosts (answer format, slash in the path); the tests use fakes
 - Retractions for DataCite DOIs; DataCite does not report them today
+- A DataCite DOI that `doi.org` knows but `api.datacite.org` answers with 404 shows "nicht prüfbar" on every report; decide on a cached state such as "registered, metadata missing"
+- `tex_package_add`: try the second mirror on a 404 as well, in case the image's mirror lacks a package that mirror.ctan.org has
 - Semantic search over Postgres with pgvector, if brute force is no longer enough
 - Short-lived tokens with OAuth
 - Rate limits for web page capture and comments; OCR limit per project and page cap

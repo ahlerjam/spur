@@ -349,6 +349,13 @@ describe('Zitatprüfung beim Schreiben', () => {
   const ZITAT = '\\enquote{Sleep supports.} \\autocite[3]{smith2024}'
   const mitZitat = () => bearbeiten({ alt: 'Zweiter Satz.', neu: ZITAT })
 
+  it('prüft auch, wenn nur der Wortlaut in einem Zitat oder eigenen Zitatmakro geändert wird', async () => {
+    docSetzen(KAPITEL, 'Vorher \\enquote{exakter Wortlaut} \\cite[3]{k} und \\zitat{eigener Wortlaut} \\cite[3]{k}.')
+    await bearbeiten({ alt: 'exakter Wortlaut', neu: 'erfundener Wortlaut' })
+    await bearbeiten({ alt: 'eigener Wortlaut', neu: 'anderer Wortlaut', schluessel: 'schluessel-0098' })
+    expect(bereichPruefen).toHaveBeenCalledTimes(2)
+  })
+
   it('prüft nur, wenn die Änderung ein Zitat berührt', async () => {
     await bearbeiten()
     expect(bereichPruefen).not.toHaveBeenCalled()

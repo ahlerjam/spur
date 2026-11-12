@@ -160,6 +160,13 @@ describe('makrosErkennen', () => {
     expect(makrosErkennen([String.raw`\newcommand{\note}[1]{}`]).ausgeblendet).toEqual(['note'])
     expect(makrosErkennen([String.raw`\newcommand{\note}[1]{ }`]).ausgeblendet).toEqual(['note'])
     expect(makrosErkennen([String.raw`\newcommand{\note}[1]{\textcolor{red}{#1}}`]).ausgeblendet).toEqual([])
+    expect(makrosErkennen([String.raw`\def\note#1{}`]).ausgeblendet).toEqual(['note'])
+  })
+
+  it('blendet leere Makros ohne Argument nicht aus: Die Klammer danach ist Text', () => {
+    for (const text of [String.raw`\newcommand{\leer}{}`, String.raw`\def\leer{}`, String.raw`\NewDocumentCommand{\leer}{}{}`]) {
+      expect(makrosErkennen([text]).ausgeblendet, text).toEqual([])
+    }
   })
 
   it('blendet Beamer-Notizen nur ohne show notes aus', () => {
@@ -221,6 +228,26 @@ describe('zitateFinden mit Makros', () => {
       ['a', true],
       ['b', true],
       ['c', false],
+    ])
+  })
+})
+
+describe('\\iffalse mit \\else und Befehlen, die wie Bedingungen aussehen', () => {
+  const sichtbarkeit = text => zitateFinden(text, { zitat: [], ausgeblendet: [] }).map(z => [z.belege[0].key, Boolean(z.ausgeblendet)])
+
+  it('blendet nur den \\iffalse-Zweig aus, nicht den \\else-Zweig', () => {
+    expect(sichtbarkeit(String.raw`\iffalse \parencite{a} \else \parencite{b} \fi \parencite{c}`)).toEqual([
+      ['a', true],
+      ['b', false],
+      ['c', false],
+    ])
+  })
+
+  it('zählt \\iff, \\ifthenelse und \\newif nicht als Bedingung', () => {
+    const text = String.raw`\newif\ifentwurf \iffalse $a \iff b$ \ifthenelse \parencite{a} \fi \parencite{b}`
+    expect(sichtbarkeit(text)).toEqual([
+      ['a', true],
+      ['b', false],
     ])
   })
 })

@@ -7,6 +7,7 @@ import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocat
 import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
 import EditorHttpController from '../../../../../app/src/Features/Editor/EditorHttpController.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
+import { zitateFinden } from '../pruefung/latex.mjs'
 import { bereichPruefen } from '../pruefung/PruefManager.mjs'
 import { bearbeitungen } from '../sammlungen.mjs'
 import { anzahlEintraege, maxEintraege } from '../projektEintraege.mjs'
@@ -77,9 +78,17 @@ function vorkommen(text, teil) {
   return treffer
 }
 
+// Ob die Änderung ein Zitat berühren kann. Ohne das wird das Projekt nicht geladen. Eigene Zitatmakros kennt erst
+// bereichPruefen, darum zählt auch ein Befehl im Bereich oder ein offenes Makro-Argument davor auf derselben Zeile.
+function koennteZitatBeruehren(text, von, bis) {
+  if (zitateFinden(text).some(f => f.von <= bis && f.bis >= von)) return true
+  if (/\\[a-zA-Z@]|„/.test(text.slice(von, bis))) return true
+  const davor = text.slice(text.lastIndexOf('\n', von - 1) + 1, von)
+  return /\\[a-zA-Z@]+\*?(\[[^\]]*\])?\{[^{}]*$/.test(davor)
+}
+
 async function pruefSperre(projectId, neuerText, von, bis) {
-  // Ohne Zitatbefehl im Bereich kein Laden des Projekts; eigene Zitatmakros kennt erst bereichPruefen.
-  if (!/\\[a-zA-Z@]|„/.test(neuerText.slice(von, bis))) return []
+  if (!koennteZitatBeruehren(neuerText, von, bis)) return []
   const zeilen = await bereichPruefen(projectId, neuerText, von, bis)
   const rot = []
   for (const z of zeilen) {

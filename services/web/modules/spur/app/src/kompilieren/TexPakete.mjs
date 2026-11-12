@@ -1,6 +1,7 @@
 // tex_package_add: holt ein Paket aus dem TeX-Live-Archiv des Spiegels, den das Image nutzt, und legt seine
 // Laufzeitdateien unter tex-pakete/<paket>/ ins Projekt. Eine latexmkrc im Projekt nimmt den Ordner in die Suchpfade.
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import Path from 'node:path'
@@ -198,10 +199,12 @@ export async function drosselZuruecksetzen(menschId) {
 async function gesperrt(projectId, paket, arbeit) {
   const sammlung = await drossel()
   const _id = `tex-sperre:${projectId}:${paket}`
+  // Der Besitzer gibt nur die eigene Sperre frei, nicht die eines Aufrufs, der eine veraltete übernommen hat.
+  const besitzer = randomUUID()
   for (;;) {
     const veraltet = new Date(Date.now() - SPERRE_VERALTET_MS)
     try {
-      await sammlung.updateOne({ _id, seit: { $lt: veraltet } }, { $set: { seit: new Date() } }, { upsert: true })
+      await sammlung.updateOne({ _id, seit: { $lt: veraltet } }, { $set: { seit: new Date(), besitzer } }, { upsert: true })
       break
     } catch (error) {
       if (error.code !== 11000) throw error
@@ -211,7 +214,7 @@ async function gesperrt(projectId, paket, arbeit) {
   try {
     return await arbeit()
   } finally {
-    await sammlung.deleteOne({ _id })
+    await sammlung.deleteOne({ _id, besitzer })
   }
 }
 
@@ -239,27 +242,17 @@ function hochladenFehler(error) {
 const zuVieleDateien = anzahl =>
   new WerkzeugFehler('projekt_zu_viele_dateien', 'spur_fehler_tex_zu_viele_dateien', { anzahl, grenze: maxEintraege() })
 
-// Lädt alle Dateien hoch. Scheitert einer, wird alles Angelegte entfernt; ein Fehler dabei wird geloggt, die
-// Antwort bleibt der erste Fehler.
-async function dateienAnlegen({ projectId, menschId, paket, dateien, ziel }) {
+async function dateienHochladen({ projectId, menschId, paket, dateien, ziel }) {
   const angelegt = []
-  try {
-    for (const [i, d] of dateien.entries()) {
-      const pause = Number(testSchalter('SPUR_TEX_UPLOAD_PAUSE_MS'))
-      if (pause > 0) await warten(pause)
-      if (Number(testSchalter('SPUR_TEX_UPLOAD_FEHLER')) === i + 1) throw new Error(`Testschalter: Upload ${i + 1} scheitert`)
-      const pfad = `${ORDNER}/${paket}/${d.name}`
-      await EditorController.promises.upsertFileWithPath(projectId, `/${pfad}`, Path.join(ziel, d.pfad), null, 'spur', menschId)
-      angelegt.push(pfad)
-    }
-    return angelegt
-  } catch (error) {
-    logger.warn({ err: error, projectId, paket, angelegt: angelegt.length }, 'TeX-Paket: Upload gescheitert, rolle zurück')
-    await zurueckrollen(projectId, menschId, paket).catch(fehler =>
-      logger.error({ err: fehler, projectId, paket }, 'TeX-Paket: Zurückrollen gescheitert')
-    )
-    throw hochladenFehler(error)
+  for (const [i, d] of dateien.entries()) {
+    const pause = Number(testSchalter('SPUR_TEX_UPLOAD_PAUSE_MS'))
+    if (pause > 0) await warten(pause)
+    if (Number(testSchalter('SPUR_TEX_UPLOAD_FEHLER')) === i + 1) throw new Error(`Testschalter: Upload ${i + 1} scheitert`)
+    const pfad = `${ORDNER}/${paket}/${d.name}`
+    await EditorController.promises.upsertFileWithPath(projectId, `/${pfad}`, Path.join(ziel, d.pfad), null, 'spur', menschId)
+    angelegt.push(pfad)
   }
+  return angelegt
 }
 
 export async function hinzufuegen({ projectId, menschId, botId, paket }) {
@@ -306,16 +299,26 @@ export async function hinzufuegen({ projectId, menschId, botId, paket }) {
       await ordnerEntfernen(projectId, menschId, `${ORDNER}/${paket}`)
       const freigeben = await Speicher.reservieren(projectId, bytes)
       let angelegt
+      // Scheitert ein Schritt bis zum Eintrag, wird alles Angelegte entfernt; ein Fehler dabei wird geloggt, die
+      // Antwort bleibt der erste Fehler. Der Eintrag kommt zuletzt: Erst er macht das Paket vollständig.
       try {
-        angelegt = await dateienAnlegen({ projectId, menschId, paket, dateien, ziel })
-      } finally {
-        await freigeben()
+        try {
+          angelegt = await dateienHochladen({ projectId, menschId, paket, dateien, ziel })
+        } finally {
+          await freigeben()
+        }
+        const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
+        await latexmkrcSichern({ projectId, menschId, botId, stand, ordner, lauf })
+        await LaufManager.angelegtMerken(lauf, [{ art: 'ordner', pfad: `${ORDNER}/${paket}`, paket, bytes }])
+        await (await texPakete()).updateOne({ projectId, paket }, { $set: { bytes } }, { upsert: true })
+      } catch (error) {
+        logger.warn({ err: error, projectId, paket }, 'TeX-Paket: Installation gescheitert, rolle zurück')
+        await zurueckrollen(projectId, menschId, paket).catch(fehler =>
+          logger.error({ err: fehler, projectId, paket }, 'TeX-Paket: Zurückrollen gescheitert')
+        )
+        throw hochladenFehler(error)
       }
-      const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
-      await LaufManager.angelegtMerken(lauf, [{ art: 'ordner', pfad: `${ORDNER}/${paket}`, paket, bytes }])
-      await (await texPakete()).updateOne({ projectId, paket }, { $set: { bytes } }, { upsert: true })
-      await installationZaehlen(menschId)
-      await latexmkrcSichern({ projectId, menschId, botId, stand, ordner, lauf })
+      await installationZaehlen(menschId).catch(error => logger.error({ err: error, menschId }, 'TeX-Paket: Drossel nicht gezählt'))
 
       const imProjekt = new Set([...vorhanden.map(e => e.paket), paket])
       return {
