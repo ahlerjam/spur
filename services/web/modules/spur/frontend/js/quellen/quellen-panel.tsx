@@ -351,11 +351,14 @@ export default function QuellenPanel() {
         {ladeFehler && (
           <Notification
             type="error"
-            content={ladeFehler}
-            action={
-              <OLButton variant="secondary" size="sm" onClick={() => laden()}>
-                {t('spur_erneut_versuchen')}
-              </OLButton>
+            content={
+              // Der Knopf steht unter dem Text: Als action stünde er im schmalen Panel daneben und quetschte den Text.
+              <>
+                <p className="mb-2">{ladeFehler}</p>
+                <OLButton variant="secondary" size="sm" onClick={() => laden()}>
+                  {t('spur_erneut_versuchen')}
+                </OLButton>
+              </>
             }
           />
         )}
