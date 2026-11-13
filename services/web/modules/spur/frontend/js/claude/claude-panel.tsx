@@ -300,7 +300,9 @@ function Verlauf({ status }: { status: Status }) {
     return <p className="spur-leer spur-chat-leer">{t('spur_keine_auftraege')}</p>
   }
   return (
+    // column-reverse im CSS hält den Verlauf unten, ohne das Zurücklesen zu stören.
     <div className="spur-chat-verlauf">
+      <div>
       {status.aeltere && (
         <p className="spur-zeile-meta spur-chat-aeltere">
           {t('spur_chat_aeltere', { anzahl: nachrichten.length })}
@@ -320,6 +322,7 @@ function Verlauf({ status }: { status: Status }) {
         ))}
         {wartet && <li className="spur-chat-wartet">{t('spur_claude_arbeitet')}</li>}
       </ol>
+      </div>
     </div>
   )
 }

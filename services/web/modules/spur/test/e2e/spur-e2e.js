@@ -1514,7 +1514,9 @@ async page => {
     const dois = text => [...text.matchAll(/10\.\d{4,9}\/[^\s},"]+/g)].map(t => t[0]).sort().join()
     const erwartet = '10.1038/nrn2762,10.5555/spur.2024.001'
     for (const format of ['.bib', '.ris', 'CSV']) {
-      const knopf = page.getByRole('link', { name: `Als ${format} exportieren` })
+      // P9: Die Exporte stehen im Menü „Liste exportieren“.
+      await page.getByRole('button', { name: 'Liste exportieren' }).click()
+      const knopf = page.getByRole('menuitem', { name: `Als ${format} exportieren` })
       const [download] = await Promise.all([page.waitForEvent('download'), knopf.click()])
       const text = await (await page.request.get(download.url())).text()
       ok(dois(text) === erwartet, `${format}: ${dois(text)}`)
@@ -1560,7 +1562,7 @@ async page => {
     await zeile('kapitel.tex').getByText('Dieser Dateityp wird nicht unterstützt', { exact: false }).waitFor({ timeout: 30000 })
     await dialog.getByRole('button', { name: 'Schließen' }).click()
     await dialog.waitFor({ state: 'detached' })
-    const quellen = page.locator('.spur-panel .spur-liste .spur-zeile-link')
+    const quellen = page.locator('.spur-panel .spur-liste .spur-quelle-titel')
     await page.locator('.spur-panel').getByRole('button', { name: 'retracted.pdf' }).waitFor()
     ok((await quellen.count()) === 2, `Quellen: ${await quellen.allTextContents()}`)
 
@@ -2171,6 +2173,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const pid = page.url().split('/').pop()
     await panelOeffnen('Claude')
     await claudePanel().getByText('Claude nicht verbunden').waitFor()
+    await startbefehlZeigen()
     await claudePanel().getByText(/claude --allowedTools/).waitFor()
     ok(await claudePanel().getByLabel('Auftrag an Claude').isDisabled(), 'Eingabefeld ohne Verbindung bedienbar')
     await claudePanel().getByText('Verbinde zuerst Claude').waitFor()
@@ -2229,8 +2232,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const neueste = chatLog().locator('.spur-chat-nachricht').last()
     ok(
       await neueste.evaluate(el => {
+        // P9: Der Verlauf rollt in eigenem Bereich unter den Läufen; dort steht die neueste Nachricht unten.
         const r = el.getBoundingClientRect()
-        return r.bottom <= window.innerHeight && r.top >= 0
+        const bereich = el.closest('.spur-chat-verlauf').getBoundingClientRect()
+        return r.bottom <= bereich.bottom + 1 && r.top >= bereich.top - 1
       }),
       `Neueste Nachricht nach dem Laden nicht sichtbar: ${await neueste.innerText()}`
     )
@@ -2763,6 +2768,12 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again."`
 
   // Kein Kasten ist breiter als sein Container, kein Befehl wird abgeschnitten.
+  // P9: Ist der Startbefehl schon bekannt, steht er eingeklappt hinter „Startbefehl anzeigen“.
+  async function startbefehlZeigen() {
+    const zeigen = claudePanel().getByRole('button', { name: 'Startbefehl anzeigen' })
+    if (await zeigen.isVisible()) await zeigen.click()
+  }
+
   async function kaestenGanz(wo) {
     const falsch = await page.locator('.spur-befehl-kasten').evaluateAll(kaesten =>
       kaesten
@@ -2816,6 +2827,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await projektOeffnen('Demo')
     await panelOeffnen('Claude')
     await claudePanel().getByText('Claude nicht verbunden').waitFor()
+    await startbefehlZeigen()
     const kasten = claudePanel().locator('.spur-befehl-kasten')
     ok((await kasten.locator('pre').textContent()) === START, `Startbefehl im Panel: ${await kasten.locator('pre').textContent()}`)
     await kaestenGanz('Claude-Panel')
@@ -2828,6 +2840,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
         await page.reload()
         await page.locator('.cm-content').first().waitFor()
         await panelOeffnen('Claude')
+        await startbefehlZeigen()
         const kasten = claudePanel().locator('.spur-befehl-kasten')
         await kasten.waitFor()
         const schlecht = await unlesbar(kasten)
@@ -3170,9 +3183,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
     const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
-    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8.
-    ok(eintraege === 44, `Backlog hat ${eintraege} Einträge statt 44`)
-    ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /1616/.test(backlog), 'Backlog ohne Transformers, Tesseract oder 1616 Übersetzungen')
+    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei.
+    ok(eintraege === 41, `Backlog hat ${eintraege} Einträge statt 41`)
+    ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /lacks \d+ keys/.test(backlog), 'Backlog ohne Transformers, Tesseract oder fehlende Übersetzungen')
   }
 
   // P6: Befunde aus der ersten echten Claude-Session.
@@ -3192,6 +3205,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await panelOeffnen('Claude')
     // Ohne laufende Session; ein Herzschlag eines früheren Features gilt noch bis zu 45 s.
     await claudePanel().getByText('Claude nicht verbunden').waitFor({ timeout: 50000 })
+    await startbefehlZeigen()
     await claudePanel()
       .getByText('Starte Claude Code im Terminal mit diesem Befehl. Claude wartet danach von selbst auf Aufträge aus diesem Panel:', { exact: true })
       .waitFor()
@@ -4166,8 +4180,8 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-grenze-c@example.org': { projekte: '', speicherGb: '' } })
     const REPO = `${FIXTURES}/../../../../../..`
     const readme = await repoDatei(`${REPO}/README.md`)
-    const betrieb = readme.split('### Limits\n')[1]?.split('\n### ')[0] ?? ''
-    ok(betrieb.includes('Admin → Limits') && betrieb.includes('unlimited'), 'README ohne Abschnitt zu den Grenzen')
+    const betrieb = readme.split('### Grenzen\n')[1]?.split('\n### ')[0] ?? ''
+    ok(betrieb.includes('Admin → Grenzen') && betrieb.includes('unlimited'), 'README ohne Abschnitt zu den Grenzen')
   }
 
   // Binärdatei aus dem Repo als Buffer (repoDatei liest Text).
@@ -5366,7 +5380,8 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await lesen.dialog.getByText('Keine Schreibrechte').waitFor()
     ok(await fremd.getByRole('button', { name: 'Einfügen' }).isDisabled(), '„Einfügen“ ohne Schreibrecht aktiv')
     await page.keyboard.press('Escape')
-    ohneKonsolenfehler('p9f3')
+    // Der 403 des Seitenbilds ist gewollt (Testschalter).
+    ohneKonsolenfehler('p9f3', /Failed to load resource: the server responded with a status of 403/)
   }
 
 
@@ -5450,11 +5465,16 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     // Tooltip an der roten Markierung: Maus und Tastatur.
     const marke = page.locator('.cm-content .spur-marke-rot', { hasText: 'Sleep strongly supports' })
     await marke.waitFor({ timeout: 30000 })
-    const tooltip = page.locator('.cm-tooltip.spur-befund-tooltip')
+    // Beim Überfahren legt CodeMirror den Tooltip in eine Hülle, am Cursor trägt die Hülle selbst die Klasse.
+    const tooltip = page.locator('.cm-tooltip.spur-befund-tooltip, .cm-tooltip .spur-befund-tooltip')
     // Cursor weg von der Markierung, sonst zeigt schon der Tooltip am Cursor den Befund.
     await page.locator('.cm-lineNumbers .cm-gutterElement', { hasText: /^1$/ }).click()
     await page.keyboard.press('Home')
-    const box = await marke.boundingBox()
+    // Die Markierung kann umbrechen: über die erste Zeile fahren, nicht über die Mitte des ganzen Kastens.
+    const box = await marke.evaluate(el => {
+      const r = el.getClientRects()[0]
+      return { x: r.left, y: r.top, height: r.height }
+    })
     for (let i = 0; i < 10 && !(await tooltip.filter({ hasText: 'Wortlaut: abweichend' }).isVisible()); i++) {
       await page.mouse.move(box.x + 10 + i * 5, box.y + box.height / 2)
       await page.waitForTimeout(700)
@@ -5470,7 +5490,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     // Sprung aus dem Bericht.
     await page.locator('.cm-content').evaluate(el => el.blur())
     await bericht.getByRole('button', { name: 'main.tex:8', exact: true }).click()
-    await page.locator('.cm-activeLine', { hasText: 'Sleep strongly supports' }).waitFor()
+    await page.locator('.cm-activeLineGutter', { hasText: /^8$/ }).waitFor()
 
     await bericht.getByRole('button', { name: 'Einstellungen der Prüfung' }).waitFor()
     await bericht.getByText(/davon \d+ markiert/).waitFor()
@@ -6060,7 +6080,10 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await anmelden('e2e-a@example.org')
     await projektOeffnen('E2E Quellen')
     const pid = page.url().split('/').pop()
+    // Die Tokens entstehen erst, wenn der Linkzugriff eingeschaltet wird.
+    await seitenAnfrage('POST', `/project/${pid}/settings/admin`, { publicAccessLevel: 'tokenBased' })
     const { readAndWrite } = await (await page.request.get(`${BASE}/project/${pid}/tokens`)).json()
+    ok(readAndWrite, 'Kein Freigabelink')
 
     for (const [px, thema] of [[1280, 'light-'], [1280, ''], [360, '']]) {
       await breite(px)
@@ -6077,6 +6100,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await anmelden('e2e-review@example.org')
     await mitGehaltenemNetz(/\/grant$/, async () => {
       await page.goto(`${BASE}/${readAndWrite}`, { waitUntil: 'commit' })
+      // Overleaf fragt vor dem Beitreten nach; der Ladebildschirm steht, solange der Zugriff angefragt wird.
+      const beitreten = page.getByRole('button', { name: /beitreten|join/i }).first()
+      await beitreten.waitFor({ timeout: 15000 }).then(() => beitreten.click(), () => {})
       await schriftzugDeckt('Freigabelink')
     })
     ohneKonsolenfehler('p9f11', /Failed to load resource|WebSocket|socket\.io/)

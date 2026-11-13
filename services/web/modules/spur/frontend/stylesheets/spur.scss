@@ -623,8 +623,11 @@ $spur-sm: 575.98px;
   margin: 0;
 }
 
-.spur-befehl-umschalten.btn {
+.spur-befehl-umschalten.btn,
+.spur-claude-statuszeile a {
   padding: 0;
+  // Overleafs Linkfarbe ist für helle Seiten; im dunklen Panel die Variante des Editors.
+  color: var(--link-ui-themed);
 }
 
 .spur-automatik {
@@ -666,7 +669,12 @@ $spur-sm: 575.98px;
   padding: var(--spacing-04) 0 var(--spacing-02);
 }
 
+// Eigener Rollbereich: Die neueste Nachricht steht unten und bleibt sichtbar, die Läufe darüber.
 .spur-chat-verlauf {
+  display: flex;
+  flex-direction: column-reverse;
+  max-height: 28vh;
+  overflow-y: auto;
   border-top: 1px solid var(--border-divider-themed);
 }
 
@@ -718,6 +726,13 @@ $spur-sm: 575.98px;
   textarea {
     width: 100%;
   }
+}
+
+// Auch bei gesperrtem Feld bleiben Label und Hinweis lesbar: Overleaf graut sie über `.form-label:has(+ :disabled)` aus,
+// der Hinweis „Verbinde zuerst Claude“ ist aber der nächste Schritt.
+.spur-panel .spur-chat-eingabe .form-label,
+.spur-panel .spur-chat-eingabe .form-text {
+  color: var(--content-secondary-themed);
 }
 
 .spur-nachricht-text {

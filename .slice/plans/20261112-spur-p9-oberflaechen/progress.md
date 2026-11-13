@@ -80,17 +80,10 @@
 - Crossref: „nicht registriert“ kürzer cachen; DataCite-404 nicht als „nicht erreichbar“ melden.
 - Prüfung: eigene Zitatmakros mit `@` im Namen erkennen.
 
-## Stand am Ende des Laufs (Turn-Grenze erreicht)
-Letzter voller E2E-Lauf nach der letzten Codeänderung (2026-11-13): grün bis auf
-- p9f3: der absichtlich ausgelöste 403 (Testschalter `SPUR_SEITENBILD_FEHLER`) zählt als Konsolenfehler; `ohneKonsolenfehler`
-  braucht hier das Muster für 403 wie in p9f2. f3 bleibt `passes: false`.
-- p9f4: der Tooltip beim Überfahren erscheint per Hand und im Frontend, in der Suite nicht zuverlässig (Tastatur-Tooltip
-  geprüft). f4 bleibt `passes: false`.
-- p9f11: Freigabelink zeigt für `e2e-review` keinen Ladebildschirm, solange `/grant` gehalten wird (Ablauf der
-  Zugriffsseite prüfen). Editor in hell, dunkel und 360 px passt. f11 bleibt `passes: false`.
-- Regressionen älterer Schritte durch neue Beschriftungen und Layout, noch anzupassen: p2f4 (Export der Beschaffung jetzt
-  im Menü „Liste exportieren“), p2f5, p3f1 (Chatverlauf unter den Läufen, neueste Nachricht außer Sicht), p5f3 und p6f1
-  (Startbefehl eingeklappt, sobald er bekannt ist), p5f4 (Kontrast des gesperrten Eingabefelds und „Verbinde zuerst
-  Claude“), p5f7 (Kontrast von „Startbefehl anzeigen“ im dunklen Design: Link-Knopf braucht `--link-ui-themed`),
-  p5f8 (Backlog hat jetzt 41 Einträge), p7f11 (README-Abschnitt heißt jetzt „Grenzen“). p6f3 war schon vorher rot.
-- Screenshots je Ansicht bei 360 und 1280 px stehen noch aus.
+## Nachtrag nach dem Ende des ersten Laufs
+- Behoben: p9f3 (403 des Testschalters ist gewollt), p9f4 (Tooltip beim Überfahren liegt in einer Hülle von CodeMirror),
+  p9f11 (die Zugriffsseite des Freigabelinks hatte eine eigene Kopie des Schriftzugs, jetzt Kern-Patch in
+  `access-attempt-screen.tsx`; Tokens entstehen erst beim Einschalten des Linkzugriffs).
+- Ältere Schritte an P9 angepasst: Export der Beschaffung im Menü, neue Quellenliste, Startbefehl aufklappen, Backlog
+  41 Einträge, README „Grenzen“; Chatverlauf rollt in eigenem Bereich unter den Läufen (neueste Nachricht unten
+  sichtbar). Label und Hinweis unter dem gesperrten Eingabefeld bleiben lesbar (Overleaf graut sie sonst aus).

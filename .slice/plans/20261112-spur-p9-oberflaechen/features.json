@@ -44,7 +44,7 @@
     "Scheitert das Laden eines Seitenbilds (Dev-Schalter), steht an seiner Stelle „Die Seite ließ sich nicht laden.“ mit „Erneut versuchen“, der Text der Seite bleibt lesbar; während des Ladens steht ein Platzhalter in Seitengröße",
     "Bei 768 px und 360 px ist die Ansicht einspaltig, die Seitenleiste ein ausklappbarer Bereich unter der Seite, ohne horizontales Rollen der ganzen Ansicht; auf dem Handy passt sie in die sichtbare Höhe (kein Inhalt hinter der Adressleiste)"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -58,7 +58,7 @@
     "Im Editor zeigt die rot markierte Stelle in Zeile 8 beim Überfahren und beim Fokus per Tastatur einen Tooltip „Wortlaut: abweichend“; ein Klick auf „main.tex:8“ im Bericht springt zur Stelle",
     "Der Knopf „Einstellungen der Prüfung“ (aus P8) und die Zählung mit „davon … markiert“ sind weiter vorhanden"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -155,7 +155,7 @@
     "Bei 0 %, etwa 50 % und 100 % Fortschritt ist kein Versatz zu sehen (drei Screenshots); der Text unter dem Schriftzug steht mittig darunter",
     "Dasselbe gilt für den Ladebildschirm der Projektliste und beim Zugang über einen Freigabelink sowie bei 360 px Breite und im dunklen Farbschema"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
