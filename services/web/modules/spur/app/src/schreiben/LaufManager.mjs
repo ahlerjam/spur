@@ -112,7 +112,6 @@ export function laufFuerClient(lauf) {
     zahlen: lauf.zahlen ?? [],
     zusammenfassung: lauf.zusammenfassung,
     angelegt: (lauf.angelegt ?? []).map(({ art, pfad, name }) => ({ art, pfad, name })),
-    rotAenderungen: lauf.rotAenderungen ?? [],
     automatisch: (lauf.angenommen ?? [])
       .filter(a => a.automatisch)
       .map(({ pfad, zeile, op }) => ({

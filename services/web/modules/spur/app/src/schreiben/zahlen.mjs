@@ -1,6 +1,6 @@
 // Heuristik für Zahlen in Claudes Text, die nicht aus ergebnisse.tex stammen.
 // Gemeldet: Zahlen im Fließtext, Werte in \num, \qty, \SI, \SIrange und in Formeln Dezimalzahlen und Zahlen
-// ab drei Stellen. Nicht gemeldet: Seitenangaben, Jahreszahlen, Datum, Uhrzeit, Versionsnummern, Befehlsargumente, Kommentare, Grafiken (TikZ,
+// ab drei Stellen. Nicht gemeldet: Seitenangaben, Jahreszahlen, Datum, Uhrzeit (auch „9 Uhr“), Versionsnummern (auch „Python 3.12“), Befehlsargumente, Kommentare, Grafiken (TikZ,
 // pgfplots), Farbangaben, optionale Argumente und einzelne Ganzzahlen bis zwei Stellen in Formeln (Exponenten,
 // Indizes).
 const MATHE = [
@@ -40,6 +40,14 @@ const DATUM = [
 ]
 const UHRZEIT = /(?<![\d.,:])(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?![\d:])/g
 const VERSION = [/\b(?:Version|Vers\.|v|V)\s*\d+(?:\.\d+)*/g, /(?<![\d.,])\d+(?:\.\d+){2,}(?![\d.,]\d)/g]
+// „9 Uhr“, „9.30 Uhr“; ohne „Uhr“ bleibt 9.30 eine Dezimalzahl.
+const UHR = /(?<![\d.,])\d{1,2}(?:[.:]\d{2})?\s*Uhr\b/g
+// Namen, hinter denen eine ganze Zahl eine Version ist, und Namen, die auch Vornamen oder Alltagswörter sind (Julia,
+// Excel, Linux): dort zählt nur eine Version mit Punkt. Nur Leerzeichen, kein Zeilenumbruch dazwischen.
+const SOFTWARE = [
+  /\b(?:Python|SPSS|SAS|Stata|MATLAB|Matlab|Node|Java|Windows|macOS|Ubuntu|TeX Live|LaTeX|NVivo|MAXQDA|JASP|jamovi|Zotero)[ \t]+\d+(?:\.\d+)*/g,
+  /\b(?:Julia|Excel|Linux)[ \t]+\d+(?:\.\d+)+/g,
+]
 const ZAHL = /(?<![\p{L}\d\\\-.,])\d+(?:[.,]\d+)*(?![\p{L}\d])/gu
 
 const dezimalzeichen = text => text.replace(/\{,\}/g, ',')
@@ -65,7 +73,7 @@ export function zahlenOhneBeleg(text, belegt = []) {
   // Formeln an Ort und Stelle durch ihre meldenswerten Zahlen ersetzen, damit die Reihenfolge bleibt.
   for (const muster of MATHE) rest = rest.replace(muster, formel => ` ${unbelegt(formelZahlen(formel))} `)
   rest = rest.replace(BEFEHL_ARGUMENTE, ' ').replace(SEITE, ' ')
-  for (const muster of [...DATUM, UHRZEIT, ...VERSION]) rest = rest.replace(muster, ' ')
+  for (const muster of [...DATUM, UHRZEIT, UHR, ...VERSION, ...SOFTWARE]) rest = rest.replace(muster, ' ')
   rest = rest.replace(JAHR, ' ')
   return [...new Set(rest.match(ZAHL) ?? [])]
 }

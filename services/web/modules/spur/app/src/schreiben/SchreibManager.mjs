@@ -8,7 +8,7 @@ import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
 import EditorHttpController from '../../../../../app/src/Features/Editor/EditorHttpController.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
 import { zitateFinden } from '../pruefung/latex.mjs'
-import { bereichPruefen } from '../pruefung/PruefManager.mjs'
+import { bereichPruefen, bibBereichPruefen } from '../pruefung/PruefManager.mjs'
 import { bearbeitungen } from '../sammlungen.mjs'
 import { anzahlEintraege, maxEintraege } from '../projektEintraege.mjs'
 import { jetzt, testSchalter } from '../schalter.mjs'
@@ -118,6 +118,23 @@ async function pruefSperre(projectId, neuerText, von, bis) {
   return rot
 }
 
+// Eine .bib-Änderung blockiert nichts, wird aber rot, sobald ein Zitat auf den geänderten Eintrag dadurch
+// nicht mehr sauber belegt ist; sonst nähme „Alle annehmen“ den kippenden Eintrag still mit.
+async function bibSperre(projectId, docId, neuerText, von, bis) {
+  const zeilen = await bibBereichPruefen(projectId, docId, neuerText, von, bis)
+  return zeilen
+    .map(z => {
+      const auszug = z.auszug || z.key
+      if (z.form === 'unbekannt' || ['nicht_pruefbar', 'abweichend', 'quelle_fehlt'].includes(z.wortlaut)) {
+        return { grund: 'nicht_pruefbar', auszug }
+      }
+      if (z.referenz === 'nicht_gefunden') return { grund: 'doi_unbekannt', auszug }
+      if (z.retraction === 'zurueckgezogen') return { grund: 'zurueckgezogen', auszug }
+      return null
+    })
+    .filter(Boolean)
+}
+
 const VERWAIST_MS = 2 * 60 * 1000
 
 // Fingerabdruck der Argumente: Derselbe Schlüssel mit anderem Inhalt ist ein Fehler des Aufrufers.
@@ -187,12 +204,18 @@ export async function docEdit({ projectId, botId, menschId, docId, pfad, alt, ne
 }
 
 // Nach dem Schreiben: rote Zitate am Lauf merken, sonst nimmt der Schalter des Menschen die neuen Changes an.
-async function nachDemSchreiben({ projectId, lauf, menschId, docId, vorher, rot }) {
+// Rot wird nach Position bestimmt, nicht nur nach neuen IDs: Schreibt doc_edit in eine eigene Einfügung hinein
+// (`\parencite{zzz}` wird zu `\parencite{unbekannt}`), wächst die bestehende Einfügung unter ihrer alten ID.
+async function nachDemSchreiben({ projectId, lauf, menschId, docId, vorher, rot, bereich }) {
   const { ranges } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
   const alt = new Set((vorher ?? []).map(c => c.id))
-  const neueChanges = (ranges?.changes ?? []).filter(c => !alt.has(c.id))
-  const neu = neueChanges.map(c => c.id)
-  if (rot.length) return await LaufManager.rotMerken(lauf, neueChanges)
+  const alle = ranges?.changes ?? []
+  const istNeu = c => !alt.has(c.id)
+  if (rot.length) {
+    const imBereich = c => c.op.i !== undefined && c.op.p < bereich.bis && c.op.p + c.op.i.length > bereich.von
+    return await LaufManager.rotMerken(lauf, alle.filter(c => istNeu(c) || imBereich(c)))
+  }
+  const neu = alle.filter(istNeu).map(c => c.id)
   // Der Lauf kann eben erst angelegt sein: Das Dokument steht dann nur in der Datenbank schon in `docs`.
   const docs = lauf.docs.some(d => String(d) === docId) ? lauf.docs : [...lauf.docs, docId]
   if (menschId) await LaufAktionen.sofortAnnehmen(projectId, { ...lauf, docs }, menschId, neu)
@@ -220,10 +243,13 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
     start = treffer[0]
   }
   const neuerText = text.slice(0, start) + neu + text.slice(start + alt.length)
-  const rot = await pruefSperre(projectId, neuerText, start, start + neu.length)
+  const istBib = /\.bib$/.test(doc.pfad)
+  const rot = istBib
+    ? await bibSperre(projectId, doc.docId, neuerText, start, start + neu.length)
+    : await pruefSperre(projectId, neuerText, start, start + neu.length)
 
   // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt, in .bib-Dateien stehen nur Metadaten.
-  const ohnePruefung = /(^|\/)ergebnisse\.tex$|\.bib$/.test(doc.pfad)
+  const ohnePruefung = istBib || /(^|\/)ergebnisse\.tex$/.test(doc.pfad)
   const kandidaten = ohnePruefung ? [] : zahlenOhneBeleg(neu)
   const zahlen = kandidaten.length ? zahlenOhneBeleg(neu, await ergebnisZahlen(projectId)) : []
   const op = opsFuer(start, alt, neu)
@@ -238,7 +264,15 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
         rot,
         zahlen: zahlen.map(zahl => ({ zahl, pfad: doc.pfad })),
       })
-      await nachDemSchreiben({ projectId, lauf, menschId, docId: doc.docId, vorher: ranges?.changes, rot })
+      await nachDemSchreiben({
+        projectId,
+        lauf,
+        menschId,
+        docId: doc.docId,
+        vorher: ranges?.changes,
+        rot,
+        bereich: { von: start, bis: start + neu.length },
+      })
     } catch (error) {
       // Geschrieben ist geschrieben: Ein Fehler beim Mitzählen oder Annehmen darf die Reservierung nicht freigeben,
       // sonst schriebe eine Wiederholung doppelt. Die Changes bleiben dann offen.

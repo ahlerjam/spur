@@ -1,5 +1,6 @@
 import classNames from 'classnames'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FileOperation } from '../../services/types/file-operation'
 import OLTag from '@/shared/components/ol/ol-tag'
 
@@ -14,6 +15,13 @@ export default function HistoryFileTreeItem({
   operation,
   icons,
 }: FileTreeItemProps) {
+  const { t } = useTranslation()
+  const operationen = {
+    added: t('history_operation_added'),
+    edited: t('history_operation_edited'),
+    renamed: t('history_operation_renamed'),
+    removed: t('history_operation_removed'),
+  }
   return (
     <div className="history-file-tree-item" role="presentation">
       {icons}
@@ -26,7 +34,7 @@ export default function HistoryFileTreeItem({
           {name}
         </div>
         {operation && (
-          <OLTag className="history-file-tree-item-badge">{operation}</OLTag>
+          <OLTag className="history-file-tree-item-badge">{operationen[operation] ?? operation}</OLTag>
         )}
       </div>
     </div>

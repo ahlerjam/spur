@@ -158,13 +158,9 @@ export const EditorProvider: FC<React.PropsWithChildren> = ({ children }) => {
       parts.push('[PDF]')
     }
 
-    if (projectName) {
-      parts.push(projectName)
-      parts.push('-')
-    }
-
-    parts.push('Online LaTeX Editor')
-    parts.push(getMeta('ol-ExposedSettings').appName)
+    // Titel in der Form „<Projektname> – spur“ wie in der Projektliste.
+    const { appName } = getMeta('ol-ExposedSettings')
+    parts.push(projectName ? `${projectName} – ${appName}` : appName)
 
     const title = parts.join(' ')
 

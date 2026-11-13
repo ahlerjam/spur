@@ -16,7 +16,10 @@ export const FLAECHEN = {
     `${JS}/shared/components/menu-bar`,
     `${JS}/features/source-editor/hooks/use-toolbar-menu-editor-commands.tsx`,
     `${JS}/features/source-editor/components/tabs`,
+    `${JS}/features/source-editor/components/toolbar`,
+    `${JS}/features/source-editor/components/editor-switch.tsx`,
     `${JS}/features/file-tree/components/file-tree-action-buttons.tsx`,
+    `${JS}/features/file-tree/components/file-tree-toolbar.tsx`,
   ],
   Leiste: [`${JS}/features/ide-react/components/rail`],
   'Review-Panel': [`${JS}/features/review-panel`],
@@ -24,6 +27,12 @@ export const FLAECHEN = {
   'Editor-Einstellungen': [`${JS}/features/ide-settings`],
   Projektliste: [`${JS}/features/project-list/components`],
   Kontomenü: [`${JS}/shared/components/navbar`],
+  Dateibaum: [`${JS}/features/file-tree`],
+  'Teilen-Dialog': [`${JS}/features/share-project-modal`],
+  Verlauf: [`${JS}/features/history`],
+  Chat: [`${JS}/features/chat`],
+  Wortzahl: [`${JS}/features/word-count-modal`],
+  Befehlspalette: [`${JS}/features/command-palette`],
 }
 
 function dateien(pfad) {
@@ -32,11 +41,11 @@ function dateien(pfad) {
 }
 
 export function schluesselIn(quelltext) {
-  return [...quelltext.matchAll(/\bt\(\s*['"]([a-z0-9_]+)['"]/g)].map(treffer => treffer[1])
+  return [...quelltext.matchAll(/(?:\bt\(\s*|i18nKey=)['"]([a-z0-9_]+)['"]/g)].map(treffer => treffer[1])
 }
 
 test('schluesselIn findet t()-Aufrufe mit einfachen und doppelten Anführungszeichen', () => {
-  assert.deepEqual(schluesselIn(`t('file') + t("insert", { x }) + translate('view') + t(variable)`), ['file', 'insert'])
+  assert.deepEqual(schluesselIn(`t('file') + t("insert", { x }) + translate('view') + t(variable) + <Trans i18nKey="viewing_x" />`), ['file', 'insert', 'viewing_x'])
 })
 
 test('jeder Schlüssel der täglichen Flächen steht in de.json', () => {
@@ -50,4 +59,18 @@ test('jeder Schlüssel der täglichen Flächen steht in de.json', () => {
     if (fehlt.length) fehlend[flaeche] = fehlt
   }
   assert.deepEqual(fehlend, {})
+})
+
+test('bekannte englische Reste sind übersetzt', () => {
+  const de = JSON.parse(readFileSync(join(WEB, 'locales/de.json'), 'utf8'))
+  assert.equal(de.raw_logs, 'Rohprotokoll')
+  assert.equal(de.raw_logs_description, 'Rohprotokoll vom LaTeX-Compiler')
+  assert.equal(de.hide_file_tree, 'Dateibaum ausblenden')
+  assert.equal(de.show_file_tree, 'Dateibaum einblenden')
+  assert.equal(de.resize, 'Größe ändern')
+  assert.equal(de.close_dialog, 'Dialog schließen')
+  assert.equal(de.more_actions, 'Weitere Aktionen')
+  assert.equal(de.none, 'Keine')
+  assert.equal(de.project_files_history, 'Verlauf der Projektdateien')
+  assert.equal(de.project_history_labels, 'Projektverlauf und Marken')
 })

@@ -33,7 +33,7 @@ const status = (teil: object) => ({
   verbunden: true,
   nachrichten: [],
   automatik: false,
-  offen: { aenderungen: 0, dateien: 0 },
+  offen: { aenderungen: 0, dateien: 0, rot: 0 },
   laeufe: [],
   weitereLaeufe: false,
   ...teil,
@@ -135,14 +135,14 @@ describe('Claude-Panel', function () {
   })
 
   it('fragt vor „Alles Offene jetzt annehmen“ nach und ist ohne Offenes gesperrt', async function () {
-    let offen = { aenderungen: 12, dateien: 2 }
+    let offen = { aenderungen: 12, dateien: 2, rot: 0 }
     fetchMock.get(STATUS, () => status({ offen }))
     fetchMock.post(ALLES, () => {
-      offen = { aenderungen: 0, dateien: 0 }
+      offen = { aenderungen: 0, dateien: 0, rot: 0 }
       return { angenommen: 12 }
     })
     zeigen()
-    const knopf = await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen' })
+    const knopf = await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen (12)' })
     knopf.focus()
     fireEvent.click(knopf)
     const dialog = await screen.findByRole('dialog')
@@ -156,10 +156,19 @@ describe('Claude-Panel', function () {
     expect(screen.queryByRole('dialog')).to.equal(null)
   })
 
-  it('gibt den Fokus nach „Abbrechen“ an den Knopf zurück', async function () {
-    fetchMock.get(STATUS, status({ offen: { aenderungen: 3, dateien: 1 } }))
+  it('nennt, wenn nur rote Zitate offen sind, dass sie einzeln geprüft werden, und nicht „Nichts offen“', async function () {
+    fetchMock.get(STATUS, status({ offen: { aenderungen: 0, dateien: 0, rot: 1 } }))
     zeigen()
-    const knopf = await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen' })
+    const knopf = await screen.findByRole('button', { name: 'Nur rote Zitate offen (1)' })
+    expect(knopf.getAttribute('aria-disabled')).to.equal('true')
+    screen.getByText(/Rote Zitate werden einzeln geprüft/)
+    expect(screen.queryByRole('button', { name: 'Nichts offen' })).to.equal(null)
+  })
+
+  it('gibt den Fokus nach „Abbrechen“ an den Knopf zurück', async function () {
+    fetchMock.get(STATUS, status({ offen: { aenderungen: 3, dateien: 1, rot: 0 } }))
+    zeigen()
+    const knopf = await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen (3)' })
     knopf.focus()
     fireEvent.click(knopf)
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Abbrechen' }))
@@ -167,7 +176,7 @@ describe('Claude-Panel', function () {
   })
 
   it('zeigt Reviewern weder Schalter noch Sammelannahme', async function () {
-    fetchMock.get(STATUS, status({ offen: { aenderungen: 3, dateien: 1 } }))
+    fetchMock.get(STATUS, status({ offen: { aenderungen: 3, dateien: 1, rot: 0 } }))
     render(<ClaudePanel />, {
       wrapper: ({ children }) => (
         <EditorProviders permissionsLevel="review" projectFeatures={{ trackChanges: true }}>
@@ -177,7 +186,7 @@ describe('Claude-Panel', function () {
     })
     await screen.findByText('Claude verbunden')
     expect(screen.queryByRole('switch')).to.equal(null)
-    expect(screen.queryByRole('button', { name: 'Alles Offene jetzt annehmen' })).to.equal(null)
+    expect(screen.queryByRole('button', { name: /^Alles Offene jetzt annehmen/ })).to.equal(null)
   })
 
   it('zeigt ohne Aufträge den Hinweis direkt über dem Eingabefeld', async function () {

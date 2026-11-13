@@ -13,6 +13,7 @@ let spurUpdate
 let upsertDocWithPath
 let deleteEntity
 let bereichPruefen
+let bibBereichPruefen
 let laufManager
 let laufAktionen
 let binaer
@@ -36,6 +37,7 @@ beforeEach(async () => {
   dokumente = new Map()
   spurUpdate = vi.fn(async () => {})
   bereichPruefen = vi.fn(async () => [])
+  bibBereichPruefen = vi.fn(async () => [])
   deleteEntity = vi.fn(async () => {})
   laufManager = {
     laufFuerSchreiben: vi.fn(async () => lauf),
@@ -86,7 +88,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/projektEintraege.mjs', () => ({ anzahlEintraege: async () => eintraege, maxEintraege: () => 2000 }))
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => laufManager)
   vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => laufAktionen)
-  vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ bereichPruefen }))
+  vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ bereichPruefen, bibBereichPruefen }))
   SchreibManager = await import('../../app/src/schreiben/SchreibManager.mjs')
 })
 
@@ -143,6 +145,26 @@ describe('docEdit', () => {
     docSetzen(bib, '@article{a,\n}')
     const ergebnis = await bearbeiten({ pfad: 'quellen.bib', alt: '\n}', neu: '\n  volume = {11},\n  pages = {3570}\n}' })
     expect(ergebnis.zahlen_ohne_beleg).toEqual([])
+  })
+
+  it('macht eine .bib-Änderung rot, wenn sie ein Zitat kippt', async () => {
+    const bib = new ObjectId()
+    projektDateien.set('quellen.bib', bib)
+    docSetzen(bib, '@article{a,\n  doi = {10.1/alt}\n}')
+    bibBereichPruefen.mockResolvedValueOnce([{ key: 'a', auszug: '', referenz: 'nicht_gefunden', form: 'parencite' }])
+    const ergebnis = await bearbeiten({ pfad: 'quellen.bib', alt: '10.1/alt', neu: '10.1/neu' })
+    expect(bibBereichPruefen).toHaveBeenCalledTimes(1)
+    expect(bereichPruefen).not.toHaveBeenCalled()
+    expect(ergebnis.rot).toEqual([{ grund: 'doi_unbekannt', auszug: 'a' }])
+  })
+
+  it('lässt eine .bib-Änderung ohne kippendes Zitat normal', async () => {
+    const bib = new ObjectId()
+    projektDateien.set('quellen.bib', bib)
+    docSetzen(bib, '@article{a,\n  title = {Alt}\n}')
+    bibBereichPruefen.mockResolvedValueOnce([{ key: 'a', auszug: '', referenz: 'gefunden', form: 'parencite' }])
+    const ergebnis = await bearbeiten({ pfad: 'quellen.bib', alt: 'Alt', neu: 'Neu' })
+    expect(ergebnis.rot).toEqual([])
   })
 
   it('findet das Dokument auch über die doc_id', async () => {
@@ -508,6 +530,24 @@ describe('Sofort annehmen nach dem Schreiben', () => {
       expect(laufManager.rotMerken).toHaveBeenCalledWith(lauf, [expect.objectContaining({ id: 'rot' })])
       expect(laufAktionen.sofortAnnehmen).not.toHaveBeenCalled()
     }
+  })
+
+  it('merkt auch die eigene Einfügung als rot, die ein zweites doc_edit zu einem roten Zitat umschreibt (alte ID, keine neue)', async () => {
+    const text = 'Satz \\parencite{zzz} Ende.'
+    docSetzen(KAPITEL, text, [{ id: 'eigen', op: { p: 5, i: '\\parencite{zzz}' }, metadata: { ts: 'T1' } }])
+    // Das Umschreiben wächst in der bestehenden Einfügung: dieselbe ID, längerer Text, keine neue Change.
+    spurUpdate.mockImplementation(async (_p, docId) => {
+      const alt = dokumente.get(String(docId))
+      dokumente.set(String(docId), {
+        ...alt,
+        ranges: { changes: [{ id: 'eigen', op: { p: 5, i: '\\parencite{unbekannt}' }, metadata: { ts: 'T1' } }] },
+      })
+    })
+    bereichPruefen.mockResolvedValue([{ auszug: 'x', key: 'unbekannt', wortlaut: 'exakt', referenz: 'nicht_gefunden' }])
+    const ergebnis = await bearbeiten({ menschId: mensch, alt: '\\parencite{zzz}', neu: '\\parencite{unbekannt}', schluessel: 'umschreiben-1' })
+    expect(ergebnis.rot).toEqual([{ grund: 'doi_unbekannt', auszug: 'x' }])
+    expect(laufManager.rotMerken).toHaveBeenCalledWith(lauf, [expect.objectContaining({ id: 'eigen' })])
+    expect(laufAktionen.sofortAnnehmen).not.toHaveBeenCalled()
   })
 })
 

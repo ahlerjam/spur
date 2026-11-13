@@ -8,6 +8,16 @@ import { LogEntry } from '../util/types'
 
 const LOG_PREVIEW_LIMIT = 100
 
+const LOG_LEVEL_KEYS: Record<string, string> = {
+  error: 'log_level_error',
+  warning: 'log_level_warning',
+  typesetting: 'log_level_typesetting',
+}
+
+function logLevelLabel(t: (key: string) => string, level: string) {
+  return LOG_LEVEL_KEYS[level] ? t(LOG_LEVEL_KEYS[level]) : level
+}
+
 const pdfLogEntriesComponents = importOverleafModules(
   'pdfLogEntriesComponents'
 ) as {
@@ -56,7 +66,7 @@ function PdfLogsEntries({
           level={logEntry.level}
           contentDetails={logEntry.contentDetails}
           entryAriaLabel={t('log_entry_description', {
-            level: logEntry.level,
+            level: logLevelLabel(t, logEntry.level),
           })}
           sourceLocation={{
             file: logEntry.file,

@@ -58,7 +58,7 @@ Deferred, not discarded. Check here before new plans.
 - Consumer Terms section 11 for EEA users in university research
 
 ## Translations
-- Overleaf's German language file still lacks 1419 keys that the English one has (`services/web/locales/de.json` against `en.json`); P9 added about 200 for the menu bar, rail, review panel, PDF area, editor settings, project list and account menu
+- Overleaf's German language file still lacks 1182 keys that the English one has (`services/web/locales/de.json` against `en.json`); P9 added about 200 for the menu bar, rail, review panel, PDF area, editor settings, project list and account menu, P10 added the chat, word count, command palette, editor alerts, log hints and theme names. What is left is mostly source-editor tooltips, group management, subscription and upgrade texts
 
 ## Ideas for P10 (owner, 2026-11-12)
 - Claim check: also check paraphrased statements against the source. For every sentence with a citation, find the passage in the source and show "supported (p. 347)", "passage not found" or "source says something else", with a jump to the passage. Always show the passage found, never a verdict without evidence, because a language model judges this and can be wrong. Extends the "paraphrases" switch under Proactivity.

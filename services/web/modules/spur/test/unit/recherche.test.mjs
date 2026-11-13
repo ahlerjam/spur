@@ -282,7 +282,8 @@ describe('platzHolen', () => {
     wartezeiten.sort((a, b) => a - b)
     expect(wartezeiten).toHaveLength(2)
     expect(wartezeiten[0]).toBeGreaterThan(2500)
-    expect(wartezeiten[0]).toBeLessThanOrEqual(3000)
+    // Jeder Aufruf liest Date.now() selbst, bevor die Datenbank die Reihenfolge vergibt: 1 bis 2 ms Abweichung sind möglich.
+    expect(wartezeiten[0]).toBeLessThanOrEqual(3050)
     expect(wartezeiten[1] - wartezeiten[0]).toBeGreaterThan(2500)
   })
 

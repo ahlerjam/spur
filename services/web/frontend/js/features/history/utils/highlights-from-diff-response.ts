@@ -1,8 +1,8 @@
-import moment from 'moment/moment'
 import { DocDiffChunk, Highlight } from '../services/types/doc'
 import { TFunction } from 'i18next'
 import displayNameForUser from './display-name-for-user'
 import { getHueForUserId } from '@/shared/utils/colors'
+import { formatTime } from '@/features/utils/format-date'
 
 export function highlightsFromDiffResponse(
   chunks: DocDiffChunk[],
@@ -30,7 +30,7 @@ export function highlightsFromDiffResponse(
       }
       const user = meta.users?.[0]
       const name = displayNameForUser(user)
-      const date = moment(meta.end_ts).format('Do MMM YYYY, h:mm a')
+      const date = formatTime(meta.end_ts, 'Do MMM YYYY, h:mm a')
       if (isInsertion) {
         highlights.push({
           type: 'addition',

@@ -35,7 +35,7 @@ type Status = {
   nachrichten: Nachricht[]
   aeltere?: boolean
   automatik: boolean
-  offen: { aenderungen: number; dateien: number }
+  offen: { aenderungen: number; dateien: number; rot: number }
   laeufe: LaufMitAenderungen[]
   weitereLaeufe: boolean
 }
@@ -159,6 +159,12 @@ function Automatik({
   }
 
   const nichtsOffen = offen.aenderungen === 0
+  const nurRot = nichtsOffen && offen.rot > 0
+  const knopfText = nurRot
+    ? t('spur_nur_rote_offen', { anzahl: offen.rot })
+    : nichtsOffen
+      ? t('spur_nichts_offen')
+      : t('spur_alles_offene_annehmen_zahl', { anzahl: offen.aenderungen })
   return (
     <section className="spur-automatik" aria-label={t('spur_automatik')}>
       <FormCheck
@@ -186,10 +192,16 @@ function Automatik({
         size="sm"
         className={nichtsOffen ? 'disabled' : undefined}
         aria-disabled={nichtsOffen || undefined}
+        aria-describedby={nurRot ? 'spur-nur-rot-hinweis' : undefined}
         onClick={() => !nichtsOffen && setFragen(true)}
       >
-        {nichtsOffen ? t('spur_nichts_offen') : t('spur_alles_offene_annehmen')}
+        {knopfText}
       </OLButton>
+      {nurRot && (
+        <p className="spur-zeile-meta" id="spur-nur-rot-hinweis">
+          {t('spur_rote_einzeln_pruefen')}
+        </p>
+      )}
       {fragen && (
         <OLModal themed show onHide={() => setFragen(false)}>
           <OLModalHeader>

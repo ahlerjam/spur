@@ -45,18 +45,41 @@ async page => {
       return await anmelden(email, versuch + 1)
     }
     await page.waitForURL(/\/project/, { waitUntil: 'commit' })
+    dashboardAufrufe.push(Date.now())
   }
 
   const KOMPILIEREN = /^(aktualisieren|recompile)$/i
 
-  async function projektOeffnen(name) {
+  // Overleaf erlaubt je Person 30 Aufrufe der Projektliste in 60 s (openDashboard). Die Suite bleibt mit Abstand darunter,
+  // sonst scheitern Schritte je nach Tempo des Rechners an „Rate limit reached“ oder an einem 429 in der Konsole.
+  const dashboardAufrufe = []
+  async function dashboardAufruf() {
+    const jetzt = Date.now()
+    while (dashboardAufrufe.length && jetzt - dashboardAufrufe[0] > 60000) dashboardAufrufe.shift()
+    if (dashboardAufrufe.length >= 18) await page.waitForTimeout(Math.max(0, 61000 - (jetzt - dashboardAufrufe[0])))
+    dashboardAufrufe.push(Date.now())
+  }
+
+  async function projektOeffnen(name, versuch = 1) {
+    await dashboardAufruf()
     await page.goto(`${BASE}/project`)
     // Die Liste zeigt nur 20 Projekte; e2e-a hat mehr. Wie ein Mensch über die Suche filtern.
-    await page
-      .getByPlaceholder(/^(Suche in allen Projekten|Search in all projects)…$/)
-      .filter({ visible: true })
-      .first()
-      .fill(name)
+    try {
+      await page
+        .getByPlaceholder(/^(Suche in allen Projekten|Search in all projects)…$/)
+        .filter({ visible: true })
+        .first()
+        .fill(name, { timeout: versuch === 1 ? 10000 : 30000 })
+    } catch (error) {
+      const text = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)
+      // Overleaf erlaubt je Person 30 Aufrufe der Projektliste in 60 s (openDashboard); die Suite ruft sie öfter auf.
+      if (versuch === 1 && /Rate limit reached/.test(text)) {
+        dashboardAufrufe.length = 0
+        await page.waitForTimeout(61000)
+        return await projektOeffnen(name, 2)
+      }
+      fail(`Projektliste für „${name}“ nicht bereit (${page.url()}): ${text} – ${error.message.split('\n')[0]}`)
+    }
     await page.getByRole('link', { name, exact: true }).first().click()
     await page.waitForURL(/\/project\/[0-9a-f]{24}/)
     await page.getByRole('button', { name: KOMPILIEREN }).first().waitFor()
@@ -113,7 +136,7 @@ async page => {
 
   // Filter des Prüfberichts („Alle“, „Markiert“, …); ohne Stellen gibt es keinen Filter.
   async function berichtFilter(name) {
-    const knopf = page.locator('.spur-filter label', { hasText: new RegExp(`^${name} \\d+$`) })
+    const knopf = page.locator('.spur-filter label', { hasText: new RegExp(`^${name}\\s+\\d+$`) })
     if (await knopf.isVisible()) await knopf.click()
   }
 
@@ -230,8 +253,14 @@ async page => {
   }
 
   async function projektId(token, name) {
-    const { inhalt } = await werkzeug(token, 'project_list')
-    return inhalt.eintraege.find(p => p.name === name).id
+    let cursor
+    do {
+      const { inhalt } = await werkzeug(token, 'project_list', cursor ? { cursor } : {})
+      const treffer = inhalt.eintraege.find(p => p.name === name)
+      if (treffer) return treffer.id
+      cursor = inhalt.naechster_cursor
+    } while (cursor)
+    fail(`Projekt „${name}“ nicht in project_list`)
   }
 
   // Wartet im Browser wie der Fake-Client; Fortschritt und Ergebnis landen in window.__spur.
@@ -335,7 +364,17 @@ async page => {
     return await page.locator('.spur-paper-doi').allTextContents()
   }
 
-  const ZAEHLUNG_BERICHT = 'Zitierstellen: 6 geprüft, davon 3 markiert, 2 ohne Quelle, 1 nicht prüfbar'
+  const KOPFZEILE_BERICHT = /^\d+ Stellen?, (\d+ markiert|keine markiert)/
+  async function kopfzeileAbwarten(erwartet, timeout = 60000) {
+    try {
+      await page.getByText(erwartet, { exact: true }).waitFor({ timeout })
+    } catch {
+      const ist = await page.locator('p.spur-zeile-meta', { hasText: KOPFZEILE_BERICHT }).first().innerText({ timeout: 2000 }).catch(() => '-')
+      fail(`Kopfzeile „${ist}“, erwartet „${erwartet}“`)
+    }
+  }
+
+  const ZAEHLUNG_BERICHT = '9 Stellen, 6 markiert: 3 mit Befund, 2 ohne Quelle, 1 nicht prüfbar'
 
   const features = {
     async f1() {
@@ -710,7 +749,7 @@ async page => {
       await berichtFilter('Alle')
 
       // P6: Der Cache von Abschnitten erscheint nicht mehr; die Zählung der Zitierstellen bleibt gleich.
-      const zaehlung = await page.getByText(/^Zitierstellen: /).innerText()
+      const zaehlung = await page.locator('p.spur-zeile-meta', { hasText: KOPFZEILE_BERICHT }).innerText()
       await editorErsetzen('\\section{Zwei}', '\\section{Zwei!}')
       await page.getByText(zaehlung, { exact: true }).waitFor()
       await editorErsetzen('\\section{Zwei!}', '\\section{Zwei}')
@@ -1560,7 +1599,7 @@ async page => {
     await zeile('smith2024.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
     await zeile('retracted.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
     await zeile('kapitel.tex').getByText('Dieser Dateityp wird nicht unterstützt', { exact: false }).waitFor({ timeout: 30000 })
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     await dialog.waitFor({ state: 'detached' })
     const quellen = page.locator('.spur-panel .spur-liste .spur-quelle-titel')
     await page.locator('.spur-panel').getByRole('button', { name: 'retracted.pdf' }).waitFor()
@@ -1571,7 +1610,7 @@ async page => {
     await dateien()
     await zeile('smith2024.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
     await zeile('retracted.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     ok((await quellen.count()) === 2, `Dubletten: ${await quellen.allTextContents()}`)
 
     const token = 'spur_e2e_fake'
@@ -1633,7 +1672,7 @@ async page => {
     const VORSCHLAG = 'Zwei Nächte, gemischte Modelle'
     const vorschlag = await werkzeug(token, 'matrix_suggest', { project_id: pid, source_id: quelle.id, spalte: 'Methode', text: VORSCHLAG })
     ok(!vorschlag.fehler, `matrix_suggest: ${JSON.stringify(vorschlag.inhalt)}`)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     await matrixOeffnen()
     const zelle = dialog.locator('.spur-matrix-zelle', { has: page.getByLabel('Methode: smith2024.pdf') })
     await zelle.getByText(VORSCHLAG).waitFor()
@@ -1648,7 +1687,7 @@ async page => {
     ])
     const csv = await (await page.request.get(download.url())).text()
     ok(csv.startsWith('Quelle,Key,Methode\n') && csv.includes(`smith2024.pdf,smith2024,"${VORSCHLAG}"`), `CSV:\n${csv}`)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     // 300 Zeilen: seitenweise, Eingaben wirken auch auf späteren Seiten.
     await projektOeffnen('E2E Viele')
@@ -1666,7 +1705,7 @@ async page => {
     await feld.fill('signifikant')
     await feld.blur()
     await page.waitForResponse(r => r.url().includes('/matrix') && r.request().method() === 'GET')
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     const viele = await projektId(token, 'E2E Viele')
     const export300 = await (await page.request.get(`${BASE}/spur/project/${viele}/matrix.csv`)).text()
     const zeilen = export300.trim().split('\n')
@@ -1794,7 +1833,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await offenlegungOeffnen()
     await dialog.getByText('Keine KI-Nutzung protokolliert.').waitFor()
     ok(await dialog.getByRole('button', { name: 'Als .tex-Abschnitt einfügen' }).isDisabled(), 'Einfügen ohne Läufe')
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     await projektOeffnen('E2E Offenlegung')
     const pid = page.url().split('/').pop()
@@ -1832,7 +1871,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await dialog.getByText('In ki-offenlegung.tex eingefügt.', { exact: false }).waitFor()
     const tex = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'ki-offenlegung.tex' })).inhalt.text
     ok(tex.startsWith('\\section*{Nutzung von KI-Werkzeugen}\n') && tex.includes('Modell: Claude Opus 5.5.'), `.tex:\n${tex}`)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
   }
 
   features.p2f10 = async () => {
@@ -3552,7 +3591,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await breite(1280)
     await anmelden('e2e-a@example.org')
     const token = await neuesToken()
-    const ZAEHLUNG = 'Zitierstellen: 1 geprüft, keine markiert, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar'
+    const ZAEHLUNG = '7 Stellen, 1 markiert: 1 ohne Seitenangabe, 4 ohne Quelle, 1 nicht prüfbar'
     const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
     try {
       await fakeSteuern({ cachesLeeren: true, stoerungen: { [`crossref:${FOODS}`]: { status: 503 } } })
@@ -3560,7 +3599,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       const pid = page.url().split('/').pop()
       await panelOeffnen('Prüfbericht')
       await berichtFilter('Alle')
-      await page.getByText(ZAEHLUNG, { exact: true }).waitFor({ timeout: 60000 })
+      await kopfzeileAbwarten(ZAEHLUNG)
       for (const key of ['ohneA', 'ohneB', 'ohneC', 'ohneD']) {
         await zeile(key).getByText('keine Quelle aufgenommen', { exact: true }).waitFor()
       }
@@ -3570,11 +3609,11 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
       await page.getByRole('button', { name: 'Erneut prüfen' }).click()
       await page.waitForTimeout(500)
-      await page.getByText(ZAEHLUNG, { exact: true }).waitFor({ timeout: 60000 })
+      await kopfzeileAbwarten(ZAEHLUNG)
 
       const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
       ok(
-        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 0, nicht_pruefbar: 1, markiert: 0 }),
+        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 0, nicht_pruefbar: 1, markiert: 1 }),
         `check_report: ${JSON.stringify(bericht.zaehlung)}`
       )
       const gruende = bericht.eintraege.map(z => z.grund).filter(Boolean).sort()
@@ -3629,7 +3668,14 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     for (const link of links.filter(l => !/^https?:/.test(l))) await repoDatei(`${REPO}/${link}`)
     const kaputt = []
     for (const link of links.filter(l => /^https:/.test(l))) {
-      const antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
+      // Ein Namensfehler oder Abbruch im Netz (ENOTFOUND, ECONNRESET) ist kurzzeitig möglich: dreimal versuchen, 5 s Abstand.
+      let antwort
+      for (let versuch = 0; versuch < 3; versuch++) {
+        antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
+        const status = antwort.status()
+        if ((Number.isInteger(status) && status < 500 && status !== 429) || versuch === 2) break
+        await page.waitForTimeout(5000)
+      }
       if (!(Number(antwort.status()) < 400)) kaputt.push(`${link}: ${antwort.status()}`)
     }
     ok(kaputt.length === 0, `Links: ${kaputt.join(' | ')}`)
@@ -3754,7 +3800,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const dialog = await kontoAnlegen('neu-p7@example.org')
     await dialog.getByText(OHNE_MAIL).waitFor()
     const link = await einladungslink(dialog)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     const { seite, schliessen } = await zweiteSeite()
     try {
@@ -3773,7 +3819,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const neuDialog = page.locator('.modal', { hasText: 'Neuen Einladungslink erzeugen' })
     const neuerLink = await einladungslink(neuDialog)
     ok(neuerLink !== link, 'Kein neuer Link')
-    await neuDialog.getByRole('button', { name: 'Schließen' }).click()
+    await neuDialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     await page.goto(`${BASE}/project`)
     await page.getByRole('menuitem', { name: 'Admin' }).click()
@@ -4154,13 +4200,15 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok((await a.innerText()).includes('3 / 3') && (await a.getByText('erreicht', { exact: true }).count()) === 1, `Zeile e2e-grenze-a: ${await a.innerText()}`)
 
     const projekte = page.locator('section', { has: page.getByRole('heading', { name: 'Projekte', exact: true }) })
+    await projekte.getByLabel('Nach Projekt oder Eigentümer suchen').fill('Grenze B2')
     const b2 = projekte.locator('tr[data-projekt="Grenze B2"]')
     const vorher = await b2.innerText()
-    ok(vorher.includes('e2e-grenze-b@example.org') && vorher.includes('/ 0,01 GB'), `Zeile Grenze B2: ${vorher}`)
+    ok(vorher.includes('e2e-grenze-b@example.org') && vorher.includes('/ 10,24 MB'), `Zeile Grenze B2: ${vorher}`)
     ok((await b2.getByText('ab 80 %').count()) === 0, 'Grenze B2 schon vor dem Vergrößern markiert')
     const r = await page.request.post(`${BASE}/spur/dev/quelle-vergroessern`, { data: { projekt: 'Grenze B2', bytes: 9 * MB } })
     ok(r.status() === 204, `Quelle vergrößern: ${r.status()}`)
     await page.reload()
+    await projekte.getByLabel('Nach Projekt oder Eigentümer suchen').fill('Grenze B2')
     await b2.waitFor()
     ok((await b2.innerText()) === vorher, 'Stand ändert sich ohne Neuberechnung')
     await b2.getByRole('button', { name: 'Speicher von „Grenze B2“ neu berechnen' }).click()
@@ -4168,6 +4216,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
     for (const bereich of ['Nutzer', 'Projekte']) {
       const abschnitt = page.locator('section', { has: page.getByRole('heading', { name: bereich, exact: true }) })
+      await abschnitt.getByRole('searchbox').fill('')
       await abschnitt.getByRole('button', { name: /^Auslastung/ }).click()
       const erste = await abschnitt.locator('tbody tr').first().innerText()
       ok(/überschritten|erreicht|ab 80 %/.test(erste), `${bereich} nach Auslastung: ${erste}`)
@@ -4373,18 +4422,18 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await breite(1280)
     await anmelden('e2e-a@example.org')
     const token = await neuesToken()
-    // Die genaue Kopfzeile auf frischen Daten prüft f7 (ZAEHLUNG_BERICHT); hier die Zahl hinter „davon“ gegen den Filter.
+    // Die genaue Kopfzeile auf frischen Daten prüft f7 (ZAEHLUNG_BERICHT); hier die Zahl hinter „markiert“ gegen den Filter.
     await projektOeffnen('E2E Bericht')
     const pid = page.url().split('/').pop()
     await panelOeffnen('Prüfbericht')
     await berichtFilter('Alle')
     await page.getByRole('button', { name: 'Erneut prüfen' }).click()
-    const kopf = page.getByText(/^Zitierstellen: /)
+    const kopf = page.locator('p.spur-zeile-meta', { hasText: KOPFZEILE_BERICHT })
     await kopf.waitFor({ timeout: 30000 })
-    const markiert = Number(/davon (\d+) markiert/.exec(await kopf.innerText())?.[1])
+    const markiert = Number(/, (\d+) markiert/.exec(await kopf.innerText())?.[1])
     const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
-    const geprueftProbleme = bericht.eintraege.filter(z => z.status === 'geprueft' && z.problem).length
-    ok(markiert > 0 && markiert === geprueftProbleme && bericht.zaehlung.markiert === markiert, `davon ${markiert} markiert, Filter ${geprueftProbleme}, MCP ${JSON.stringify(bericht.zaehlung)}`)
+    const geprueftProbleme = bericht.eintraege.filter(z => z.problem).length
+    ok(markiert > 0 && markiert === geprueftProbleme && bericht.zaehlung.markiert === markiert, `${markiert} markiert, Filter ${geprueftProbleme}, MCP ${JSON.stringify(bericht.zaehlung)}`)
     for (const schluessel of ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar']) {
       ok(Number.isInteger(bericht.zaehlung[schluessel]), `zaehlung.${schluessel} fehlt: ${JSON.stringify(bericht.zaehlung)}`)
     }
@@ -4398,7 +4447,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const pid2 = page.url().split('/').pop()
     await panelOeffnen('Prüfbericht')
     await page.getByRole('button', { name: 'Erneut prüfen' }).click()
-    await page.getByText('Zitierstellen: 1 geprüft, keine markiert, 1 Beleg ohne Wortlaut', { exact: true }).waitFor({ timeout: 30000 })
+    await kopfzeileAbwarten('2 Stellen, keine markiert, 1 Beleg ohne Wortlaut', 30000)
     await page.locator('.spur-zeile .badge').getByText('Beleg ohne Wortlaut', { exact: true }).waitFor()
     const zweiter = (await werkzeug(token, 'check_report', { project_id: pid2 })).inhalt.zaehlung
     ok(zweiter.beleg_ohne_wortlaut === 1 && zweiter.geprueft === 1 && zweiter.markiert === 0, `check_report: ${JSON.stringify(zweiter)}`)
@@ -4549,14 +4598,14 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       ok(!zweimal.fehler && zweimal.inhalt.hinweis === 'schon im Projekt' && zweimal.inhalt.dateien.length === 0, `Zweiter Aufruf: ${JSON.stringify(zweimal.inhalt)}`)
       await vollstaendig(pid)
 
-      const pidB = await projektId(token, 'E2E P8 Pakete B')
+      const pidB = await projektId(token, 'E2E P8 Pakete Fehler')
       await fakeSteuern({ stoerungen: { texlive: { status: 502 }, 'texlive-b': { status: 502 } } })
       const beide = await carlito(pidB)
       ok(
         beide.fehler && beide.inhalt.fehler === 'spiegel_nicht_erreichbar' && beide.inhalt.detail === 'Die Paketquelle antwortet mit Fehler 502. Versuch es später erneut.',
         `Beide Spiegel 502: ${JSON.stringify(beide.inhalt)}`
       )
-      await projektOeffnen('E2E P8 Pakete B')
+      await projektOeffnen('E2E P8 Pakete Fehler')
       await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name: 'main.tex' }))
       ok((await page.locator('.file-tree').getByRole('treeitem', { name: 'tex-pakete' }).count()) === 0, 'Ordner tex-pakete im Dateibaum')
       await panelOeffnen('Claude')
@@ -5428,7 +5477,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     // Filter mit Zahlen; „Markiert“ zeigt nur Stellen mit Problem; ein leerer Filter erklärt sich.
     const zahlen = {}
     for (const name of ['Alle', 'Markiert', 'Ohne Quelle', 'Nicht prüfbar']) {
-      const label = bericht.locator('.spur-filter label', { hasText: new RegExp(`^${name} \\d+$`) })
+      const label = bericht.locator('.spur-filter label', { hasText: new RegExp(`^${name}\\s+\\d+$`) })
       zahlen[name] = Number((await label.innerText()).match(/\d+$/)[0])
     }
     ok(zahlen.Alle === (await bericht.locator('.spur-zeile').count()), `„Alle“ zählt ${zahlen.Alle}`)
@@ -5516,12 +5565,12 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.locator('.cm-activeLineGutter', { hasText: /^8$/ }).waitFor()
 
     await bericht.getByRole('button', { name: 'Einstellungen der Prüfung' }).waitFor()
-    await bericht.getByText(/davon \d+ markiert/).waitFor()
+    await bericht.getByText(/, (\d+ markiert|keine markiert)/).first().waitFor()
 
     // Ein Filter ohne Treffer erklärt sich (im Projekt mit nur grünen Stellen).
     await projektOeffnen('E2E Bericht Grün')
     await panelOeffnen('Prüfbericht')
-    await bericht.locator('.spur-filter label', { hasText: /^Markiert 0$/ }).waitFor({ timeout: 30000 })
+    await bericht.locator('.spur-filter label', { hasText: /^Markiert\s+0$/ }).waitFor({ timeout: 30000 })
     await berichtFilter('Markiert')
     await bericht.getByText('Keine Stellen mit diesem Befund.', { exact: true }).waitFor()
     ohneKonsolenfehler('p9f4')
@@ -5598,18 +5647,18 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await modal().waitFor({ state: 'detached' })
     ok((await karte.locator('.spur-lauf-aenderung', { hasText: 'Nachtrag' }).count()) === 1, 'Abbrechen hat angenommen')
     await fokusAuf(sammel, 'nach „Abbrechen“')
-    // Per Tastatur: Enter öffnet, Enter auf „Annehmen“ nimmt an; danach liegt der Fokus auf „Nichts offen“.
+    // Per Tastatur: Enter öffnet, Enter auf „Annehmen“ nimmt an; danach liegt der Fokus auf „Nur rote Zitate offen (1)“.
     await sammel.focus()
     await page.keyboard.press('Enter')
     await modal().getByRole('button', { name: 'Annehmen', exact: true }).focus()
     await page.keyboard.press('Enter')
     await modal().waitFor({ state: 'detached', timeout: 20000 })
-    const nichts = panel.getByRole('button', { name: 'Nichts offen' })
+    const nichts = panel.getByRole('button', { name: 'Nur rote Zitate offen (1)' })
     await nichts.waitFor({ timeout: 10000 })
-    ok(await nichts.isDisabled(), '„Nichts offen“ nicht gesperrt')
+    ok(await nichts.isDisabled(), '„Nur rote Zitate offen“ nicht gesperrt')
     await fokusAuf(nichts, 'nach dem Annehmen')
     await page.keyboard.press('Enter')
-    ok((await modal().count()) === 0, '„Nichts offen“ öffnet den Dialog')
+    ok((await modal().count()) === 0, '„Nur rote Zitate offen“ öffnet den Dialog')
     await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'footfullcite' }).waitFor()
     ok((await karte.locator('.spur-lauf-aenderung', { hasText: 'Nachtrag' }).count()) === 0, 'Offenes nicht angenommen')
 
@@ -5649,7 +5698,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       await panelOeffnen('Claude')
       await claudePanel().getByText(/^Claude (nicht )?verbunden$/).first().waitFor()
       ok((await claudePanel().getByRole('switch').count()) === 0, `${email} sieht den Schalter`)
-      ok((await claudePanel().getByRole('button', { name: /Alles Offene|Nichts offen/ }).count()) === 0, `${email} sieht die Sammelannahme`)
+      ok((await claudePanel().getByRole('button', { name: /Alles Offene|Nichts offen|Nur rote Zitate offen/ }).count()) === 0, `${email} sieht die Sammelannahme`)
       for (const [methode, pfad, body] of [['PUT', `/spur/project/${pid}/claude/automatik`, { an: true }], ['POST', `/spur/project/${pid}/claude/alles-annehmen`, {}]]) {
         const antwort = await seitenAnfrage(methode, pfad, body)
         ok(antwort.status === 403, `${email} ${methode} ${pfad}: ${antwort.status}`)
@@ -5983,13 +6032,13 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       { name: 'gleich.pdf', mimeType: 'application/pdf', buffer: pdf },
     ])
     ok((await modal().locator('.spur-import-liste li', { hasText: 'gleich.pdf' }).count()) === 2, 'Gleiche Namen nicht als zwei Zeilen')
-    await modal().getByRole('button', { name: 'Schließen' }).click()
+    await modal().getByRole('button', { name: 'Schließen', exact: true }).click()
     await modal().getByText('Der Upload läuft noch. Beim Schließen kommen die übrigen Dateien nicht an.').waitFor()
     await modal().getByRole('button', { name: 'Weiter hochladen' }).click()
     hochladen()
     await page.waitForFunction(() => [...document.querySelectorAll('.spur-import-liste li')].every(li => !li.textContent.includes('wird aufgenommen')), null, { timeout: 30000 }).catch(() => {})
     await page.unroute(/\/quellen$/)
-    await modal().getByRole('button', { name: 'Schließen' }).click()
+    await modal().getByRole('button', { name: 'Schließen', exact: true }).click()
     await modal().waitFor({ state: 'detached' })
 
     // Einladungslink: „Kopiert“ nur, wenn das Kopieren gelungen ist.
@@ -6004,7 +6053,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await dialog.getByRole('button', { name: 'Kopieren' }).last().click()
     await dialog.getByText('Kopieren nicht möglich. Markier den Link und kopier ihn von Hand.').waitFor()
     ok((await dialog.getByRole('button', { name: 'Kopiert' }).count()) === 0, '„Kopiert“ trotz Fehler')
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     ohneKonsolenfehler('p9f8', /Failed to load resource: the server responded with a status of (403|409|503)/)
   }
 
@@ -6191,7 +6240,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     for (const [nutzerListe, projekte, pruefen] of [
       [viele, echt.projekte, async () => {
         ok((await page.locator('tr[data-email]').count()) === 50, `Erste Seite: ${await page.locator('tr[data-email]').count()} Zeilen`)
-        await seite.getByRole('button', { name: 'Nächste Seite' }).click()
+        await seite.getByRole('navigation', { name: 'Seiten der Nutzerliste' }).getByRole('button', { name: 'Nächste Seite' }).click()
         ok((await page.locator('tr[data-email]').count()) === 10, `Zweite Seite: ${await page.locator('tr[data-email]').count()} Zeilen`)
       }],
       [[], [], async () => {
@@ -6241,6 +6290,453 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       ok(!text.includes('Automatisch annehmen, wenn ein Lauf ohne Probleme endet'), `${name} nennt das alte Häkchen`)
       ok(!/\bLimits\b/.test(text), `${name} nennt „Limits“`)
     }
+  }
+
+  features.p10f7 = async () => {
+    await breite(1280)
+    await grenzenSetzen({ projekte: '', speicherGb: '1' })
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await fakeSteuern({ stoerungen: {}, schalter: {} })
+    const pid = await projektId(token, 'E2E P8 Pakete B')
+    const antworten = await Promise.all([1, 2].map(() => werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'carlito' })))
+    ok(antworten.every(a => !a.fehler), `Gleichzeitig: ${JSON.stringify(antworten.map(a => a.inhalt))}`)
+    ok(antworten.filter(a => a.inhalt.dateien.length === 5).length === 1, `Genau eine Installation: ${JSON.stringify(antworten.map(a => a.inhalt))}`)
+    ok(antworten.filter(a => a.inhalt.hinweis === 'schon im Projekt').length === 1, `Zweiter meldet nicht „schon im Projekt“: ${JSON.stringify(antworten.map(a => a.inhalt))}`)
+    const pfade = await paketPfade(pid)
+    ok(JSON.stringify(pfade) === JSON.stringify(CARLITO_DATEIEN), `Dateien: ${pfade}`)
+  }
+
+  features.p10f1 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E Bericht')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await berichtFilter('Alle')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    const kopf = page.locator('p.spur-zeile-meta', { hasText: KOPFZEILE_BERICHT })
+    await kopf.waitFor({ timeout: 30000 })
+    const text = await kopf.innerText()
+    const zahlFilter = Number(/^Markiert\s+(\d+)$/.exec((await page.locator('.spur-filter label', { hasText: /^Markiert\s+\d+$/ }).innerText()).trim())?.[1])
+    const zahlKopf = Number(/, (\d+) markiert/.exec(text)?.[1])
+    ok(zahlFilter > 0 && zahlFilter === zahlKopf, `Filter ${zahlFilter}, Kopfzeile „${text}“`)
+    ok(new RegExp(`^\\d+ Stellen, ${zahlKopf} markiert: \\d+ mit Befund`).test(text), `Kopfzeile beginnt nicht mit Gesamtzahl und markiert: „${text}“`)
+    const dateien = await page.locator('.spur-gruppe-kopf .spur-zeile-meta').allInnerTexts()
+    const summe = dateien.reduce((s, t) => s + Number(/(\d+) markiert/.exec(t)?.[1] ?? 0), 0)
+    ok(summe === zahlFilter, `Dateizeilen ${JSON.stringify(dateien)} ergeben ${summe}, Filter ${zahlFilter}`)
+    await berichtFilter('Markiert')
+    await page.waitForFunction(n => document.querySelectorAll('.spur-gruppe .spur-zeile').length === n, zahlFilter, { timeout: 5000 }).catch(() => {})
+    const sichtbar = await page.locator('.spur-gruppe .spur-zeile').count()
+    ok(sichtbar === zahlFilter, `Mit Filter ${sichtbar} Zeilen, Filterknopf „${await page.locator('.spur-filter .btn-check:checked + label').innerText()}“`)
+    await berichtFilter('Alle')
+    const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
+    ok(bericht.zaehlung.markiert === zahlFilter, `check_report: ${JSON.stringify(bericht.zaehlung)}`)
+    const { daten } = await mcp(token, 'tools/list')
+    const beschreibung = daten.result.tools.find(w => w.name === 'check_report').description
+    ok(/markiert zählt alle Stellen mit problem: true/.test(beschreibung), `Beschreibung: ${beschreibung}`)
+
+    await projektOeffnen('E2E P8 Zählung')
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.getByText(/, keine markiert/).waitFor({ timeout: 30000 })
+    await page.locator('.spur-filter label', { hasText: /^Markiert\s+0$/ }).waitFor()
+  }
+
+  features.p10f3 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    let nr = 0
+    const schreiben = async (pid, alt, neu) => {
+      const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: `p10f3-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit ${neu}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+    const ROT = '\\parencite{unbekannt}'
+
+    // Schalter an: normale Änderung ist angenommen, übrig bleibt nur das rote Zitat.
+    await projektOeffnen('E2E Rot Auto')
+    let pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    let panel = claudePanel()
+    await schreiben(pid, 'Alpha Satz.', 'Alpha Satz erweitert.')
+    const rot = await schreiben(pid, 'Beta Satz.', `Beta Satz. ${ROT}`)
+    ok(rot.rot.length === 1, `Zitat nicht rot: ${JSON.stringify(rot)}`)
+    const nurRot = panel.getByRole('button', { name: 'Nur rote Zitate offen (1)' })
+    await nurRot.waitFor({ timeout: 15000 })
+    ok((await nurRot.getAttribute('aria-disabled')) === 'true', 'Knopf nicht ausgegraut')
+    await panel.getByText(/Rote Zitate werden einzeln geprüft/).waitFor()
+    ok((await panel.getByRole('button', { name: 'Nichts offen' }).count()) === 0, '„Nichts offen“ steht trotz rotem Zitat da')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Auto an.' })
+
+    // Schalter aus: ohne Änderungen „Nichts offen“, mit zwei normalen „Alles Offene jetzt annehmen (2)“.
+    await projektOeffnen('E2E Rot Hand')
+    pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    panel = claudePanel()
+    await panel.getByRole('button', { name: 'Nichts offen' }).waitFor({ timeout: 15000 })
+    await schreiben(pid, 'Alpha Satz.', 'Alpha Satz erweitert.')
+    await schreiben(pid, 'Gamma Satz.', 'Gamma Satz erweitert.')
+    await panel.getByRole('button', { name: 'Alles Offene jetzt annehmen (2)' }).waitFor({ timeout: 15000 })
+
+    // Dazu ein rotes Zitat: „Alle annehmen“ der Lauf-Karte fragt nach.
+    await schreiben(pid, 'Beta Satz.', `Beta Satz. ${ROT}`)
+    const karte = panel.locator('.spur-lauf-karte').first()
+    const alle = karte.getByRole('button', { name: 'Alle annehmen', exact: true })
+    await karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' }).locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor({ timeout: 15000 })
+    await alle.click()
+    await modal().getByText('1 rotes Zitat mit annehmen?', { exact: true }).waitFor()
+    await fokusAuf(modal().getByRole('button', { name: 'Nur die anderen', exact: true }), 'im Dialog')
+    // Esc schließt, nichts ist angenommen, der Fokus liegt wieder auf „Alle annehmen“.
+    await page.keyboard.press('Escape')
+    await modal().waitFor({ state: 'detached' })
+    ok((await karte.locator('.spur-lauf-aenderung').count()) === 3, 'Esc hat etwas angenommen')
+    await fokusAuf(alle, 'nach Esc')
+    // „Nur die anderen“: Das rote Zitat bleibt als Track Change offen.
+    await alle.click()
+    await modal().getByRole('button', { name: 'Nur die anderen', exact: true }).click()
+    await modal().waitFor({ state: 'detached', timeout: 20000 })
+    await karte.locator('.spur-lauf-aenderung', { hasText: 'erweitert' }).waitFor({ state: 'detached', timeout: 15000 })
+    await karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' }).locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor()
+    ok((await karte.locator('.spur-lauf-aenderung').count()) === 1, 'Nach „Nur die anderen“ ist mehr als das rote Zitat offen')
+    // „Alle annehmen“ im Dialog nimmt auch das rote Zitat an.
+    await alle.click()
+    await modal().getByRole('button', { name: 'Alle annehmen', exact: true }).click()
+    await modal().waitFor({ state: 'detached', timeout: 20000 })
+    await karte.locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor({ state: 'detached', timeout: 15000 })
+    ok((await karte.locator('.spur-lauf-rot').count()) === 0 && (await karte.getByText('Bitte prüfen').count()) === 0, 'Leere Überschrift „Bitte prüfen“ nach der Annahme')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Hand.' })
+
+    // Ein Lauf ohne rote Zitate: ohne Dialog.
+    await schreiben(pid, 'Delta Satz.', 'Delta Satz erweitert.')
+    const neu = panel.locator('.spur-lauf-karte').first()
+    await neu.locator('.spur-lauf-aenderung', { hasText: 'erweitert' }).waitFor({ timeout: 15000 })
+    await neu.getByRole('button', { name: 'Alle annehmen', exact: true }).click()
+    await neu.locator('.spur-lauf-aenderung', { hasText: 'erweitert' }).waitFor({ state: 'detached', timeout: 15000 })
+    ok((await modal().count()) === 0, 'Dialog ohne rotes Zitat')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Ohne Rot.' })
+  }
+
+  features.p10f5 = async () => {
+    await breite(1280)
+    await grenzenSetzen({ projekte: '', speicherGb: '1' })
+    await page.goto(`${BASE}/spur/admin/grenzen`)
+    const abschnitt = page.locator('section', { has: page.getByRole('heading', { name: 'Projekte', exact: true }) })
+    const zeilen = abschnitt.locator('tbody tr[data-projekt]')
+    await zeilen.first().waitFor({ timeout: 30000 })
+    const { projekte } = (await seitenAnfrage('GET', '/spur/admin/grenzen.json')).daten
+    ok(projekte.length > 50, `Zu wenige Projekte für die zweite Seite: ${projekte.length}`)
+    ok((await zeilen.count()) === 50, `Zeilen auf Seite 1: ${await zeilen.count()}`)
+    await abschnitt.getByRole('navigation', { name: 'Seiten der Projektliste' }).waitFor()
+
+    const suche = abschnitt.getByLabel('Nach Projekt oder Eigentümer suchen')
+    await suche.fill('P8 Pakete')
+    const namen = await zeilen.evaluateAll(z => z.map(e => e.getAttribute('data-projekt')))
+    ok(namen.length > 0 && namen.every(n => n.includes('P8 Pakete')), `Suche nach Projekt: ${namen}`)
+    await suche.fill('e2e-pakete@')
+    const eigentuemer = await zeilen.evaluateAll(z => z.map(e => e.children[1].textContent))
+    ok(eigentuemer.length > 0 && eigentuemer.every(e => e.startsWith('e2e-pakete@') || e.includes('e2e-pakete@')), `Suche nach Eigentümer: ${eigentuemer}`)
+    await suche.fill('gibt-es-nicht-xyz')
+    await abschnitt.getByText('Keine Projekte gefunden', { exact: true }).waitFor()
+    await suche.fill('')
+
+    const zellen = await zeilen.evaluateAll(z => z.map(e => e.querySelector('.spur-grenzen-zahl').textContent.trim()))
+    ok(zellen.every(z => /^\d/.test(z)) && !zellen.some(z => /^0 GB/.test(z)), `Speicher: ${zellen.slice(0, 20)}`)
+    ok(zellen.some(z => /^[\d.,]+ (KB|MB)/.test(z)), `Keine KB oder MB: ${zellen.slice(0, 20)}`)
+    const leer = projekte.slice(0, 50).find(p => p.bytes === 0)
+    if (leer) {
+      const text = await abschnitt.locator(`tr[data-projekt="${leer.name}"] .spur-grenzen-zahl`).first().textContent()
+      ok(/^0 KB/.test(text.trim()), `Leeres Projekt: ${text}`)
+    }
+
+    // Zeile 51 steht auf der zweiten Seite; „Speicher neu berechnen“ trifft genau dieses Projekt.
+    await abschnitt.getByRole('button', { name: 'Nächste Seite' }).click()
+    const erste = zeilen.first()
+    const name = await erste.getAttribute('data-projekt')
+    const ziel = projekte[50]
+    ok(ziel.name === name, `Zeile 51 ist „${name}“, erwartet „${ziel.name}“`)
+    const [anfrage] = await Promise.all([
+      page.waitForRequest(r => r.method() === 'POST' && r.url().includes('/neu-berechnen')),
+      erste.getByRole('button', { name: /neu berechnen/ }).click(),
+    ])
+    ok(anfrage.url().includes(`/projekt/${ziel.id}/neu-berechnen`), `Anfrage: ${anfrage.url()}, erwartet ${ziel.id}`)
+  }
+
+  features.p10f2 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P8 Zahlen')
+    let nr = 0
+    const schreiben = async neu => {
+      const { fehler, inhalt } = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', neu, idempotenz_schluessel: `p10f2-${Date.now()}-${nr++}` })
+      ok(!fehler, `doc_edit: ${JSON.stringify(inhalt)}`)
+      return inhalt.zahlen_ohne_beleg
+    }
+    const zeit = await schreiben('\nDie Sitzung begann um 9 Uhr und endete um 9.30 Uhr, ausgewertet mit Python 3.12, R 4.3.1 und SPSS 29, gesetzt mit LaTeX2e.\n')
+    ok(JSON.stringify(zeit) === '[]', `Uhrzeiten und Versionen gemeldet: ${JSON.stringify(zeit)}`)
+    const werte = await schreiben('\nVon 240 Befragten antworteten 37,5 Prozent; der Mittelwert lag bei 3.14 und 12,5 von 1.250 Fällen fehlten.\n')
+    ok(JSON.stringify([...werte].sort()) === JSON.stringify(['1.250', '12,5', '240', '3.14', '37,5']), `Gemeldet: ${JSON.stringify(werte)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Uhrzeiten geprüft.' })
+  }
+
+  features.p10f4 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E P8 DOI')
+    await page.locator('.cm-content').waitFor({ timeout: 60000 })
+    await railTab(DATEIBAUM).click()
+    ok((await page.title()) === 'E2E P8 DOI – spur', `Titel im Editor: „${await page.title()}“`)
+    const ENGLISCH = ['Resize', 'Close dialog', 'More actions', 'Project files history', 'Project history and labels', 'Toggle navigation']
+    const englischeAttribute = async () =>
+      await page.evaluate(
+        woerter => [...document.querySelectorAll('[title],[aria-label]')].flatMap(e => [e.getAttribute('title'), e.getAttribute('aria-label')]).filter(t => woerter.includes(t)),
+        ENGLISCH
+      )
+    ok((await page.locator('[title="Größe ändern"]').count()) >= 1, 'Resizer ohne deutschen Tooltip')
+    const imEditor = await englischeAttribute()
+    ok(imEditor.length === 0, `Englische Attribute im Editor: ${imEditor}`)
+    await page.getByRole('button', { name: 'Teilen' }).first().click()
+    await page.getByRole('button', { name: 'Dialog schließen' }).first().waitFor()
+    const imDialog = await englischeAttribute()
+    ok(imDialog.length === 0, `Englische Attribute im Dialog: ${imDialog}`)
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Dialog schließen' }).first().waitFor({ state: 'detached' })
+    const baum = page.getByRole('button', { name: 'Dateibaum ausblenden', exact: true })
+    await baum.waitFor()
+    ok((await baum.getAttribute('aria-label')) === 'Dateibaum ausblenden', 'aria-label des Knopfs')
+    await page.goto(`${BASE}/project`)
+    await page.getByPlaceholder(/^Suche in allen Projekten…$/).filter({ visible: true }).first().waitFor({ timeout: 30000 })
+    ok((await page.title()) === 'Deine Projekte – spur', `Titel der Projektliste: „${await page.title()}“`)
+
+    // Einstellungen → Erscheinungsbild: Gesamtthema in Deutsch.
+    await projektOeffnen('E2E P8 DOI')
+    await page.getByRole('button', { name: 'Einstellungen', exact: true }).first().click()
+    await page.getByRole('tab', { name: 'Erscheinungsbild' }).or(page.getByRole('button', { name: 'Erscheinungsbild' })).first().click()
+    const thema = page.getByLabel('Gesamtthema')
+    await thema.waitFor({ timeout: 15000 })
+    const themen = (await thema.locator('option').allInnerTexts()).map(t => t.trim())
+    ok(JSON.stringify(themen) === JSON.stringify(['Dunkel', 'Hell', 'System']), `Gesamtthema: ${themen}`)
+    const dialogText = await page.locator('.modal').first().innerText()
+    ok(!/\b(Dark|Light)\b/.test(dialogText), `Englische Optionen in den Einstellungen: ${dialogText.match(/\b(Dark|Light)\b/)}`)
+    await page.keyboard.press('Escape')
+
+    await projektOeffnen('E2E Kaputt')
+    await page.getByRole('button', { name: KOMPILIEREN }).first().click()
+    await page.getByText('Rohprotokoll', { exact: true }).first().waitFor({ state: 'attached', timeout: 120000 })
+    ok((await page.getByText(/^Raw logs?$/i).count()) === 0, 'Englisches „Raw Logs“ im Log-Bereich')
+    // Die Hinweise zum Fehler stehen auf Deutsch (Schlüssel log_hint_*), nicht im Quelltext.
+    await page.getByText('Der Compiler versteht einen deiner Befehle nicht', { exact: false }).first().waitFor({ state: 'attached', timeout: 30000 })
+    ok((await page.getByText('The compiler is having trouble').count()) === 0, 'Englischer Hinweis im Log-Bereich')
+    ok((await page.getByText(/^Learn more$/).count()) === 0, '„Learn more“ im Log-Bereich')
+
+    // Chat in der Seitenleiste: Titel, leerer Zustand und Eingabefeld auf Deutsch.
+    await panelOeffnen('Chat')
+    await page.getByText('Chat mit Mitarbeitenden', { exact: true }).first().waitFor({ timeout: 15000 })
+    await page.getByText('Noch keine Nachrichten', { exact: true }).waitFor({ timeout: 15000 })
+    const chatText = await page.locator('.rail-panel-title').first().locator('xpath=ancestor::*[contains(@class,"rail-panel") or @role="tabpanel"][1]').innerText().catch(() => '')
+    ok(!/Collaborator chat|No messages yet|Start the conversation|Send a message/.test(chatText), `Englische Reste im Chat: ${chatText.slice(0, 200)}`)
+    const eingabe = await page.locator('textarea:visible').last().getAttribute('placeholder')
+    ok(/Mitarbeitenden/.test(eingabe ?? ''), `Chat-Eingabefeld: ${eingabe}`)
+  }
+
+  features.p10f6 = async () => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Bericht')
+    await panelOeffnen('Prüfbericht')
+    await page.locator('.spur-filter').waitFor({ timeout: 30000 })
+    const knoepfe = () =>
+      page.locator('.spur-filter label').evaluateAll(l =>
+        l.map(e => {
+          const r = e.getBoundingClientRect()
+          const rahmen = e.closest('.spur-filter').getBoundingClientRect()
+          // Kein Pixel Überlauf: weder im Knopf noch über den Rand der Filterleiste hinaus.
+          return { text: e.textContent, x: Math.round(r.x), y: Math.round(r.y), b: Math.round(r.width), abgeschnitten: e.scrollWidth > e.clientWidth || r.right > rahmen.right }
+        })
+      )
+    const ziehen = async ziel => {
+      const hb = await page.getByRole('separator').first().boundingBox()
+      await page.mouse.move(hb.x + hb.width / 2, 500)
+      await page.mouse.down()
+      await page.mouse.move(ziel, 500, { steps: 10 })
+      await page.mouse.up()
+      await page.waitForTimeout(800)
+    }
+    for (const ziel of [245, 250, 258]) {
+      await ziehen(ziel)
+      const breite = Math.round((await page.getByRole('tabpanel', { name: 'Prüfbericht' }).boundingBox()).width)
+      const schmal = await knoepfe()
+      ok(schmal.length === 4 && !schmal.some(k => k.abgeschnitten), `Schmal (${breite} px) abgeschnitten: ${JSON.stringify(schmal)}`)
+      ok(new Set(schmal.map(k => k.y)).size === 2 && new Set(schmal.map(k => k.b)).size <= 2 && Math.abs(schmal[0].b - schmal[1].b) <= 2, `Schmal (${breite} px) kein 2×2-Raster: ${JSON.stringify(schmal)}`)
+    }
+    await ziehen(470)
+    const breit = await knoepfe()
+    ok(new Set(breit.map(k => k.y)).size === 1 && !breit.some(k => k.abgeschnitten), `Breit nicht in einer Zeile: ${JSON.stringify(breit)}`)
+    // Pfeiltasten wechseln den Filter.
+    await page.getByRole('radio', { name: /^Alle/ }).focus()
+    await page.keyboard.press('ArrowRight')
+    await page.getByRole('radio', { name: /^Markiert/, checked: true }).waitFor()
+    for (const schema of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: schema })
+      const farben = await page.locator('.spur-filter .btn-check:checked + label').evaluate(el => {
+        const cs = getComputedStyle(el)
+        return [cs.color, cs.backgroundColor]
+      })
+      const hell = c => {
+        const [r, g, b] = c.match(/\d+/g).slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 })
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+      }
+      const [a, b] = farben.map(hell).sort((x, y) => y - x)
+      ok((a + 0.05) / (b + 0.05) >= 4.5, `Kontrast des aktiven Filters (${schema}): ${farben}`)
+    }
+    await page.emulateMedia({ colorScheme: null })
+
+    // Hell: Der aktive Filter hebt sich nicht nur durch die Füllung ab (Kontrast der Fläche zu Weiß war 1,21:1),
+    // sondern durch einen 2-px-Rahmen in der Textfarbe; dessen Kontrast zum Hintergrund liegt bei mindestens 3:1.
+    await mitDesign('light-', async () => {
+      await projektOeffnen('E2E Bericht')
+      await panelOeffnen('Prüfbericht')
+      await page.locator('.spur-filter').waitFor({ timeout: 30000 })
+      const m = await page.locator('.spur-filter').evaluate(leiste => {
+        const zahlen = s => s.match(/[\d.]+/g).map(Number)
+        const kanal = c => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+        const hell = ([r, g, b]) => 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b)
+        let grund = leiste
+        while (grund && /rgba\(.*, 0\)$|transparent/.test(getComputedStyle(grund).backgroundColor)) grund = grund.parentElement
+        const aktiv = leiste.querySelector('.btn-check:checked + label')
+        const inaktiv = leiste.querySelector('.btn-check:not(:checked) + label')
+        const schatten = getComputedStyle(aktiv).boxShadow
+        const farbe = schatten.match(/rgba?\([^)]+\)/)?.[0]
+        return {
+          schatten,
+          inaktiv: getComputedStyle(inaktiv).boxShadow,
+          gewicht: getComputedStyle(aktiv).fontWeight,
+          hintergrund: getComputedStyle(grund).backgroundColor,
+          verhaeltnis: farbe ? (Math.max(hell(zahlen(farbe)), hell(zahlen(getComputedStyle(grund).backgroundColor))) + 0.05) / (Math.min(hell(zahlen(farbe)), hell(zahlen(getComputedStyle(grund).backgroundColor))) + 0.05) : 0,
+        }
+      })
+      ok(m.schatten !== 'none' && m.inaktiv === 'none', `Aktiver Filter hell nicht abgesetzt: ${JSON.stringify(m)}`)
+      ok(m.verhaeltnis >= 3, `Nicht-Text-Kontrast des aktiven Filters hell ${m.verhaeltnis.toFixed(2)}:1 (${JSON.stringify(m)})`)
+      ok(Number(m.gewicht) >= 600, `Aktiver Filter nicht fett: ${m.gewicht}`)
+    })
+  }
+
+  // Rote Zitate entscheidet der Server: auch das Umschreiben einer eigenen Einfügung und das Teilen per Tippen.
+  async function roteLage(pid) {
+    const status = await jsonVon(`/spur/project/${pid}/claude`)
+    const lauf = status.laeufe[0]
+    return { status, lauf, rot: lauf.aenderungen.filter(a => a.rot), normal: lauf.aenderungen.filter(a => !a.rot) }
+  }
+
+  async function roteSchreiben(token, pid) {
+    let nr = 0
+    const schreiben = async (alt, neu) => {
+      const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: `p10rot-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit ${neu}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+    const erst = await schreiben('Alpha Satz.', 'Alpha Satz. \\parencite{smith2024}')
+    ok(erst.rot.length === 0, `Erstes doc_edit ist rot: ${JSON.stringify(erst.rot)}`)
+    // Umschreiben der eigenen Einfügung: dieselbe Change wächst, es gibt keine neue ID.
+    const zweit = await schreiben('\\parencite{smith2024}', '\\parencite{unbekannt}')
+    ok(zweit.rot.length === 1 && zweit.rot[0].grund === 'doi_unbekannt', `Umschreiben meldet nicht rot: ${JSON.stringify(zweit.rot)}`)
+    await schreiben('Gamma Satz.', 'Gamma Satz erweitert.')
+  }
+
+  features.p10f3b = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E Rot Umgeschrieben')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    const panel = claudePanel()
+    await roteSchreiben(token, pid)
+
+    // Dieselben Server-Daten für Knopf, Dialog und Karte: ein rotes, ein normales Change.
+    await panel.getByRole('button', { name: 'Alles Offene jetzt annehmen (1)' }).waitFor({ timeout: 15000 })
+    const vorher = await roteLage(pid)
+    ok(vorher.rot.length === 1 && vorher.normal.length === 1, `Rot ${vorher.rot.length}, normal ${vorher.normal.length}`)
+    ok(vorher.status.offen.aenderungen === 1 && vorher.status.offen.rot === 1, `offen: ${JSON.stringify(vorher.status.offen)}`)
+    const karte = panel.locator('.spur-lauf-karte').first()
+    await karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' }).locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor({ timeout: 15000 })
+    ok((await karte.locator('.spur-lauf-rot .spur-lauf-aenderung').count()) === 1, 'Karte zeigt nicht genau ein rotes Zitat')
+
+    // Der Server nimmt Rotes nie ohne rote_mit an, auch nicht auf Zuruf der ID.
+    const laufId = vorher.lauf.lauf.id
+    const ohne = await seitenPost(`/spur/project/${pid}/laeufe/${laufId}/annehmen`, { change_ids: [vorher.rot[0].id] })
+    ok(ohne.status === 200 && ohne.daten.angenommen === 0, `Annahme ohne rote_mit: ${JSON.stringify(ohne)}`)
+    const falsch = await seitenPost(`/spur/project/${pid}/laeufe/${laufId}/annehmen`, { rote_mit: 'ja' })
+    ok(falsch.status === 422, `rote_mit kein Wahrheitswert: ${falsch.status}`)
+
+    const alle = karte.getByRole('button', { name: 'Alle annehmen', exact: true })
+    await alle.click()
+    await modal().getByText('1 rotes Zitat mit annehmen?', { exact: true }).waitFor()
+    await modal().getByRole('button', { name: 'Nur die anderen', exact: true }).click()
+    await modal().waitFor({ state: 'detached', timeout: 20000 })
+    await panel.getByRole('button', { name: 'Nur rote Zitate offen (1)' }).waitFor({ timeout: 15000 })
+    const nachher = await roteLage(pid)
+    ok(nachher.rot.length === 1 && nachher.normal.length === 0, `Danach rot ${nachher.rot.length}, normal ${nachher.normal.length}`)
+    ok(nachher.status.offen.aenderungen === 0 && nachher.status.offen.rot === 1, `offen danach: ${JSON.stringify(nachher.status.offen)}`)
+    await karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' }).locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor()
+
+    // Nur Rotes offen: Der Dialog bietet kein „Nur die anderen“, der Fokus liegt auf „Abbrechen“.
+    await alle.click()
+    await modal().getByRole('button', { name: 'Abbrechen', exact: true }).waitFor()
+    ok((await modal().getByRole('button', { name: 'Nur die anderen' }).count()) === 0, '„Nur die anderen“ bei nur roten Zitaten')
+    await fokusAuf(modal().getByRole('button', { name: 'Abbrechen', exact: true }), 'im Dialog ohne „Nur die anderen“')
+    await page.keyboard.press('Enter')
+    await modal().waitFor({ state: 'detached' })
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Umgeschrieben.' })
+  }
+
+  features.p10f3c = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E Rot Geteilt')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    const panel = claudePanel()
+    let nr = 0
+    const schreiben = async (alt, neu) => {
+      const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: `p10split-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit ${neu}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+    const rot = await schreiben('Beta Satz.', 'Beta Satz. \\parencite{unbekannt}')
+    ok(rot.rot.length === 1, `Zitat nicht rot: ${JSON.stringify(rot)}`)
+    await schreiben('Gamma Satz.', 'Gamma Satz erweitert.')
+    await panel.getByRole('button', { name: 'Alles Offene jetzt annehmen (1)' }).waitFor({ timeout: 15000 })
+    const vorher = await roteLage(pid)
+    ok(vorher.rot.length === 1, `Vor dem Tippen ${vorher.rot.length} rote Changes`)
+
+    // Ein Mensch tippt mitten in das rote Zitat: Die Einfügung zerfällt in Stücke mit neuen IDs.
+    await page.locator('.cm-content').getByText('unbekannt').first().click()
+    await page.keyboard.type('Z')
+    let geteilt
+    for (let i = 0; i < 20; i++) {
+      geteilt = await roteLage(pid)
+      if (geteilt.rot.length >= 2) break
+      await page.waitForTimeout(500)
+    }
+    ok(geteilt.rot.length >= 2, `Das rote Zitat zerfiel nicht in Stücke: ${JSON.stringify(geteilt.lauf.aenderungen.map(a => [a.id, a.rot, a.text]))}`)
+    ok(geteilt.normal.length === 1, `Normale Changes nach dem Tippen: ${geteilt.normal.length}`)
+    const anzahl = geteilt.rot.length
+    ok(geteilt.status.offen.rot === anzahl, `Knopf-Zahl ${geteilt.status.offen.rot}, Server ${anzahl}`)
+
+    const karte = panel.locator('.spur-lauf-karte').first()
+    await karte.locator('.spur-lauf-rot .spur-lauf-aenderung').nth(anzahl - 1).waitFor({ timeout: 15000 })
+    await karte.getByRole('button', { name: 'Alle annehmen', exact: true }).click()
+    await modal().getByText(new RegExp(`^${anzahl} rote Zitate mit annehmen\\?$`)).waitFor()
+    await modal().getByRole('button', { name: 'Nur die anderen', exact: true }).click()
+    await modal().waitFor({ state: 'detached', timeout: 20000 })
+    await panel.getByRole('button', { name: `Nur rote Zitate offen (${anzahl})` }).waitFor({ timeout: 15000 })
+    const nachher = await roteLage(pid)
+    ok(nachher.rot.length === anzahl && nachher.normal.length === 0, `Danach rot ${nachher.rot.length}, normal ${nachher.normal.length}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Geteilt.' })
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

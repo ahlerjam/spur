@@ -364,6 +364,14 @@ Eins. Zwei. Drei. Vier. Fünf.
     [a, schreiber].map(person => ({ projectId: automatik._id, userId: person._id, autoAnnehmen: true }))
   )
 
+  // P10: Rote Zitate im Claude-Panel, einmal mit Schalter an, einmal aus (neue Läufe, unabhängig von „E2E Automatik“).
+  const rotText = { 'main.tex': ROT_MAIN, 'references.bib': BERICHT_BIB }
+  const rotAuto = await neuAnlegen(a, 'E2E Rot Auto', rotText)
+  await neuAnlegen(a, 'E2E Rot Hand', rotText)
+  await neuAnlegen(a, 'E2E Rot Umgeschrieben', rotText)
+  await neuAnlegen(a, 'E2E Rot Geteilt', rotText)
+  await (await einstellungen()).insertOne({ projectId: rotAuto._id, userId: a._id, autoAnnehmen: true })
+
   // P9: zuletzt vor zwei Tagen von e2e-a bearbeitet („vor 2 Tagen von dir“ in der Projektliste).
   const alt = await neuAnlegen(a, 'E2E Alt', { 'main.tex': LEER })
   await db.projects.updateOne(
@@ -548,9 +556,22 @@ const CARLITO = String.raw`\documentclass{article}
 \end{document}
 `
 
+const ROT_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Alpha Satz.
+
+Beta Satz.
+
+Gamma Satz.
+
+Delta Satz.
+\end{document}`
+
 async function p8Vorbereiten(a) {
   await neuAnlegen(a, 'E2E P8 Zahlen', { 'main.tex': LEER })
-  for (const name of ['E2E P8 Pakete', 'E2E P8 Pakete B', 'E2E P8 Pakete Abbruch']) await neuAnlegen(a, name, { 'main.tex': CARLITO })
+  for (const name of ['E2E P8 Pakete', 'E2E P8 Pakete B', 'E2E P8 Pakete Fehler', 'E2E P8 Pakete Abbruch']) await neuAnlegen(a, name, { 'main.tex': CARLITO })
   // Reste eines abgebrochenen Versuchs: ein leerer Ordner und ein Ordner mit einer Datei, beide ohne Eintrag.
   const leer = await neuAnlegen(a, 'E2E P8 Pakete Rest', { 'main.tex': CARLITO })
   await ProjectEntityUpdateHandler.promises.mkdirp(leer._id, '/tex-pakete/carlito', a._id)

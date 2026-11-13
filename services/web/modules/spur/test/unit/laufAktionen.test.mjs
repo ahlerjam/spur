@@ -138,17 +138,25 @@ describe('aenderungen', () => {
 })
 
 describe('fuerKarte und laufDaten', () => {
+  it('markiert rote Changes für die Karte nach ID und nach Zeit, der Server entscheidet', () => {
+    const ts = '2026-11-07T10:20:00.000Z'
+    const liste = [{ docId: doc, pfad: 'kapitel.tex', geloescht: false, text: 'abc', changes: [change('r', { p: 0, i: 'x' }, ts), change('s', { p: 1, i: 'y' }, ts), change('n', { p: 2, i: 'z' }, '2026-11-07T10:05:00.000Z')] }]
+    const karte = LaufAktionen.fuerKarte(liste, { rotAenderungen: ['r'], rotZeiten: [ts] })
+    expect(karte.map(c => [c.id, c.rot])).toEqual([['r', true], ['s', true], ['n', false]])
+  })
+
   it('beschreibt Einfügungen und Löschungen mit Zeile und gekürztem Text', async () => {
     docSetzen('Zeile eins\nZeile zwei', [change('e', { p: 11, i: 'x'.repeat(300) }), change('l', { p: 0, d: 'Zeile' })])
-    const karte = LaufAktionen.fuerKarte(await LaufAktionen.aenderungen(projekt, await lauf()))
+    const l = await lauf()
+    const karte = LaufAktionen.fuerKarte(await LaufAktionen.aenderungen(projekt, l), l)
     expect(karte).toEqual([
-      { id: 'e', docId: doc, pfad: 'kapitel.tex', art: 'einfuegung', text: 'x'.repeat(200), zeile: 2 },
-      { id: 'l', docId: doc, pfad: 'kapitel.tex', art: 'loeschung', text: 'Zeile', zeile: 1 },
+      { id: 'e', docId: doc, pfad: 'kapitel.tex', rot: false, art: 'einfuegung', text: 'x'.repeat(200), zeile: 2 },
+      { id: 'l', docId: doc, pfad: 'kapitel.tex', rot: false, art: 'loeschung', text: 'Zeile', zeile: 1 },
     ])
   })
 
   it('fuerKarte vermerkt gelöschte Dokumente', () => {
-    expect(LaufAktionen.fuerKarte([{ docId: doc, geloescht: true, changes: [] }])).toEqual([{ docId: doc, geloescht: true }])
+    expect(LaufAktionen.fuerKarte([{ docId: doc, geloescht: true, changes: [] }], {})).toEqual([{ docId: doc, geloescht: true }])
   })
 
   it('laufDaten ist ohne Lauf leer und lädt bei abgeschlossenen Läufen keine Changes', async () => {
@@ -210,6 +218,34 @@ describe('annehmen', () => {
     const l = await lauf()
     expect(await LaufAktionen.annehmen(projekt, l, anna, ['a'])).toEqual({ angenommen: 2, rest: 1 })
     expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a', 'a2'], anna)
+  })
+
+  describe('rote Zitate (rote_mit)', () => {
+    const ROT = '2026-11-07T10:20:00.000Z'
+    const STUECK = '2026-11-07T10:25:00.000Z'
+
+    it('nimmt ohne rote_mit nie ein rotes Zitat an, weder mit noch ohne IDs', async () => {
+      docSetzen('abc', [change('a', { p: 0, i: 'x' }), change('r', { p: 1, i: 'rot' }, ROT)])
+      const l = await lauf({ rotAenderungen: ['r'], rotZeiten: [ROT] })
+      expect(await LaufAktionen.annehmen(projekt, l, anna)).toEqual({ angenommen: 1, rest: 1 })
+      expect(await LaufAktionen.annehmen(projekt, l, anna, ['a', 'r'])).toEqual({ angenommen: 1, rest: 1 })
+      expect(acceptChanges).toHaveBeenNthCalledWith(1, projekt, doc, ['a'], anna)
+      expect(acceptChanges).toHaveBeenNthCalledWith(2, projekt, doc, ['a'], anna)
+    })
+
+    it('nimmt das rote Zitat mit rote_mit an', async () => {
+      docSetzen('abc', [change('a', { p: 0, i: 'x' }), change('r', { p: 1, i: 'rot' }, ROT)])
+      const l = await lauf({ rotAenderungen: ['r'], rotZeiten: [ROT] })
+      expect(await LaufAktionen.annehmen(projekt, l, anna, ['r'], { roteMit: true })).toEqual({ angenommen: 1, rest: 1 })
+      expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['r'], anna)
+    })
+
+    it('erkennt auch Stücke eines geteilten roten Einschubs (gleiche Zeit, neue ID) als rot', async () => {
+      docSetzen('abc', [change('a', { p: 0, i: 'x' }), change('s1', { p: 1, i: 'ro' }, STUECK), change('s2', { p: 5, i: 't' }, STUECK)])
+      const l = await lauf({ rotAenderungen: ['r'], rotZeiten: [STUECK] })
+      expect(await LaufAktionen.annehmen(projekt, l, anna, ['a', 's1'])).toEqual({ angenommen: 1, rest: 2 })
+      expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a'], anna)
+    })
   })
 
   it('macht ohne Changes nichts am Dokument', async () => {
@@ -526,9 +562,9 @@ describe('Alles Offene jetzt annehmen', () => {
     return { fertig, offen }
   }
 
-  it('zählt offene Changes des eigenen Bots über alle Läufe ohne rote', async () => {
+  it('zählt offene Changes des eigenen Bots über alle Läufe ohne rote und nennt die roten gesondert', async () => {
     await zweiLaeufe()
-    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 2, dateien: 1 })
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 2, dateien: 1, rot: 1 })
   })
 
   it('nimmt alles außer roten Zitaten an; ein offener Lauf bleibt offen', async () => {
@@ -545,7 +581,7 @@ describe('Alles Offene jetzt annehmen', () => {
     await zweiLaeufe()
     await datenbank.db.collection('spurRuns').updateMany({ status: 'offen' }, { $set: { rotZeiten: ['2026-11-07T11:20:00.000Z'] } })
     docSetzen('a b c rot', [change('b', { p: 2, i: 'b' }, SPAETER), change('r-stueck', { p: 6, i: 'ro' }, '2026-11-07T11:20:00.000Z')])
-    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 1, dateien: 1 })
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 1, dateien: 1, rot: 1 })
   })
 
   it('verlangt Schreibrecht', async () => {

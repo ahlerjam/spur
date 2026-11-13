@@ -14,12 +14,12 @@ import { ToolbarButtonMenu } from './button-menu'
 import OLListGroupItem from '@/shared/components/ol/ol-list-group-item'
 
 const levels = new Map([
-  ['text', 'Normal text'],
-  ['section', 'Section'],
-  ['subsection', 'Subsection'],
-  ['subsubsection', 'Subsubsection'],
-  ['paragraph', 'Paragraph'],
-  ['subparagraph', 'Subparagraph'],
+  ['text', 'heading_normal_text'],
+  ['section', 'heading_section'],
+  ['subsection', 'heading_subsection'],
+  ['subsubsection', 'heading_subsubsection'],
+  ['paragraph', 'heading_paragraph'],
+  ['subparagraph', 'heading_subparagraph'],
 ])
 
 const levelsEntries = [...levels.entries()]
@@ -49,7 +49,7 @@ export const SectionHeadingDropdown = () => {
         </>
       }
     >
-      {levelsEntries.map(([level, label]) => (
+      {levelsEntries.map(([level, labelKey]) => (
         <OLListGroupItem
           role="menuitem"
           key={level}
@@ -61,7 +61,7 @@ export const SectionHeadingDropdown = () => {
           }}
           className={`ol-cm-section-heading-menu-item section-level-${level}`}
         >
-          {label}
+          {t(labelKey)}
         </OLListGroupItem>
       ))}
     </ToolbarButtonMenu>

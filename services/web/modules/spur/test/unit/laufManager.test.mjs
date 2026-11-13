@@ -133,7 +133,6 @@ describe('laufFuerClient', () => {
       zahlen: [],
       zusammenfassung: null,
       angelegt: [],
-      rotAenderungen: [],
       automatisch: [],
     })
   })
@@ -167,11 +166,10 @@ describe('laeufeListe', () => {
     expect((await LaufManager.laeufeListe(projekt, bot, { vor: 'kaputt' })).laeufe).toHaveLength(20)
   })
 
-  it('laufFuerClient nennt automatisch Angenommenes und rote Changes', () => {
-    const lauf = { _id: 'l', status: 'offen', docs: [], aenderungen: 2, rot: [], rotAenderungen: ['r'],
+  it('laufFuerClient nennt automatisch Angenommenes', () => {
+    const lauf = { _id: 'l', status: 'offen', docs: [], aenderungen: 2, rot: [],
       angenommen: [{ automatisch: true, pfad: 'main.tex', zeile: 3, op: { p: 1, i: 'Von 240 Befragten' } }, { op: { p: 1, d: 'x' } }] }
     expect(LaufManager.laufFuerClient(lauf)).toMatchObject({
-      rotAenderungen: ['r'],
       automatisch: [{ pfad: 'main.tex', zeile: 3, art: 'einfuegung', text: 'Von 240 Befragten' }],
     })
   })

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
 import LadeKnopf from '../lade-knopf'
+import { OLModal, OLModalBody, OLModalFooter, OLModalHeader, OLModalTitle } from '@/shared/components/ol/ol-modal'
 import MaterialIcon from '@/shared/components/material-icon'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
@@ -18,7 +19,6 @@ export type Lauf = {
   zahlen: { zahl: string; pfad: string }[]
   zusammenfassung: string | null
   angelegt?: { art: 'datei' | 'ordner' | 'quelle'; pfad?: string; name?: string }[]
-  rotAenderungen?: string[]
   automatisch?: { pfad: string; zeile: number; art: 'einfuegung' | 'loeschung'; text: string }[]
 }
 
@@ -30,6 +30,7 @@ export type Aenderung = {
   text?: string
   zeile?: number
   geloescht?: boolean
+  rot?: boolean
 }
 
 const STUFE = {
@@ -77,14 +78,23 @@ export default function LaufKarte({
   const [offen, setOffen] = useState(aufgeklappt)
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  const [fragen, setFragen] = useState(false)
+  const alleAnnehmen = useRef<HTMLButtonElement>(null)
+  // Nach jedem Schließen des Dialogs (Annehmen, Abbrechen, Esc) liegt der Fokus wieder auf „Alle annehmen“.
+  const warOffen = useRef(false)
+  useEffect(() => {
+    if (warOffen.current && !fragen) alleAnnehmen.current?.focus()
+    warOffen.current = fragen
+  }, [fragen])
   const pfad = (aktion: string) => projektPfad(`/laeufe/${lauf.id}/${aktion}`)
   const laufOffen = lauf.status === 'offen' || lauf.status === 'fertig'
   const changes = aenderungen.filter(a => !a.geloescht)
-  const rot = new Set(lauf.rotAenderungen ?? [])
-  const zuPruefen = changes.filter(a => a.id && rot.has(a.id))
-  const uebrige = changes.filter(a => !a.id || !rot.has(a.id))
+  // Welche Changes rot sind, entscheidet der Server (Flag `rot`), nicht die Karte.
+  const zuPruefen = changes.filter(a => a.rot)
+  const uebrige = changes.filter(a => !a.rot)
   const automatisch = lauf.automatisch ?? []
   const angelegt = lauf.angelegt ?? []
+  const rotMitAuszug = lauf.rot.filter(r => r.auszug)
   const koerperId = `spur-lauf-${lauf.id}`
 
   const aktion = async (methode: string, url: string, daten?: unknown) => {
@@ -93,17 +103,26 @@ export default function LaufKarte({
     try {
       await jsonAnfrage(methode, url, daten)
       await neuLaden()
+      return true
     } catch (error) {
       setFehler((error as Error).message)
+      return false
     } finally {
       setLaeuft(false)
     }
   }
 
+  const mitDialogAnnehmen = async (daten?: unknown) => {
+    if (await aktion('POST', pfad('annehmen'), daten)) setFragen(false)
+  }
+
+  // Der Server lässt rote Zitate ohne rote_mit offen, auch solche, die erst nach dem Laden der Karte dazukamen.
+  const ohneRote = () => mitDialogAnnehmen({ rote_mit: false })
+
   const knoepfe = (a: Aenderung) => (
     <div className="spur-panel-werkzeuge spur-ohne-rand">
       {write && (
-        <OLButton variant="secondary" size="sm" disabled={laeuft} onClick={() => aktion('POST', pfad('annehmen'), { change_ids: [a.id] })}>
+        <OLButton variant="secondary" size="sm" disabled={laeuft} onClick={() => aktion('POST', pfad('annehmen'), { change_ids: [a.id], rote_mit: Boolean(a.rot) })}>
           {t('spur_annehmen')}
         </OLButton>
       )}
@@ -143,11 +162,11 @@ export default function LaufKarte({
               </ul>
             </div>
           )}
-          {lauf.rot.length > 0 && zuPruefen.length === 0 && (
+          {laufOffen && zuPruefen.length === 0 && rotMitAuszug.length > 0 && (
             <div className="spur-lauf-rot" role="status">
               <OLBadge bg="danger">{t('spur_bitte_pruefen')}</OLBadge>
               <ul className="spur-liste">
-                {lauf.rot.map((r, i) => (
+                {rotMitAuszug.map((r, i) => (
                   <li key={i} className="spur-zeile-meta">
                     {t('spur_nicht_pruefbar')}: {r.auszug}
                   </li>
@@ -193,7 +212,13 @@ export default function LaufKarte({
           )}
           <div className="spur-panel-werkzeuge spur-ohne-rand">
             {laufOffen && write && changes.length > 0 && (
-              <LadeKnopf variant="primary" size="sm" isLoading={laeuft} onClick={() => aktion('POST', pfad('annehmen'))}>
+              <LadeKnopf
+                ref={alleAnnehmen}
+                variant="primary"
+                size="sm"
+                isLoading={laeuft}
+                onClick={() => (zuPruefen.length > 0 ? setFragen(true) : ohneRote())}
+              >
                 {t('spur_alle_annehmen')}
               </LadeKnopf>
             )}
@@ -209,6 +234,29 @@ export default function LaufKarte({
             )}
           </div>
           <p className="spur-zeile-meta">{t('spur_label_hinweis')}</p>
+          {fragen && (
+            <OLModal themed show onHide={() => setFragen(false)}>
+              <OLModalHeader>
+                <OLModalTitle>{t('spur_rote_mitannehmen_titel', { count: zuPruefen.length })}</OLModalTitle>
+              </OLModalHeader>
+              <OLModalBody>
+                <p>{t('spur_rote_mitannehmen_text')}</p>
+              </OLModalBody>
+              <OLModalFooter>
+                {/* Ist nur Rotes offen, gibt es keine „anderen“: Der Fokus liegt dann auf „Abbrechen“, nicht auf der Annahme. */}
+                <OLButton variant="primary" autoFocus onClick={uebrige.length > 0 ? ohneRote : () => setFragen(false)}>
+                  {uebrige.length > 0 ? t('spur_nur_die_anderen') : t('cancel')}
+                </OLButton>
+                <LadeKnopf
+                  variant="secondary"
+                  isLoading={laeuft}
+                  onClick={() => mitDialogAnnehmen({ rote_mit: true })}
+                >
+                  {t('spur_alle_annehmen')}
+                </LadeKnopf>
+              </OLModalFooter>
+            </OLModal>
+          )}
         </div>
       )}
     </section>

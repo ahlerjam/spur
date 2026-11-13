@@ -221,9 +221,10 @@ describe('TexPakete.hinzufuegen', () => {
   })
 
   it('lässt einen zweiten gleichzeitigen Aufruf warten, bis der erste fertig ist', async () => {
-    const [erster, zweiter] = await Promise.all([holen(), holen()])
-    expect(erster.dateien).toHaveLength(5)
-    expect(zweiter.hinweis).toBe('schon im Projekt')
+    // Wer die Sperre zuerst bekommt, hängt davon ab, welcher Aufruf die TeX-Live-Datenbank früher gelesen hat.
+    const ergebnisse = await Promise.all([holen(), holen()])
+    expect(ergebnisse.filter(e => e.dateien.length === 5)).toHaveLength(1)
+    expect(ergebnisse.filter(e => e.hinweis === 'schon im Projekt')).toHaveLength(1)
     expect(paketDateien()).toHaveLength(5)
   })
 

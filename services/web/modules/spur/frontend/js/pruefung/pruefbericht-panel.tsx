@@ -11,7 +11,7 @@ import MaterialIcon from '@/shared/components/material-icon'
 import Notification from '@/shared/components/notification'
 import { befunde } from './befunde'
 import PruefEinstellungen from './pruef-einstellungen'
-import { type Bericht, pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, Zeile } from './pruef-store'
+import { pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, type StellenStatus, Zeile } from './pruef-store'
 
 const FILTER = {
   alle: () => true,
@@ -91,13 +91,25 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
   )
 }
 
-function Zaehlung({ zaehlung }: { zaehlung: Bericht['zaehlung'] }) {
+// „Markiert“ heißt wie im Filter: alle Stellen mit Problem. Die Aufschlüsselung nennt zuerst die markierten Stellen je
+// Status, danach die nicht markierten, damit die Kopfzeile alle Stellen nennt.
+function Zaehlung({ zeilen }: { zeilen: Zeile[] }) {
   const { t } = useTranslation()
-  const teile = STELLEN_STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s], count: zaehlung[s] }))
-  if (zaehlung.geprueft > 0) {
-    teile[0] += zaehlung.markiert > 0 ? `, ${t('spur_stellen_markiert', { anzahl: zaehlung.markiert })}` : `, ${t('spur_stellen_keine_markiert')}`
-  }
-  return <p className="spur-zeile-meta">{t('spur_zitierstellen', { liste: teile.join(', ') })}</p>
+  const teile = useMemo(() => {
+    const zahl = Object.fromEntries(STELLEN_STATUS.map(s => [s, { markiert: 0, rest: 0 }])) as Record<StellenStatus, { markiert: number; rest: number }>
+    for (const z of zeilen) if (zahl[z.status]) zahl[z.status][z.problem ? 'markiert' : 'rest']++
+    const text = (status: StellenStatus, anzahl: number) =>
+      t(status === 'geprueft' ? 'spur_stellen_mit_befund' : `spur_stellen_${status}`, { anzahl, count: anzahl })
+    const liste = (art: 'markiert' | 'rest', ohne?: StellenStatus) =>
+      STELLEN_STATUS.filter(s => s !== ohne && zahl[s][art] > 0).map(s => text(s, zahl[s][art]))
+    const markiert = zeilen.filter(z => z.problem).length
+    return [
+      t('spur_stellen_gesamt', { count: zeilen.length }),
+      markiert > 0 ? t('spur_stellen_markiert', { anzahl: markiert, liste: liste('markiert').join(', ') }) : t('spur_stellen_keine_markiert'),
+      ...liste('rest', 'geprueft'),
+    ]
+  }, [zeilen, t])
+  return <p className="spur-zeile-meta">{teile.join(', ')}</p>
 }
 
 export default function PruefberichtPanel() {
@@ -164,7 +176,7 @@ export default function PruefberichtPanel() {
         {bericht?.zeilen.length === 0 && status !== 'fehler' && (
           <p className="spur-leer">{t('spur_keine_zitate')}</p>
         )}
-        {bericht && bericht.zeilen.length > 0 && <Zaehlung zaehlung={bericht.zaehlung} />}
+        {bericht && bericht.zeilen.length > 0 && <Zaehlung zeilen={bericht.zeilen} />}
         {bericht && bericht.uebersprungen > 0 && (
           <p className="spur-zeile-meta">{t('spur_uebersprungen', { count: bericht.uebersprungen })}</p>
         )}

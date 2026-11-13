@@ -97,7 +97,7 @@ describe('Prüfbericht-Panel', function () {
 
   it('zählt die Zitierstellen nach Status und nennt je nicht geprüfter Stelle den Grund', async function () {
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
-    await screen.findByText('Zitierstellen: 1 geprüft, keine markiert, 1 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar')
+    await screen.findByText('4 Stellen, 1 markiert: 1 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar')
     expect(screen.queryByText(/Abschnitte geprüft/)).to.not.exist
     screen.getByText('keine Quelle aufgenommen')
     screen.getByText('Seitenangabe fehlt')
@@ -134,8 +134,28 @@ describe('Prüfbericht-Panel', function () {
     })
     await pruefen()
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
-    await screen.findByText('Zitierstellen: 6 geprüft, davon 4 markiert, 2 ohne Quelle, 2 Belege ohne Wortlaut, 1 nicht prüfbar')
+    await screen.findByText('2 Stellen, 1 markiert: 1 mit Befund, 1 Beleg ohne Wortlaut')
     screen.getByText('Beleg ohne Wortlaut')
+  })
+
+  it('beginnt mit der Gesamtzahl, nennt dieselbe Zahl markiert wie der Filter und schlüsselt sie auf', async function () {
+    const stelle = (id: string, status: string) => ({ ...zeile(id, true), auszug: id, status, grund: status === 'geprueft' ? null : 'x' })
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, {
+      zeilen: [
+        ...['a', 'b', 'c'].map(id => stelle(id, 'geprueft')),
+        ...['d', 'e'].map(id => stelle(id, 'ohne_quelle')),
+        stelle('f', 'nicht_pruefbar'),
+        ...['g', 'h', 'i'].map(id => ({ ...zeile(id, false), auszug: id })),
+      ],
+      zaehlung: { geprueft: 6, markiert: 6, ohne_quelle: 2, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 1 },
+    })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    await screen.findByText('9 Stellen, 6 markiert: 3 mit Befund, 2 ohne Quelle, 1 nicht prüfbar')
+    screen.getByRole('radio', { name: 'Markiert 6' })
+    fireEvent.click(screen.getByRole('radio', { name: /^Markiert/ }))
+    expect(document.querySelectorAll('.spur-zeile')).to.have.length(6)
   })
 
   it('lässt Status mit null Stellen in der Zählung weg', async function () {
@@ -143,6 +163,6 @@ describe('Prüfbericht-Panel', function () {
     fetchMock.get(BERICHT, { zeilen: [zeile('gruen', false)], zaehlung: { geprueft: 1, markiert: 0, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 } })
     await pruefen()
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
-    await screen.findByText('Zitierstellen: 1 geprüft, keine markiert')
+    await screen.findByText('1 Stelle, keine markiert')
   })
 })
