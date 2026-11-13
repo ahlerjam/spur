@@ -6,7 +6,7 @@
     "`check_report` über MCP liefert `zaehlung.markiert` mit derselben Zahl; die Werkzeugbeschreibung und `docs/mcp-contract.md` erklären die Bedeutung in einem Satz",
     "Projekt „E2E P8 Zählung“ (keine Markierung): Kopfzeile nennt „keine markiert“, Filter „Markiert 0“"
   ]},
-  {"id": "f2", "title": "Uhrzeiten und Softwareversionen sind keine Zahl ohne Beleg", "passes": false, "steps": [
+  {"id": "f2", "title": "Uhrzeiten und Softwareversionen sind keine Zahl ohne Beleg", "passes": true, "steps": [
     "Über MCP schreibt `doc_edit` im Projekt „E2E P8 Zahlen“ den Satz „Die Sitzung begann um 9 Uhr und endete um 9.30 Uhr, ausgewertet mit Python 3.12, R 4.3.1 und SPSS 29, gesetzt mit LaTeX2e.“: Die Antwort enthält `zahlen_ohne_beleg: []`",
     "Der Satz „Von 240 Befragten antworteten 37,5 Prozent; der Mittelwert lag bei 3.14 und 12,5 von 1.250 Fällen fehlten.“ meldet genau `240`, `37,5`, `3.14`, `12,5`, `1.250`",
     "Unit-Tests decken ab: `9 Uhr`, `9.30 Uhr`, `9:30 Uhr`, `Python 3.12`, `R 4.3.1`, `SPSS 29`, `LaTeX2e`, `Node 20` werden nicht gemeldet; `3.14`, `12,5`, `1.250`, `240`, `Gruppe 2 hatte 17 Teilnehmende` (17 gemeldet) werden gemeldet"
