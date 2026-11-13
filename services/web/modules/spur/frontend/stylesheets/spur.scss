@@ -535,9 +535,9 @@ $spur-sm: 575.98px;
     }
 
     // Der aktive Filter fällt auch im hellen Schema auf (Kontrast der Fläche zu Weiß reicht dort nicht):
-    // 2 px Rahmen in der Textfarbe und fette Schrift, nicht nur eine andere Hintergrundfarbe.
+    // 2 px Rahmen in der Textfarbe (hell dunkel, dunkel hell) und fette Schrift, nicht nur eine andere Hintergrundfarbe.
     > .btn-check:checked + .btn {
-      box-shadow: inset 0 0 0 2px var(--content-primary);
+      box-shadow: inset 0 0 0 2px currentColor;
       font-weight: 700;
     }
   }
