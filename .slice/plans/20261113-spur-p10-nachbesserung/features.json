@@ -37,7 +37,7 @@
     "Hell und dunkel: Der aktive Filter ist klar erkennbar, Kontrast mindestens 4,5:1",
     "Tastatur: Pfeiltasten wechseln den Filter wie bisher"
   ]},
-  {"id": "f7", "title": "D9: Test für gleichzeitige Paketinstallation ist stabil", "passes": false, "steps": [
+  {"id": "f7", "title": "D9: Test für gleichzeitige Paketinstallation ist stabil", "passes": true, "steps": [
     "Der Builder reproduziert das Wackeln: `texPaketeHinzufuegen.test.mjs` 20-mal einzeln ausgeführt, die Zahl der roten Läufe steht in `progress.md`",
     "Die Ursache steht in `progress.md` (Sperre in `hinzufuegen` oder Test); bei einem Fehler in der Sperre ist der Code behoben und ein Test zeigt zwei gleichzeitige `tex_package_add carlito`, die genau eine Installation mit fünf Dateien ergeben, der zweite meldet „schon im Projekt“",
     "Danach ist der Test 20 Läufe in Folge grün und `spur-dev test` 3 Läufe in Folge grün",
