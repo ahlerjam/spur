@@ -1599,7 +1599,7 @@ async page => {
     await zeile('smith2024.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
     await zeile('retracted.pdf').getByText('aufgenommen', { exact: true }).waitFor({ timeout: 30000 })
     await zeile('kapitel.tex').getByText('Dieser Dateityp wird nicht unterstützt', { exact: false }).waitFor({ timeout: 30000 })
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     await dialog.waitFor({ state: 'detached' })
     const quellen = page.locator('.spur-panel .spur-liste .spur-quelle-titel')
     await page.locator('.spur-panel').getByRole('button', { name: 'retracted.pdf' }).waitFor()
@@ -1610,7 +1610,7 @@ async page => {
     await dateien()
     await zeile('smith2024.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
     await zeile('retracted.pdf').getByText('schon vorhanden').waitFor({ timeout: 30000 })
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     ok((await quellen.count()) === 2, `Dubletten: ${await quellen.allTextContents()}`)
 
     const token = 'spur_e2e_fake'
@@ -1672,7 +1672,7 @@ async page => {
     const VORSCHLAG = 'Zwei Nächte, gemischte Modelle'
     const vorschlag = await werkzeug(token, 'matrix_suggest', { project_id: pid, source_id: quelle.id, spalte: 'Methode', text: VORSCHLAG })
     ok(!vorschlag.fehler, `matrix_suggest: ${JSON.stringify(vorschlag.inhalt)}`)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     await matrixOeffnen()
     const zelle = dialog.locator('.spur-matrix-zelle', { has: page.getByLabel('Methode: smith2024.pdf') })
     await zelle.getByText(VORSCHLAG).waitFor()
@@ -1687,7 +1687,7 @@ async page => {
     ])
     const csv = await (await page.request.get(download.url())).text()
     ok(csv.startsWith('Quelle,Key,Methode\n') && csv.includes(`smith2024.pdf,smith2024,"${VORSCHLAG}"`), `CSV:\n${csv}`)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     // 300 Zeilen: seitenweise, Eingaben wirken auch auf späteren Seiten.
     await projektOeffnen('E2E Viele')
@@ -1705,7 +1705,7 @@ async page => {
     await feld.fill('signifikant')
     await feld.blur()
     await page.waitForResponse(r => r.url().includes('/matrix') && r.request().method() === 'GET')
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     const viele = await projektId(token, 'E2E Viele')
     const export300 = await (await page.request.get(`${BASE}/spur/project/${viele}/matrix.csv`)).text()
     const zeilen = export300.trim().split('\n')
@@ -1833,7 +1833,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await offenlegungOeffnen()
     await dialog.getByText('Keine KI-Nutzung protokolliert.').waitFor()
     ok(await dialog.getByRole('button', { name: 'Als .tex-Abschnitt einfügen' }).isDisabled(), 'Einfügen ohne Läufe')
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     await projektOeffnen('E2E Offenlegung')
     const pid = page.url().split('/').pop()
@@ -1871,7 +1871,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await dialog.getByText('In ki-offenlegung.tex eingefügt.', { exact: false }).waitFor()
     const tex = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'ki-offenlegung.tex' })).inhalt.text
     ok(tex.startsWith('\\section*{Nutzung von KI-Werkzeugen}\n') && tex.includes('Modell: Claude Opus 5.5.'), `.tex:\n${tex}`)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
   }
 
   features.p2f10 = async () => {
@@ -3800,7 +3800,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const dialog = await kontoAnlegen('neu-p7@example.org')
     await dialog.getByText(OHNE_MAIL).waitFor()
     const link = await einladungslink(dialog)
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     const { seite, schliessen } = await zweiteSeite()
     try {
@@ -3819,7 +3819,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const neuDialog = page.locator('.modal', { hasText: 'Neuen Einladungslink erzeugen' })
     const neuerLink = await einladungslink(neuDialog)
     ok(neuerLink !== link, 'Kein neuer Link')
-    await neuDialog.getByRole('button', { name: 'Schließen' }).click()
+    await neuDialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
     await page.goto(`${BASE}/project`)
     await page.getByRole('menuitem', { name: 'Admin' }).click()
@@ -6032,13 +6032,13 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       { name: 'gleich.pdf', mimeType: 'application/pdf', buffer: pdf },
     ])
     ok((await modal().locator('.spur-import-liste li', { hasText: 'gleich.pdf' }).count()) === 2, 'Gleiche Namen nicht als zwei Zeilen')
-    await modal().getByRole('button', { name: 'Schließen' }).click()
+    await modal().getByRole('button', { name: 'Schließen', exact: true }).click()
     await modal().getByText('Der Upload läuft noch. Beim Schließen kommen die übrigen Dateien nicht an.').waitFor()
     await modal().getByRole('button', { name: 'Weiter hochladen' }).click()
     hochladen()
     await page.waitForFunction(() => [...document.querySelectorAll('.spur-import-liste li')].every(li => !li.textContent.includes('wird aufgenommen')), null, { timeout: 30000 }).catch(() => {})
     await page.unroute(/\/quellen$/)
-    await modal().getByRole('button', { name: 'Schließen' }).click()
+    await modal().getByRole('button', { name: 'Schließen', exact: true }).click()
     await modal().waitFor({ state: 'detached' })
 
     // Einladungslink: „Kopiert“ nur, wenn das Kopieren gelungen ist.
@@ -6053,7 +6053,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await dialog.getByRole('button', { name: 'Kopieren' }).last().click()
     await dialog.getByText('Kopieren nicht möglich. Markier den Link und kopier ihn von Hand.').waitFor()
     ok((await dialog.getByRole('button', { name: 'Kopiert' }).count()) === 0, '„Kopiert“ trotz Fehler')
-    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
     ohneKonsolenfehler('p9f8', /Failed to load resource: the server responded with a status of (403|409|503)/)
   }
 
