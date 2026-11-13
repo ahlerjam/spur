@@ -42,3 +42,6 @@
 - D8 (plan 20261110-spur-p6-claude-test) f7: Gilt eine Zahl, die in `ergebnisse.tex` steht, auch im Fließtext als belegt?
   Interim: Nur in Formeln und siunitx-Werten; im Fließtext bleibt eine getippte Zahl gemeldet (Hinweis: Makro nutzen), p2f8 bleibt grün.
   Options: A (empfohlen) so lassen, Fließtext soll das Makro nutzen | B überall als belegt werten und p2f8 anpassen | C nirgends als belegt werten, nur Makros zählen
+- D9 (plan 20261112-spur-p8-korrekturen) Gate: Der Unit-Test `texPaketeHinzufuegen.test.mjs` „lässt einen zweiten gleichzeitigen Aufruf warten, bis der erste fertig ist“ schlug in 2 von 5 Läufen von `spur-dev test` fehl (`erster.dateien` hatte nicht 5 Einträge), in den drei übrigen war er grün.
+  Interim: Gemerged, weil die Abnahme (f1–f11 PASS) und drei Läufe in Folge grün waren; der Test ist nicht stabil.
+  Options: A (empfohlen) kleiner Nachbesserungsplan: Reihenfolge der beiden gleichzeitigen Aufrufe im Test oder die Sperre in `hinzufuegen` prüfen | B so lassen
