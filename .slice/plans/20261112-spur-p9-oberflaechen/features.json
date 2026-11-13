@@ -11,7 +11,7 @@
     "Bei 360 px Breite hat keine der Flächen horizontales Rollen (`document.documentElement.scrollWidth` gleich Fensterbreite); die Konsole bleibt ohne Fehler",
     "`spur.scss` enthält keine Farbe als Zahlenwert außerhalb eines Blocks mit benannten Werten und keine doppelt definierte Klasse (Test unter `tools/tests` prüft beides und ist grün)"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -75,7 +75,7 @@
     "Ein Reviewer-Konto und ein Lese-Konto sehen weder Schalter noch Knopf; der Aufruf der Routen mit diesen Konten liefert 403; wird der Person mit eingeschaltetem Schalter das Schreibrecht entzogen, bleibt die nächste Änderung ihres Claude offen",
     "Der Schalter ist per Tastatur bedienbar, sagt seinen Zustand an und zeigt beim Speichern keinen Sprung im Layout; scheitert das Speichern (Dev-Schalter), springt er zurück und eine Meldung nennt den Grund"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -168,7 +168,7 @@
     "`docs/backlog.md`: erledigte Punkte unter „Interface“ sind entfernt (Kontrast „Nicht frei“, schmales Recherche-Panel, gemischte Menüsprachen); neu steht dort der Rest der fehlenden deutschen Schlüssel mit Zahl",
     "Kein Text in README oder Doku nennt eine Beschriftung, die es in der Oberfläche nicht mehr gibt (Suche nach den alten Texten „Automatisch annehmen, wenn ein Lauf ohne Probleme endet“ und „Limits“ findet nichts)"
    ],
-   "passes": false
+   "passes": true
   }
  ]
 }
