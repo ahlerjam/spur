@@ -4282,5 +4282,14 @@
   "spur_projekte_suchen": "Search by project or owner",
   "spur_projektseiten": "Project list pages",
   "spur_workflow_zu_lang": "The text has __anzahl__ characters; at most __grenze__ are allowed. Please shorten it.",
-  "last_updated_date_by_you": "__lastUpdatedDate__ by you"
+  "last_updated_date_by_you": "__lastUpdatedDate__ by you",
+  "heading_normal_text": "Normal text",
+  "heading_section": "Section",
+  "heading_subsection": "Subsection",
+  "heading_subsubsection": "Subsubsection",
+  "heading_paragraph": "Paragraph",
+  "heading_subparagraph": "Subparagraph",
+  "log_level_error": "error",
+  "log_level_warning": "warning",
+  "log_level_typesetting": "typesetting"
 }

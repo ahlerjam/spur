@@ -3101,5 +3101,14 @@
   "spur_projekte_suchen": "Nach Projekt oder Eigentümer suchen",
   "spur_projektseiten": "Seiten der Projektliste",
   "spur_workflow_zu_lang": "Der Text hat __anzahl__ Zeichen; erlaubt sind höchstens __grenze__. Kürz ihn bitte.",
-  "last_updated_date_by_you": "__lastUpdatedDate__ von dir"
+  "last_updated_date_by_you": "__lastUpdatedDate__ von dir",
+  "heading_normal_text": "Normaler Text",
+  "heading_section": "Abschnitt",
+  "heading_subsection": "Unterabschnitt",
+  "heading_subsubsection": "Unterunterabschnitt",
+  "heading_paragraph": "Absatz",
+  "heading_subparagraph": "Unterabsatz",
+  "log_level_error": "Fehler",
+  "log_level_warning": "Warnung",
+  "log_level_typesetting": "Satz"
 }

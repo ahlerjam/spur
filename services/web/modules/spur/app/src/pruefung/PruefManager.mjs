@@ -184,6 +184,29 @@ export async function bereichPruefen(projectId, text, von, bis) {
   return await fundeBewerten(funde, kontext)
 }
 
+// Schlüssel der .bib-Einträge, die den Bereich [von, bis) berühren.
+function bibSchluesselIm(text, von, bis) {
+  const starts = [...text.matchAll(/@\w+\s*\{\s*([^,\s]+)\s*,/g)]
+  return new Set(
+    starts
+      .filter((m, i) => m.index < bis && (starts[i + 1]?.index ?? text.length) > von)
+      .map(m => m[1])
+  )
+}
+
+// Für eine Änderung an einer .bib-Datei: prüft mit dem neuen Text alle Zitate der .tex-Dateien,
+// deren Schlüssel im geänderten Eintrag steht. So wird ein Zitat auch rot, wenn erst die .bib es kippt.
+export async function bibBereichPruefen(projectId, docId, text, von, bis) {
+  const schluessel = bibSchluesselIm(text, von, bis)
+  if (!schluessel.size) return []
+  const docs = (await dokumente(projectId)).map(d => (d.docId === docId ? { ...d, text } : d))
+  const kontext = await kontextLaden(projectId, docs)
+  const funde = texte(docs)
+    .flatMap(t => zitateFinden(t, kontext.makros))
+    .filter(f => !f.ausgeblendet && f.belege.some(b => schluessel.has(b.key)))
+  return await fundeBewerten(funde, kontext)
+}
+
 async function zeilenFuer(projectId, abschnittsListe, kontext, basis, nutzung) {
   const cache = await pruefCache()
   const schluessel = abschnittsListe.map(a => hash(basis, a.text))

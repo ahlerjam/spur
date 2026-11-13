@@ -7,15 +7,17 @@ import FileTreeActionButtons from './file-tree-action-buttons'
 function FileTreeToolbar() {
   const { t } = useTranslation()
   const { fileTreeExpanded, toggleFileTreeExpanded } = useCollapsibleFileTree()
+  const toggleLabel = fileTreeExpanded
+    ? t('hide_file_tree')
+    : t('show_file_tree')
 
   return (
     <div className="file-tree-toolbar">
       <button
         className="file-tree-expand-collapse-button"
         onClick={toggleFileTreeExpanded}
-        aria-label={
-          fileTreeExpanded ? t('hide_file_tree') : t('show_file_tree')
-        }
+        aria-label={toggleLabel}
+        title={toggleLabel}
       >
         <MaterialIcon
           type={
