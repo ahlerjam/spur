@@ -600,11 +600,20 @@ describe('Claude-Zugang und Läufe', () => {
 
   const lauf = body => req({ params: { project_id: String(projekt), lauf_id: 'l1' }, body })
 
-  it('laufAnnehmen nimmt alle oder die gewählten Changes an', async () => {
+  it('laufAnnehmen nimmt alle oder die gewählten Changes an, rote Zitate nur mit rote_mit', async () => {
     await ausfuehren(C.laufAnnehmen, lauf({}))
-    expect(m.Aktionen.annehmen).toHaveBeenCalledWith(projekt, { _id: 'l1' }, anna, undefined)
+    expect(m.Aktionen.annehmen).toHaveBeenCalledWith(projekt, { _id: 'l1' }, anna, undefined, { roteMit: false })
     await ausfuehren(C.laufAnnehmen, lauf({ change_ids: ['a', 'b'] }))
-    expect(m.Aktionen.annehmen).toHaveBeenLastCalledWith(projekt, { _id: 'l1' }, anna, ['a', 'b'])
+    expect(m.Aktionen.annehmen).toHaveBeenLastCalledWith(projekt, { _id: 'l1' }, anna, ['a', 'b'], { roteMit: false })
+    await ausfuehren(C.laufAnnehmen, lauf({ rote_mit: true }))
+    expect(m.Aktionen.annehmen).toHaveBeenLastCalledWith(projekt, { _id: 'l1' }, anna, undefined, { roteMit: true })
+  })
+
+  it('laufAnnehmen weist ein rote_mit ab, das kein Wahrheitswert ist', async () => {
+    m.Aktionen.annehmen.mockClear()
+    const { res } = await ausfuehren(C.laufAnnehmen, lauf({ rote_mit: 'ja' }))
+    expect(res.statusCode).toBe(422)
+    expect(m.Aktionen.annehmen).not.toHaveBeenCalled()
   })
 
   it.each([['kein Array', 'a'], ['Zahlen', [1, 2]]])('laufAnnehmen weist change_ids ab, die %s sind', async (_name, ids) => {

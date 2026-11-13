@@ -509,5 +509,23 @@ describe('Sofort annehmen nach dem Schreiben', () => {
       expect(laufAktionen.sofortAnnehmen).not.toHaveBeenCalled()
     }
   })
+
+  it('merkt auch die eigene Einfügung als rot, die ein zweites doc_edit zu einem roten Zitat umschreibt (alte ID, keine neue)', async () => {
+    const text = 'Satz \\parencite{zzz} Ende.'
+    docSetzen(KAPITEL, text, [{ id: 'eigen', op: { p: 5, i: '\\parencite{zzz}' }, metadata: { ts: 'T1' } }])
+    // Das Umschreiben wächst in der bestehenden Einfügung: dieselbe ID, längerer Text, keine neue Change.
+    spurUpdate.mockImplementation(async (_p, docId) => {
+      const alt = dokumente.get(String(docId))
+      dokumente.set(String(docId), {
+        ...alt,
+        ranges: { changes: [{ id: 'eigen', op: { p: 5, i: '\\parencite{unbekannt}' }, metadata: { ts: 'T1' } }] },
+      })
+    })
+    bereichPruefen.mockResolvedValue([{ auszug: 'x', key: 'unbekannt', wortlaut: 'exakt', referenz: 'nicht_gefunden' }])
+    const ergebnis = await bearbeiten({ menschId: mensch, alt: '\\parencite{zzz}', neu: '\\parencite{unbekannt}', schluessel: 'umschreiben-1' })
+    expect(ergebnis.rot).toEqual([{ grund: 'doi_unbekannt', auszug: 'x' }])
+    expect(laufManager.rotMerken).toHaveBeenCalledWith(lauf, [expect.objectContaining({ id: 'eigen' })])
+    expect(laufAktionen.sofortAnnehmen).not.toHaveBeenCalled()
+  })
 })
 

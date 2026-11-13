@@ -53,7 +53,16 @@ export async function aenderungen(projectId, lauf) {
   })
 }
 
-export function fuerKarte(liste) {
+// Der Server entscheidet, welche Changes rot sind: nach ID oder nach Zeitstempel. Der Zeitstempel bleibt erhalten,
+// wenn jemand in einen roten Einschub tippt und ihn in Stücke mit neuen IDs teilt.
+export function rotPruefer(lauf) {
+  const ids = new Set(lauf.rotAenderungen ?? [])
+  const zeiten = new Set(lauf.rotZeiten ?? [])
+  return c => ids.has(c.id) || zeiten.has(String(c.metadata?.ts))
+}
+
+export function fuerKarte(liste, lauf) {
+  const istRot = rotPruefer(lauf)
   return liste.flatMap(d =>
     d.geloescht
       ? [{ docId: d.docId, geloescht: true }]
@@ -61,6 +70,7 @@ export function fuerKarte(liste) {
           id: c.id,
           docId: d.docId,
           pfad: d.pfad,
+          rot: istRot(c),
           art: c.op.i !== undefined ? 'einfuegung' : 'loeschung',
           // Die Ops liegen auf Wortgrenzen (opsFuer), der Text beginnt also nie mitten im Wort.
           text: (c.op.i ?? c.op.d).slice(0, 200),
@@ -116,18 +126,29 @@ async function angelegtEntfernen(projectId, lauf, userId) {
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { angelegt: [] } })
 }
 
+// `roteMit`: Rote Zitate nimmt nur an, wer es ausdrücklich verlangt (rote_mit); sonst bleiben sie offen, auch wenn
+// ihre ID in `nurIds` steht oder gar keine IDs übergeben werden.
 // `automatisch`: vom Schalter direkt nach dem Schreiben; die Karte zeigt diese Changes weiter an.
 // Schalter und Sammelannahme lassen einen offenen Lauf offen: Claude schreibt vielleicht weiter, und der nächste
 // doc_edit legte sonst einen neuen Lauf an.
-export async function annehmen(projectId, lauf, userId, nurIds, { automatisch = false, laufOffenLassen = automatisch } = {}) {
+export async function annehmen(
+  projectId,
+  lauf,
+  userId,
+  nurIds,
+  { automatisch = false, laufOffenLassen = automatisch, roteMit = false } = {}
+) {
   mussOffenSein(lauf)
+  const istRot = rotPruefer(lauf)
   const liste = await aenderungen(projectId, lauf)
   const angenommen = []
   // Ein Stapel teilt sich den Text, aus dem sein Kontext stammt; „Lauf rückgängig“ nimmt Stapel nacheinander zurück.
   const stapel = String(new ObjectId())
   for (const d of liste) {
     // Wie beim Ablehnen: ein gespaltener Einschub wird ganz angenommen, sonst blieben Restmarken.
-    const ids = mitGanzenEinschueben(d.changes, nurIds).map(c => c.id)
+    const ids = mitGanzenEinschueben(d.changes, nurIds)
+      .filter(c => roteMit || !istRot(c))
+      .map(c => c.id)
     if (!ids.length) continue
     await DocumentUpdaterHandler.promises.acceptChanges(projectId, d.docId, ids, userId)
     // Wie TrackChangesController: offene Editoren entfernen die Marken sofort.
@@ -305,9 +326,7 @@ async function offeneLaeufe(projectId, botId) {
 
 // Offene Changes je Lauf ohne rote Zitate (die bleiben, bis ein Mensch sie einzeln prüft).
 async function offeneOhneRot(projectId, lauf) {
-  const rot = new Set(lauf.rotAenderungen ?? [])
-  const rotZeiten = new Set(lauf.rotZeiten ?? [])
-  const istRot = c => rot.has(c.id) || rotZeiten.has(String(c.metadata?.ts))
+  const istRot = rotPruefer(lauf)
   return (await aenderungen(projectId, lauf)).map(d => {
     const changes = d.changes.filter(c => !istRot(c))
     return { ...d, changes, rot: d.changes.length - changes.length }
@@ -346,5 +365,5 @@ export async function allesAnnehmen(projectId, botId, menschId) {
 export async function laufDaten(projectId, lauf) {
   if (!lauf) return { lauf: null, aenderungen: [] }
   const liste = lauf.status === 'offen' || lauf.status === 'fertig' ? await aenderungen(projectId, lauf) : []
-  return { lauf: LaufManager.laufFuerClient(lauf), aenderungen: fuerKarte(liste) }
+  return { lauf: LaufManager.laufFuerClient(lauf), aenderungen: fuerKarte(liste, lauf) }
 }

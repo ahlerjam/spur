@@ -368,6 +368,8 @@ Eins. Zwei. Drei. Vier. Fünf.
   const rotText = { 'main.tex': ROT_MAIN, 'references.bib': BERICHT_BIB }
   const rotAuto = await neuAnlegen(a, 'E2E Rot Auto', rotText)
   await neuAnlegen(a, 'E2E Rot Hand', rotText)
+  await neuAnlegen(a, 'E2E Rot Umgeschrieben', rotText)
+  await neuAnlegen(a, 'E2E Rot Geteilt', rotText)
   await (await einstellungen()).insertOne({ projectId: rotAuto._id, userId: a._id, autoAnnehmen: true })
 
   // P9: zuletzt vor zwei Tagen von e2e-a bearbeitet („vor 2 Tagen von dir“ in der Projektliste).

@@ -452,10 +452,19 @@ const changeIds = req => {
   return ids
 }
 
+const roteMit = req => {
+  const wert = req.body?.rote_mit
+  if (wert === undefined) return false
+  if (typeof wert !== 'boolean') throw new Problem(422, 'rote_mit', 'spur_fehler_rote_mit')
+  return wert
+}
+
 export const laufAnnehmen = mitProblemen(async (req, res) => {
   const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id)
   res.json(
-    await LaufAktionen.annehmen(projektId(req), lauf, new ObjectId(nutzerId(req)), changeIds(req))
+    await LaufAktionen.annehmen(projektId(req), lauf, new ObjectId(nutzerId(req)), changeIds(req), {
+      roteMit: roteMit(req),
+    })
   )
 })
 

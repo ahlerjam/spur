@@ -18,14 +18,20 @@ export default function OverallThemeSetting() {
   const { loadingStyleSheet } = useLayoutContext()
   const { overallTheme, setOverallTheme } = useProjectSettingsContext()
 
-  const options: Array<Option<OverallTheme>> = useMemo(
-    () =>
+  // Die Namen kommen vom Server auf Englisch (Dark, Light, System); spur zeigt sie übersetzt.
+  const options: Array<Option<OverallTheme>> = useMemo(() => {
+    const namen: Record<string, string> = {
+      Dark: t('overall_theme_dark'),
+      Light: t('overall_theme_light'),
+      System: t('overall_theme_system'),
+    }
+    return (
       overallThemes?.map(({ name, val }) => ({
         value: val,
-        label: name,
-      })) ?? [],
-    [overallThemes]
-  )
+        label: namen[name] ?? name,
+      })) ?? []
+    )
+  }, [overallThemes, t])
 
   if (!overallThemes || isIEEEBranded()) {
     return null

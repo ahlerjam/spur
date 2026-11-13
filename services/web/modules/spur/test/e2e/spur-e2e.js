@@ -3239,7 +3239,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
     // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei.
-    ok(eintraege === 42, `Backlog hat ${eintraege} Einträge statt 42`)
+    ok(eintraege === 41, `Backlog hat ${eintraege} Einträge statt 41`)
     ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /lacks \d+ keys/.test(backlog), 'Backlog ohne Transformers, Tesseract oder fehlende Übersetzungen')
   }
 
@@ -6510,10 +6510,26 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.getByPlaceholder(/^Suche in allen Projekten…$/).filter({ visible: true }).first().waitFor({ timeout: 30000 })
     ok((await page.title()) === 'Deine Projekte – spur', `Titel der Projektliste: „${await page.title()}“`)
 
+    // Einstellungen → Erscheinungsbild: Gesamtthema in Deutsch.
+    await projektOeffnen('E2E P8 DOI')
+    await page.getByRole('button', { name: 'Einstellungen', exact: true }).first().click()
+    await page.getByRole('tab', { name: 'Erscheinungsbild' }).or(page.getByRole('button', { name: 'Erscheinungsbild' })).first().click()
+    const thema = page.getByLabel('Gesamtthema')
+    await thema.waitFor({ timeout: 15000 })
+    const themen = (await thema.locator('option').allInnerTexts()).map(t => t.trim())
+    ok(JSON.stringify(themen) === JSON.stringify(['Dunkel', 'Hell', 'System']), `Gesamtthema: ${themen}`)
+    const dialogText = await page.locator('.modal').first().innerText()
+    ok(!/\b(Dark|Light)\b/.test(dialogText), `Englische Optionen in den Einstellungen: ${dialogText.match(/\b(Dark|Light)\b/)}`)
+    await page.keyboard.press('Escape')
+
     await projektOeffnen('E2E Kaputt')
     await page.getByRole('button', { name: KOMPILIEREN }).first().click()
     await page.getByText('Rohprotokoll', { exact: true }).first().waitFor({ state: 'attached', timeout: 120000 })
     ok((await page.getByText(/^Raw logs?$/i).count()) === 0, 'Englisches „Raw Logs“ im Log-Bereich')
+    // Die Hinweise zum Fehler stehen auf Deutsch (Schlüssel log_hint_*), nicht im Quelltext.
+    await page.getByText('Der Compiler versteht einen deiner Befehle nicht', { exact: false }).first().waitFor({ state: 'attached', timeout: 30000 })
+    ok((await page.getByText('The compiler is having trouble').count()) === 0, 'Englischer Hinweis im Log-Bereich')
+    ok((await page.getByText(/^Learn more$/).count()) === 0, '„Learn more“ im Log-Bereich')
   }
 
   features.p10f6 = async () => {
@@ -6526,7 +6542,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       page.locator('.spur-filter label').evaluateAll(l =>
         l.map(e => {
           const r = e.getBoundingClientRect()
-          return { text: e.textContent, x: Math.round(r.x), y: Math.round(r.y), b: Math.round(r.width), abgeschnitten: e.scrollWidth > e.clientWidth + 1 }
+          const rahmen = e.closest('.spur-filter').getBoundingClientRect()
+          // Kein Pixel Überlauf: weder im Knopf noch über den Rand der Filterleiste hinaus.
+          return { text: e.textContent, x: Math.round(r.x), y: Math.round(r.y), b: Math.round(r.width), abgeschnitten: e.scrollWidth > e.clientWidth || r.right > rahmen.right }
         })
       )
     const ziehen = async ziel => {
@@ -6537,10 +6555,13 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       await page.mouse.up()
       await page.waitForTimeout(800)
     }
-    await ziehen(250)
-    const schmal = await knoepfe()
-    ok(schmal.length === 4 && !schmal.some(k => k.abgeschnitten), `Schmal abgeschnitten: ${JSON.stringify(schmal)}`)
-    ok(new Set(schmal.map(k => k.y)).size === 2 && new Set(schmal.map(k => k.b)).size <= 2 && Math.abs(schmal[0].b - schmal[1].b) <= 2, `Schmal kein 2×2-Raster: ${JSON.stringify(schmal)}`)
+    for (const ziel of [245, 250, 258]) {
+      await ziehen(ziel)
+      const breite = Math.round((await page.getByRole('tabpanel', { name: 'Prüfbericht' }).boundingBox()).width)
+      const schmal = await knoepfe()
+      ok(schmal.length === 4 && !schmal.some(k => k.abgeschnitten), `Schmal (${breite} px) abgeschnitten: ${JSON.stringify(schmal)}`)
+      ok(new Set(schmal.map(k => k.y)).size === 2 && new Set(schmal.map(k => k.b)).size <= 2 && Math.abs(schmal[0].b - schmal[1].b) <= 2, `Schmal (${breite} px) kein 2×2-Raster: ${JSON.stringify(schmal)}`)
+    }
     await ziehen(470)
     const breit = await knoepfe()
     ok(new Set(breit.map(k => k.y)).size === 1 && !breit.some(k => k.abgeschnitten), `Breit nicht in einer Zeile: ${JSON.stringify(breit)}`)
@@ -6562,6 +6583,151 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       ok((a + 0.05) / (b + 0.05) >= 4.5, `Kontrast des aktiven Filters (${schema}): ${farben}`)
     }
     await page.emulateMedia({ colorScheme: null })
+
+    // Hell: Der aktive Filter hebt sich nicht nur durch die Füllung ab (Kontrast der Fläche zu Weiß war 1,21:1),
+    // sondern durch einen 2-px-Rahmen in der Textfarbe; dessen Kontrast zum Hintergrund liegt bei mindestens 3:1.
+    await mitDesign('light-', async () => {
+      await projektOeffnen('E2E Bericht')
+      await panelOeffnen('Prüfbericht')
+      await page.locator('.spur-filter').waitFor({ timeout: 30000 })
+      const m = await page.locator('.spur-filter').evaluate(leiste => {
+        const zahlen = s => s.match(/[\d.]+/g).map(Number)
+        const kanal = c => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+        const hell = ([r, g, b]) => 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b)
+        let grund = leiste
+        while (grund && /rgba\(.*, 0\)$|transparent/.test(getComputedStyle(grund).backgroundColor)) grund = grund.parentElement
+        const aktiv = leiste.querySelector('.btn-check:checked + label')
+        const inaktiv = leiste.querySelector('.btn-check:not(:checked) + label')
+        const schatten = getComputedStyle(aktiv).boxShadow
+        const farbe = schatten.match(/rgba?\([^)]+\)/)?.[0]
+        return {
+          schatten,
+          inaktiv: getComputedStyle(inaktiv).boxShadow,
+          gewicht: getComputedStyle(aktiv).fontWeight,
+          hintergrund: getComputedStyle(grund).backgroundColor,
+          verhaeltnis: farbe ? (Math.max(hell(zahlen(farbe)), hell(zahlen(getComputedStyle(grund).backgroundColor))) + 0.05) / (Math.min(hell(zahlen(farbe)), hell(zahlen(getComputedStyle(grund).backgroundColor))) + 0.05) : 0,
+        }
+      })
+      ok(m.schatten !== 'none' && m.inaktiv === 'none', `Aktiver Filter hell nicht abgesetzt: ${JSON.stringify(m)}`)
+      ok(m.verhaeltnis >= 3, `Nicht-Text-Kontrast des aktiven Filters hell ${m.verhaeltnis.toFixed(2)}:1 (${JSON.stringify(m)})`)
+      ok(Number(m.gewicht) >= 600, `Aktiver Filter nicht fett: ${m.gewicht}`)
+    })
+  }
+
+  // Rote Zitate entscheidet der Server: auch das Umschreiben einer eigenen Einfügung und das Teilen per Tippen.
+  async function roteLage(pid) {
+    const status = await jsonVon(`/spur/project/${pid}/claude`)
+    const lauf = status.laeufe[0]
+    return { status, lauf, rot: lauf.aenderungen.filter(a => a.rot), normal: lauf.aenderungen.filter(a => !a.rot) }
+  }
+
+  async function roteSchreiben(token, pid) {
+    let nr = 0
+    const schreiben = async (alt, neu) => {
+      const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: `p10rot-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit ${neu}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+    const erst = await schreiben('Alpha Satz.', 'Alpha Satz. \\parencite{smith2024}')
+    ok(erst.rot.length === 0, `Erstes doc_edit ist rot: ${JSON.stringify(erst.rot)}`)
+    // Umschreiben der eigenen Einfügung: dieselbe Change wächst, es gibt keine neue ID.
+    const zweit = await schreiben('\\parencite{smith2024}', '\\parencite{unbekannt}')
+    ok(zweit.rot.length === 1 && zweit.rot[0].grund === 'doi_unbekannt', `Umschreiben meldet nicht rot: ${JSON.stringify(zweit.rot)}`)
+    await schreiben('Gamma Satz.', 'Gamma Satz erweitert.')
+  }
+
+  features.p10f3b = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E Rot Umgeschrieben')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    const panel = claudePanel()
+    await roteSchreiben(token, pid)
+
+    // Dieselben Server-Daten für Knopf, Dialog und Karte: ein rotes, ein normales Change.
+    await panel.getByRole('button', { name: 'Alles Offene jetzt annehmen (1)' }).waitFor({ timeout: 15000 })
+    const vorher = await roteLage(pid)
+    ok(vorher.rot.length === 1 && vorher.normal.length === 1, `Rot ${vorher.rot.length}, normal ${vorher.normal.length}`)
+    ok(vorher.status.offen.aenderungen === 1 && vorher.status.offen.rot === 1, `offen: ${JSON.stringify(vorher.status.offen)}`)
+    const karte = panel.locator('.spur-lauf-karte').first()
+    await karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' }).locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor({ timeout: 15000 })
+    ok((await karte.locator('.spur-lauf-rot .spur-lauf-aenderung').count()) === 1, 'Karte zeigt nicht genau ein rotes Zitat')
+
+    // Der Server nimmt Rotes nie ohne rote_mit an, auch nicht auf Zuruf der ID.
+    const laufId = vorher.lauf.lauf.id
+    const ohne = await seitenPost(`/spur/project/${pid}/laeufe/${laufId}/annehmen`, { change_ids: [vorher.rot[0].id] })
+    ok(ohne.status === 200 && ohne.daten.angenommen === 0, `Annahme ohne rote_mit: ${JSON.stringify(ohne)}`)
+    const falsch = await seitenPost(`/spur/project/${pid}/laeufe/${laufId}/annehmen`, { rote_mit: 'ja' })
+    ok(falsch.status === 422, `rote_mit kein Wahrheitswert: ${falsch.status}`)
+
+    const alle = karte.getByRole('button', { name: 'Alle annehmen', exact: true })
+    await alle.click()
+    await modal().getByText('1 rotes Zitat mit annehmen?', { exact: true }).waitFor()
+    await modal().getByRole('button', { name: 'Nur die anderen', exact: true }).click()
+    await modal().waitFor({ state: 'detached', timeout: 20000 })
+    await panel.getByRole('button', { name: 'Nur rote Zitate offen (1)' }).waitFor({ timeout: 15000 })
+    const nachher = await roteLage(pid)
+    ok(nachher.rot.length === 1 && nachher.normal.length === 0, `Danach rot ${nachher.rot.length}, normal ${nachher.normal.length}`)
+    ok(nachher.status.offen.aenderungen === 0 && nachher.status.offen.rot === 1, `offen danach: ${JSON.stringify(nachher.status.offen)}`)
+    await karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' }).locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor()
+
+    // Nur Rotes offen: Der Dialog bietet kein „Nur die anderen“, der Fokus liegt auf „Abbrechen“.
+    await alle.click()
+    await modal().getByRole('button', { name: 'Abbrechen', exact: true }).waitFor()
+    ok((await modal().getByRole('button', { name: 'Nur die anderen' }).count()) === 0, '„Nur die anderen“ bei nur roten Zitaten')
+    await fokusAuf(modal().getByRole('button', { name: 'Abbrechen', exact: true }), 'im Dialog ohne „Nur die anderen“')
+    await page.keyboard.press('Enter')
+    await modal().waitFor({ state: 'detached' })
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Umgeschrieben.' })
+  }
+
+  features.p10f3c = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E Rot Geteilt')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    const panel = claudePanel()
+    let nr = 0
+    const schreiben = async (alt, neu) => {
+      const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: `p10split-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit ${neu}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+    const rot = await schreiben('Beta Satz.', 'Beta Satz. \\parencite{unbekannt}')
+    ok(rot.rot.length === 1, `Zitat nicht rot: ${JSON.stringify(rot)}`)
+    await schreiben('Gamma Satz.', 'Gamma Satz erweitert.')
+    await panel.getByRole('button', { name: 'Alles Offene jetzt annehmen (1)' }).waitFor({ timeout: 15000 })
+    const vorher = await roteLage(pid)
+    ok(vorher.rot.length === 1, `Vor dem Tippen ${vorher.rot.length} rote Changes`)
+
+    // Ein Mensch tippt mitten in das rote Zitat: Die Einfügung zerfällt in Stücke mit neuen IDs.
+    await page.locator('.cm-content').getByText('unbekannt').first().click()
+    await page.keyboard.type('Z')
+    let geteilt
+    for (let i = 0; i < 20; i++) {
+      geteilt = await roteLage(pid)
+      if (geteilt.rot.length >= 2) break
+      await page.waitForTimeout(500)
+    }
+    ok(geteilt.rot.length >= 2, `Das rote Zitat zerfiel nicht in Stücke: ${JSON.stringify(geteilt.lauf.aenderungen.map(a => [a.id, a.rot, a.text]))}`)
+    ok(geteilt.normal.length === 1, `Normale Changes nach dem Tippen: ${geteilt.normal.length}`)
+    const anzahl = geteilt.rot.length
+    ok(geteilt.status.offen.rot === anzahl, `Knopf-Zahl ${geteilt.status.offen.rot}, Server ${anzahl}`)
+
+    const karte = panel.locator('.spur-lauf-karte').first()
+    await karte.locator('.spur-lauf-rot .spur-lauf-aenderung').nth(anzahl - 1).waitFor({ timeout: 15000 })
+    await karte.getByRole('button', { name: 'Alle annehmen', exact: true }).click()
+    await modal().getByText(new RegExp(`^${anzahl} rote Zitate mit annehmen\\?$`)).waitFor()
+    await modal().getByRole('button', { name: 'Nur die anderen', exact: true }).click()
+    await modal().waitFor({ state: 'detached', timeout: 20000 })
+    await panel.getByRole('button', { name: `Nur rote Zitate offen (${anzahl})` }).waitFor({ timeout: 15000 })
+    const nachher = await roteLage(pid)
+    ok(nachher.rot.length === anzahl && nachher.normal.length === 0, `Danach rot ${nachher.rot.length}, normal ${nachher.normal.length}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Geteilt.' })
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

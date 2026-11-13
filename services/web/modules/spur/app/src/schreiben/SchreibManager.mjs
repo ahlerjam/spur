@@ -187,12 +187,19 @@ export async function docEdit({ projectId, botId, menschId, docId, pfad, alt, ne
 }
 
 // Nach dem Schreiben: rote Zitate am Lauf merken, sonst nimmt der Schalter des Menschen die neuen Changes an.
-async function nachDemSchreiben({ projectId, lauf, menschId, docId, vorher, rot }) {
+// Rot wird nach Position bestimmt, nicht nur nach neuen IDs: Schreibt doc_edit in eine eigene Einfügung hinein
+// (`\parencite{zzz}` wird zu `\parencite{unbekannt}`), wächst die bestehende Einfügung unter ihrer alten ID.
+async function nachDemSchreiben({ projectId, lauf, menschId, docId, vorher, rot, bereich }) {
   const { ranges } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
   const alt = new Set((vorher ?? []).map(c => c.id))
   const neueChanges = (ranges?.changes ?? []).filter(c => !alt.has(c.id))
   const neu = neueChanges.map(c => c.id)
-  if (rot.length) return await LaufManager.rotMerken(lauf, neueChanges)
+  if (rot.length) {
+    const beruehrt = (ranges?.changes ?? []).filter(
+      c => !alt.has(c.id) || (c.op.i !== undefined && c.op.p < bereich.bis && c.op.p + c.op.i.length > bereich.von)
+    )
+    return await LaufManager.rotMerken(lauf, beruehrt)
+  }
   // Der Lauf kann eben erst angelegt sein: Das Dokument steht dann nur in der Datenbank schon in `docs`.
   const docs = lauf.docs.some(d => String(d) === docId) ? lauf.docs : [...lauf.docs, docId]
   if (menschId) await LaufAktionen.sofortAnnehmen(projectId, { ...lauf, docs }, menschId, neu)
@@ -238,7 +245,15 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
         rot,
         zahlen: zahlen.map(zahl => ({ zahl, pfad: doc.pfad })),
       })
-      await nachDemSchreiben({ projectId, lauf, menschId, docId: doc.docId, vorher: ranges?.changes, rot })
+      await nachDemSchreiben({
+        projectId,
+        lauf,
+        menschId,
+        docId: doc.docId,
+        vorher: ranges?.changes,
+        rot,
+        bereich: { von: start, bis: start + neu.length },
+      })
     } catch (error) {
       // Geschrieben ist geschrieben: Ein Fehler beim Mitzählen oder Annehmen darf die Reservierung nicht freigeben,
       // sonst schriebe eine Wiederholung doppelt. Die Changes bleiben dann offen.

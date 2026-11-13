@@ -36,7 +36,7 @@ export function useEditorThemesOptionGroups() {
     const legacyEditorThemeOptions: Array<Option> =
       legacyEditorThemes?.map(({ name: theme }) => ({
         value: theme,
-        label: getThemeName(theme) + ' (Legacy)',
+        label: `${getThemeName(theme)} (${t('legacy_theme_suffix')})`,
       })) ?? []
 
     const groups = []

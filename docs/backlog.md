@@ -45,9 +45,6 @@ Deferred, not discarded. Check here before new plans.
 - Rate limits for web page capture and comments; OCR limit per project and page cap
 - Use SSRF protection (`netz.mjs`) for `linked-url-proxy` as well and respect `Settings.blockedNetworks`
 
-## Claude panel
-- Red citations that a person split by typing into them (new change IDs, same `rotZeiten` time) are not recognised by the run card: "Alle annehmen" asks nothing and "Nur die anderen" can accept the red piece. Fix on the server: `annehmen` takes a flag for red changes and skips them by `rotZeiten` otherwise (P10 security review)
-
 ## Interface
 - Also highlight markings in the page text of the source preview
 

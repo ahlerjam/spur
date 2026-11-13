@@ -19,7 +19,6 @@ export type Lauf = {
   zahlen: { zahl: string; pfad: string }[]
   zusammenfassung: string | null
   angelegt?: { art: 'datei' | 'ordner' | 'quelle'; pfad?: string; name?: string }[]
-  rotAenderungen?: string[]
   automatisch?: { pfad: string; zeile: number; art: 'einfuegung' | 'loeschung'; text: string }[]
 }
 
@@ -31,6 +30,7 @@ export type Aenderung = {
   text?: string
   zeile?: number
   geloescht?: boolean
+  rot?: boolean
 }
 
 const STUFE = {
@@ -89,9 +89,9 @@ export default function LaufKarte({
   const pfad = (aktion: string) => projektPfad(`/laeufe/${lauf.id}/${aktion}`)
   const laufOffen = lauf.status === 'offen' || lauf.status === 'fertig'
   const changes = aenderungen.filter(a => !a.geloescht)
-  const rot = new Set(lauf.rotAenderungen ?? [])
-  const zuPruefen = changes.filter(a => a.id && rot.has(a.id))
-  const uebrige = changes.filter(a => !a.id || !rot.has(a.id))
+  // Welche Changes rot sind, entscheidet der Server (Flag `rot`), nicht die Karte.
+  const zuPruefen = changes.filter(a => a.rot)
+  const uebrige = changes.filter(a => !a.rot)
   const automatisch = lauf.automatisch ?? []
   const angelegt = lauf.angelegt ?? []
   const rotMitAuszug = lauf.rot.filter(r => r.auszug)
@@ -117,13 +117,12 @@ export default function LaufKarte({
   }
 
   // Ohne Rückfrage nur, was die Karte kennt: Ein rotes Zitat, das erst nach dem Laden dazukam, bleibt offen.
-  const ids = uebrige.map(a => a.id).filter(Boolean)
-  const keineRoten = () => aktion('POST', pfad('annehmen'), { change_ids: ids })
+  const ohneRote = () => aktion('POST', pfad('annehmen'), { rote_mit: false })
 
   const knoepfe = (a: Aenderung) => (
     <div className="spur-panel-werkzeuge spur-ohne-rand">
       {write && (
-        <OLButton variant="secondary" size="sm" disabled={laeuft} onClick={() => aktion('POST', pfad('annehmen'), { change_ids: [a.id] })}>
+        <OLButton variant="secondary" size="sm" disabled={laeuft} onClick={() => aktion('POST', pfad('annehmen'), { change_ids: [a.id], rote_mit: Boolean(a.rot) })}>
           {t('spur_annehmen')}
         </OLButton>
       )}
@@ -218,7 +217,7 @@ export default function LaufKarte({
                 variant="primary"
                 size="sm"
                 isLoading={laeuft}
-                onClick={() => (zuPruefen.length > 0 ? setFragen(true) : keineRoten())}
+                onClick={() => (zuPruefen.length > 0 ? setFragen(true) : ohneRote())}
               >
                 {t('spur_alle_annehmen')}
               </LadeKnopf>
@@ -244,18 +243,20 @@ export default function LaufKarte({
                 <p>{t('spur_rote_mitannehmen_text')}</p>
               </OLModalBody>
               <OLModalFooter>
-                <OLButton
-                  variant="primary"
-                  autoFocus
-                  disabled={uebrige.length === 0}
-                  onClick={() => mitDialogAnnehmen({ change_ids: ids })}
-                >
-                  {t('spur_nur_die_anderen')}
-                </OLButton>
+                {/* Ist nur Rotes offen, gibt es keine „anderen“: Der Fokus liegt dann auf „Abbrechen“, nicht auf der Annahme. */}
+                {uebrige.length > 0 ? (
+                  <OLButton variant="primary" autoFocus onClick={() => mitDialogAnnehmen({ rote_mit: false })}>
+                    {t('spur_nur_die_anderen')}
+                  </OLButton>
+                ) : (
+                  <OLButton variant="primary" autoFocus onClick={() => setFragen(false)}>
+                    {t('cancel')}
+                  </OLButton>
+                )}
                 <LadeKnopf
                   variant="secondary"
                   isLoading={laeuft}
-                  onClick={() => mitDialogAnnehmen()}
+                  onClick={() => mitDialogAnnehmen({ rote_mit: true })}
                 >
                   {t('spur_alle_annehmen')}
                 </LadeKnopf>

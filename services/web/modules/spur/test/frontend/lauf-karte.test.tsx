@@ -123,10 +123,9 @@ describe('Lauf-Karte', function () {
         lauf={{
           ...lauf,
           status: 'offen',
-          rotAenderungen: ['rot'],
           automatisch: [{ pfad: 'main.tex', zeile: 2, art: 'einfuegung', text: 'Von 240 Befragten antworteten 90.' }],
         }}
-        aenderungen={[...aenderungen, { ...aenderungen[0], id: 'rot', text: '\\footfullcite{smith2024}' }]}
+        aenderungen={[...aenderungen, { ...aenderungen[0], id: 'rot', rot: true, text: '\\footfullcite{smith2024}' }]}
         neuLaden={async () => {}}
       />,
       { wrapper: mitRolle('owner') }
@@ -151,8 +150,8 @@ describe('Lauf-Karte', function () {
   })
 
   describe('mit rotem Zitat', function () {
-    const rotLauf: Lauf = { ...lauf, rotAenderungen: ['a2'] }
-    const beide = [...aenderungen, { ...aenderungen[0], id: 'a2', text: '\\parencite{unbekannt}' }]
+    const rotLauf: Lauf = lauf
+    const beide = [...aenderungen, { ...aenderungen[0], id: 'a2', rot: true, text: '\\parencite{unbekannt}' }]
     let anfragen: unknown[]
 
     beforeEach(function () {
@@ -180,14 +179,14 @@ describe('Lauf-Karte', function () {
       const nurAndere = within(dialog).getByRole('button', { name: 'Nur die anderen' })
       await waitFor(() => expect(document.activeElement).to.equal(nurAndere))
       fireEvent.click(nurAndere)
-      await waitFor(() => expect(anfragen).to.deep.equal([{ change_ids: ['a1'] }]))
+      await waitFor(() => expect(anfragen).to.deep.equal([{ rote_mit: false }]))
     })
 
     it('nimmt mit „Alle annehmen“ im Dialog auch das rote Zitat an', async function () {
       zeigenRot()
       fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Alle annehmen' }))
-      await waitFor(() => expect(anfragen).to.deep.equal([null]))
+      await waitFor(() => expect(anfragen).to.deep.equal([{ rote_mit: true }]))
     })
 
     it('schließt mit Esc, ohne etwas anzunehmen, und gibt den Fokus zurück', async function () {
@@ -200,6 +199,19 @@ describe('Lauf-Karte', function () {
       await waitFor(() => expect(screen.queryByRole('dialog')).to.equal(null))
       await waitFor(() => expect(document.activeElement).to.equal(alle))
       expect(anfragen).to.deep.equal([])
+    })
+
+    it('fragt bei nur roten Zitaten ohne „Nur die anderen“ und fokussiert „Abbrechen“; die Zeile nimmt das rote ausdrücklich an', async function () {
+      render(<LaufKarte lauf={rotLauf} aenderungen={[beide[1]]} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
+      fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).queryByRole('button', { name: 'Nur die anderen' })).to.equal(null)
+      const abbrechen = within(dialog).getByRole('button', { name: 'Abbrechen' })
+      await waitFor(() => expect(document.activeElement).to.equal(abbrechen))
+      fireEvent.click(abbrechen)
+      await waitFor(() => expect(screen.queryByRole('dialog')).to.equal(null))
+      fireEvent.click(screen.getByRole('button', { name: 'Annehmen' }))
+      await waitFor(() => expect(anfragen).to.deep.equal([{ change_ids: ['a2'], rote_mit: true }]))
     })
 
     it('lässt den Dialog nach einem Fehler offen', async function () {
@@ -225,7 +237,7 @@ describe('Lauf-Karte', function () {
     it('nimmt ohne rote Zitate ohne Dialog an', async function () {
       render(<LaufKarte lauf={lauf} aenderungen={aenderungen} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
       fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
-      await waitFor(() => expect(anfragen).to.deep.equal([{ change_ids: ['a1'] }]))
+      await waitFor(() => expect(anfragen).to.deep.equal([{ rote_mit: false }]))
       expect(screen.queryByRole('dialog')).to.equal(null)
     })
   })
