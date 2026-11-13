@@ -31,7 +31,7 @@
     "Die Spalte Speicher zeigt kleine Projekte in KB oder MB mit deutscher Zahl (z. B. „3,4 MB“), keines steht auf „0 GB“, wenn es Dateien hat; ein leeres Projekt zeigt „0 KB“",
     "„Speicher neu berechnen“ in Zeile 51 (zweite Seite) wirkt auf das richtige Projekt"
   ]},
-  {"id": "f6", "title": "Filterknöpfe im Prüfbericht sauber bei schmalem und breitem Panel", "ui": true, "passes": false, "steps": [
+  {"id": "f6", "title": "Filterknöpfe im Prüfbericht sauber bei schmalem und breitem Panel", "ui": true, "passes": true, "steps": [
     "Seitenleiste in Standardbreite (~210 px bei 1440 px Fenster), Projekt „E2E Bericht“: Die vier Filter stehen ohne einzelnes Umbrechen eines Knopfes, z. B. als 2×2-Raster gleich breiter Knöpfe oder in einer Zeile mit gekürzten Beschriftungen, und keine Zahl wird abgeschnitten (Screenshot)",
     "Seitenleiste breit gezogen (~400 px): Die vier Filter stehen in einer Zeile (Screenshot)",
     "Hell und dunkel: Der aktive Filter ist klar erkennbar, Kontrast mindestens 4,5:1",
