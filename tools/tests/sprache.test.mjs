@@ -28,6 +28,8 @@ export const FLAECHEN = {
   Projektliste: [`${JS}/features/project-list/components`],
   Kontomenü: [`${JS}/shared/components/navbar`],
   Dateibaum: [`${JS}/features/file-tree`],
+  'Teilen-Dialog': [`${JS}/features/share-project-modal`],
+  Verlauf: [`${JS}/features/history`],
 }
 
 function dateien(pfad) {
