@@ -102,17 +102,21 @@ export default function LaufKarte({
     try {
       await jsonAnfrage(methode, url, daten)
       await neuLaden()
+      return true
     } catch (error) {
       setFehler((error as Error).message)
+      return false
     } finally {
       setLaeuft(false)
     }
   }
 
   const mitDialogAnnehmen = async (daten?: unknown) => {
-    await aktion('POST', pfad('annehmen'), daten)
-    setFragen(false)
+    if (await aktion('POST', pfad('annehmen'), daten)) setFragen(false)
   }
+
+  // Ohne Rückfrage nur, was die Karte kennt: Ein rotes Zitat, das erst nach dem Laden dazukam, bleibt offen.
+  const keineRoten = () => aktion('POST', pfad('annehmen'), { change_ids: uebrige.map(a => a.id) })
 
   const knoepfe = (a: Aenderung) => (
     <div className="spur-panel-werkzeuge spur-ohne-rand">
@@ -212,7 +216,7 @@ export default function LaufKarte({
                 variant="primary"
                 size="sm"
                 isLoading={laeuft}
-                onClick={() => (zuPruefen.length > 0 ? setFragen(true) : aktion('POST', pfad('annehmen')))}
+                onClick={() => (zuPruefen.length > 0 ? setFragen(true) : keineRoten())}
               >
                 {t('spur_alle_annehmen')}
               </LadeKnopf>

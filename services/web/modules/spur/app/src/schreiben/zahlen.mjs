@@ -43,7 +43,7 @@ const VERSION = [/\b(?:Version|Vers\.|v|V)\s*\d+(?:\.\d+)*/g, /(?<![\d.,])\d+(?:
 // „9 Uhr“, „9.30 Uhr“; ohne „Uhr“ bleibt 9.30 eine Dezimalzahl.
 const UHR = /(?<![\d.,])\d{1,2}(?:[.:]\d{2})?\s*Uhr\b/g
 // Nur bekannte Namen: „Gruppe 2“ ist keine Version.
-const SOFTWARE = /\b(?:Python|R|SPSS|SAS|Stata|MATLAB|Matlab|Julia|Node|Java|Excel|Word|Windows|macOS|Ubuntu|Linux|TeX Live|LaTeX|NVivo|MAXQDA|JASP|jamovi|Zotero)\s+\d+(?:\.\d+)*/g
+const SOFTWARE = /\b(?:Python|SPSS|SAS|Stata|MATLAB|Matlab|Julia|Node|Java|Excel|Windows|macOS|Ubuntu|Linux|TeX Live|LaTeX|NVivo|MAXQDA|JASP|jamovi|Zotero)\s+\d+(?:\.\d+)*/g
 const ZAHL = /(?<![\p{L}\d\\\-.,])\d+(?:[.,]\d+)*(?![\p{L}\d])/gu
 
 const dezimalzeichen = text => text.replace(/\{,\}/g, ',')

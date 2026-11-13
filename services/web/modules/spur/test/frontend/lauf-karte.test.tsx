@@ -202,10 +202,20 @@ describe('Lauf-Karte', function () {
       expect(anfragen).to.deep.equal([])
     })
 
+    it('lässt den Dialog nach einem Fehler offen', async function () {
+      fetchMock.removeRoutes().post(/\/laeufe\/lauf-1\/annehmen$/, { status: 500, body: { fehler: 'kaputt' } })
+      zeigenRot()
+      fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Nur die anderen' }))
+      await waitFor(() => expect(fetchMock.callHistory.calls().length).to.be.greaterThan(0))
+      await new Promise(resolve => setTimeout(resolve, 100))
+      expect(screen.queryByRole('dialog')).to.exist
+    })
+
     it('nimmt ohne rote Zitate ohne Dialog an', async function () {
       render(<LaufKarte lauf={lauf} aenderungen={aenderungen} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
       fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
-      await waitFor(() => expect(anfragen).to.deep.equal([null]))
+      await waitFor(() => expect(anfragen).to.deep.equal([{ change_ids: ['a1'] }]))
       expect(screen.queryByRole('dialog')).to.equal(null)
     })
   })
