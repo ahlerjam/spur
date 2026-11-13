@@ -27,6 +27,7 @@ export const FLAECHEN = {
   'Editor-Einstellungen': [`${JS}/features/ide-settings`],
   Projektliste: [`${JS}/features/project-list/components`],
   Kontomenü: [`${JS}/shared/components/navbar`],
+  Dateibaum: [`${JS}/features/file-tree`],
 }
 
 function dateien(pfad) {
