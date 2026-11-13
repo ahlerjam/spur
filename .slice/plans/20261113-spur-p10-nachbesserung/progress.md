@@ -36,3 +36,5 @@ Ansichten, je am laufenden Build mit Playwright aufgenommen und angesehen (Scree
 | Lauf-Karte nach „Alle annehmen“ | keine leere Überschrift „Bitte prüfen“ | wie links |
 | Teilen-Dialog | „Linkfreigabe ist aus“, alles deutsch | 344 px breit im 360-px-Fenster |
 | Verlauf | „Ansicht vom 13. November“, 24-Stunden-Zeit, Tab „Marken“ | wie links, Breite 360 |
+
+Bilder der Endabnahme (18 Dateien, neun Ansichten je bei 1280 und 360 px, am Build 1c01ef005f aufgenommen, außerhalb des Worktrees wegen der Regel „keine Screenshots im Repo“): `~/.cache/slice/spur/evidence-p10/` mit `projektliste-`, `editor-`, `pruefbericht-`, `admin-grenzen-`, `log-bereich-`, `claude-dialog-`, `lauf-karte-`, `teilen-dialog-` und `verlauf-` jeweils `1280.png` und `360.png` (zusätzlich eine leere Probe `probe.png`).
