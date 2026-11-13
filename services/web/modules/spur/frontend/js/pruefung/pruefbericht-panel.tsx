@@ -97,7 +97,7 @@ function Zaehlung({ zeilen }: { zeilen: Zeile[] }) {
   const { t } = useTranslation()
   const teile = useMemo(() => {
     const zahl = Object.fromEntries(STELLEN_STATUS.map(s => [s, { markiert: 0, rest: 0 }])) as Record<StellenStatus, { markiert: number; rest: number }>
-    for (const z of zeilen) zahl[z.status][z.problem ? 'markiert' : 'rest']++
+    for (const z of zeilen) if (zahl[z.status]) zahl[z.status][z.problem ? 'markiert' : 'rest']++
     const text = (status: StellenStatus, anzahl: number) =>
       t(status === 'geprueft' ? 'spur_stellen_mit_befund' : `spur_stellen_${status}`, { anzahl, count: anzahl })
     const liste = (art: 'markiert' | 'rest', ohne?: StellenStatus) =>

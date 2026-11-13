@@ -34,7 +34,7 @@ export default function HistoryFileTreeItem({
           {name}
         </div>
         {operation && (
-          <OLTag className="history-file-tree-item-badge">{operationen[operation]}</OLTag>
+          <OLTag className="history-file-tree-item-badge">{operationen[operation] ?? operation}</OLTag>
         )}
       </div>
     </div>

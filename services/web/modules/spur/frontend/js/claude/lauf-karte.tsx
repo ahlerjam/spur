@@ -117,7 +117,8 @@ export default function LaufKarte({
   }
 
   // Ohne Rückfrage nur, was die Karte kennt: Ein rotes Zitat, das erst nach dem Laden dazukam, bleibt offen.
-  const keineRoten = () => aktion('POST', pfad('annehmen'), { change_ids: uebrige.map(a => a.id) })
+  const ids = uebrige.map(a => a.id).filter(Boolean)
+  const keineRoten = () => aktion('POST', pfad('annehmen'), { change_ids: ids })
 
   const knoepfe = (a: Aenderung) => (
     <div className="spur-panel-werkzeuge spur-ohne-rand">
@@ -247,7 +248,7 @@ export default function LaufKarte({
                   variant="primary"
                   autoFocus
                   disabled={uebrige.length === 0}
-                  onClick={() => mitDialogAnnehmen({ change_ids: uebrige.map(a => a.id) })}
+                  onClick={() => mitDialogAnnehmen({ change_ids: ids })}
                 >
                   {t('spur_nur_die_anderen')}
                 </OLButton>
