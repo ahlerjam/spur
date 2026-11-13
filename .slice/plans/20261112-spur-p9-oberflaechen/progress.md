@@ -93,3 +93,6 @@
 - Screenshots bei 360 und 1280 px (Quellen, Prüfbericht, Claude, Recherche, Vorschläge, große Ansicht, Import-Dialog,
   Projektliste, Grenzen, Workflows) liegen außerhalb des Repos. Auffällig, aber gelassen: Im Import-Dialog bei 360 px
   ist die Sammlungsauswahl neben dem Knopf schmal („Schlaf u…“); „Choose Files“ ist die Sprache des Browsers.
+  Im Claude-Panel steht der Automatik-Schalter allein in der Zeile, sein Label groß und fett darunter; Vorschlag:
+  Label in Textgröße neben den Schalter. Die Aufnahme der großen Ansicht bei 360 px stammt von vor dem Fix der
+  Blätterknöpfe; deren Größe prüft p5f6.
