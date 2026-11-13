@@ -3311,8 +3311,13 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const formular = page.locator('form.review-panel-entry-content')
     const hinweis = formular.getByText('Claude wird benachrichtigt', { exact: true })
     await feld.waitFor()
-    await feld.click()
+    // Overleaf setzt den neuen Kommentar erst an seine Stelle und fokussiert dann selbst das Feld (im Shadow-DOM);
+    // vorher Getipptes kann mit dem ersten Eintrag verschwinden. Wie ein Mensch: erst tippen, wenn der Cursor dort steht.
+    await page.waitForFunction(() =>
+      document.querySelector('.review-panel-add-comment-editor')?.shadowRoot?.activeElement?.classList.contains('cm-content')
+    )
     await page.keyboard.type('@claude bitte ansehen')
+    await feld.filter({ hasText: '@claude bitte ansehen' }).waitFor({ timeout: 5000 })
     await hinweis.waitFor({ timeout: 5000 })
     const hinweisKasten = formular.locator('.spur-claude-hinweis')
     ok(!(await unlesbar(hinweisKasten)).length, `Hinweis schlecht lesbar: ${await unlesbar(hinweisKasten)}`)

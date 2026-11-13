@@ -61,6 +61,9 @@
   Wechsel des Schalters vor dem nächsten Rendern (Ref statt Zustand); E2E-Warten ohne Meldung. Übersprungen: „Nichts
   offen“ ist fokussierbar, aber wirkungslos – gewollt, damit der Fokus nach dem Annehmen nicht auf der Seite landet.
   jsdom lässt den Fokus auf gesperrten Knöpfen; die Tests setzen ihn darum selbst auf die Seite wie Chrome.
+- E2E p6f3 (wackelte schon vor P9): Der Schritt tippte, bevor Overleaf den neuen Kommentar platziert und selbst
+  fokussiert hatte; der Text ging mit dem ersten Eintrag verloren. Er wartet jetzt auf diesen Fokus (Feld im
+  Shadow-DOM) und prüft, dass der Text im Feld steht.
 - Security: Der Fix ändert nur Fokus und ARIA im Browser, keine Route, keine Rechte, keine Eingaben an den Server;
   keine eigene Sicherheitsprüfung nötig.
 
