@@ -69,6 +69,7 @@
 - /code-review (medium, `74da65505c..HEAD`, nur E2E-Schritte): behoben: p6f3 wartet auf den Fokus ohne Annahme über den
   Shadow-Host, löst das Feld bei jeder Abfrage neu auf und meldet Fokus und Feldinhalt; p5f6 rundet nicht mehr, sondern
   misst erst nach dem Ende der Einblend-Animationen (abgebrochene Animationen zählen als fertig).
+- Letzter voller E2E-Lauf nach der letzten Änderung (`ed6acb4777`): alle Features grün, f1 bis p9f12.
 - Screenshots aller Ansichten bei 360 und 1280 px nach der letzten Änderung an der Oberfläche neu aufgenommen
   (Projektliste, Quellen, Prüfbericht, Claude, Recherche, Vorschläge, Import, große Ansicht, Grenzen, Workflows).
 - Screenshots nach dem Fokus-Fix: Claude-Panel mit „Nichts offen“ bei 360 und 1280 px; der Fokusring ist per Tastatur
