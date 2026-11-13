@@ -27,7 +27,7 @@ export default function KeybindingSetting() {
       id="mode"
       label={t('keybindings')}
       description={t('work_in_vim_or_emacs_emulation_mode')}
-      options={OPTIONS}
+      options={OPTIONS.map(o => (o.value === 'default' ? { ...o, label: t('none') } : o))}
       onChange={setMode}
       value={mode}
     />

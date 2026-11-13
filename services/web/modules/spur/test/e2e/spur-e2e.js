@@ -3668,7 +3668,13 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     for (const link of links.filter(l => !/^https?:/.test(l))) await repoDatei(`${REPO}/${link}`)
     const kaputt = []
     for (const link of links.filter(l => /^https:/.test(l))) {
-      const antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
+      // Ein Namensfehler oder Abbruch im Netz (ENOTFOUND, ECONNRESET) ist kurzzeitig möglich: dreimal versuchen, 5 s Abstand.
+      let antwort
+      for (let versuch = 0; versuch < 3; versuch++) {
+        antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
+        if (Number.isInteger(antwort.status())) break
+        await page.waitForTimeout(5000)
+      }
       if (!(Number(antwort.status()) < 400)) kaputt.push(`${link}: ${antwort.status()}`)
     }
     ok(kaputt.length === 0, `Links: ${kaputt.join(' | ')}`)
@@ -6399,6 +6405,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await modal().getByRole('button', { name: 'Alle annehmen', exact: true }).click()
     await modal().waitFor({ state: 'detached', timeout: 20000 })
     await karte.locator('.spur-lauf-aenderung', { hasText: 'parencite' }).waitFor({ state: 'detached', timeout: 15000 })
+    ok((await karte.locator('.spur-lauf-rot').count()) === 0 && (await karte.getByText('Bitte prüfen').count()) === 0, 'Leere Überschrift „Bitte prüfen“ nach der Annahme')
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Hand.' })
 
     // Ein Lauf ohne rote Zitate: ohne Dialog.
@@ -6480,6 +6487,15 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.locator('.cm-content').waitFor({ timeout: 60000 })
     await railTab(DATEIBAUM).click()
     ok((await page.title()) === 'E2E P8 DOI – spur', `Titel im Editor: „${await page.title()}“`)
+    const ENGLISCH = ['Resize', 'Close dialog', 'More actions', 'Project files history', 'Project history and labels', 'Toggle navigation']
+    const englischeAttribute = async () =>
+      await page.evaluate(woerter => [...document.querySelectorAll('[title],[aria-label]')].map(e => e.getAttribute('title') || e.getAttribute('aria-label')).filter(t => woerter.includes(t)), ENGLISCH)
+    ok((await page.locator('[title="Größe ändern"]').count()) >= 1, 'Resizer ohne deutschen Tooltip')
+    ok(JSON.stringify(await englischeAttribute()) === '[]', `Englische Attribute im Editor: ${await englischeAttribute()}`)
+    await page.getByRole('button', { name: 'Teilen' }).first().click()
+    await page.getByRole('button', { name: 'Dialog schließen' }).first().waitFor()
+    ok(JSON.stringify(await englischeAttribute()) === '[]', `Englische Attribute im Dialog: ${await englischeAttribute()}`)
+    await page.keyboard.press('Escape')
     const baum = page.getByRole('button', { name: 'Dateibaum ausblenden', exact: true })
     await baum.waitFor()
     ok((await baum.getAttribute('aria-label')) === 'Dateibaum ausblenden', 'aria-label des Knopfs')

@@ -161,11 +161,11 @@ export default function LaufKarte({
               </ul>
             </div>
           )}
-          {lauf.rot.length > 0 && zuPruefen.length === 0 && (
+          {laufOffen && zuPruefen.length === 0 && lauf.rot.some(r => r.auszug) && (
             <div className="spur-lauf-rot" role="status">
               <OLBadge bg="danger">{t('spur_bitte_pruefen')}</OLBadge>
               <ul className="spur-liste">
-                {lauf.rot.map((r, i) => (
+                {lauf.rot.filter(r => r.auszug).map((r, i) => (
                   <li key={i} className="spur-zeile-meta">
                     {t('spur_nicht_pruefbar')}: {r.auszug}
                   </li>

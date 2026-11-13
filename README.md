@@ -92,7 +92,7 @@ Under Admin → Grenzen (limits) you set a default for everyone: projects per us
 
 The same page has a "TeX-Pakete" part with three fields: size per package in MB (default 100), all packages of a project in MB (default 300) and installations per hour and person (default 60). An empty field restores the default; only whole numbers from 1 are accepted.
 
-Projects count when the user owns them, including archived ones and those in the trash. Storage counts uploaded files, sources and TeX packages, but not the history or the compile output. Anyone already above a limit keeps everything; only new projects and uploads are blocked, and writing in the editor keeps working. The page also lists projects per user and storage per project, marks those at 80 % or more, and can recalculate the storage of a project. Both tables have a search field (user name or address; project name or owner) and show 50 rows per page. Storage is shown in KB, MB or GB.
+Projects count when the user owns them, including archived ones and those in the trash. Storage counts uploaded files, sources and TeX packages, but not the history or the compile output. Anyone already above a limit keeps everything; only new projects and uploads are blocked, and writing in the editor keeps working. The page also lists projects per user and storage per project, marks those at 80 % or more, and can recalculate the storage of a project. Both tables have a search field (user name or address; project name or owner) and show 50 rows per page. Storage is shown in KB, MB or GB; like the limit it counts uploaded files, sources and TeX packages, not text documents such as `.tex` and `.bib`, so a project of text files only shows 0 KB.
 
 ### TeX packages
 

@@ -433,6 +433,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
     <section className="spur-admin-abschnitt" aria-labelledby="spur-grenzen-projekte">
       <h2 id="spur-grenzen-projekte">{t('spur_grenzen_projekte')}</h2>
       {fehler && <Notification type="error" content={fehler} />}
+      <p className="form-text">{t('spur_speicher_hinweis')}</p>
       <div className="spur-admin-suche">
         <OLFormLabel htmlFor="spur-projekt-suche">{t('spur_projekte_suchen')}</OLFormLabel>
         <OLFormControl

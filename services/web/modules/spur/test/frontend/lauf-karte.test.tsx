@@ -212,6 +212,16 @@ describe('Lauf-Karte', function () {
       expect(screen.queryByRole('dialog')).to.exist
     })
 
+    it('zeigt „Bitte prüfen“ ohne Inhalt nicht und nach der Annahme gar nicht', function () {
+      const leer: Lauf = { ...lauf, rot: [{ grund: 'x', auszug: '' }] }
+      const { unmount } = render(<LaufKarte lauf={leer} aenderungen={aenderungen} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
+      expect(screen.queryByText('Bitte prüfen')).to.equal(null)
+      unmount()
+      const angenommen: Lauf = { ...lauf, status: 'angenommen', rot: [{ grund: 'x', auszug: '\\parencite{unbekannt}' }] }
+      render(<LaufKarte lauf={angenommen} aenderungen={[]} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
+      expect(screen.queryByText('Bitte prüfen')).to.equal(null)
+    })
+
     it('nimmt ohne rote Zitate ohne Dialog an', async function () {
       render(<LaufKarte lauf={lauf} aenderungen={aenderungen} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
       fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
