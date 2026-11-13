@@ -5815,6 +5815,8 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.goto(`${BASE}/user/settings`)
     const zeilen = page.locator('.spur-token')
     await page.getByRole('button', { name: 'Token erzeugen' }).waitFor()
+    // Die Tokenliste lädt nach dem Knopf; erst zählen, wenn sie da ist (lokal liegen oft viele alte Tokens).
+    await page.waitForLoadState('networkidle')
     const vorher = await zeilen.count()
     await page.getByRole('button', { name: 'Token erzeugen' }).dblclick()
     await page.getByText('So verbindest du Claude Code').waitFor()
@@ -6523,11 +6525,21 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.keyboard.press('Escape')
 
     await projektOeffnen('E2E Kaputt')
-    await page.getByRole('button', { name: KOMPILIEREN }).first().click()
-    await page.getByText('Rohprotokoll', { exact: true }).first().waitFor({ state: 'attached', timeout: 120000 })
+    // Ein früherer Schritt kann „E2E Kaputt“ eben erst kompiliert haben; dann überspringt Overleaf den Lauf
+    // („gerade erst kompiliert“) und es gibt keinen Hinweis im Log. Bis zum echten Lauf neu anstoßen.
+    const hinweis = page.getByText('Der Compiler versteht einen deiner Befehle nicht', { exact: false }).first()
+    const uebersprungen = page.getByText('gerade erst kompiliert', { exact: false }).first()
+    for (let versuch = 1; ; versuch++) {
+      await page.getByRole('button', { name: KOMPILIEREN }).first().click()
+      await hinweis.or(uebersprungen).waitFor({ state: 'attached', timeout: 120000 })
+      if (await hinweis.count()) break
+      ok(versuch < 5, 'Kompilieren wurde fünfmal übersprungen')
+      await page.waitForTimeout(10000)
+    }
+    await page.getByText('Rohprotokoll', { exact: true }).first().waitFor({ state: 'attached', timeout: 30000 })
     ok((await page.getByText(/^Raw logs?$/i).count()) === 0, 'Englisches „Raw Logs“ im Log-Bereich')
     // Die Hinweise zum Fehler stehen auf Deutsch (Schlüssel log_hint_*), nicht im Quelltext.
-    await page.getByText('Der Compiler versteht einen deiner Befehle nicht', { exact: false }).first().waitFor({ state: 'attached', timeout: 30000 })
+    await hinweis.waitFor({ state: 'attached', timeout: 30000 })
     ok((await page.getByText('The compiler is having trouble').count()) === 0, 'Englischer Hinweis im Log-Bereich')
     ok((await page.getByText(/^Learn more$/).count()) === 0, '„Learn more“ im Log-Bereich')
 
