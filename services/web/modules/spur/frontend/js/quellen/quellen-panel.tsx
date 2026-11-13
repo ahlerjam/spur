@@ -25,7 +25,7 @@ import QuelleVorschau from './quelle-vorschau'
 import QuellenSuche from './quellen-suche'
 import Semantik from './semantik'
 import Zugewiesen from './zugewiesen'
-import { anzeigename, datumLang, OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
+import { datumLang, OCR_SICHER_AB, type Quelle, type Treffer } from './typen'
 import WebAufnehmen from './web-aufnehmen'
 
 const MAX_BYTES = 50 * 1024 * 1024

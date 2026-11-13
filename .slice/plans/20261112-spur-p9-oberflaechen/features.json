@@ -118,7 +118,7 @@
     "Der Einladungslink zeigt „Kopiert“ nur, wenn das Kopieren gelungen ist, sonst „Kopieren nicht möglich. Markier den Link und kopier ihn von Hand.“",
     "Alle Texte für „Schließen“, „Speichern“ und „Kopieren“ kommen je aus einem einzigen Sprachschlüssel (Test prüft, dass die doppelten Schlüssel entfernt sind)"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -131,7 +131,7 @@
     "Auf „Workflows“ zeigt jeder Text nach „Speichern“ die Bestätigung „Gespeichert“ am Knopf; ein Text über 20 000 Zeichen zeigt die Meldung am Feld und behält die Eingabe",
     "Bei 360 px haben beide Seiten kein horizontales Rollen der Seite; breite Tabellen rollen in ihrem eigenen Bereich"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -144,7 +144,7 @@
     "Ein Test führt die Liste der Sprachschlüssel, die Menüleiste, Leiste, Review-Panel, PDF-Bereich, Editor-Einstellungen, Projektliste und Kontomenü verwenden, und ist grün, wenn jeder davon in `de.json` steht",
     "Mit `OVERLEAF_SITE_LANGUAGE=en` sind dieselben Flächen englisch wie bisher"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

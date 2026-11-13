@@ -127,7 +127,8 @@ function Seitenbereich({
 
   const seitenBreite = Math.max(1, Math.round((bereich * zoom) / 100))
   // So viele Pixel wie Gerätepixel, damit die Schrift beim Zoomen scharf bleibt.
-  const pixel = Math.ceil(seitenBreite * (window.devicePixelRatio || 1))
+  // In Schritten von 200 px wie der Server: Kleine Breitenänderungen behalten dieselbe Adresse und den Cache.
+  const pixel = Math.min(4800, Math.ceil((seitenBreite * (window.devicePixelRatio || 1)) / 200) * 200)
   const src = projektPfad(`/quellen/${quelle.id}/seiten/${nummer}/bild?breite=${pixel}${versuch ? `&versuch=${versuch}` : ''}`)
 
   // Das alte Bild bleibt stehen, bis das neue geladen ist; so springt beim Blättern und Zoomen nichts.

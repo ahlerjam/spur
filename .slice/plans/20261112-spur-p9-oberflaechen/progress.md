@@ -47,3 +47,23 @@
 ## Needs decision
 
 ## Vorschläge (außerhalb dieses Plans)
+
+## Hinweise zur Prüfung
+- f11: Die Projektliste bekommt ihre Projekte mit der Seite (vorab geladen) und zeigt den Ladebildschirm darum nicht
+  so lange, dass ihn die E2E halten könnte. Sie nutzt denselben Baustein (`loading-branded.tsx`) wie Editor und
+  Freigabelink; die E2E misst Editor (hell, dunkel, 360 px) und Freigabelink. Die erste, vom Server gerenderte Fassung
+  (`ide-react.pug`, `new_from_template.pug`) hat dieselbe Struktur.
+- f10 Schritt 5 (`OVERLEAF_SITE_LANGUAGE=en`): Die englischen Texte bleiben unverändert in `en.json`; neu ist nur
+  `last_updated_date_by_you` („__lastUpdatedDate__ by you“). Ein Neustart mit englischer Sprache liegt außerhalb der
+  E2E-Suite, die eine deutsche Instanz voraussetzt.
+
+## Abschluss
+- /simplify: übernommen: ungenutzter Import, Seitenbild-Breite schon im Browser auf 200-px-Stufen (stabile Adresse,
+  Cache). Übersprungen (Vorschläge): gemeinsamer Platzhalter- und Menüknopf-Baustein für Quellen, Recherche und
+  Vorschläge; Zählung der offenen Änderungen aus den schon geladenen Läufen ableiten (zählt aber auch Läufe jenseits
+  der 20 gezeigten); doppelte `getDocument`-Aufrufe in `allesAnnehmen`/`zuruecknehmen`; Farbe von Formular-Labels im
+  dunklen Modal in Overleafs `modal.scss` statt in `spur.scss` (Kern-Patch); Moment-Locale zentral beim Start setzen.
+- Security (Subagent, ohne `/security-review`-Remote): behoben: rote Einschübe, die jemand durch Tippen in Stücke teilt
+  (neue IDs), blieben für „Alles Offene jetzt annehmen“ nicht rot; jetzt zählt auch die Zeit (`rotZeiten`).
+  Offen (niedrig): Seitenbilder in vielen Breiten rendern ohne Drossel; gleichzeitige Renderings ohne atomares Umbenennen
+  (bestehendes Muster).

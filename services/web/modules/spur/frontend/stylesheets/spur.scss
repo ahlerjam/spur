@@ -389,7 +389,10 @@ $spur-sm: 575.98px;
     overflow-y: auto;
   }
 
+  // Einspaltig wächst der Seitenbereich mit der Seite; die Seitenleiste folgt darunter.
   .spur-gross-hauptteil {
+    display: block;
+    min-height: auto;
     overflow: visible;
   }
 

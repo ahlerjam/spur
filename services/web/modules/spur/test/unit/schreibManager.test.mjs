@@ -505,7 +505,7 @@ describe('Sofort annehmen nach dem Schreiben', () => {
       neuerChange('rot')
       const ergebnis = await bearbeiten({ menschId: mensch, neu: '\\footfullcite{smith2024}', schluessel: `rot-${Object.keys(rot)[0]}` })
       expect(ergebnis.rot).toHaveLength(1)
-      expect(laufManager.rotMerken).toHaveBeenCalledWith(lauf, ['rot'])
+      expect(laufManager.rotMerken).toHaveBeenCalledWith(lauf, [expect.objectContaining({ id: 'rot' })])
       expect(laufAktionen.sofortAnnehmen).not.toHaveBeenCalled()
     }
   })

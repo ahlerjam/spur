@@ -60,10 +60,19 @@ export async function aenderungMerken(lauf, { docId, rot, zahlen = [] }) {
   )
 }
 
-// Changes mit rotem Zitat: Weder der Schalter noch „Alles Offene jetzt annehmen“ nimmt sie an.
-export async function rotMerken(lauf, ids) {
-  if (!ids.length) return
-  await (await laeufe()).updateOne({ _id: lauf._id }, { $addToSet: { rotAenderungen: { $each: ids } } })
+// Changes mit rotem Zitat: Weder der Schalter noch „Alles Offene jetzt annehmen“ nimmt sie an. Die Zeit bleibt
+// auch erhalten, wenn jemand in den Einschub tippt und ihn in Stücke mit neuen IDs teilt.
+export async function rotMerken(lauf, changes) {
+  if (!changes.length) return
+  await (await laeufe()).updateOne(
+    { _id: lauf._id },
+    {
+      $addToSet: {
+        rotAenderungen: { $each: changes.map(c => c.id) },
+        rotZeiten: { $each: changes.map(c => c.metadata?.ts).filter(Boolean).map(String) },
+      },
+    }
+  )
 }
 
 // Was ein Lauf außerhalb der Dokumente anlegt (Dateien, Ordner, Quellen); „Lauf rückgängig“ entfernt es.

@@ -9,9 +9,9 @@ block content
 	.editor.full-size
 		.loading-screen()
 			.loading-screen-brand-container
-				.loading-screen-brand(
-					style="height: 20%;"
-				)
+				.loading-screen-brand(aria-hidden='true')
+					span.loading-screen-brand-grund spur
+					span.loading-screen-brand-fuellung(style='clip-path: inset(80% 0 0 0)') spur
 
 			h3.loading-screen-label() #{translate("Opening template")}
 				span.loading-screen-ellip .

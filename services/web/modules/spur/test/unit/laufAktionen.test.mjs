@@ -541,6 +541,13 @@ describe('Alles Offene jetzt annehmen', () => {
     expect((await gespeichert(offen)).status).toBe('offen')
   })
 
+  it('lässt auch Stücke eines geteilten roten Einschubs offen (gleiche Zeit, neue ID)', async () => {
+    await zweiLaeufe()
+    await datenbank.db.collection('spurRuns').updateMany({ status: 'offen' }, { $set: { rotZeiten: ['2026-11-07T11:20:00.000Z'] } })
+    docSetzen('a b c rot', [change('b', { p: 2, i: 'b' }, SPAETER), change('r-stueck', { p: 6, i: 'ro' }, '2026-11-07T11:20:00.000Z')])
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 1, dateien: 1 })
+  })
+
   it('verlangt Schreibrecht', async () => {
     await zweiLaeufe()
     recht.vergeben(anna, projekt, { stufe: 'review' })

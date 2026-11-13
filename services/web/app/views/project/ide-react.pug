@@ -16,7 +16,10 @@ block content
 	main#ide-root
 		div(class=['loading-screen', `loading-screen-init-${initialLoadingScreenTheme}`])
 			.loading-screen-brand-container
-				.loading-screen-brand(style='height: 20%')
+				//- spur: dieselbe Schriftzug-Struktur wie loading-branded.tsx
+				.loading-screen-brand(aria-hidden='true')
+					span.loading-screen-brand-grund spur
+					span.loading-screen-brand-fuellung(style='clip-path: inset(80% 0 0 0)') spur
 			h3.loading-screen-label #{translate("loading")}
 				span.loading-screen-ellip .
 				span.loading-screen-ellip .

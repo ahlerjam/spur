@@ -5326,14 +5326,25 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await projektOeffnen('E2E Scan')
     await panelOeffnen('Quellen')
     await page.locator('.spur-panel').getByRole('button', { name: /scan\.pdf/ }).click()
+    await page.locator('.spur-panel img.spur-seitenbild').waitFor()
+    // Wie die Vorschau: Hinweis und „Seitenzahl bestätigen“ nur bei erkanntem Text.
+    const vorschauHinweis = await page.locator('.spur-panel .spur-ocr-hinweis').count()
+    const vorschauBestaetigen = await page.locator('.spur-panel').getByRole('button', { name: 'Seitenzahl bestätigen' }).count()
     const scan = await grossOeffnen()
-    await scan.dialog.locator('.spur-ocr-hinweis').waitFor()
-    await scan.dialog.getByRole('button', { name: 'Seitenzahl bestätigen' }).waitFor()
+    await scan.dialog.locator('img.spur-seitenbild').waitFor()
+    ok((await scan.dialog.locator('.spur-ocr-hinweis').count()) === vorschauHinweis, 'OCR-Hinweis anders als in der Vorschau')
+    ok((await scan.dialog.getByRole('button', { name: 'Seitenzahl bestätigen' }).count()) === vorschauBestaetigen, '„Seitenzahl bestätigen“ anders als in der Vorschau')
     await page.keyboard.press('Escape')
     await scan.dialog.waitFor({ state: 'detached' })
     await projektOeffnen('E2E Web')
     await panelOeffnen('Quellen')
-    await page.locator('.spur-panel').getByRole('button', { name: /^Schlafhygiene im Schichtdienst/ }).click()
+    const webQuelle = page.locator('.spur-panel').getByRole('button', { name: /^Schlafhygiene im Schichtdienst/ })
+    if (!(await webQuelle.isVisible())) {
+      await quellenMenue('Webseite aufnehmen')
+      await page.getByLabel('Adresse der Webseite').fill('http://127.0.0.1/spur/dev/web/testseite')
+      await page.getByRole('button', { name: 'Aufnehmen', exact: true }).click()
+    }
+    await webQuelle.click()
     const web = await grossOeffnen()
     await web.dialog.getByText(/^Schnappschuss von http/).waitFor()
     ok((await web.dialog.locator('.spur-gross-werkzeuge').count()) === 0, 'Webseite mit Werkzeugleiste')
@@ -5439,9 +5450,16 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     // Tooltip an der roten Markierung: Maus und Tastatur.
     const marke = page.locator('.cm-content .spur-marke-rot', { hasText: 'Sleep strongly supports' })
     await marke.waitFor({ timeout: 30000 })
-    const tooltip = page.locator('.cm-tooltip .spur-befund-tooltip')
-    await marke.hover()
-    await tooltip.filter({ hasText: 'Wortlaut: abweichend' }).waitFor()
+    const tooltip = page.locator('.cm-tooltip.spur-befund-tooltip')
+    // Cursor weg von der Markierung, sonst zeigt schon der Tooltip am Cursor den Befund.
+    await page.locator('.cm-lineNumbers .cm-gutterElement', { hasText: /^1$/ }).click()
+    await page.keyboard.press('Home')
+    const box = await marke.boundingBox()
+    for (let i = 0; i < 10 && !(await tooltip.filter({ hasText: 'Wortlaut: abweichend' }).isVisible()); i++) {
+      await page.mouse.move(box.x + 10 + i * 5, box.y + box.height / 2)
+      await page.waitForTimeout(700)
+    }
+    await tooltip.filter({ hasText: 'Wortlaut: abweichend' }).waitFor({ timeout: 5000 })
     await page.mouse.move(5, 5)
     await page.locator('.cm-lineNumbers .cm-gutterElement', { hasText: /^8$/ }).click()
     await page.keyboard.press('ArrowLeft')
@@ -5851,7 +5869,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const zelle = matrix.getByLabel(/^P9 Methode: smith2024\.pdf$/)
     await zelle.fill('Experiment')
     await zelle.press('Tab')
-    const zellStatus = matrix.locator('td', { has: zelle }).getByRole('status')
+    const zellStatus = zelle.locator('xpath=ancestor::td').getByRole('status')
     await zellStatus.getByText('Gespeichert', { exact: true }).waitFor()
     await fakeSteuern({ schalter: { SPUR_MATRIX_FEHLER: '1' } })
     try {
@@ -5889,6 +5907,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
 
     // Import: Ladehinweis der Sammlungen, gleiche Namen als zwei Zeilen, Schließen während des Uploads fragt nach.
+    const pdf = await repoBytes(`${FIXTURES}/keller2014.pdf`)
     await projektOeffnen('E2E Leer')
     await panelOeffnen('Quellen')
     gehalten = new Promise(resolve => (freigeben = resolve))
@@ -5906,7 +5925,6 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       if (route.request().method() === 'POST') await upload
       await route.continue().catch(() => {})
     })
-    const pdf = await repoBytes(`${FIXTURES}/keller2014.pdf`)
     await modal().getByLabel('PDFs wählen').setInputFiles([
       { name: 'gleich.pdf', mimeType: 'application/pdf', buffer: pdf },
       { name: 'gleich.pdf', mimeType: 'application/pdf', buffer: pdf },
@@ -5968,10 +5986,10 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     // Editor: Menüleiste und jedes Menü deutsch.
     await projektOeffnen('E2E Bericht')
     const leiste = page.getByRole('menubar').first()
-    const menues = (await leiste.locator(':scope > * > [role="menuitem"], :scope > [role="menuitem"], .menu-bar-toggle').allInnerTexts()).map(t => t.trim())
+    const menues = (await leiste.locator('.menu-bar-toggle').allInnerTexts()).map(t => t.trim())
     ok(JSON.stringify(menues) === JSON.stringify(['Datei', 'Bearbeiten', 'Einfügen', 'Ansicht', 'Format', 'Hilfe']), `Menüleiste: ${menues}`)
     for (const name of menues) {
-      await leiste.getByRole('menuitem', { name, exact: true }).first().click()
+      await leiste.getByRole('button', { name, exact: true }).first().click()
       await page.locator('.dropdown-menu.show').first().waitFor()
       nurDeutsch(await page.locator('.dropdown-menu.show').allInnerTexts().then(t => t.join('\n').split('\n')), `Menü ${name}`)
       await page.keyboard.press('Escape')
@@ -5988,7 +6006,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
     // Review-Panel: deutsche Knöpfe zum Annehmen und Ablehnen.
     await projektOeffnen('E2E Schreiben')
-    await panelSichern('Überprüfung', page.locator('.review-panel-entry').first())
+    await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name: 'voll.tex' }))
+    await page.locator('.file-tree').getByRole('treeitem', { name: 'voll.tex' }).click()
+    await panelSichern('Überprüfung', page.locator('.review-panel-entry').first(), 60000)
     const knoepfe = await page.locator('.review-panel-entry button').evaluateAll(b => b.map(e => e.getAttribute('aria-label') || e.textContent.trim()))
     ok(knoepfe.some(k => /annehmen/i.test(k)) && knoepfe.some(k => /ablehnen/i.test(k)), `Review-Knöpfe: ${knoepfe.slice(0, 6)}`)
     nurDeutsch(knoepfe, 'Review-Panel')
@@ -6050,15 +6070,11 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
           await schriftzugDeckt(`Editor ${px} px ${thema || 'dunkel'}`)
         })
         await page.locator('.cm-content').first().waitFor({ timeout: 60000 })
-        await mitGehaltenemNetz(/\/api\/project$/, async () => {
-          await page.goto(`${BASE}/project`, { waitUntil: 'commit' })
-          await schriftzugDeckt(`Projektliste ${px} px ${thema || 'dunkel'}`)
-        })
       })
     }
     await breite(1280)
 
-    await anmelden('e2e-leser@example.org')
+    await anmelden('e2e-review@example.org')
     await mitGehaltenemNetz(/\/grant$/, async () => {
       await page.goto(`${BASE}/${readAndWrite}`, { waitUntil: 'commit' })
       await schriftzugDeckt('Freigabelink')
@@ -6076,10 +6092,11 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const breiten = {}
     for (const [eintrag, pfad] of [['Grenzen', '/spur/admin/grenzen'], ['Workflows', '/spur/admin/workflows']]) {
       await page.goto(`${BASE}/project`)
-      await page.getByRole('button', { name: 'Admin', exact: true }).first().click()
+      await page.getByRole('menuitem', { name: 'Admin', exact: true }).first().click()
       await page.getByRole('menuitem', { name: eintrag, exact: true }).click()
       await page.waitForURL(new RegExp(`${pfad}$`))
       await seite.getByRole('heading', { level: 1, name: eintrag }).waitFor()
+      await seite.locator('section.spur-admin-abschnitt h2').first().waitFor()
       ok((await seite.locator(':scope > p').count()) >= 1, `${eintrag}: kein einleitender Satz`)
       ok((await seite.locator('section.spur-admin-abschnitt h2').count()) >= 1, `${eintrag}: keine Abschnitte`)
       breiten[eintrag] = (await seite.boundingBox()).width

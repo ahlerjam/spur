@@ -307,7 +307,9 @@ async function offeneLaeufe(projectId, botId) {
 // Offene Changes je Lauf ohne rote Zitate (die bleiben, bis ein Mensch sie einzeln prüft).
 async function offeneOhneRot(projectId, lauf) {
   const rot = new Set(lauf.rotAenderungen ?? [])
-  return (await aenderungen(projectId, lauf)).map(d => ({ ...d, changes: d.changes.filter(c => !rot.has(c.id)) }))
+  const rotZeiten = new Set(lauf.rotZeiten ?? [])
+  const istRot = c => rot.has(c.id) || rotZeiten.has(String(c.metadata?.ts))
+  return (await aenderungen(projectId, lauf)).map(d => ({ ...d, changes: d.changes.filter(c => !istRot(c)) }))
 }
 
 export async function offenZaehlen(projectId, botId) {
