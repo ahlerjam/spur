@@ -87,3 +87,9 @@
 - Ältere Schritte an P9 angepasst: Export der Beschaffung im Menü, neue Quellenliste, Startbefehl aufklappen, Backlog
   41 Einträge, README „Grenzen“; Chatverlauf rollt in eigenem Bereich unter den Läufen (neueste Nachricht unten
   sichtbar). Label und Hinweis unter dem gesperrten Eingabefeld bleiben lesbar (Overleaf graut sie sonst aus).
+- Letzter voller E2E-Lauf (2026-11-13, nach der letzten Änderung): alle Features grün, auch `p6f3`. Davor behoben:
+  Blätterknöpfe der großen Ansicht schrumpften bei 360 px unter 24 px (p5f6); `seitenAnfrage` las das CSRF-Token,
+  während die Seite nach dem Anmelden noch weiterleitete (p7f9, nur im vollen Lauf).
+- Screenshots bei 360 und 1280 px (Quellen, Prüfbericht, Claude, Recherche, Vorschläge, große Ansicht, Import-Dialog,
+  Projektliste, Grenzen, Workflows) liegen außerhalb des Repos. Auffällig, aber gelassen: Im Import-Dialog bei 360 px
+  ist die Sammlungsauswahl neben dem Knopf schmal („Schlaf u…“); „Choose Files“ ist die Sprache des Browsers.
