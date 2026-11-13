@@ -25,7 +25,7 @@
     "Die Seitenleiste nennt den Knopf zum Einklappen des Dateibaums „Dateibaum ausblenden“ (aria-label und Tooltip)",
     "Der Builder sucht mit Playwright in Editor (Menüs, Seitenleiste, Log-Bereich, PDF-Werkzeugleiste, Einstellungen) und Projektliste weitere englische sichtbare Texte und aria-labels; jeder Fund ist übersetzt oder in `progress.md` begründet; `tools/tests/sprache.test.mjs` prüft die neuen Schlüssel"
   ]},
-  {"id": "f5", "title": "Admin-Projekttabelle mit Suche, Blättern und lesbarem Speicher", "ui": true, "passes": false, "steps": [
+  {"id": "f5", "title": "Admin-Projekttabelle mit Suche, Blättern und lesbarem Speicher", "ui": true, "passes": true, "steps": [
     "Admin öffnet „Grenzen“: Über der Projekttabelle steht ein Suchfeld „Nach Projekt oder Eigentümer suchen“; die Tabelle zeigt höchstens 50 Zeilen und darunter eine Blätterleiste wie die Nutzertabelle",
     "Eingabe „P8 Pakete“ zeigt nur Projekte mit diesem Namensteil; Eingabe „e2e-pakete@“ nur Projekte dieses Eigentümers; eine Eingabe ohne Treffer zeigt „Keine Projekte gefunden“",
     "Die Spalte Speicher zeigt kleine Projekte in KB oder MB mit deutscher Zahl (z. B. „3,4 MB“), keines steht auf „0 GB“, wenn es Dateien hat; ein leeres Projekt zeigt „0 KB“",
