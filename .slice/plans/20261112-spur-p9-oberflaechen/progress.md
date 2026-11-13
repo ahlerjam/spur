@@ -66,7 +66,11 @@
   Shadow-DOM) und prüft, dass der Text im Feld steht.
 - E2E p5f6: Die Blätterknöpfe sind genau 24 × 24 px; der Schritt vergleicht jetzt ganze Pixel (Bruchteile beim
   Öffnen des Dialogs) und nennt bei einem Fehler die Maße.
-- Letzter voller E2E-Lauf nach der letzten Änderung (`6507441bad`): alle Features grün, f1 bis p9f12.
+- /code-review (medium, `74da65505c..HEAD`, nur E2E-Schritte): behoben: p6f3 wartet auf den Fokus ohne Annahme über den
+  Shadow-Host, löst das Feld bei jeder Abfrage neu auf und meldet Fokus und Feldinhalt; p5f6 rundet nicht mehr, sondern
+  misst erst nach dem Ende der Einblend-Animationen (abgebrochene Animationen zählen als fertig).
+- Screenshots aller Ansichten bei 360 und 1280 px nach der letzten Änderung an der Oberfläche neu aufgenommen
+  (Projektliste, Quellen, Prüfbericht, Claude, Recherche, Vorschläge, Import, große Ansicht, Grenzen, Workflows).
 - Screenshots nach dem Fokus-Fix: Claude-Panel mit „Nichts offen“ bei 360 und 1280 px; der Fokusring ist per Tastatur
   sichtbar (2 px blau), auch auf dem gesperrt aussehenden Knopf.
 - Security: Der Fix ändert nur Fokus und ARIA im Browser, keine Route, keine Rechte, keine Eingaben an den Server;

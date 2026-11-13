@@ -3015,8 +3015,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const klein = await grossOeffnen()
     const box = await klein.dialog.locator('.modal-content').boundingBox()
     ok(box.width >= 355 && box.x <= 1, `Große Ansicht bei 360 px: ${JSON.stringify(box)}`)
+    // Erst messen, wenn der Dialog fertig eingeblendet ist; währenddessen liegen die Maße kurz unter dem Endwert.
+    await klein.dialog.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished.catch(() => {}))))
     const zuKlein = await klein.dialog.getByRole('button').evaluateAll(knoepfe =>
-      knoepfe.filter(k => k.offsetParent).map(k => [k.textContent.trim() || k.getAttribute('aria-label'), k.getBoundingClientRect()]).filter(([, r]) => Math.round(r.width) < 24 || Math.round(r.height) < 24).map(([n, r]) => `${n} ${r.width}×${r.height}`)
+      knoepfe.filter(k => k.offsetParent).map(k => [k.textContent.trim() || k.getAttribute('aria-label'), k.getBoundingClientRect()]).filter(([, r]) => r.width < 24 || r.height < 24).map(([n, r]) => `${n} ${r.width}×${r.height}`)
     )
     ok(zuKlein.length === 0, `Knöpfe unter 24 px: ${zuKlein}`)
     await ohneSeitlichesRollen('Große Ansicht 360 px')
@@ -3313,11 +3315,17 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await feld.waitFor()
     // Overleaf setzt den neuen Kommentar erst an seine Stelle und fokussiert dann selbst das Feld (im Shadow-DOM);
     // vorher Getipptes kann mit dem ersten Eintrag verschwinden. Wie ein Mensch: erst tippen, wenn der Cursor dort steht.
-    await page.waitForFunction(() =>
-      document.querySelector('.review-panel-add-comment-editor')?.shadowRoot?.activeElement?.classList.contains('cm-content')
-    )
+    // Der Locator wird bei jeder Abfrage neu aufgelöst: Overleaf ersetzt das Feld beim ersten Platzieren.
+    const feldHatFokus = () => feld.evaluate(el => el.getRootNode().activeElement === el).catch(() => false)
+    let fokussiert = false
+    for (let i = 0; i < 50 && !fokussiert; i++) {
+      fokussiert = await feldHatFokus()
+      if (!fokussiert) await page.waitForTimeout(200)
+    }
+    ok(fokussiert, 'Overleaf hat das Kommentarfeld nicht fokussiert')
     await page.keyboard.type('@claude bitte ansehen')
-    await feld.filter({ hasText: '@claude bitte ansehen' }).waitFor({ timeout: 5000 })
+    const angekommen = await feld.filter({ hasText: '@claude bitte ansehen' }).waitFor({ timeout: 5000 }).then(() => true, () => false)
+    ok(angekommen, `Getipptes nicht im Kommentarfeld: „${await feld.textContent()}“, Fokus im Feld: ${await feldHatFokus()}`)
     await hinweis.waitFor({ timeout: 5000 })
     const hinweisKasten = formular.locator('.spur-claude-hinweis')
     ok(!(await unlesbar(hinweisKasten)).length, `Hinweis schlecht lesbar: ${await unlesbar(hinweisKasten)}`)
