@@ -19,7 +19,7 @@
     "Erneut „Alle annehmen“ und im Dialog „Alle annehmen“: auch das rote Zitat ist angenommen; Esc im Dialog schließt ohne etwas anzunehmen und der Fokus liegt wieder auf „Alle annehmen“",
     "Ein Lauf ohne rote Zitate: „Alle annehmen“ nimmt ohne Dialog alles an"
   ]},
-  {"id": "f4", "title": "Keine englischen Reste in Editor, Log-Bereich und Projektliste", "ui": true, "passes": false, "steps": [
+  {"id": "f4", "title": "Keine englischen Reste in Editor, Log-Bereich und Projektliste", "ui": true, "passes": true, "steps": [
     "Der Tab-Titel im Editor lautet „E2E P8 DOI – spur“ (Muster „<Projektname> – spur“); der Titel der Projektliste folgt demselben Muster",
     "Nach einem Kompilierfehler zeigt der Log-Bereich „Rohprotokoll“ statt „Raw Logs“ und die Beschreibung auf Deutsch",
     "Die Seitenleiste nennt den Knopf zum Einklappen des Dateibaums „Dateibaum ausblenden“ (aria-label und Tooltip)",
