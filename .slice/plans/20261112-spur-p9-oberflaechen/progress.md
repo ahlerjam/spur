@@ -67,3 +67,15 @@
   (neue IDs), blieben für „Alles Offene jetzt annehmen“ nicht rot; jetzt zählt auch die Zeit (`rotZeiten`).
   Offen (niedrig): Seitenbilder in vielen Breiten rendern ohne Drossel; gleichzeitige Renderings ohne atomares Umbenennen
   (bestehendes Muster).
+- /code-review (medium, Basis bis HEAD): behoben: Momentjs-Locale wurde global deutsch (`formatDate` jetzt mit Sprache
+  der Oberfläche, globale Locale zurück auf Englisch); doppelte Leerzeile. Die übrigen Befunde betreffen Code aus P8
+  (Proxy-Erkennung bei 404 im PDF-Betrachter, Zahlenfilter für Uhrzeit und Version, Rückrollen von `latexmkrc`, Drossel
+  nicht atomar, zweiter TeX-Live-Spiegel bei 404, Cache „nicht registriert“, Makronamen mit `@`) und stehen als
+  Vorschläge unten.
+
+## Vorschläge (aus dem Review, außerhalb dieses Plans)
+- PDF-Betrachter: Proxy-Sperre nur bei 2xx-HTML melden, nicht bei 404/500.
+- Zahlen ohne Beleg: Verhältnisse wie „1:20“ und Einheiten wie „V 230“ nicht als Uhrzeit/Version ausfiltern.
+- TeX-Pakete: `latexmkrc` beim Rückrollen zurücksetzen; Drossel atomar zählen; bei 404 den zweiten Spiegel versuchen.
+- Crossref: „nicht registriert“ kürzer cachen; DataCite-404 nicht als „nicht erreichbar“ melden.
+- Prüfung: eigene Zitatmakros mit `@` im Namen erkennen.

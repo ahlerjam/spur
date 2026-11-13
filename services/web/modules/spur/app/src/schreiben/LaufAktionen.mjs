@@ -154,7 +154,6 @@ export async function annehmen(projectId, lauf, userId, nurIds, { automatisch = 
   return { angenommen: angenommen.length, rest }
 }
 
-
 export async function ablehnen(projectId, lauf, userId, nurIds) {
   mussOffenSein(lauf)
   const liste = await aenderungen(projectId, lauf)
