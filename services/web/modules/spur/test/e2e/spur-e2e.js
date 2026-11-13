@@ -3900,6 +3900,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
   const PROJEKTE_VOLL = 'Du hast 3 von 3 Projekten. Lösche ein Projekt endgültig oder frag deinen Admin.'
 
   async function seitenAnfrage(methode, pfad, body) {
+    // Nach dem Anmelden leitet die Seite noch weiter; das Token steht erst danach sicher im Kopf.
+    await page.waitForLoadState('load')
+    await page.locator('meta[name="ol-csrfToken"]').waitFor({ state: 'attached' })
     return await page.evaluate(
       async ([m, url, daten]) => {
         const token = document.querySelector('meta[name="ol-csrfToken"]').content

@@ -854,6 +854,13 @@ $spur-sm: 575.98px;
   justify-content: space-between;
   gap: var(--spacing-03);
   margin-top: var(--spacing-04);
+
+  // Kleine Symbolknöpfe bleiben mindestens 24 px groß, auch wenn eine lange Seitenangabe drückt.
+  > .btn {
+    flex-shrink: 0;
+    min-width: 24px;
+    min-height: 24px;
+  }
 }
 
 // In der Werkzeugleiste der Vorschau: Knöpfe auf einer Linie, die Seitenangabe bricht in sich um.
