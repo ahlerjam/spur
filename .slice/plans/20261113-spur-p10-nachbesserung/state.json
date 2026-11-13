@@ -1,1 +1,1 @@
-{"state": "halted", "builderModel": "sonnet", "runBranch": "slice/run-20261113-spur-p10-nachbesserung", "sessionId": "7fdedad5-afef-4b2d-b706-3783446594b8", "started": "2026-11-13T09:05:04Z", "reason": "paused by owner after builder, before acceptance (Opus) – run worktree kept"}
+{"state": "done", "builderModel": "sonnet", "runBranch": "slice/run-20261113-spur-p10-nachbesserung", "sessionId": "7fdedad5-afef-4b2d-b706-3783446594b8", "started": "2026-11-13T09:05:04Z", "finished": "2026-11-13T21:11:25Z"}

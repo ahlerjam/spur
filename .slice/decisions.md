@@ -46,3 +46,6 @@
   Interim: Gemerged, weil die Abnahme (f1–f11 PASS) und drei Läufe in Folge grün waren; der Test ist nicht stabil.
   Options: A (empfohlen) kleiner Nachbesserungsplan: Reihenfolge der beiden gleichzeitigen Aufrufe im Test oder die Sperre in `hinzufuegen` prüfen | B so lassen
   Resolved 2026-11-13 (P10 f7): erledigt, Ursache im Test, nicht in der Sperre. Beide Aufrufe lesen zuerst die TeX-Live-Datenbank; wer damit zuerst fertig ist, bekommt die Sperre. Der Test nahm an, dass der erste Aufruf gewinnt, unter Last gewann zuweilen der zweite (`erster.dateien` war dann leer, der Befund „schon im Projekt“ stand beim ersten). Der Test prüft jetzt, dass genau einer fünf Dateien anlegt und der andere „schon im Projekt“ meldet, egal in welcher Reihenfolge; `gesperrt` bleibt unverändert.
+- D10 (plan 20261113-spur-p10-nachbesserung) f5: Sollen Textdokumente (`.tex`, `.bib`) zum Projektspeicher zählen? Heute zählen nur hochgeladene Dateien, Quellen und TeX-Pakete; reine Textprojekte stehen auf „0 KB“.
+  Interim: Hinweis über der Admin-Tabelle und im README.
+  Options: so lassen | Textdokumente mitzählen (Docstore-Abfrage je Projekt, ändert die Grenze für alle)
