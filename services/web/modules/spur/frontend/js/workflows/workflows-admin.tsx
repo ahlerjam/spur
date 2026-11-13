@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import useWaitForI18n from '@/shared/hooks/use-wait-for-i18n'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormText from '@/shared/components/ol/ol-form-text'
@@ -116,9 +117,9 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
           </OLFormText>
         )}
         <div className="spur-vorschlag-aktionen">
-          <OLButton type="submit" variant="primary" size="sm" isLoading={laeuft}>
+          <LadeKnopf type="submit" variant="primary" size="sm" isLoading={laeuft}>
             {t('save')}
-          </OLButton>
+          </LadeKnopf>
           <span role="status" className={meldung?.typ === 'error' ? 'form-text text-danger' : 'spur-zeile-meta'}>
             {meldung?.text}
           </span>

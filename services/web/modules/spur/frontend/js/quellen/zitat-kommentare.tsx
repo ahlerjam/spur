@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
@@ -79,7 +80,7 @@ function KommentarFormular({
         ))}
       </OLFormSelect>
       <div className="spur-kommentar-knoepfe">
-        <OLButton
+        <LadeKnopf
           type="submit"
           variant="primary"
           size="sm"
@@ -87,7 +88,7 @@ function KommentarFormular({
           isLoading={sendet}
         >
           {t('spur_kommentar_senden')}
-        </OLButton>
+        </LadeKnopf>
         <OLButton variant="secondary" size="sm" onClick={abbrechen}>
           {t('cancel')}
         </OLButton>

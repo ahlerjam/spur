@@ -91,6 +91,26 @@ describe('Claude-Panel', function () {
     expect(JSON.parse(fetchMock.callHistory.lastCall(AUTOMATIK)!.options.body as string)).to.deep.equal({ an: true })
   })
 
+  it('behält den Fokus auf dem Schalter, während er speichert, und nimmt dabei keinen zweiten Wechsel an', async function () {
+    let freigeben = () => {}
+    fetchMock.get(STATUS, status({}))
+    fetchMock.put(AUTOMATIK, () => new Promise(resolve => { freigeben = () => resolve(204) }))
+    zeigen()
+    const schalter = await screen.findByRole('switch', { name: 'Alles von Claude automatisch annehmen' })
+    schalter.focus()
+    fireEvent.click(schalter)
+    await waitFor(() => expect(fetchMock.callHistory.called(AUTOMATIK)).to.equal(true))
+    expect(schalter).to.have.property('disabled', false)
+    expect(schalter.getAttribute('aria-busy')).to.equal('true')
+    expect(document.activeElement).to.equal(schalter)
+    fireEvent.click(schalter)
+    expect(fetchMock.callHistory.calls(AUTOMATIK)).to.have.length(1)
+    expect(schalter).to.have.property('checked', true)
+    freigeben()
+    await waitFor(() => expect(schalter.getAttribute('aria-busy')).to.equal(null))
+    expect(document.activeElement).to.equal(schalter)
+  })
+
   it('springt zurück und nennt den Grund, wenn das Speichern scheitert', async function () {
     fetchMock.get(STATUS, status({}))
     fetchMock.put(AUTOMATIK, { status: 503, headers: { 'Content-Type': 'application/problem+json' }, body: { detail: 'Die Einstellung ließ sich nicht speichern.' } })
@@ -109,12 +129,28 @@ describe('Claude-Panel', function () {
       return { angenommen: 12 }
     })
     zeigen()
-    fireEvent.click(await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen' }))
+    const knopf = await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen' })
+    knopf.focus()
+    fireEvent.click(knopf)
     const dialog = await screen.findByRole('dialog')
     within(dialog).getByText('12 Änderungen in 2 Dateien annehmen? Rote Zitate bleiben offen.')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Annehmen' }))
     const nichts = await screen.findByRole('button', { name: 'Nichts offen' })
-    expect(nichts).to.have.property('disabled', true)
+    // Gesperrt, aber fokussierbar: Der Fokus kehrt nach dem Dialog auf den Knopf zurück, nicht auf die Seite.
+    expect(nichts.getAttribute('aria-disabled')).to.equal('true')
+    await waitFor(() => expect(document.activeElement).to.equal(nichts))
+    fireEvent.click(nichts)
+    expect(screen.queryByRole('dialog')).to.equal(null)
+  })
+
+  it('gibt den Fokus nach „Abbrechen“ an den Knopf zurück', async function () {
+    fetchMock.get(STATUS, status({ offen: { aenderungen: 3, dateien: 1 } }))
+    zeigen()
+    const knopf = await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen' })
+    knopf.focus()
+    fireEvent.click(knopf)
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Abbrechen' }))
+    await waitFor(() => expect(document.activeElement).to.equal(knopf))
   })
 
   it('zeigt Reviewern weder Schalter noch Sammelannahme', async function () {

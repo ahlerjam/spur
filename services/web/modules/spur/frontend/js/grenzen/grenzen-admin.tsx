@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import useWaitForI18n from '@/shared/hooks/use-wait-for-i18n'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
@@ -182,9 +183,9 @@ function StandardFormular({
           {feld('texProStunde', t('spur_tex_pro_stunde'), zahl(texStandard.texProStunde))}
         </div>
         <p className="form-text">{t('spur_tex_grenzen_hinweis')}</p>
-        <OLButton type="submit" variant="primary" isLoading={laeuft} className="mt-3">
+        <LadeKnopf type="submit" variant="primary" isLoading={laeuft} className="mt-3">
           {t('save')}
-        </OLButton>
+        </LadeKnopf>
       </form>
       {meldung && <Notification className="mt-3" type={meldung.typ} content={meldung.text} />}
     </section>
@@ -385,9 +386,9 @@ function AusnahmeFormular({ nutzer, fertig, abbrechen }: { nutzer: Nutzer; ferti
       {feld('speicherGb', t('spur_speicher_je_projekt_gb'))}
       <FeldFehler id={`${id}-fehler`} text={feldFehler.allgemein} />
       <div className="spur-panel-werkzeuge spur-ohne-rand">
-        <OLButton type="submit" variant="primary" size="sm" isLoading={laeuft}>
+        <LadeKnopf type="submit" variant="primary" size="sm" isLoading={laeuft}>
           {t('save')}
-        </OLButton>
+        </LadeKnopf>
         <OLButton variant="secondary" size="sm" onClick={abbrechen}>
           {t('cancel')}
         </OLButton>
@@ -454,7 +455,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
                   <Markierung anteil={auslastung(p.bytes, p.grenze)} />
                 </td>
                 <td>
-                  <OLButton
+                  <LadeKnopf
                     variant="secondary"
                     size="sm"
                     isLoading={laeuft === p.id}
@@ -462,7 +463,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
                     onClick={() => neuBerechnen(p)}
                   >
                     {t('spur_speicher_neu_berechnen')}
-                  </OLButton>
+                  </LadeKnopf>
                 </td>
               </tr>
             ))}

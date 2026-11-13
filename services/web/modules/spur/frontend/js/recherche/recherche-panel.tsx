@@ -2,6 +2,7 @@ import { type KeyboardEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
@@ -161,7 +162,7 @@ export default function RecherchePanel() {
                     {treffer.doi && (
                       <div className="spur-paper-aktionen">
                         {darfSchreiben && treffer.frei && (
-                          <OLButton
+                          <LadeKnopf
                             variant="primary"
                             size="sm"
                             isLoading={arbeitet === treffer.doi}
@@ -169,10 +170,10 @@ export default function RecherchePanel() {
                             onClick={() => aktion(treffer, 'aufnehmen')}
                           >
                             {t('spur_aufnehmen')}
-                          </OLButton>
+                          </LadeKnopf>
                         )}
                         {darfSchreiben && treffer.frei !== true && (
-                          <OLButton
+                          <LadeKnopf
                             variant="secondary"
                             size="sm"
                             isLoading={arbeitet === treffer.doi}
@@ -180,7 +181,7 @@ export default function RecherchePanel() {
                             onClick={() => aktion(treffer, 'beschaffen')}
                           >
                             {t('spur_auf_beschaffungsliste')}
-                          </OLButton>
+                          </LadeKnopf>
                         )}
                         <Zitationen doi={treffer.doi} />
                       </div>

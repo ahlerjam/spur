@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import MaterialIcon from '@/shared/components/material-icon'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
@@ -192,9 +193,9 @@ export default function LaufKarte({
           )}
           <div className="spur-panel-werkzeuge spur-ohne-rand">
             {laufOffen && write && changes.length > 0 && (
-              <OLButton variant="primary" size="sm" isLoading={laeuft} onClick={() => aktion('POST', pfad('annehmen'))}>
+              <LadeKnopf variant="primary" size="sm" isLoading={laeuft} onClick={() => aktion('POST', pfad('annehmen'))}>
                 {t('spur_alle_annehmen')}
-              </OLButton>
+              </LadeKnopf>
             )}
             {laufOffen && darfAblehnen && changes.length > 0 && (
               <OLButton variant="danger-ghost" size="sm" disabled={laeuft} onClick={() => aktion('POST', pfad('ablehnen'))}>

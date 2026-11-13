@@ -4,6 +4,7 @@ import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-hea
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
@@ -242,14 +243,14 @@ function Liste({
               {v.pfad && <p className="spur-zeile-meta">{v.pfad}</p>}
               <p className="spur-nachricht-text">{v.text}</p>
               <div className="spur-vorschlag-aktionen">
-                <OLButton
+                <LadeKnopf
                   variant="primary"
                   size="sm"
                   isLoading={laeuft === v.id}
                   onClick={() => erledigen(v, 'uebernehmen')}
                 >
                   {t('spur_vorschlag_uebernehmen')}
-                </OLButton>
+                </LadeKnopf>
                 <OLButton
                   variant="secondary"
                   size="sm"

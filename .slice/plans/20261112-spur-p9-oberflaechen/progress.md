@@ -44,6 +44,13 @@
 - E2E: Der Lauf hebt vor jedem Feature alle `page.route` auf (eine angehaltene Route aus einem abgebrochenen Schritt hielt
   sonst jede spätere Anfrage fest). Fehlermeldungen nennen die Zeilen im Stapel.
 
+- Nach der Abnahme (f5 zurück auf `passes: false`): Der Schalter war beim Speichern `disabled`, „Nichts offen“
+  ebenso; der Browser ließ den Fokus auf die Seite fallen. Jetzt: Der Schalter bleibt bedienbar (`aria-busy`, ein
+  zweiter Wechsel wird während des Speicherns ignoriert), „Nichts offen“ ist `aria-disabled` und bekommt nach dem
+  Dialog den Fokus. Dasselbe Muster steckte in jedem Knopf mit `isLoading` (Overleafs `OLButton` setzt dabei
+  `disabled`): Der neue Baustein `lade-knopf.tsx` gibt einem Knopf, der beim Start des Ladens den Fokus hatte, ihn
+  danach zurück, sofern niemand ihn woanders hingesetzt hat; alle 22 ladenden Knöpfe in spur nutzen ihn.
+
 ## Needs decision
 
 ## Vorschläge (außerhalb dieses Plans)

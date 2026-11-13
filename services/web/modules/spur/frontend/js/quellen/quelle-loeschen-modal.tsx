@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import {
   OLModal,
@@ -73,9 +74,9 @@ export default function QuelleLoeschenModal({
         <OLButton variant="secondary" onClick={schliessen}>
           {t('cancel')}
         </OLButton>
-        <OLButton variant="danger" isLoading={laeuft} onClick={loeschen}>
+        <LadeKnopf variant="danger" isLoading={laeuft} onClick={loeschen}>
           {t('spur_endgueltig_loeschen')}
-        </OLButton>
+        </LadeKnopf>
       </OLModalFooter>
     </OLModal>
   )

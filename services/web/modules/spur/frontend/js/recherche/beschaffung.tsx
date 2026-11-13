@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import {
   OLDropdown,
   OLDropdownItem,
@@ -166,7 +167,7 @@ export default function Beschaffung() {
                   aria-label={t('spur_beschafftes_pdf')}
                   onChange={e => hochladen(e.target.files?.[0])}
                 />
-                <OLButton
+                <LadeKnopf
                   variant="primary"
                   size="sm"
                   isLoading={laedtHoch}
@@ -174,7 +175,7 @@ export default function Beschaffung() {
                   onClick={() => dateiFeld.current?.click()}
                 >
                   {t('spur_pdf_hochladen')}
-                </OLButton>
+                </LadeKnopf>
               </>
             )}
             <OLDropdown>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
@@ -78,14 +79,14 @@ export default function QuellenHolenModal({
         <OLButton variant="secondary" onClick={schliessen}>
           {t('cancel')}
         </OLButton>
-        <OLButton
+        <LadeKnopf
           variant="primary"
           disabled={!auswahl}
           isLoading={laeuft}
           onClick={holen}
         >
           {t('spur_holen')}
-        </OLButton>
+        </LadeKnopf>
       </OLModalFooter>
     </OLModal>
   )

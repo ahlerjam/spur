@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import MaterialIcon from '@/shared/components/material-icon'
@@ -303,7 +304,7 @@ export default function QuellenPanel() {
               aria-label={t('spur_datei_waehlen')}
               onChange={e => hochladen(e.target.files)}
             />
-            <OLButton
+            <LadeKnopf
               variant="primary"
               size="sm"
               isLoading={laedtHoch}
@@ -311,7 +312,7 @@ export default function QuellenPanel() {
               onClick={() => dateiFeld.current?.click()}
             >
               {t('spur_quelle_hinzufuegen')}
-            </OLButton>
+            </LadeKnopf>
           </>
         )}
         <OLDropdown align="end">
@@ -443,7 +444,7 @@ export default function QuellenPanel() {
                 <p className="spur-zeile-meta" role="status">
                   {t('spur_weitere_quellen', { anzahl: quellen.length, gesamt })}
                 </p>
-                <OLButton
+                <LadeKnopf
                   variant="secondary"
                   size="sm"
                   isLoading={laedtMehr}
@@ -451,7 +452,7 @@ export default function QuellenPanel() {
                   onClick={mehrLaden}
                 >
                   {t('spur_weitere_quellen_laden')}
-                </OLButton>
+                </LadeKnopf>
               </div>
             )}
           </>

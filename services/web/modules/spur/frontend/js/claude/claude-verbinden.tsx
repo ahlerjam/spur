@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import Notification from '@/shared/components/notification'
 import {
   OLModal,
@@ -140,9 +141,9 @@ export default function ClaudeVerbinden() {
         </ul>
       </div>
       <div>
-        <OLButton variant="secondary" isLoading={erzeugt} loadingLabel={t('spur_laedt')} onClick={erzeugen}>
+        <LadeKnopf variant="secondary" isLoading={erzeugt} loadingLabel={t('spur_laedt')} onClick={erzeugen}>
           {t('spur_token_erzeugen')}
-        </OLButton>
+        </LadeKnopf>
       </div>
       {frage && (
         <OLModal show onHide={() => setFrage(null)}>

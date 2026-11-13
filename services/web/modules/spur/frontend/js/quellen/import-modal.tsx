@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
@@ -122,9 +123,9 @@ export default function ImportModal({
                     </option>
                   ))}
                 </OLFormSelect>
-                <OLButton variant="primary" isLoading={laeuft} disabled={!sammlung} onClick={zoteroImportieren}>
+                <LadeKnopf variant="primary" isLoading={laeuft} disabled={!sammlung} onClick={zoteroImportieren}>
                   {t('spur_aus_zotero_importieren')}
-                </OLButton>
+                </LadeKnopf>
               </div>
             </>
           )}

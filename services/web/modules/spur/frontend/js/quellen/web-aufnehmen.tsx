@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import {
@@ -90,7 +91,7 @@ export default function WebAufnehmen({
           <OLButton variant="secondary" onClick={abbrechen}>
             {t('cancel')}
           </OLButton>
-          <OLButton
+          <LadeKnopf
             type="submit"
             variant="primary"
             disabled={!url.trim()}
@@ -98,7 +99,7 @@ export default function WebAufnehmen({
             loadingLabel={t('spur_wird_abgerufen')}
           >
             {t('spur_aufnehmen')}
-          </OLButton>
+          </LadeKnopf>
         </OLModalFooter>
       </form>
     </OLModal>

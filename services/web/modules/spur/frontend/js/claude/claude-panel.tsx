@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
@@ -116,6 +117,8 @@ function Automatik({
   }, [an, speichert])
 
   const umschalten = async (neu: boolean) => {
+    // Gesperrt wird nicht über `disabled`: Der Browser nähme dem Schalter sonst den Fokus.
+    if (speichert) return
     setWert(neu)
     setFehler(null)
     setSpeichert(true)
@@ -136,13 +139,18 @@ function Automatik({
     try {
       await jsonAnfrage('POST', projektPfad('/claude/alles-annehmen'))
       await neuLaden()
-      setFragen(false)
     } catch (error) {
       setFehler((error as Error).message)
-      setFragen(false)
     } finally {
+      dialogSchliessen()
       setNimmtAn(false)
     }
+  }
+
+  // Nach dem Dialog kehrt der Fokus auf den Knopf zurück, auch wenn er inzwischen „Nichts offen“ zeigt.
+  const dialogSchliessen = () => {
+    setFragen(false)
+    window.requestAnimationFrame(() => knopf.current?.focus())
   }
 
   const nichtsOffen = offen.aenderungen === 0
@@ -153,7 +161,7 @@ function Automatik({
         id="spur-automatik"
         role="switch"
         checked={wert}
-        disabled={speichert}
+        aria-busy={speichert || undefined}
         aria-describedby="spur-automatik-hinweis"
         label={t('spur_automatik_schalter')}
         onChange={e => umschalten(e.target.checked)}
@@ -166,11 +174,19 @@ function Automatik({
           {fehler}
         </OLFormText>
       )}
-      <OLButton ref={knopf} variant="secondary" size="sm" disabled={nichtsOffen} onClick={() => setFragen(true)}>
+      {/* Gesperrt über `aria-disabled`, damit der Knopf den Fokus nach dem Annehmen behält. */}
+      <OLButton
+        ref={knopf}
+        variant="secondary"
+        size="sm"
+        className={nichtsOffen ? 'disabled' : undefined}
+        aria-disabled={nichtsOffen || undefined}
+        onClick={() => !nichtsOffen && setFragen(true)}
+      >
         {nichtsOffen ? t('spur_nichts_offen') : t('spur_alles_offene_annehmen')}
       </OLButton>
       {fragen && (
-        <OLModal themed show onHide={() => setFragen(false)}>
+        <OLModal themed show onHide={dialogSchliessen}>
           <OLModalHeader>
             <OLModalTitle>{t('spur_alles_offene_annehmen')}</OLModalTitle>
           </OLModalHeader>
@@ -184,12 +200,12 @@ function Automatik({
             </p>
           </OLModalBody>
           <OLModalFooter>
-            <OLButton variant="secondary" onClick={() => setFragen(false)}>
+            <OLButton variant="secondary" onClick={dialogSchliessen}>
               {t('cancel')}
             </OLButton>
-            <OLButton variant="primary" isLoading={nimmtAn} onClick={allesAnnehmen}>
+            <LadeKnopf variant="primary" isLoading={nimmtAn} onClick={allesAnnehmen}>
               {t('spur_annehmen')}
-            </OLButton>
+            </LadeKnopf>
           </OLModalFooter>
         </OLModal>
       )}
@@ -283,9 +299,9 @@ function Laeufe({ status, neuLaden }: { status: Status; neuLaden: () => Promise<
       ))}
       {fehler && <Notification type="error" content={fehler} />}
       {weitere && (
-        <OLButton variant="secondary" size="sm" isLoading={laedt} loadingLabel={t('spur_laedt')} onClick={mehrLaden}>
+        <LadeKnopf variant="secondary" size="sm" isLoading={laedt} loadingLabel={t('spur_laedt')} onClick={mehrLaden}>
           {t('spur_aeltere_laden')}
-        </OLButton>
+        </LadeKnopf>
       )}
     </div>
   )
@@ -394,9 +410,9 @@ function QuellenSammelnFormular({
           <OLFormText id="spur-quellen-anzahl-hilfe">{t('spur_anzahl_hilfe')}</OLFormText>
         )}
       </OLFormGroup>
-      <OLButton type="submit" variant="primary" size="sm" isLoading={laeuft}>
+      <LadeKnopf type="submit" variant="primary" size="sm" isLoading={laeuft}>
         {t('spur_sammeln_starten')}
-      </OLButton>
+      </LadeKnopf>
     </form>
   )
 }
@@ -434,7 +450,7 @@ function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehl
       <ul className="spur-liste">
         {liste.map(w => (
           <li className="spur-workflow" key={w.name}>
-            <OLButton
+            <LadeKnopf
               variant="secondary"
               size="sm"
               isLoading={laeuft === w.name}
@@ -447,7 +463,7 @@ function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehl
               }
             >
               {w.titel}
-            </OLButton>
+            </LadeKnopf>
             <p className="spur-zeile-meta" id={`spur-workflow-${w.name}`}>
               {w.beschreibung}
             </p>
@@ -555,9 +571,9 @@ function Eingabe({
       ) : (
         <OLFormText id="spur-auftrag-hinweis">{verbunden ? t('spur_strg_enter') : t('spur_erst_verbinden')}</OLFormText>
       )}
-      <OLButton type="submit" variant="primary" size="sm" isLoading={sendet} disabled={!verbunden}>
+      <LadeKnopf type="submit" variant="primary" size="sm" isLoading={sendet} disabled={!verbunden}>
         {t('spur_senden')}
-      </OLButton>
+      </LadeKnopf>
     </form>
   )
 }
