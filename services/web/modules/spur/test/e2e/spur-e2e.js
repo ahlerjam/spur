@@ -3672,7 +3672,8 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       let antwort
       for (let versuch = 0; versuch < 3; versuch++) {
         antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
-        if (Number.isInteger(antwort.status()) || versuch === 2) break
+        const status = antwort.status()
+        if ((Number.isInteger(status) && status < 500 && status !== 429) || versuch === 2) break
         await page.waitForTimeout(5000)
       }
       if (!(Number(antwort.status()) < 400)) kaputt.push(`${link}: ${antwort.status()}`)
@@ -6489,7 +6490,10 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok((await page.title()) === 'E2E P8 DOI – spur', `Titel im Editor: „${await page.title()}“`)
     const ENGLISCH = ['Resize', 'Close dialog', 'More actions', 'Project files history', 'Project history and labels', 'Toggle navigation']
     const englischeAttribute = async () =>
-      await page.evaluate(woerter => [...document.querySelectorAll('[title],[aria-label]')].map(e => e.getAttribute('title') || e.getAttribute('aria-label')).filter(t => woerter.includes(t)), ENGLISCH)
+      await page.evaluate(
+        woerter => [...document.querySelectorAll('[title],[aria-label]')].flatMap(e => [e.getAttribute('title'), e.getAttribute('aria-label')]).filter(t => woerter.includes(t)),
+        ENGLISCH
+      )
     ok((await page.locator('[title="Größe ändern"]').count()) >= 1, 'Resizer ohne deutschen Tooltip')
     const imEditor = await englischeAttribute()
     ok(imEditor.length === 0, `Englische Attribute im Editor: ${imEditor}`)
@@ -6498,6 +6502,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const imDialog = await englischeAttribute()
     ok(imDialog.length === 0, `Englische Attribute im Dialog: ${imDialog}`)
     await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Dialog schließen' }).first().waitFor({ state: 'detached' })
     const baum = page.getByRole('button', { name: 'Dateibaum ausblenden', exact: true })
     await baum.waitFor()
     ok((await baum.getAttribute('aria-label')) === 'Dateibaum ausblenden', 'aria-label des Knopfs')
