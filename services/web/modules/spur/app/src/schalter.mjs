@@ -43,6 +43,9 @@ export function devSchalterSetzen(werte) {
   if (IST_DEV) devUeberschreibung = { ...werte }
 }
 
+// Fehler auslösen für Tests: nur im Dev-Stack und nur über die Fake-Steuerung, nie aus der Umgebung.
+export const testSchalter = name => (IST_DEV ? devUeberschreibung[name] : undefined)
+
 const wert = name => (IST_DEV && name in devUeberschreibung ? devUeberschreibung[name] : process.env[name])
 
 // Mit dem Paper-Fake gilt für Unpaywall eine Testadresse, solange die E2E-Suite sie nicht ausdrücklich leert.

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import Settings from '@overleaf/settings'
 import { fetchNothing, RequestFailedError } from '@overleaf/fetch-utils'
 import { Problem } from '../probleme.mjs'
+import { testSchalter } from '../schalter.mjs'
 
 const TIMEOUT_MS = 30000
 
@@ -10,9 +11,13 @@ const neuerSeed = () => randomBytes(9).toString('hex')
 
 // Wendet Ops über den spur-Endpunkt des document-updater an. Mit `tracked` als Track Change.
 export async function spurUpdate(projectId, docId, op, version, { userId, tracked }) {
+  const url = `${Settings.apis.documentupdater.url}/project/${projectId}/doc/${docId}/spur-update`
   try {
+    if (testSchalter('SPUR_DOKUPDATER_500')) {
+      throw new RequestFailedError(url, { method: 'POST' }, new Response('Testschalter', { status: 500 }), null)
+    }
     await fetchNothing(
-      `${Settings.apis.documentupdater.url}/project/${projectId}/doc/${docId}/spur-update`,
+      url,
       {
         method: 'POST',
         json: {

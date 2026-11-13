@@ -1,6 +1,8 @@
 import Settings from '@overleaf/settings'
 import AuthorizationMiddleware from '../../../../app/src/Features/Authorization/AuthorizationMiddleware.mjs'
 import AuthenticationController from '../../../../app/src/Features/Authentication/AuthenticationController.mjs'
+import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
+import SessionManager from '../../../../app/src/Features/Authentication/SessionManager.mjs'
 import { multerUploadHandler } from '../../../../app/src/infrastructure/Multer.mjs'
 import RateLimiterMiddleware from '../../../../app/src/Features/Security/RateLimiterMiddleware.mjs'
 import { RateLimiter } from '../../../../app/src/infrastructure/RateLimiter.mjs'
@@ -12,10 +14,9 @@ import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
 import * as GrenzenController from './grenzen/GrenzenController.mjs'
 import * as UploadLinkController from './hochladen/UploadLinkController.mjs'
-import { e2eVorbereiten, quelleVergroessern, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
+import { e2eVorbereiten, pdfUmleiten, proxySperre, quelleVergroessern, speicherFehler, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { mailFakeLesen, mailFakeSteuern } from './dev/MailFake.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
-import { texLiveFake } from './dev/TexLiveFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
 
 const lesen = [
@@ -36,6 +37,18 @@ const schreiben = [
 
 const angemeldet = AuthenticationController.requireLogin()
 const admin = AuthorizationMiddleware.ensureUserIsSiteAdmin
+// Für Abrufe aus dem Formular: 403 mit Meldung statt Overleafs Umleitung auf /restricted, der ein PUT nicht folgen kann.
+const adminApi = [
+  angemeldet,
+  async (req, res, next) => {
+    try {
+      if (await AuthorizationManager.promises.isUserSiteAdmin(SessionManager.getLoggedInUserId(req.session))) return next()
+      problemSenden(res, new Problem(403, 'keine_rechte', 'spur_fehler_nur_admin'))
+    } catch (error) {
+      next(error)
+    }
+  },
+]
 
 // Begrenzt teure Aufrufe (Paper-Dienste mit installationsweiter Drossel, Einbetten mit dem Modell) je Anmeldung.
 const fremdDienste = RateLimiterMiddleware.rateLimit(new RateLimiter('spur-recherche', { points: 30, duration: 60 }))
@@ -70,6 +83,18 @@ const QUELLEN = '/spur/project/:project_id/quellen'
 
 export default {
   apply(webRouter, _privateApiRouter, publicApiRouter) {
+    if (IST_DEV) {
+      // Vor den echten Routen: Ahmt einen Proxy vor PDF-Auslieferung und Quellenliste nach (Testschalter).
+      // nginx liefert das PDF selbst aus; im Dev-Stack zeigt die Compile-Antwort darum auf eine Route von web.
+      webRouter.post('/project/:Project_id/compile', pdfUmleiten)
+      webRouter.get('/spur/dev/proxy-pdf/output.pdf', proxySperre('SPUR_PROXY_PDF'))
+      webRouter.get(QUELLEN, proxySperre('SPUR_PROXY_API'))
+      webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/bild`, proxySperre('SPUR_SEITENBILD_FEHLER'))
+      webRouter.put('/spur/project/:project_id/claude/automatik', speicherFehler('SPUR_AUTOMATIK_FEHLER'))
+      webRouter.get('/spur/project/:project_id/claude', proxySperre('SPUR_CLAUDE_FEHLER'))
+      webRouter.put('/spur/project/:project_id/matrix/zellen', speicherFehler('SPUR_MATRIX_FEHLER'))
+      webRouter.get('/spur/project/:project_id/pruefbericht', proxySperre('SPUR_PRUEFBERICHT_FEHLER'))
+    }
     webRouter.get(QUELLEN, ...lesen, SpurController.quellenListe)
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
     webRouter.post(`${QUELLEN}/web`, ...schreiben, SpurController.webQuelleAufnehmen)
@@ -111,9 +136,12 @@ export default {
     )
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite`, ...lesen, SpurController.quelleSeite)
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/bild`, ...lesen, SpurController.quelleBild)
+    webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/textebene`, ...lesen, SpurController.quelleTextebene)
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)
     webRouter.patch(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleAendern)
     webRouter.get('/spur/project/:project_id/pruefbericht', ...lesen, SpurController.pruefbericht)
+    webRouter.get('/spur/project/:project_id/pruefbericht/makros', ...lesen, SpurController.pruefMakros)
+    webRouter.put('/spur/project/:project_id/pruefbericht/makros', ...schreiben, SpurController.pruefMakrosSetzen)
     webRouter.get('/spur/project/:project_id/claude', ...lesen, SpurController.claudeStatus)
     webRouter.post('/spur/project/:project_id/claude/auftrag', ...lesen, SpurController.claudeAuftrag)
     webRouter.get('/spur/project/:project_id/workflows', ...lesen, SpurController.workflows)
@@ -125,10 +153,10 @@ export default {
     webRouter.delete(`${ADMIN_WORKFLOWS}/:name`, admin, WorkflowsAdminController.zuruecksetzen)
     const ADMIN_GRENZEN = '/spur/admin/grenzen'
     webRouter.get(ADMIN_GRENZEN, admin, GrenzenController.seite)
-    webRouter.get(`${ADMIN_GRENZEN}.json`, admin, GrenzenController.daten)
-    webRouter.put(`${ADMIN_GRENZEN}/standard`, admin, GrenzenController.standardSetzen)
-    webRouter.put(`${ADMIN_GRENZEN}/nutzer/:user_id`, admin, GrenzenController.nutzerSetzen)
-    webRouter.post(`${ADMIN_GRENZEN}/projekt/:project_id/neu-berechnen`, admin, GrenzenController.neuBerechnen)
+    webRouter.get(`${ADMIN_GRENZEN}.json`, ...adminApi, GrenzenController.daten)
+    webRouter.put(`${ADMIN_GRENZEN}/standard`, ...adminApi, GrenzenController.standardSetzen)
+    webRouter.put(`${ADMIN_GRENZEN}/nutzer/:user_id`, ...adminApi, GrenzenController.nutzerSetzen)
+    webRouter.post(`${ADMIN_GRENZEN}/projekt/:project_id/neu-berechnen`, ...adminApi, GrenzenController.neuBerechnen)
     webRouter.get('/spur/grenzen/projekte', angemeldet, GrenzenController.meineProjekte)
     webRouter.get('/spur/project/:project_id/speicher', ...lesen, GrenzenController.projektSpeicher)
     const LAUF = '/spur/project/:project_id/laeufe/:lauf_id'
@@ -136,6 +164,8 @@ export default {
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)
     webRouter.post(`${LAUF}/zuruecknehmen`, ...schreiben, SpurController.laufZuruecknehmen)
     webRouter.put('/spur/project/:project_id/claude/automatik', ...schreiben, SpurController.automatikSetzen)
+    webRouter.post('/spur/project/:project_id/claude/alles-annehmen', ...schreiben, SpurController.allesAnnehmen)
+    webRouter.get('/spur/project/:project_id/claude/laeufe', ...lesen, SpurController.claudeLaeufe)
     const VORSCHLAEGE = '/spur/project/:project_id/vorschlaege'
     webRouter.get(VORSCHLAEGE, ...lesen, VorschlaegeController.status)
     webRouter.put(`${VORSCHLAEGE}/eigene`, ...lesen, VorschlaegeController.eigeneSetzen)
@@ -182,7 +212,6 @@ export default {
       publicApiRouter.post('/spur/dev/e2e/vorbereiten', e2eVorbereiten)
       publicApiRouter.post('/spur/dev/mail', mailFakeSteuern)
       publicApiRouter.get('/spur/dev/mail', mailFakeLesen)
-      publicApiRouter.get('/spur/dev/texlive/archive/:datei', texLiveFake)
       publicApiRouter.post('/spur/dev/quelle-vergroessern', quelleVergroessern)
     }
   },

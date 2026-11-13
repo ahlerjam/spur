@@ -36,7 +36,6 @@ export default function SeitenBlaettern({
   const { t } = useTranslation()
   return (
     <div className="spur-blaettern">
-      <Seitenangabe quelle={quelle} nummer={nummer} seite={seite} />
       <OLIconButton
         variant="ghost"
         size="sm"
@@ -53,6 +52,8 @@ export default function SeitenBlaettern({
         disabled={nummer >= quelle.seitenzahl}
         onClick={() => setNummer(nummer + 1)}
       />
+      {/* Die Angabe steht hinter den Knöpfen, damit ihre wechselnde Breite sie nicht verschiebt. */}
+      <Seitenangabe quelle={quelle} nummer={nummer} seite={seite} />
     </div>
   )
 }

@@ -4,9 +4,11 @@ import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-hea
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
+import OLFormText from '@/shared/components/ol/ol-form-text'
 import Notification from '@/shared/components/notification'
 import { useAbfrage } from '../abfrage'
 import { jsonAnfrage, projektPfad } from '../api'
@@ -44,6 +46,7 @@ export default function VorschlaegePanel() {
       <RailPanelHeader title={t('spur_vorschlaege')} />
       <div className="spur-panel-inhalt" aria-busy={!daten}>
         {fehler && <Notification type="error" content={fehler} />}
+        {!daten && !fehler && <EinstellungenPlatzhalter />}
         {daten && (
           <>
             <Einstellungen stand={daten.stand} speichern={speichern} />
@@ -55,6 +58,22 @@ export default function VorschlaegePanel() {
   )
 }
 
+function EinstellungenPlatzhalter() {
+  const { t } = useTranslation()
+  return (
+    <div className="spur-vorschlag-einstellungen" role="status" aria-label={t('spur_laedt')}>
+      {[0, 1, 2].map(i => (
+        <div key={i} className="spur-vorschlag-zeile spur-platzhalter-zeile" aria-hidden="true">
+          <span className="placeholder col-6" />
+          <span className="placeholder col-4" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const LIMIT = /^[1-9]\d{0,3}$/
+
 function Einstellungen({
   stand,
   speichern,
@@ -65,40 +84,95 @@ function Einstellungen({
   const { t } = useTranslation()
   const { write } = usePermissionsContext()
   const [limit, setLimit] = useState(String(stand.limit))
+  const [limitFehler, setLimitFehler] = useState(false)
+  const limitFeld = useRef<HTMLInputElement>(null)
   useEffect(() => setLimit(String(stand.limit)), [stand.limit])
   const wertName = (wert: Wert) => t(`spur_vorschlag_${wert}`)
 
+  const limitSpeichern = () => {
+    const ok = LIMIT.test(limit.trim()) && Number(limit) <= 1000
+    setLimitFehler(!ok)
+    if (!ok) return limitFeld.current?.focus()
+    speichern('/spur/vorschlaege/limit', { limit: Number(limit) })
+  }
+
   return (
-    <section className="spur-vorschlag-einstellungen" aria-labelledby="spur-vorschlag-einstellungen">
-      <h3 id="spur-vorschlag-einstellungen" className="spur-abschnitt">
-        {t('spur_vorschlag_eigene')}
-      </h3>
-      {ARTEN.map(art => (
-        <div className="spur-vorschlag-schalter" key={art}>
-          <OLFormLabel htmlFor={`spur-schalter-${art}`}>{t(`spur_vorschlag_${art}`)}</OLFormLabel>
-          <OLFormSelect
-            id={`spur-schalter-${art}`}
-            size="sm"
-            value={stand.eigene[art] ?? ''}
-            onChange={e =>
-              speichern(projektPfad('/vorschlaege/eigene'), { art, wert: e.target.value || null })
-            }
-          >
-            <option value="">
-              {t('spur_vorschlag_wie_projekt', { wert: wertName(stand.projekt[art] ?? 'aus') })}
-            </option>
-            <option value="aus">{wertName('aus')}</option>
-            <option value="vorschlag">{wertName('vorschlag')}</option>
-          </OLFormSelect>
-        </div>
-      ))}
+    <div className="spur-vorschlag-einstellungen">
+      <section className="spur-vorschlag-bereich" aria-labelledby="spur-vorschlag-eigene">
+        <h5 id="spur-vorschlag-eigene" className="spur-abschnitt">
+          {t('spur_vorschlag_eigene')}
+        </h5>
+        {ARTEN.map(art => (
+          <div className="spur-vorschlag-zeile" key={art}>
+            <OLFormLabel htmlFor={`spur-schalter-${art}`}>{t(`spur_vorschlag_${art}`)}</OLFormLabel>
+            <OLFormSelect
+              id={`spur-schalter-${art}`}
+              size="sm"
+              value={stand.eigene[art] ?? ''}
+              onChange={e =>
+                speichern(projektPfad('/vorschlaege/eigene'), { art, wert: e.target.value || null })
+              }
+            >
+              <option value="">
+                {t('spur_vorschlag_wie_projekt', { wert: wertName(stand.projekt[art] ?? 'aus') })}
+              </option>
+              <option value="aus">{wertName('aus')}</option>
+              <option value="vorschlag">{wertName('vorschlag')}</option>
+            </OLFormSelect>
+          </div>
+        ))}
+        <form
+          className="spur-vorschlag-limit"
+          noValidate
+          onSubmit={e => {
+            e.preventDefault()
+            limitSpeichern()
+          }}
+        >
+          <OLFormLabel htmlFor="spur-vorschlag-limit">{t('spur_vorschlag_limit')}</OLFormLabel>
+          <div className="spur-limit-zeile">
+            <OLFormControl
+              ref={limitFeld}
+              id="spur-vorschlag-limit"
+              inputMode="numeric"
+              size="sm"
+              value={limit}
+              isInvalid={limitFehler}
+              aria-invalid={limitFehler || undefined}
+              aria-describedby={limitFehler ? 'spur-limit-fehler spur-limit-stand' : 'spur-limit-stand'}
+              onChange={e => {
+                setLimit(e.target.value)
+                setLimitFehler(false)
+              }}
+            />
+            <span className="spur-zeile-meta" id="spur-limit-stand" role="status">
+              {stand.limitErreicht
+                ? t('spur_vorschlag_limit_erreicht')
+                : t('spur_vorschlag_heute', { heute: stand.heute, limit: stand.limit })}
+            </span>
+            <OLButton type="submit" variant="secondary" size="sm">
+              {t('save')}
+            </OLButton>
+          </div>
+          {limitFehler && (
+            <OLFormText type="error" id="spur-limit-fehler">
+              {t('spur_vorschlag_limit_ungueltig')}
+            </OLFormText>
+          )}
+          {/* Kein Notification-Kasten: Im schmalen Panel bräche dessen Symbolspalte den Text Wort für Wort um. */}
+          {stand.limitErreicht && <p className="spur-zeile-meta">{t('spur_vorschlag_limit_erreicht_hinweis')}</p>}
+        </form>
+      </section>
       {write && (
-        <fieldset className="spur-vorschlag-projekt">
-          <legend className="spur-abschnitt">{t('spur_vorschlag_projekt_standard')}</legend>
+        <section className="spur-vorschlag-bereich" aria-labelledby="spur-vorschlag-projekt">
+          <h5 id="spur-vorschlag-projekt" className="spur-abschnitt">
+            {t('spur_vorschlag_projekt_standard')}
+          </h5>
           {ARTEN.map(art => (
-            <div className="spur-vorschlag-schalter" key={art}>
+            <div className="spur-vorschlag-zeile" key={art}>
               <OLFormLabel htmlFor={`spur-projekt-${art}`}>
-                {t('spur_vorschlag_projekt_label', { art: t(`spur_vorschlag_${art}`) })}
+                {t(`spur_vorschlag_${art}`)}
+                <span className="visually-hidden"> ({t('spur_projekt')})</span>
               </OLFormLabel>
               <OLFormSelect
                 id={`spur-projekt-${art}`}
@@ -111,45 +185,9 @@ function Einstellungen({
               </OLFormSelect>
             </div>
           ))}
-        </fieldset>
+        </section>
       )}
-      <form
-        className="spur-vorschlag-limit"
-        onSubmit={e => {
-          e.preventDefault()
-          speichern('/spur/vorschlaege/limit', { limit: Number(limit) })
-        }}
-      >
-        <OLFormLabel htmlFor="spur-vorschlag-limit">{t('spur_vorschlag_limit')}</OLFormLabel>
-        <div className="spur-limit-zeile">
-          <OLFormControl
-            id="spur-vorschlag-limit"
-            type="number"
-            min={1}
-            max={1000}
-            size="sm"
-            value={limit}
-            onChange={e => setLimit(e.target.value)}
-          />
-          <OLButton type="submit" variant="secondary" size="sm">
-            {t('spur_vorschlag_limit_speichern')}
-          </OLButton>
-        </div>
-      </form>
-      <div role="status">
-        {/* Kein Notification-Kasten: Im schmalen Panel bräche dessen Symbolspalte den Text Wort für Wort um. */}
-        {stand.limitErreicht ? (
-          <>
-            <OLBadge bg="warning">{t('spur_vorschlag_limit_erreicht')}</OLBadge>
-            <p className="spur-zeile-meta">{t('spur_vorschlag_limit_erreicht_hinweis')}</p>
-          </>
-        ) : (
-          <p className="spur-zeile-meta">
-            {t('spur_vorschlag_heute', { heute: stand.heute, limit: stand.limit })}
-          </p>
-        )}
-      </div>
-    </section>
+    </div>
   )
 }
 
@@ -187,9 +225,9 @@ function Liste({
 
   return (
     <section aria-labelledby="spur-vorschlaege-liste">
-      <h3 id="spur-vorschlaege-liste" className="spur-abschnitt" ref={ueberschrift} tabIndex={-1}>
+      <h5 id="spur-vorschlaege-liste" className="spur-abschnitt" ref={ueberschrift} tabIndex={-1}>
         {t('spur_vorschlaege_offen', { anzahl: daten.vorschlaege.length })}
-      </h3>
+      </h5>
       <div role="status">{meldung && <p className="spur-vorschlag-meldung">{meldung}</p>}</div>
       {daten.vorschlaege.length === 0 && (
         <p className="spur-leer">{alleAus ? t('spur_vorschlaege_aus') : t('spur_vorschlaege_keine')}</p>
@@ -199,20 +237,20 @@ function Liste({
           <li key={v.id}>
             <article className="spur-vorschlag-karte" aria-labelledby={`spur-vorschlag-${v.id}`}>
               <div className="spur-lauf-kopf">
-                <h4 id={`spur-vorschlag-${v.id}`}>{v.titel}</h4>
+                <h6 id={`spur-vorschlag-${v.id}`}>{v.titel}</h6>
                 <OLBadge bg="info">{t(`spur_vorschlag_${v.art}`)}</OLBadge>
               </div>
               {v.pfad && <p className="spur-zeile-meta">{v.pfad}</p>}
               <p className="spur-nachricht-text">{v.text}</p>
               <div className="spur-vorschlag-aktionen">
-                <OLButton
+                <LadeKnopf
                   variant="primary"
                   size="sm"
                   isLoading={laeuft === v.id}
                   onClick={() => erledigen(v, 'uebernehmen')}
                 >
                   {t('spur_vorschlag_uebernehmen')}
-                </OLButton>
+                </LadeKnopf>
                 <OLButton
                   variant="secondary"
                   size="sm"

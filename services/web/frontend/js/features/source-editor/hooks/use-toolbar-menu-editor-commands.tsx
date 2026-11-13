@@ -306,7 +306,7 @@ export const useToolbarMenuBarEditorCommands = () => {
       },
       {
         id: 'format-style-section',
-        label: 'Section',
+        label: t('heading_section'),
         handler: () => {
           setSectionHeadingLevel(view, 'section')
           view.focus()
@@ -314,7 +314,7 @@ export const useToolbarMenuBarEditorCommands = () => {
       },
       {
         id: 'format-style-subsection',
-        label: 'Subsection',
+        label: t('heading_subsection'),
         handler: () => {
           setSectionHeadingLevel(view, 'subsection')
           view.focus()
@@ -322,7 +322,7 @@ export const useToolbarMenuBarEditorCommands = () => {
       },
       {
         id: 'format-style-subsubsection',
-        label: 'Subsubsection',
+        label: t('heading_subsubsection'),
         handler: () => {
           setSectionHeadingLevel(view, 'subsubsection')
           view.focus()
@@ -330,7 +330,7 @@ export const useToolbarMenuBarEditorCommands = () => {
       },
       {
         id: 'format-style-paragraph',
-        label: 'Paragraph',
+        label: t('heading_paragraph'),
         handler: () => {
           setSectionHeadingLevel(view, 'paragraph')
           view.focus()
@@ -338,7 +338,7 @@ export const useToolbarMenuBarEditorCommands = () => {
       },
       {
         id: 'format-style-subparagraph',
-        label: 'Subparagraph',
+        label: t('heading_subparagraph'),
         handler: () => {
           setSectionHeadingLevel(view, 'subparagraph')
           view.focus()

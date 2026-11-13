@@ -212,17 +212,21 @@ export const WERKZEUGE = {
   check_report: {
     description:
       'Prüfbericht des Projekts wie im Browser. zaehlung zählt die Zitierstellen nach status (geprueft, ohne_quelle, ' +
-      'ohne_seitenangabe, nicht_pruefbar); jede nicht geprüfte Stelle nennt ihren grund.',
+      'ohne_seitenangabe, beleg_ohne_wortlaut, nicht_pruefbar); jede nicht geprüfte Stelle nennt ihren grund. ' +
+      'markiert zählt alle Stellen mit problem: true, auch ohne Quelle und nicht prüfbare, wie der Filter „Markiert“; ' +
+      'beleg_ohne_wortlaut sind die Stellen, die eine Quelle nur zitieren, ohne ihren Wortlaut wiederzugeben. uebersprungen zählt Stellen in ausgeblendeten Bereichen ' +
+      '(leer definierte Makros, \\iffalse, Beamer-Notizen, Einstellung „Ausgeblendete Makros“).',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
-      const { zeilen, zaehlung } = await PruefManager.bericht(projectId)
-      return { ...blatt(zeilen, cursor), zaehlung }
+      const { zeilen, zaehlung, uebersprungen } = await PruefManager.bericht(projectId)
+      return { ...blatt(zeilen, cursor), zaehlung, uebersprungen }
     },
   },
 
   bib_list: {
-    description: 'Referenzen aus den .bib-Dateien mit Status in Crossref.',
+    description:
+      'Referenzen aus den .bib-Dateien mit Status der DOI: Crossref, sonst die Registrierstelle laut doi.org (registrierstelle).',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
@@ -233,7 +237,7 @@ export const WERKZEUGE = {
       const teil = blatt(eintraege, cursor)
       teil.eintraege = await Promise.all(
         teil.eintraege.map(async e => {
-          const werk = e.doi ? await Crossref.werk(e.doi) : null
+          const werk = e.doi ? await Crossref.pruefen(e.doi) : null
           return { key: e.key, doi: e.doi, ...referenzStatus(e, werk) }
         })
       )
@@ -243,12 +247,14 @@ export const WERKZEUGE = {
 
   wait_for_event: {
     description:
-      'Wartet auf den nächsten Auftrag (Long-Poll, Fortschritt alle 30 Sekunden). Nach jedem Auftrag erneut aufrufen.',
+      'Wartet bis zu 100 Sekunden auf den nächsten Auftrag. Bei ereignis: null rufst du wait_for_event sofort erneut auf; ' +
+      'bei abgeloest: true tust du nichts, ein neuerer Aufruf wartet schon; einen Auftrag erledigst du und rufst danach ' +
+      'wait_for_event erneut auf. cursor ist für events_since.',
     inputSchema: z.object({ max_sekunden: z.number().int().min(1).max(3600).optional() }),
-    async ausfuehren({ max_sekunden: max = 1800 }, { botId }, ctx) {
+    async ausfuehren({ max_sekunden: max = Inbox.standardWarteSekunden() }, { botId }, ctx) {
       const token = ctx.mcpReq._meta?.progressToken
       let schritt = 0
-      const ereignis = await Inbox.warteAufEreignis(botId, {
+      const { ereignis, abgeloest } = await Inbox.warteAufEreignis(botId, {
         signal: ctx.mcpReq.signal,
         maxMs: max * 1000,
         fortschritt: async sekunden => {
@@ -259,12 +265,17 @@ export const WERKZEUGE = {
           })
         },
       })
-      return ereignis ? { ereignis } : { ereignis: null, hinweis: meldung('spur_fehler_kein_auftrag') }
+      if (ereignis) return { ereignis, cursor: ereignis.id }
+      const cursor = await Inbox.letzterCursor(botId)
+      if (abgeloest) return { ereignis: null, abgeloest: true, cursor, hinweis: meldung('spur_warten_abgeloest') }
+      return { ereignis: null, cursor, hinweis: meldung('spur_warten_kein_auftrag') }
     },
   },
 
   events_since: {
-    description: 'Ereignisse nach einem Cursor, für verpasste Aufträge.',
+    description:
+      'Ereignisse nach dem cursor aus der letzten Antwort von wait_for_event oder events_since; ohne cursor die neuesten. ' +
+      'Gelesene Ereignisse kommen über wait_for_event nicht noch einmal.',
     inputSchema: z.object({ cursor: z.string().optional() }),
     async ausfuehren({ cursor }, { botId }) {
       return await Inbox.seit(botId, cursor)
@@ -320,6 +331,7 @@ Object.assign(WERKZEUGE, {
       return await SchreibManager.docEdit({
         projectId,
         botId,
+        menschId,
         docId: args.doc_id,
         pfad: args.pfad,
         alt: args.alt,
@@ -342,6 +354,7 @@ Object.assign(WERKZEUGE, {
       return await SchreibManager.docCreate({
         projectId,
         botId,
+        menschId,
         pfad: args.pfad,
         inhalt: args.inhalt,
         schluessel: args.idempotenz_schluessel,
@@ -366,7 +379,7 @@ Object.assign(WERKZEUGE, {
       const lauf = await LaufManager.offenerLauf(projectId, botId)
       if (!lauf) throw new WerkzeugFehler('kein_lauf', 'spur_fehler_kein_lauf')
       await LaufManager.beenden(lauf, zusammenfassung)
-      await LaufAktionen.nachLaufende(projectId, lauf, menschId)
+      await LaufAktionen.nachLaufende(projectId, lauf)
       return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
     },
   },

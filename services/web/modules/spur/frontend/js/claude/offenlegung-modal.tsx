@@ -36,7 +36,7 @@ export default function OffenlegungModal({ schliessen }: { schliessen: () => voi
   const kopieren = async () => {
     try {
       await navigator.clipboard.writeText(daten!.text)
-      setMeldung({ typ: 'success', text: t('spur_kopiert') })
+      setMeldung({ typ: 'success', text: t('copied') })
     } catch {
       setMeldung({ typ: 'error', text: t('spur_kopieren_fehlgeschlagen') })
     }
@@ -52,7 +52,7 @@ export default function OffenlegungModal({ schliessen }: { schliessen: () => voi
   }
 
   return (
-    <OLModal show onHide={schliessen} size="lg">
+    <OLModal themed show onHide={schliessen} size="lg">
       <OLModalHeader>
         <OLModalTitle>{t('spur_ki_offenlegung')}</OLModalTitle>
       </OLModalHeader>
@@ -74,7 +74,7 @@ export default function OffenlegungModal({ schliessen }: { schliessen: () => voi
       </OLModalBody>
       <OLModalFooter>
         <OLButton variant="secondary" onClick={schliessen}>
-          {t('spur_schliessen')}
+          {t('close')}
         </OLButton>
         <OLButton variant="secondary" disabled={!daten || daten.leer} onClick={kopieren}>
           {t('spur_text_kopieren')}

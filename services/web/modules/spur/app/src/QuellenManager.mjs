@@ -10,7 +10,7 @@ import { Problem } from './probleme.mjs'
 import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, vorschlaege } from './sammlungen.mjs'
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
-import { ocrSeite, seitenBild, seitenTexte, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, versatzAusLabels, vttSeiten } from './pdf.mjs'
 import { abrufen } from './WebSchnappschuss.mjs'
 import { quelleGeaendert } from './live.mjs'
 import * as Speicher from './Speicher.mjs'
@@ -390,15 +390,21 @@ export async function seite(quelle, nummer) {
   return eintrag
 }
 
-export async function bild(quelle, nummer) {
-  const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}`)
+export async function bild(quelle, nummer, breite = null) {
+  const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}${breite ? `-w${breite}` : ''}`)
   const pfad = `${ziel}.png`
   try {
     await fs.access(pfad)
     return pfad
   } catch {
-    return await seitenBild(dateiPfad(quelle), nummer, ziel)
+    return await seitenBild(dateiPfad(quelle), nummer, ziel, breite)
   }
+}
+
+// Lage der Zeilen über dem Seitenbild; erkannter Text (OCR) hat keine Lage.
+export async function textEbene(quelle, nummer) {
+  if (quelle.status !== 'text') return { breite: null, hoehe: null, zeilen: [] }
+  return await pdfTextEbene(dateiPfad(quelle), nummer)
 }
 
 function auszug(text, begriff) {
@@ -419,17 +425,15 @@ export async function suchen(projectId, begriff) {
   const ids = [...new Set(treffer.map(t => String(t.quelleId)))].map(
     id => new ObjectId(id)
   )
-  const namen = new Map(
-    (
-      await (await quellen())
-        .find({ _id: { $in: ids }, projectId }, { projection: { dateiname: 1, art: 1 } })
-        .toArray()
-    ).map(q => [String(q._id), q])
+  // Die Quelle reist mit: Sie steht nicht unbedingt in der geladenen Liste.
+  const quellenNachId = new Map(
+    (await (await quellen()).find({ _id: { $in: ids }, projectId }).toArray()).map(q => [String(q._id), q])
   )
   return treffer.map(t => ({
     quelleId: t.quelleId,
-    dateiname: namen.get(String(t.quelleId))?.dateiname,
-    art: namen.get(String(t.quelleId))?.art,
+    dateiname: quellenNachId.get(String(t.quelleId))?.dateiname,
+    art: quellenNachId.get(String(t.quelleId))?.art,
+    quelle: quellenNachId.get(String(t.quelleId)),
     seite: t.seite,
     label: t.label,
     position: t.text.toLowerCase().indexOf(begriff.toLowerCase()),

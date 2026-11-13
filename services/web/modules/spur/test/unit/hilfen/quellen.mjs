@@ -17,6 +17,10 @@ export function crossrefAttrappe() {
         const roh = WERKE[doi.toLowerCase()]
         return roh ? werkAuswerten(roh) : { gefunden: false }
       },
+      async pruefen(doi) {
+        const werk = await this.werk(doi)
+        return werk.gefunden ? { ...werk, registrierstelle: 'crossref' } : { gefunden: false, registrierstelle: null }
+      },
     },
   }
 }

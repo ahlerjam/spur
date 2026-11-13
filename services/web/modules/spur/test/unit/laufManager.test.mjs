@@ -133,6 +133,7 @@ describe('laufFuerClient', () => {
       zahlen: [],
       zusammenfassung: null,
       angelegt: [],
+      automatisch: [],
     })
   })
 
@@ -147,3 +148,30 @@ describe('laufFuerClient', () => {
     ])
   })
 })
+
+describe('laeufeListe', () => {
+  it('liefert die letzten 20 Läufe des Bots, neueste zuerst, und lädt ältere in Schritten von 20', async () => {
+    const sammlung = datenbank.db.collection('spurRuns')
+    const ids = []
+    for (let i = 0; i < 45; i++) ids.push((await sammlung.insertOne({ projectId: projekt, botId: bot, status: 'fertig', nr: i })).insertedId)
+    await sammlung.insertOne({ projectId: projekt, botId: new ObjectId(), status: 'fertig', nr: 99 })
+    const erste = await LaufManager.laeufeListe(projekt, bot, {})
+    expect(erste.laeufe.map(l => l.nr)).toEqual(Array.from({ length: 20 }, (_, i) => 44 - i))
+    expect(erste.weitere).toBe(true)
+    const zweite = await LaufManager.laeufeListe(projekt, bot, { vor: String(erste.laeufe.at(-1)._id) })
+    expect(zweite.laeufe[0].nr).toBe(24)
+    const dritte = await LaufManager.laeufeListe(projekt, bot, { vor: String(zweite.laeufe.at(-1)._id) })
+    expect(dritte.laeufe.map(l => l.nr)).toEqual([4, 3, 2, 1, 0])
+    expect(dritte.weitere).toBe(false)
+    expect((await LaufManager.laeufeListe(projekt, bot, { vor: 'kaputt' })).laeufe).toHaveLength(20)
+  })
+
+  it('laufFuerClient nennt automatisch Angenommenes', () => {
+    const lauf = { _id: 'l', status: 'offen', docs: [], aenderungen: 2, rot: [],
+      angenommen: [{ automatisch: true, pfad: 'main.tex', zeile: 3, op: { p: 1, i: 'Von 240 Befragten' } }, { op: { p: 1, d: 'x' } }] }
+    expect(LaufManager.laufFuerClient(lauf)).toMatchObject({
+      automatisch: [{ pfad: 'main.tex', zeile: 3, art: 'einfuegung', text: 'Von 240 Befragten' }],
+    })
+  })
+})
+

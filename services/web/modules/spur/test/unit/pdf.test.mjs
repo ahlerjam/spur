@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
-import { ocrSeite, seitenBild, seitenTexte, tsvAuswerten, versatzAusLabels, vttSeiten } from '../../app/src/pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, textEbene, textEbeneAuswerten, tsvAuswerten, versatzAusLabels, vttSeiten } from '../../app/src/pdf.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 
 const fixture = name => fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url))
@@ -48,6 +48,27 @@ describe('seitenBild', () => {
     expect(pfad).toBe(`${ziel}.png`)
     expect(existsSync(pfad)).toBe(true)
     expect(statSync(pfad).size).toBeGreaterThan(500)
+  })
+
+  it('rendert auf eine vorgegebene Breite in Pixeln', async () => {
+    const { readFileSync } = await import('node:fs')
+    const pfad = await seitenBild(fixture('smith2024.pdf'), 1, join(ordner, 'seite-1-breit'), 1400)
+    // PNG: Breite steht ab Byte 16 im IHDR-Block.
+    expect(readFileSync(pfad).readUInt32BE(16)).toBe(1400)
+  })
+})
+
+describe('textEbene', () => {
+  it('liefert Seitengröße und Zeilen mit Lage in Punkten', async () => {
+    const ebene = await textEbene(fixture('smith2024.pdf'), 1)
+    expect(ebene).toMatchObject({ breite: 612, hoehe: 792 })
+    expect(ebene.zeilen[0]).toEqual({ x: 72, y: 63.384, b: 100.704, h: 11.1, text: 'Sleep and Memory' })
+    expect(ebene.zeilen.map(z => z.text).join(' ')).toContain('Participants completed the task over two consecutive nights.')
+  })
+
+  it('entschlüsselt Zeichen und lässt leere Zeilen weg', () => {
+    const xml = '<page width="100" height="200"><line xMin="1" yMin="2" xMax="11" yMax="7"><word xMin="1" yMin="2" xMax="5" yMax="7">A&amp;B</word><word xMin="6" yMin="2" xMax="11" yMax="7">&lt;c&gt;</word></line><line xMin="0" yMin="0" xMax="0" yMax="0"></line></page>'
+    expect(textEbeneAuswerten(xml)).toEqual({ breite: 100, hoehe: 200, zeilen: [{ x: 1, y: 2, b: 10, h: 5, text: 'A&B <c>' }] })
   })
 })
 

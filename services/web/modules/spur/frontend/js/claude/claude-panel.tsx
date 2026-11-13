@@ -3,10 +3,21 @@ import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormGroup from '@/shared/components/ol/ol-form-group'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormText from '@/shared/components/ol/ol-form-text'
+import {
+  OLModal,
+  OLModalBody,
+  OLModalFooter,
+  OLModalHeader,
+  OLModalTitle,
+} from '@/shared/components/ol/ol-modal'
+import { FormCheck } from 'react-bootstrap'
+import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
+import getMeta from '@/utils/meta'
 import Notification from '@/shared/components/notification'
 import { useAbfrage } from '../abfrage'
 import { anfrage, jsonAnfrage, projektPfad } from '../api'
@@ -18,20 +29,42 @@ import { WORKFLOW_PRAEFIX } from './workflow-befehl'
 
 type Nachricht = { id: string; von: 'mensch' | 'claude'; text: string; am: string }
 type Workflow = { name: string; titel: string; beschreibung: string; eingaben?: string[] }
+type LaufMitAenderungen = { lauf: Lauf; aenderungen: Aenderung[] }
 type Status = {
   verbunden: boolean
   nachrichten: Nachricht[]
   aeltere?: boolean
   automatik: boolean
-  lauf: Lauf | null
-  aenderungen: Aenderung[]
+  offen: { aenderungen: number; dateien: number; rot: number }
+  laeufe: LaufMitAenderungen[]
+  weitereLaeufe: boolean
+}
+
+// Sobald Claude einmal verbunden war oder der Befehl kopiert wurde, bleibt der Startbefehl eingeklappt (je Person).
+const befehlSchluessel = () => `spur-startbefehl-bekannt:${getMeta('ol-user_id')}`
+function befehlBekannt() {
+  try {
+    return window.localStorage.getItem(befehlSchluessel()) === 'ja'
+  } catch {
+    return false
+  }
+}
+function befehlMerken() {
+  try {
+    window.localStorage.setItem(befehlSchluessel(), 'ja')
+  } catch {
+    // Ohne Speicher klappt der Befehl beim nächsten Öffnen wieder auf.
+  }
 }
 
 export default function ClaudePanel() {
   const { t } = useTranslation()
+  const { write } = usePermissionsContext()
   // Ohne Verbindung alle 2 s: Eine neue Verbindung soll binnen 5 s sichtbar sein, auch mit der Antwortzeit.
   const [takt, setTakt] = useState(2000)
-  const { daten: status, fehler, setFehler, laden } = useAbfrage<Status>(projektPfad('/claude'), takt)
+  const { daten: status, fehler: ladeFehler, laden } = useAbfrage<Status>(projektPfad('/claude'), takt)
+  // Fehler beim Senden oder Starten bleiben stehen, bis die nächste Aktion gelingt; nur der Ladefehler geht von selbst.
+  const [fehler, setFehler] = useState<string | null>(null)
   useEffect(() => setTakt(status?.verbunden ? 5000 : 2000), [status?.verbunden])
   const [offenlegung, setOffenlegung] = useState(false)
 
@@ -44,92 +77,284 @@ export default function ClaudePanel() {
         </OLButton>
       </div>
       {offenlegung && <OffenlegungModal schliessen={() => setOffenlegung(false)} />}
-      {fehler && (
-        <div className="spur-chat-meldung">
-          <Notification type="error" content={fehler} />
-        </div>
-      )}
-      {status && (
-        <>
-          <Verbindung verbunden={status.verbunden} />
-          <Verlauf status={status} neuLaden={laden} />
-          {status.verbunden && (
-            <>
-              <Workflows gestartet={laden} fehler={setFehler} />
-              <Eingabe gesendet={laden} fehler={setFehler} />
-            </>
-          )}
-        </>
-      )}
+      <div className="spur-panel-inhalt spur-claude-inhalt">
+        {ladeFehler && <Notification type="error" content={ladeFehler} />}
+        {fehler && <Notification type="error" content={fehler} />}
+        {status && (
+          <>
+            {write && <Automatik an={status.automatik} offen={status.offen} neuLaden={laden} />}
+            <Verbindung verbunden={status.verbunden} />
+            <Laeufe status={status} neuLaden={laden} />
+            <Verlauf status={status} />
+            {status.verbunden && <Workflows gestartet={laden} fehler={setFehler} />}
+            <Eingabe verbunden={status.verbunden} gesendet={laden} fehler={setFehler} />
+          </>
+        )}
+      </div>
     </div>
+  )
+}
+
+function Automatik({
+  an,
+  offen,
+  neuLaden,
+}: {
+  an: boolean
+  offen: Status['offen']
+  neuLaden: () => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const [wert, setWert] = useState(an)
+  const [speichert, setSpeichert] = useState(false)
+  const [fehler, setFehler] = useState<string | null>(null)
+  const [fragen, setFragen] = useState(false)
+  const [nimmtAn, setNimmtAn] = useState(false)
+  const knopf = useRef<HTMLButtonElement>(null)
+  // Nach jedem Schließen des Dialogs (Annehmen, Abbrechen, Esc) kehrt der Fokus auf den Knopf zurück. Overleafs Modal
+  // versucht das auch, scheitert aber, sobald der Knopf „Nichts offen“ zeigt und darum nicht mehr bereit war.
+  const warOffen = useRef(false)
+  useEffect(() => {
+    if (warOffen.current && !fragen) knopf.current?.focus()
+    warOffen.current = fragen
+  }, [fragen])
+  // Die Abfrage alle paar Sekunden überschreibt keine laufende Änderung.
+  useEffect(() => {
+    if (!speichert) setWert(an)
+  }, [an, speichert])
+
+  // Gesperrt wird nicht über `disabled`: Der Browser nähme dem Schalter sonst den Fokus. Ein Ref statt des Zustands,
+  // damit auch zwei Wechsel vor dem nächsten Rendern nur eine Anfrage auslösen.
+  const laeuft = useRef(false)
+  const umschalten = async (neu: boolean) => {
+    if (laeuft.current) return
+    laeuft.current = true
+    setWert(neu)
+    setFehler(null)
+    setSpeichert(true)
+    try {
+      await jsonAnfrage('PUT', projektPfad('/claude/automatik'), { an: neu })
+      await neuLaden()
+    } catch (error) {
+      setWert(!neu)
+      setFehler((error as Error).message)
+    } finally {
+      laeuft.current = false
+      setSpeichert(false)
+    }
+  }
+
+  const allesAnnehmen = async () => {
+    setNimmtAn(true)
+    setFehler(null)
+    try {
+      await jsonAnfrage('POST', projektPfad('/claude/alles-annehmen'))
+      await neuLaden()
+    } catch (error) {
+      setFehler((error as Error).message)
+    } finally {
+      setFragen(false)
+      setNimmtAn(false)
+    }
+  }
+
+  const nichtsOffen = offen.aenderungen === 0
+  const nurRot = nichtsOffen && offen.rot > 0
+  const knopfText = nurRot
+    ? t('spur_nur_rote_offen', { anzahl: offen.rot })
+    : nichtsOffen
+      ? t('spur_nichts_offen')
+      : t('spur_alles_offene_annehmen_zahl', { anzahl: offen.aenderungen })
+  return (
+    <section className="spur-automatik" aria-label={t('spur_automatik')}>
+      <FormCheck
+        type="switch"
+        id="spur-automatik"
+        role="switch"
+        checked={wert}
+        aria-busy={speichert || undefined}
+        aria-describedby="spur-automatik-hinweis"
+        label={t('spur_automatik_schalter')}
+        onChange={e => umschalten(e.target.checked)}
+      />
+      <p className="spur-zeile-meta" id="spur-automatik-hinweis">
+        {t('spur_rote_bleiben_offen')}
+      </p>
+      {fehler && (
+        <OLFormText type="error" role="alert">
+          {fehler}
+        </OLFormText>
+      )}
+      {/* Gesperrt über `aria-disabled`, damit der Knopf den Fokus nach dem Annehmen behält. */}
+      <OLButton
+        ref={knopf}
+        variant="secondary"
+        size="sm"
+        className={nichtsOffen ? 'disabled' : undefined}
+        aria-disabled={nichtsOffen || undefined}
+        aria-describedby={nurRot ? 'spur-nur-rot-hinweis' : undefined}
+        onClick={() => !nichtsOffen && setFragen(true)}
+      >
+        {knopfText}
+      </OLButton>
+      {nurRot && (
+        <p className="spur-zeile-meta" id="spur-nur-rot-hinweis">
+          {t('spur_rote_einzeln_pruefen')}
+        </p>
+      )}
+      {fragen && (
+        <OLModal themed show onHide={() => setFragen(false)}>
+          <OLModalHeader>
+            <OLModalTitle>{t('spur_alles_offene_annehmen')}</OLModalTitle>
+          </OLModalHeader>
+          <OLModalBody>
+            <p>
+              {t('spur_alles_annehmen_frage', {
+                aenderungen: t('spur_aenderungen_zahl', { count: offen.aenderungen }),
+                dateien: t('spur_dateien_zahl', { count: offen.dateien }),
+              })}{' '}
+              {t('spur_rote_bleiben_offen')}
+            </p>
+          </OLModalBody>
+          <OLModalFooter>
+            <OLButton variant="secondary" onClick={() => setFragen(false)}>
+              {t('cancel')}
+            </OLButton>
+            <LadeKnopf variant="primary" isLoading={nimmtAn} onClick={allesAnnehmen}>
+              {t('spur_annehmen')}
+            </LadeKnopf>
+          </OLModalFooter>
+        </OLModal>
+      )}
+    </section>
   )
 }
 
 function Verbindung({ verbunden }: { verbunden: boolean }) {
   const { t } = useTranslation()
+  const [bekannt, setBekannt] = useState(befehlBekannt)
+  const [aufgeklappt, setAufgeklappt] = useState(false)
+  useEffect(() => {
+    if (verbunden && !bekannt) {
+      befehlMerken()
+      setBekannt(true)
+    }
+  }, [verbunden, bekannt])
+  const eingeklappt = (verbunden || bekannt) && !aufgeklappt
+
   return (
-    <div className="spur-claude-status" aria-live="polite">
-      <OLBadge bg={verbunden ? 'success' : 'warning'}>
-        {verbunden ? t('spur_claude_verbunden') : t('spur_claude_nicht_verbunden')}
-      </OLBadge>
-      {!verbunden && (
-        <>
-          <p className="spur-zeile-meta">{t('spur_claude_starten')}</p>
-          <BefehlKasten befehl={startBefehl(t)} />
-        </>
+    <div className="spur-claude-status">
+      <p className="spur-claude-statuszeile" aria-live="polite">
+        <OLBadge bg={verbunden ? 'success' : 'warning'}>
+          {verbunden ? t('spur_claude_verbunden') : t('spur_claude_nicht_verbunden')}
+        </OLBadge>
+        {!verbunden && <a href="/user/settings#language-feedback">{t('spur_token_verwalten')}</a>}
+      </p>
+      {(verbunden || bekannt) && (
+        <OLButton
+          variant="link"
+          size="sm"
+          className="spur-befehl-umschalten"
+          aria-expanded={!eingeklappt}
+          aria-controls="spur-startbefehl"
+          onClick={() => setAufgeklappt(!aufgeklappt)}
+        >
+          {eingeklappt ? t('spur_startbefehl_anzeigen') : t('spur_startbefehl_ausblenden')}
+        </OLButton>
+      )}
+      {!eingeklappt && (
+        <div id="spur-startbefehl">
+          {!verbunden && <p className="spur-zeile-meta">{t('spur_claude_starten')}</p>}
+          <BefehlKasten
+            befehl={startBefehl(t)}
+            kopiert={() => {
+              befehlMerken()
+            }}
+          />
+        </div>
       )}
     </div>
   )
 }
 
-function Verlauf({ status, neuLaden }: { status: Status; neuLaden: () => Promise<void> }) {
+// Der neueste Lauf steht offen, ältere eingeklappt mit Status und Zahl offener Änderungen.
+function Laeufe({ status, neuLaden }: { status: Status; neuLaden: () => Promise<void> }) {
+  const { t } = useTranslation()
+  const [aeltere, setAeltere] = useState<{ laeufe: LaufMitAenderungen[]; weitere: boolean } | null>(null)
+  const [laedt, setLaedt] = useState(false)
+  const [fehler, setFehler] = useState<string | null>(null)
+  const alle = [...status.laeufe, ...(aeltere?.laeufe ?? [])]
+  const weitere = aeltere ? aeltere.weitere : status.weitereLaeufe
+
+  const mehrLaden = async () => {
+    setLaedt(true)
+    setFehler(null)
+    try {
+      const letzter = alle.at(-1)!.lauf.id
+      const antwort = await anfrage<{ laeufe: LaufMitAenderungen[]; weitereLaeufe: boolean }>(
+        projektPfad(`/claude/laeufe?vor=${letzter}`)
+      )
+      setAeltere({ laeufe: [...(aeltere?.laeufe ?? []), ...antwort.laeufe], weitere: antwort.weitereLaeufe })
+    } catch (error) {
+      setFehler((error as Error).message)
+    } finally {
+      setLaedt(false)
+    }
+  }
+
+  // Nach einer Aktion an einem älteren Lauf auch die nachgeladenen neu holen.
+  const allesNeuLaden = async () => {
+    await neuLaden()
+    setAeltere(null)
+  }
+
+  if (!alle.length) return null
+  return (
+    <div className="spur-laeufe">
+      {alle.map(({ lauf, aenderungen }, i) => (
+        <LaufKarte key={lauf.id} lauf={lauf} aenderungen={aenderungen} neuLaden={allesNeuLaden} aufgeklappt={i === 0} />
+      ))}
+      {fehler && <Notification type="error" content={fehler} />}
+      {weitere && (
+        <LadeKnopf variant="secondary" size="sm" isLoading={laedt} loadingLabel={t('spur_laedt')} onClick={mehrLaden}>
+          {t('spur_aeltere_laden')}
+        </LadeKnopf>
+      )}
+    </div>
+  )
+}
+
+function Verlauf({ status }: { status: Status }) {
   const { t, i18n } = useTranslation()
   const nachrichten = status.nachrichten
   const wartet = status.verbunden && nachrichten.at(-1)?.von === 'mensch'
-  // Die Lauf-Karte steht dort im Verlauf, wo der Lauf begann; spätere Antworten folgen darunter.
-  const { lauf } = status
-  const laufBei = lauf
-    ? nachrichten.filter(n => new Date(n.am) <= new Date(lauf.gestartet)).length
-    : -1
-  const laufKarte = lauf && (
-    <li className="spur-chat-lauf" key="lauf">
-      <LaufKarte
-        lauf={lauf}
-        aenderungen={status.aenderungen}
-        automatik={status.automatik}
-        neuLaden={neuLaden}
-      />
-    </li>
-  )
 
-  // column-reverse im CSS hält den Verlauf unten, ohne das Zurücklesen zu stören.
+  if (nachrichten.length === 0 && status.laeufe.length === 0) {
+    return <p className="spur-leer spur-chat-leer">{t('spur_keine_auftraege')}</p>
+  }
   return (
+    // column-reverse im CSS hält den Verlauf unten, ohne das Zurücklesen zu stören.
     <div className="spur-chat-verlauf">
       <div>
-        {nachrichten.length === 0 && !status.lauf && (
-          <p className="spur-leer">{t('spur_keine_nachrichten')}</p>
-        )}
-        {status.aeltere && (
-          <p className="spur-zeile-meta spur-chat-aeltere">
-            {t('spur_chat_aeltere', { anzahl: nachrichten.length })}
-          </p>
-        )}
-        <ol className="spur-chat" role="log" aria-label={t('spur_unterhaltung')}>
-          {nachrichten.map((n, i) => [
-            i === laufBei && laufKarte,
-            <li className={`spur-chat-nachricht spur-nachricht-${n.von}`} key={n.id}>
-              <p className="spur-zeile-meta">
-                {n.von === 'claude' ? 'Claude' : t('spur_du')} ·{' '}
-                <time dateTime={n.am}>
-                  {new Date(n.am).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
-                </time>
-              </p>
-              <p className="spur-nachricht-text">{n.text}</p>
-            </li>,
-          ])}
-          {laufBei === nachrichten.length && laufKarte}
-          {wartet && <li className="spur-chat-wartet">{t('spur_claude_arbeitet')}</li>}
-        </ol>
+      {status.aeltere && (
+        <p className="spur-zeile-meta spur-chat-aeltere">
+          {t('spur_chat_aeltere', { anzahl: nachrichten.length })}
+        </p>
+      )}
+      <ol className="spur-chat" role="log" aria-label={t('spur_unterhaltung')}>
+        {nachrichten.map(n => (
+          <li className={`spur-chat-nachricht spur-nachricht-${n.von}`} key={n.id}>
+            <p className="spur-zeile-meta">
+              {n.von === 'claude' ? 'Claude' : t('spur_du')} ·{' '}
+              <time dateTime={n.am}>
+                {new Date(n.am).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })}
+              </time>
+            </p>
+            <p className="spur-nachricht-text">{n.text}</p>
+          </li>
+        ))}
+        {wartet && <li className="spur-chat-wartet">{t('spur_claude_arbeitet')}</li>}
+      </ol>
       </div>
     </div>
   )
@@ -202,9 +427,9 @@ function QuellenSammelnFormular({
           <OLFormText id="spur-quellen-anzahl-hilfe">{t('spur_anzahl_hilfe')}</OLFormText>
         )}
       </OLFormGroup>
-      <OLButton type="submit" variant="primary" size="sm" isLoading={laeuft}>
+      <LadeKnopf type="submit" variant="primary" size="sm" isLoading={laeuft}>
         {t('spur_sammeln_starten')}
-      </OLButton>
+      </LadeKnopf>
     </form>
   )
 }
@@ -242,7 +467,7 @@ function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehl
       <ul className="spur-liste">
         {liste.map(w => (
           <li className="spur-workflow" key={w.name}>
-            <OLButton
+            <LadeKnopf
               variant="secondary"
               size="sm"
               isLoading={laeuft === w.name}
@@ -255,7 +480,7 @@ function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehl
               }
             >
               {w.titel}
-            </OLButton>
+            </LadeKnopf>
             <p className="spur-zeile-meta" id={`spur-workflow-${w.name}`}>
               {w.beschreibung}
             </p>
@@ -290,7 +515,15 @@ function Workflows({ gestartet, fehler }: { gestartet: () => Promise<void>; fehl
   )
 }
 
-function Eingabe({ gesendet, fehler }: { gesendet: () => Promise<void>; fehler: (f: string | null) => void }) {
+function Eingabe({
+  verbunden,
+  gesendet,
+  fehler,
+}: {
+  verbunden: boolean
+  gesendet: () => Promise<void>
+  fehler: (f: string | null) => void
+}) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
   const [sendet, setSendet] = useState(false)
@@ -332,6 +565,7 @@ function Eingabe({ gesendet, fehler }: { gesendet: () => Promise<void>; fehler: 
         ref={feld}
         rows={3}
         value={text}
+        disabled={!verbunden}
         isInvalid={leer}
         aria-invalid={leer || undefined}
         aria-describedby={leer ? 'spur-auftrag-leer' : 'spur-auftrag-hinweis'}
@@ -352,11 +586,11 @@ function Eingabe({ gesendet, fehler }: { gesendet: () => Promise<void>; fehler: 
           {t('spur_auftrag_leer')}
         </OLFormText>
       ) : (
-        <OLFormText id="spur-auftrag-hinweis">{t('spur_strg_enter')}</OLFormText>
+        <OLFormText id="spur-auftrag-hinweis">{verbunden ? t('spur_strg_enter') : t('spur_erst_verbinden')}</OLFormText>
       )}
-      <OLButton type="submit" variant="primary" size="sm" isLoading={sendet}>
+      <LadeKnopf type="submit" variant="primary" size="sm" isLoading={sendet} disabled={!verbunden}>
         {t('spur_senden')}
-      </OLButton>
+      </LadeKnopf>
     </form>
   )
 }

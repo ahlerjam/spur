@@ -29,6 +29,7 @@ beforeEach(async () => {
       holen: vi.fn(),
       seite: vi.fn(),
       bild: vi.fn(),
+      textEbene: vi.fn(),
       dateiPfad: vi.fn(),
       aendern: vi.fn(async (q, felder) => ({ ...q, ...felder })),
       loeschen: vi.fn(async () => {}),
@@ -63,8 +64,10 @@ beforeEach(async () => {
       ablehnen: vi.fn(async () => ({ abgelehnt: 1, rest: 0 })),
       zuruecknehmen: vi.fn(async () => {}),
       automatikSetzen: vi.fn(async () => {}),
+      offenZaehlen: vi.fn(async () => ({ aenderungen: 0, dateien: 0 })),
+      allesAnnehmen: vi.fn(async () => ({ angenommen: 3 })),
     },
-    Lauf: { letzterLauf: vi.fn(async () => null) },
+    Lauf: { letzterLauf: vi.fn(async () => null), laeufeListe: vi.fn(async () => ({ laeufe: [], weitere: false })) },
     Workflows: {
       liste: vi.fn(async () => [{ name: 'folien', titel: 'Folien aus Paper', beschreibung: 'B', text: 'T', angepasst: false }]),
       starten: vi.fn(async () => ({ _id: 'n9' })),
@@ -118,8 +121,15 @@ describe('Quellenliste und Suche', () => {
     m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
     const { res } = await ausfuehren(C.quellenListe, req({ query: { seite: '2' } }))
     expect(m.Quellen.liste).toHaveBeenCalledWith(projekt, { seite: 2 })
-    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, ocr: null, web: null })
+    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', autoren: [], jahr: null, fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, ocr: null, web: null })
     expect(res.body).toMatchObject({ gesamt: 1, seitengroesse: 100 })
+  })
+
+  it('quellenListe nennt Autoren mit Initial und das Jahr', async () => {
+    const q = quelle({ meta: { titel: 'Sleep and Memory', autoren: [{ given: 'Alice Beth', family: 'Smith' }, { family: 'Jones' }], jahr: 2024 } })
+    m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
+    const { res } = await ausfuehren(C.quellenListe, req())
+    expect(res.body.quellen[0]).toMatchObject({ titel: 'Sleep and Memory', autoren: ['A. B. Smith', 'Jones'], jahr: 2024 })
   })
 
   it('quellenListe nimmt bei unsinniger Seite die erste', async () => {
@@ -144,6 +154,15 @@ describe('Quellenliste und Suche', () => {
       expect.objectContaining({ quelleId: q._id, imDateinamen: true, seite: 1, quelle: expect.objectContaining({ id: q._id }) }),
       { quelleId: 'q2', seite: 3 },
     ])
+  })
+
+  it('quellenSuche gibt Treffern im Text ihre Quelle mit, auch jenseits der geladenen Liste', async () => {
+    const q = quelle()
+    m.Quellen.dateinamenSuchen.mockResolvedValue([])
+    m.Quellen.suchen.mockResolvedValue([{ quelleId: q._id, seite: 2, quelle: q }])
+    const { res } = await ausfuehren(C.quellenSuche, req({ query: { q: 'x' } }))
+    expect(res.body.treffer[0]).toEqual({ quelleId: q._id, seite: 2, quelle: expect.objectContaining({ id: q._id, dateiname: 'a.pdf' }) })
+    expect(res.body.treffer[0].quelle).not.toHaveProperty('meta')
   })
 })
 
@@ -214,6 +233,28 @@ describe('Seiten, Bilder und Dateien', () => {
     const { res } = await ausfuehren(C.quelleBild, mitQuelle())
     expect(res.kopfzeilen['Content-Type']).toBe('png')
     expect(Buffer.concat(res.inhalt).subarray(0, 4).toString()).toBe('%PDF')
+  })
+
+  it('quelleBild rendert in der gewünschten Breite, gerundet auf 200 px und begrenzt', async () => {
+    m.Quellen.bild.mockResolvedValue(fixture('smith2024.pdf'))
+    for (const [breite, erwartet] of [['1234', 1400], ['99999', 4800], ['10', 200], ['abc', null], [undefined, null]]) {
+      m.Quellen.bild.mockClear()
+      await ausfuehren(C.quelleBild, mitQuelle({ query: { breite } }))
+      expect(m.Quellen.bild).toHaveBeenCalledWith(expect.anything(), 3, erwartet)
+    }
+  })
+
+  it('quelleTextebene liefert die Zeilen einer PDF-Seite', async () => {
+    m.Quellen.textEbene.mockResolvedValue({ breite: 612, hoehe: 792, zeilen: [{ x: 1, y: 2, b: 3, h: 4, text: 'a' }] })
+    const { res } = await ausfuehren(C.quelleTextebene, mitQuelle())
+    expect(m.Quellen.seite).toHaveBeenCalledWith(expect.anything(), 3)
+    expect(res.body).toEqual({ breite: 612, hoehe: 792, zeilen: [{ x: 1, y: 2, b: 3, h: 4, text: 'a' }] })
+  })
+
+  it('quelleTextebene gibt es nur für PDFs', async () => {
+    m.Quellen.holen.mockResolvedValue(quelle({ art: 'web' }))
+    const { res } = await ausfuehren(C.quelleTextebene, mitQuelle())
+    expect(res.statusCode).toBe(404)
   })
 
   it('quelleBild gibt es nur für PDFs', async () => {
@@ -487,17 +528,35 @@ describe('Claude-Zugang und Läufe', () => {
       aeltere: true,
     })
     m.Aktionen.automatik.mockResolvedValue(true)
-    m.Aktionen.laufDaten.mockResolvedValue({ lauf: { id: 'l1' }, aenderungen: [] })
+    m.Aktionen.offenZaehlen.mockResolvedValue({ aenderungen: 12, dateien: 2 })
+    m.Lauf.laeufeListe.mockResolvedValue({ laeufe: [{ _id: 'l2' }, { _id: 'l1' }], weitere: true })
+    m.Aktionen.laufDaten.mockImplementation(async (_p, lauf) => ({ lauf: { id: lauf._id }, aenderungen: [] }))
     const { res } = await ausfuehren(C.claudeStatus, req())
     expect(m.Inbox.verlauf).toHaveBeenCalledWith(projekt, 'bot1')
+    expect(m.Lauf.laeufeListe).toHaveBeenCalledWith(projekt, 'bot1', { vor: undefined })
     expect(res.body).toEqual({
       verbunden: true,
       nachrichten: [{ id: 'n1', von: 'mensch', text: 'eins', am: 1 }, { id: 'n2', von: 'claude', text: 'zwei', am: 2 }],
       aeltere: true,
       automatik: true,
-      lauf: { id: 'l1' },
-      aenderungen: [],
+      offen: { aenderungen: 12, dateien: 2 },
+      laeufe: [{ lauf: { id: 'l2' }, aenderungen: [] }, { lauf: { id: 'l1' }, aenderungen: [] }],
+      weitereLaeufe: true,
     })
+  })
+
+  it('claudeLaeufe lädt ältere Läufe vor einem gegebenen Lauf', async () => {
+    m.Lauf.laeufeListe.mockResolvedValue({ laeufe: [{ _id: 'l0' }], weitere: false })
+    m.Aktionen.laufDaten.mockImplementation(async (_p, lauf) => ({ lauf: { id: lauf._id }, aenderungen: [] }))
+    const { res } = await ausfuehren(C.claudeLaeufe, req({ query: { vor: 'l1' } }))
+    expect(m.Lauf.laeufeListe).toHaveBeenCalledWith(projekt, 'bot1', { vor: 'l1' })
+    expect(res.body).toEqual({ laeufe: [{ lauf: { id: 'l0' }, aenderungen: [] }], weitereLaeufe: false })
+  })
+
+  it('allesAnnehmen nimmt die offenen Änderungen des eigenen Bots an', async () => {
+    const { res } = await ausfuehren(C.allesAnnehmen, req())
+    expect(m.Aktionen.allesAnnehmen).toHaveBeenCalledWith(projekt, 'bot1', anna)
+    expect(res.body).toEqual({ angenommen: 3 })
   })
 
   it('workflows liefert Name, Titel und Beschreibung', async () => {
@@ -541,11 +600,20 @@ describe('Claude-Zugang und Läufe', () => {
 
   const lauf = body => req({ params: { project_id: String(projekt), lauf_id: 'l1' }, body })
 
-  it('laufAnnehmen nimmt alle oder die gewählten Changes an', async () => {
+  it('laufAnnehmen nimmt alle oder die gewählten Changes an, rote Zitate nur mit rote_mit', async () => {
     await ausfuehren(C.laufAnnehmen, lauf({}))
-    expect(m.Aktionen.annehmen).toHaveBeenCalledWith(projekt, { _id: 'l1' }, anna, undefined)
+    expect(m.Aktionen.annehmen).toHaveBeenCalledWith(projekt, { _id: 'l1' }, anna, undefined, { roteMit: false })
     await ausfuehren(C.laufAnnehmen, lauf({ change_ids: ['a', 'b'] }))
-    expect(m.Aktionen.annehmen).toHaveBeenLastCalledWith(projekt, { _id: 'l1' }, anna, ['a', 'b'])
+    expect(m.Aktionen.annehmen).toHaveBeenLastCalledWith(projekt, { _id: 'l1' }, anna, ['a', 'b'], { roteMit: false })
+    await ausfuehren(C.laufAnnehmen, lauf({ rote_mit: true }))
+    expect(m.Aktionen.annehmen).toHaveBeenLastCalledWith(projekt, { _id: 'l1' }, anna, undefined, { roteMit: true })
+  })
+
+  it('laufAnnehmen weist ein rote_mit ab, das kein Wahrheitswert ist', async () => {
+    m.Aktionen.annehmen.mockClear()
+    const { res } = await ausfuehren(C.laufAnnehmen, lauf({ rote_mit: 'ja' }))
+    expect(res.statusCode).toBe(422)
+    expect(m.Aktionen.annehmen).not.toHaveBeenCalled()
   })
 
   it.each([['kein Array', 'a'], ['Zahlen', [1, 2]]])('laufAnnehmen weist change_ids ab, die %s sind', async (_name, ids) => {

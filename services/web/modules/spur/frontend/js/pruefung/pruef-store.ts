@@ -14,29 +14,33 @@ export type Zeile = {
   seite: string | null
   gefundenAuf?: string
   referenz?: string
+  registrierstelle?: string | null
+  registrierstelleName?: string
   retraction?: string | null
   problem: boolean
   status: StellenStatus
   grund: string | null
 }
 
-export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar'] as const
+export const STELLEN_STATUS = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'beleg_ohne_wortlaut', 'nicht_pruefbar'] as const
 export type StellenStatus = (typeof STELLEN_STATUS)[number]
 
 export type Bericht = {
   zeilen: Zeile[]
-  zaehlung: Record<StellenStatus, number>
+  zaehlung: Record<StellenStatus, number> & { markiert: number }
+  uebersprungen: number
 }
 
 export type PruefZustand = {
   status: 'bereit' | 'laeuft' | 'fertig' | 'fehler'
   bericht: Bericht | null
   fehler: string | null
+  geprueftAm: number | null
 }
 
 const WARTEZEIT_MS = 2500
 
-let zustand: PruefZustand = { status: 'bereit', bericht: null, fehler: null }
+let zustand: PruefZustand = { status: 'bereit', bericht: null, fehler: null, geprueftAm: null }
 const hoerer = new Set<() => void>()
 let timer: ReturnType<typeof setTimeout> | undefined
 let laufNummer = 0
@@ -62,7 +66,7 @@ export async function pruefen() {
   setzen({ status: 'laeuft', fehler: null })
   try {
     const bericht = await anfrage<Bericht>(projektPfad('/pruefbericht'))
-    if (nummer === laufNummer) setzen({ status: 'fertig', bericht })
+    if (nummer === laufNummer) setzen({ status: 'fertig', bericht, geprueftAm: Date.now() })
   } catch (error) {
     if (nummer === laufNummer) {
       setzen({ status: 'fehler', fehler: (error as Error).message })

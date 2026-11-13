@@ -2,6 +2,7 @@ import type { DefaultNavbarMetadata } from '@/shared/components/types/default-na
 import NavDropdownMenu from '@/shared/components/navbar/nav-dropdown-menu'
 import NavDropdownLinkItem from '@/shared/components/navbar/nav-dropdown-link-item'
 import { useSendProjectListMB } from '@/features/project-list/components/project-list-events'
+import { useTranslation } from 'react-i18next'
 
 export default function AdminMenu({
   canDisplayAdminMenu,
@@ -22,6 +23,7 @@ export default function AdminMenu({
   | 'adminUrl'
 >) {
   const sendProjectListMB = useSendProjectListMB()
+  const { t } = useTranslation()
   return (
     <NavDropdownMenu
       title="Admin"
@@ -45,8 +47,12 @@ export default function AdminMenu({
           <NavDropdownLinkItem href="/admin/register">
             Register Users
           </NavDropdownLinkItem>
+          {/* spur: Seiten des spur-Moduls, übersetzt wie die übrige Oberfläche */}
           <NavDropdownLinkItem href="/spur/admin/grenzen">
-            Limits
+            {t('spur_grenzen')}
+          </NavDropdownLinkItem>
+          <NavDropdownLinkItem href="/spur/admin/workflows">
+            {t('spur_workflows')}
           </NavDropdownLinkItem>
         </>
       ) : null}

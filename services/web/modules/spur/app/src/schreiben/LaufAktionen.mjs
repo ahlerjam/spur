@@ -53,7 +53,16 @@ export async function aenderungen(projectId, lauf) {
   })
 }
 
-export function fuerKarte(liste) {
+// Der Server entscheidet, welche Changes rot sind: nach ID oder nach Zeitstempel. Der Zeitstempel bleibt erhalten,
+// wenn jemand in einen roten Einschub tippt und ihn in Stücke mit neuen IDs teilt.
+function rotPruefer(lauf) {
+  const ids = new Set(lauf.rotAenderungen ?? [])
+  const zeiten = new Set(lauf.rotZeiten ?? [])
+  return c => ids.has(c.id) || zeiten.has(String(c.metadata?.ts))
+}
+
+export function fuerKarte(liste, lauf) {
+  const istRot = rotPruefer(lauf)
   return liste.flatMap(d =>
     d.geloescht
       ? [{ docId: d.docId, geloescht: true }]
@@ -61,6 +70,7 @@ export function fuerKarte(liste) {
           id: c.id,
           docId: d.docId,
           pfad: d.pfad,
+          rot: istRot(c),
           art: c.op.i !== undefined ? 'einfuegung' : 'loeschung',
           // Die Ops liegen auf Wortgrenzen (opsFuer), der Text beginnt also nie mitten im Wort.
           text: (c.op.i ?? c.op.d).slice(0, 200),
@@ -116,27 +126,50 @@ async function angelegtEntfernen(projectId, lauf, userId) {
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { angelegt: [] } })
 }
 
-export async function annehmen(projectId, lauf, userId, nurIds) {
+// `roteMit`: Rote Zitate nimmt nur an, wer es ausdrücklich verlangt (rote_mit); sonst bleiben sie offen, auch wenn
+// ihre ID in `nurIds` steht oder gar keine IDs übergeben werden.
+// `automatisch`: vom Schalter direkt nach dem Schreiben; die Karte zeigt diese Changes weiter an.
+// Schalter und Sammelannahme lassen einen offenen Lauf offen: Claude schreibt vielleicht weiter, und der nächste
+// doc_edit legte sonst einen neuen Lauf an.
+export async function annehmen(
+  projectId,
+  lauf,
+  userId,
+  nurIds,
+  { automatisch = false, laufOffenLassen = automatisch, roteMit = false } = {}
+) {
   mussOffenSein(lauf)
+  const istRot = rotPruefer(lauf)
   const liste = await aenderungen(projectId, lauf)
   const angenommen = []
+  // Ein Stapel teilt sich den Text, aus dem sein Kontext stammt; „Lauf rückgängig“ nimmt Stapel nacheinander zurück.
+  const stapel = String(new ObjectId())
   for (const d of liste) {
     // Wie beim Ablehnen: ein gespaltener Einschub wird ganz angenommen, sonst blieben Restmarken.
-    const ids = mitGanzenEinschueben(d.changes, nurIds).map(c => c.id)
+    const ids = mitGanzenEinschueben(d.changes, nurIds)
+      .filter(c => roteMit || !istRot(c))
+      .map(c => c.id)
     if (!ids.length) continue
     await DocumentUpdaterHandler.promises.acceptChanges(projectId, d.docId, ids, userId)
     // Wie TrackChangesController: offene Editoren entfernen die Marken sofort.
     EditorRealTimeController.emitToRoom(projectId, 'accept-changes', d.docId, ids)
     for (const c of d.changes.filter(c => ids.includes(c.id))) {
-      angenommen.push({ docId: d.docId, op: c.op, ...kontextUm(d.text, c.op) })
+      angenommen.push({
+        docId: d.docId,
+        op: c.op,
+        ...kontextUm(d.text, c.op),
+        stapel,
+        ...(automatisch && { automatisch: true, pfad: d.pfad, zeile: d.text.slice(0, c.op.p).split('\n').length }),
+      })
     }
   }
   const rest = liste.reduce((n, d) => n + d.changes.length, 0) - angenommen.length
+  const fertig = rest === 0 && !(laufOffenLassen && lauf.status === 'offen')
   await (await laeufe()).updateOne(
     { _id: lauf._id },
     {
       $push: { angenommen: { $each: angenommen } },
-      ...(rest === 0 ? { $set: { status: 'angenommen' } } : {}),
+      ...(fertig ? { $set: { status: 'angenommen' } } : {}),
     }
   )
   return { angenommen: angenommen.length, rest }
@@ -172,33 +205,87 @@ function konflikt(text, p) {
 
 // Rücknahme eines angenommenen Laufs als neue Track Changes; bei Überschneidung nichts ändern.
 export async function zuruecknehmen(projectId, lauf, userId) {
-  // Ein noch nicht angenommener Lauf mit angelegten Dateien: Changes ablehnen und das Angelegte entfernen.
-  if ((lauf.status === 'offen' || lauf.status === 'fertig') && lauf.angelegt?.length) {
+  const offen = lauf.status === 'offen' || lauf.status === 'fertig'
+  // Ein noch nicht angenommener Lauf: offene Changes ablehnen, Angelegtes entfernen und, was Schalter oder
+  // Sammelannahme schon angenommen haben, zurücknehmen. Erst ein Probelauf: Ein Konflikt ändert gar nichts.
+  if (offen && (lauf.angelegt?.length || lauf.angenommen?.length)) {
+    if (lauf.angenommen?.length) await rueckPlan(projectId, lauf, { offeneAbziehen: true })
     await ablehnen(projectId, lauf, userId)
+    if (lauf.angenommen?.length) await angenommenesZuruecknehmen(projectId, lauf, userId)
     await statusSetzen(lauf, 'zurueckgenommen')
     return
   }
   if (lauf.status !== 'angenommen') {
     throw new Problem(409, 'nicht_angenommen', 'spur_fehler_nicht_angenommen')
   }
-  const plan = []
-  for (const docId of [...new Set(lauf.angenommen.map(a => a.docId))]) {
-    const { lines, version } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
-    const text = lines.join('\n')
-    const ops = []
-    for (const eintrag of lauf.angenommen.filter(a => a.docId === docId)) {
-      // Ohne gespeicherten Kontext lässt sich die Stelle nicht sicher finden: lieber Konflikt.
-      const p = eintrag.vor === undefined ? null : heutigePosition(text, eintrag)
-      if (p === null) throw konflikt(text, eintrag.op.p)
-      ops.push({ ...eintrag.op, p })
-    }
-    plan.push({ docId, version, ops: umkehrOps(ops.map(op => ({ op }))).map(({ u, ...op }) => op) })
+  await angenommenesZuruecknehmen(projectId, lauf, userId)
+  await angelegtEntfernen(projectId, lauf, userId)
+  await statusSetzen(lauf, 'zurueckgenommen')
+}
+
+function opsAnwenden(text, ops) {
+  return ops.reduce(
+    (t, op) => (op.i !== undefined ? t.slice(0, op.p) + op.i + t.slice(op.p) : t.slice(0, op.p) + t.slice(op.p + op.d.length)),
+    text
+  )
+}
+
+// Aufeinanderfolgende Einträge desselben Stapels; alte Einträge ohne Stapel gelten als einer.
+function stapelVon(eintraege) {
+  const gruppen = []
+  for (const e of eintraege) {
+    if (gruppen.length && gruppen.at(-1)[0].stapel === e.stapel) gruppen.at(-1).push(e)
+    else gruppen.push([e])
   }
+  return gruppen
+}
+
+// Der Kontext eines Stapels kann offene Changes enthalten, die beim Zurücknehmen schon herausgerechnet sind
+// (oder umgekehrt). Dann mit kürzerem Kontext auf beiden Seiten suchen; bei mehreren Treffern gilt weiter der nächste
+// zur alten Stelle.
+function positionMitKuerzeremKontext(text, eintrag) {
+  for (const laenge of [40, 20, 10]) {
+    const p = heutigePosition(text, { ...eintrag, vor: eintrag.vor.slice(-laenge), nach: eintrag.nach.slice(0, laenge) })
+    if (p !== null) return p
+  }
+  return null
+}
+
+// Ops, die das Angenommene je Dokument zurücknehmen: der jüngste Stapel zuerst, jeder gegen den Text, aus dem sein
+// Kontext stammt. Mit `offeneAbziehen` rechnet der Plan die offenen Changes des Laufs vorher heraus (Probelauf).
+async function rueckPlan(projectId, lauf, { offeneAbziehen = false } = {}) {
+  const offeneJeDoc = new Map()
+  if (offeneAbziehen) {
+    for (const d of await aenderungen(projectId, lauf)) offeneJeDoc.set(String(d.docId), d.changes)
+  }
+  const plan = []
+  const docs = new Map(lauf.angenommen.map(a => [String(a.docId), a.docId]))
+  for (const [schluessel, docId] of docs) {
+    const { lines, version } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
+    let text = opsAnwenden(lines.join('\n'), umkehrOps(offeneJeDoc.get(schluessel) ?? []))
+    const ops = []
+    for (const gruppe of stapelVon(lauf.angenommen.filter(a => String(a.docId) === schluessel)).reverse()) {
+      const gefunden = []
+      for (const eintrag of gruppe) {
+        // Ohne gespeicherten Kontext lässt sich die Stelle nicht sicher finden: lieber Konflikt.
+        const p = eintrag.vor === undefined ? null : positionMitKuerzeremKontext(text, eintrag)
+        if (p === null) throw konflikt(text, eintrag.op.p)
+        gefunden.push({ op: { ...eintrag.op, p } })
+      }
+      const rueck = umkehrOps(gefunden).map(({ u, ...op }) => op)
+      text = opsAnwenden(text, rueck)
+      ops.push(...rueck)
+    }
+    plan.push({ docId, version, ops })
+  }
+  return plan
+}
+
+async function angenommenesZuruecknehmen(projectId, lauf, userId) {
+  const plan = await rueckPlan(projectId, lauf)
   for (const { docId, version, ops } of plan) {
     await spurUpdate(projectId, docId, ops, version, { userId, tracked: true })
   }
-  await angelegtEntfernen(projectId, lauf, userId)
-  await statusSetzen(lauf, 'zurueckgenommen')
 }
 
 export async function automatik(projectId, userId) {
@@ -214,16 +301,69 @@ export async function automatikSetzen(projectId, userId, an) {
   )
 }
 
-// Sammelannahme am Laufende, nur ohne rote Status und Zahlen ohne Beleg und nur, wenn der Mensch sie im Browser eingeschaltet hat.
-export async function nachLaufende(projectId, lauf, menschId) {
-  if (lauf.rot.length || lauf.zahlen?.length || !(await automatik(projectId, menschId))) return
-  // Die Einstellung überdauert eine Herabstufung; annehmen darf nur, wer jetzt schreiben darf.
-  if (!['readAndWrite', 'owner'].includes(await rolleFuerClaude(menschId, projectId))) return
-  await annehmen(projectId, lauf, menschId)
+// Am Laufende wird nichts nachträglich angenommen (der Schalter wirkt nur beim Schreiben). Hat der Schalter alles
+// angenommen, gilt der Lauf als angenommen.
+export async function nachLaufende(projectId, lauf) {
+  if (!lauf.angenommen?.length) return
+  const offen = (await aenderungen(projectId, lauf)).reduce((n, d) => n + d.changes.length, 0)
+  if (offen === 0) await statusSetzen(lauf, 'angenommen')
+}
+
+const darfSchreiben = async (menschId, projectId) =>
+  ['readAndWrite', 'owner'].includes(await rolleFuerClaude(menschId, projectId))
+
+// Schalter an: Changes, die Claude eben geschrieben hat, sofort annehmen. Rote Zitate kommen gar nicht hierher
+// (SchreibManager merkt sie am Lauf). Die Einstellung überdauert eine Herabstufung; es zählt das Recht jetzt.
+export async function sofortAnnehmen(projectId, lauf, menschId, ids) {
+  if (!ids.length || !(await automatik(projectId, menschId))) return
+  if (!(await darfSchreiben(menschId, projectId))) return
+  await annehmen(projectId, lauf, menschId, ids, { automatisch: true })
+}
+
+async function offeneLaeufe(projectId, botId) {
+  return await (await laeufe()).find({ projectId, botId, status: { $in: ['offen', 'fertig'] } }).toArray()
+}
+
+// Offene Changes je Lauf ohne rote Zitate (die bleiben, bis ein Mensch sie einzeln prüft).
+async function offeneOhneRot(projectId, lauf) {
+  const istRot = rotPruefer(lauf)
+  return (await aenderungen(projectId, lauf)).map(d => {
+    const changes = d.changes.filter(c => !istRot(c))
+    return { ...d, changes, rot: d.changes.length - changes.length }
+  })
+}
+
+export async function offenZaehlen(projectId, botId) {
+  let anzahl = 0
+  let rot = 0
+  const dateien = new Set()
+  for (const lauf of await offeneLaeufe(projectId, botId)) {
+    for (const d of await offeneOhneRot(projectId, lauf)) {
+      anzahl += d.changes.length
+      rot += d.rot
+      if (d.changes.length) dateien.add(String(d.docId))
+    }
+  }
+  return { aenderungen: anzahl, dateien: dateien.size, rot }
+}
+
+// „Alles Offene jetzt annehmen“: alle Läufe des eigenen Bots, rote Zitate bleiben offen.
+export async function allesAnnehmen(projectId, botId, menschId) {
+  if (!(await darfSchreiben(menschId, projectId))) {
+    throw new Problem(403, 'nur_schreibende', 'spur_fehler_nur_schreibende')
+  }
+  let angenommen = 0
+  for (const lauf of await offeneLaeufe(projectId, botId)) {
+    const ids = (await offeneOhneRot(projectId, lauf)).flatMap(d => d.changes.map(c => c.id))
+    if (!ids.length) continue
+    const ergebnis = await annehmen(projectId, lauf, menschId, ids, { laufOffenLassen: true })
+    angenommen += ergebnis.angenommen
+  }
+  return { angenommen }
 }
 
 export async function laufDaten(projectId, lauf) {
   if (!lauf) return { lauf: null, aenderungen: [] }
   const liste = lauf.status === 'offen' || lauf.status === 'fertig' ? await aenderungen(projectId, lauf) : []
-  return { lauf: LaufManager.laufFuerClient(lauf), aenderungen: fuerKarte(liste) }
+  return { lauf: LaufManager.laufFuerClient(lauf), aenderungen: fuerKarte(liste, lauf) }
 }

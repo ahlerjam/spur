@@ -83,3 +83,66 @@ $V = 0{,}89\,\mathrm{L}$, \qty{75.7}{\percent} und $x^2$.
     expect(zahlenOhneBeleg('412 und noch einmal 412.')).toEqual(['412'])
   })
 })
+
+describe('Datum, Uhrzeit und Versionsnummern', () => {
+  it.each([
+    '12.11.2026',
+    '12.11.26',
+    'am 12.11. begann',
+    '12. November 2026',
+    '12. Nov. 2026',
+    'November 12, 2026',
+    '12 November 2026',
+    '2026-11-12',
+    '14:30',
+    '14:30:05',
+    '14:30 Uhr',
+    'v2.0.1',
+    'Version 1.2.3',
+    'Version 4.2',
+    'Version 7',
+    'R 4.3.2',
+    '9 Uhr',
+    '9.30 Uhr',
+    '9:30 Uhr',
+    'Python 3.12',
+    'R 4.3.1',
+    'SPSS 29',
+    'LaTeX2e',
+    'Node 20',
+  ])('meldet „%s“ nicht', text => {
+    expect(zahlenOhneBeleg(`Erhoben ${text} im Labor.`)).toEqual([])
+  })
+
+  it.each([
+    ['3.14', ['3.14']],
+    ['12,5', ['12,5']],
+    ['1.250', ['1.250']],
+  ])('meldet %s weiter', (zahl, erwartet) => {
+    expect(zahlenOhneBeleg(`Der Wert ist ${zahl} Einheiten.`)).toEqual(erwartet)
+  })
+
+  it.each(['12.5', '4.2'])('meldet die Dezimalzahl %s am Satzende', zahl => {
+    expect(zahlenOhneBeleg(`Der Mittelwert liegt bei ${zahl}.`)).toEqual([zahl])
+  })
+
+  it('meldet Gruppennummern und Messwerte neben Uhrzeiten und Versionen', () => {
+    expect(zahlenOhneBeleg('Gruppe 2 hatte 17 Teilnehmende.')).toContain('17')
+    expect(zahlenOhneBeleg('Um 9 Uhr waren es 240 mit Python 3.12 und 3.14 Punkten.')).toEqual(['240', '3.14'])
+  })
+
+  it('meldet ganze Zahlen hinter mehrdeutigen Namen und über Zeilenumbrüche hinweg', () => {
+    expect(zahlenOhneBeleg('Excel 5 Tabellen lagen vor.')).toEqual(['5'])
+    expect(zahlenOhneBeleg('Julia 3 Probanden kamen.')).toEqual(['3'])
+    expect(zahlenOhneBeleg('Linux 12 Server liefen.')).toEqual(['12'])
+    expect(zahlenOhneBeleg('Gruppe SAS\n\n40 Fälle lagen vor.')).toEqual(['40'])
+    expect(zahlenOhneBeleg('Excel 16.0 und Julia 1.10 liefen.')).toEqual([])
+  })
+
+  it('meldet im Satz aus der Spec nur die Messwerte', () => {
+    expect(
+      zahlenOhneBeleg('Die Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.')
+    ).toEqual([])
+    expect(zahlenOhneBeleg('Von 240 Befragten antworteten 37,5 Prozent am 12.11.2026.')).toEqual(['240', '37,5'])
+  })
+})

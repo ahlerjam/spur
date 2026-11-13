@@ -138,17 +138,25 @@ describe('aenderungen', () => {
 })
 
 describe('fuerKarte und laufDaten', () => {
+  it('markiert rote Changes für die Karte nach ID und nach Zeit, der Server entscheidet', () => {
+    const ts = '2026-11-07T10:20:00.000Z'
+    const liste = [{ docId: doc, pfad: 'kapitel.tex', geloescht: false, text: 'abc', changes: [change('r', { p: 0, i: 'x' }, ts), change('s', { p: 1, i: 'y' }, ts), change('n', { p: 2, i: 'z' }, '2026-11-07T10:05:00.000Z')] }]
+    const karte = LaufAktionen.fuerKarte(liste, { rotAenderungen: ['r'], rotZeiten: [ts] })
+    expect(karte.map(c => [c.id, c.rot])).toEqual([['r', true], ['s', true], ['n', false]])
+  })
+
   it('beschreibt Einfügungen und Löschungen mit Zeile und gekürztem Text', async () => {
     docSetzen('Zeile eins\nZeile zwei', [change('e', { p: 11, i: 'x'.repeat(300) }), change('l', { p: 0, d: 'Zeile' })])
-    const karte = LaufAktionen.fuerKarte(await LaufAktionen.aenderungen(projekt, await lauf()))
+    const l = await lauf()
+    const karte = LaufAktionen.fuerKarte(await LaufAktionen.aenderungen(projekt, l), l)
     expect(karte).toEqual([
-      { id: 'e', docId: doc, pfad: 'kapitel.tex', art: 'einfuegung', text: 'x'.repeat(200), zeile: 2 },
-      { id: 'l', docId: doc, pfad: 'kapitel.tex', art: 'loeschung', text: 'Zeile', zeile: 1 },
+      { id: 'e', docId: doc, pfad: 'kapitel.tex', rot: false, art: 'einfuegung', text: 'x'.repeat(200), zeile: 2 },
+      { id: 'l', docId: doc, pfad: 'kapitel.tex', rot: false, art: 'loeschung', text: 'Zeile', zeile: 1 },
     ])
   })
 
   it('fuerKarte vermerkt gelöschte Dokumente', () => {
-    expect(LaufAktionen.fuerKarte([{ docId: doc, geloescht: true, changes: [] }])).toEqual([{ docId: doc, geloescht: true }])
+    expect(LaufAktionen.fuerKarte([{ docId: doc, geloescht: true, changes: [] }], {})).toEqual([{ docId: doc, geloescht: true }])
   })
 
   it('laufDaten ist ohne Lauf leer und lädt bei abgeschlossenen Läufen keine Changes', async () => {
@@ -193,7 +201,9 @@ describe('annehmen', () => {
     expect(emitToRoom).toHaveBeenCalledWith(projekt, 'accept-changes', doc, ['a'])
     const danach = await gespeichert(l)
     expect(danach.status).toBe('angenommen')
-    expect(danach.angenommen).toEqual([{ docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }) }])
+    expect(danach.angenommen).toEqual([
+      { docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }), stapel: expect.any(String) },
+    ])
   })
 
   it('nimmt auf Wunsch nur gewählte Changes an und lässt den Lauf offen für den Rest', async () => {
@@ -208,6 +218,34 @@ describe('annehmen', () => {
     const l = await lauf()
     expect(await LaufAktionen.annehmen(projekt, l, anna, ['a'])).toEqual({ angenommen: 2, rest: 1 })
     expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a', 'a2'], anna)
+  })
+
+  describe('rote Zitate (rote_mit)', () => {
+    const ROT = '2026-11-07T10:20:00.000Z'
+    const STUECK = '2026-11-07T10:25:00.000Z'
+
+    it('nimmt ohne rote_mit nie ein rotes Zitat an, weder mit noch ohne IDs', async () => {
+      docSetzen('abc', [change('a', { p: 0, i: 'x' }), change('r', { p: 1, i: 'rot' }, ROT)])
+      const l = await lauf({ rotAenderungen: ['r'], rotZeiten: [ROT] })
+      expect(await LaufAktionen.annehmen(projekt, l, anna)).toEqual({ angenommen: 1, rest: 1 })
+      expect(await LaufAktionen.annehmen(projekt, l, anna, ['a', 'r'])).toEqual({ angenommen: 1, rest: 1 })
+      expect(acceptChanges).toHaveBeenNthCalledWith(1, projekt, doc, ['a'], anna)
+      expect(acceptChanges).toHaveBeenNthCalledWith(2, projekt, doc, ['a'], anna)
+    })
+
+    it('nimmt das rote Zitat mit rote_mit an', async () => {
+      docSetzen('abc', [change('a', { p: 0, i: 'x' }), change('r', { p: 1, i: 'rot' }, ROT)])
+      const l = await lauf({ rotAenderungen: ['r'], rotZeiten: [ROT] })
+      expect(await LaufAktionen.annehmen(projekt, l, anna, ['r'], { roteMit: true })).toEqual({ angenommen: 1, rest: 1 })
+      expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['r'], anna)
+    })
+
+    it('erkennt auch Stücke eines geteilten roten Einschubs (gleiche Zeit, neue ID) als rot', async () => {
+      docSetzen('abc', [change('a', { p: 0, i: 'x' }), change('s1', { p: 1, i: 'ro' }, STUECK), change('s2', { p: 5, i: 't' }, STUECK)])
+      const l = await lauf({ rotAenderungen: ['r'], rotZeiten: [STUECK] })
+      expect(await LaufAktionen.annehmen(projekt, l, anna, ['a', 's1'])).toEqual({ angenommen: 1, rest: 2 })
+      expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a'], anna)
+    })
   })
 
   it('macht ohne Changes nichts am Dokument', async () => {
@@ -392,31 +430,165 @@ describe('Automatik am Laufende', () => {
     expect(await LaufAktionen.automatik(projekt, anna)).toBe(false)
   })
 
-  it('nimmt bei eingeschalteter Automatik ohne rote Status alles an', async () => {
+  it('nimmt am Laufende nichts nachträglich an, auch bei eingeschaltetem Schalter', async () => {
     await LaufAktionen.automatikSetzen(projekt, anna, true)
     const l = await lauf()
-    await LaufAktionen.nachLaufende(projekt, l, anna)
+    await LaufAktionen.nachLaufende(projekt, l)
+    expect(acceptChanges).not.toHaveBeenCalled()
+    expect((await gespeichert(l)).status).toBe('fertig')
+  })
+
+  it('schließt einen Lauf als angenommen, wenn der Schalter alles angenommen hat', async () => {
+    docSetzen('Text mit neu.', [])
+    const l = await lauf({ angenommen: [{ automatisch: true, docId: doc, op: { p: 9, i: 'neu' } }] })
+    await LaufAktionen.nachLaufende(projekt, l)
     expect((await gespeichert(l)).status).toBe('angenommen')
   })
+})
 
-  it('tut nichts bei ausgeschalteter Automatik', async () => {
-    const l = await lauf()
-    await LaufAktionen.nachLaufende(projekt, l, anna)
-    expect(acceptChanges).not.toHaveBeenCalled()
+describe('Sofort annehmen (Schalter „Alles von Claude automatisch annehmen“)', () => {
+  beforeEach(() => {
+    docSetzen('Text mit neu.', [change('a', { p: 9, i: 'neu' })])
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
   })
 
-  it('übernimmt nie Läufe mit roten Status', async () => {
+  it('nimmt die neuen Changes sofort an, vermerkt sie als automatisch und lässt den Lauf offen', async () => {
     await LaufAktionen.automatikSetzen(projekt, anna, true)
-    await LaufAktionen.nachLaufende(projekt, await lauf({ rot: [{ grund: 'nicht_pruefbar' }] }), anna)
-    expect(acceptChanges).not.toHaveBeenCalled()
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a'], anna)
+    const danach = await gespeichert(l)
+    expect(danach.status).toBe('offen')
+    expect(danach.angenommen).toEqual([
+      expect.objectContaining({ docId: doc, op: { p: 9, i: 'neu' }, automatisch: true, pfad: 'kapitel.tex', zeile: 1 }),
+    ])
   })
 
-  it('übernimmt nichts mehr, wenn der Mensch inzwischen nur noch lesen oder prüfen darf', async () => {
+  it('tut nichts bei ausgeschaltetem Schalter oder ohne Schreibrecht', async () => {
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
     await LaufAktionen.automatikSetzen(projekt, anna, true)
     for (const stufe of ['readOnly', 'review']) {
       recht.vergeben(anna, projekt, { stufe })
-      await LaufAktionen.nachLaufende(projekt, await lauf(), anna)
+      await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
     }
     expect(acceptChanges).not.toHaveBeenCalled()
   })
+
+  it('„Lauf rückgängig“ entfernt auch sofort angenommene Changes eines offenen Laufs und lehnt den Rest ab', async () => {
+    await LaufAktionen.automatikSetzen(projekt, anna, true)
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    docSetzen('Text mit neu. rot', [change('r', { p: 14, i: 'rot' })])
+    await LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna)
+    expect(spurUpdate).toHaveBeenCalledWith(projekt, doc, [expect.objectContaining({ p: 14, d: 'rot' })], 7, { userId: anna })
+    expect(spurUpdate).toHaveBeenCalledWith(projekt, doc, [{ p: 9, d: 'neu' }], 7, { userId: anna, tracked: true })
+    expect((await gespeichert(l)).status).toBe('zurueckgenommen')
+  })
 })
+
+describe('Lauf rückgängig nach Schalter und Sammelannahme', () => {
+  // document-updater wendet die Ops nacheinander an; das Dokument im Test folgt ihnen.
+  function opsAnwenden() {
+    spurUpdate.mockImplementation(async (_p, docId, ops) => {
+      const d = dokumente.get(String(docId))
+      let text = d.lines.join('\n')
+      for (const op of ops) {
+        text = op.i !== undefined ? text.slice(0, op.p) + op.i + text.slice(op.p) : text.slice(0, op.p) + text.slice(op.p + op.d.length)
+      }
+      const offen = d.ranges.changes.filter(c => !ops.some(o => o.u && o.p === c.op.p))
+      dokumente.set(String(docId), { ...d, lines: text.split('\n'), ranges: { changes: offen } })
+    })
+  }
+
+  it('nimmt nacheinander Angenommenes zurück, auch wenn spätere Änderungen den Kontext verändert haben', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    await LaufAktionen.automatikSetzen(projekt, anna, true)
+    opsAnwenden()
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    // Erst „ A“ hinter „Eins.“, dann „ B“ hinter „Zwei.“ (im Kontext von A), dann ein offener roter Einschub.
+    docSetzen('Eins. A Zwei.', [change('a', { p: 5, i: ' A' })])
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    docSetzen('Eins. A Zwei. B', [change('b', { p: 13, i: ' B' })])
+    await LaufAktionen.sofortAnnehmen(projekt, await gespeichert(l), anna, ['b'])
+    docSetzen('Eins. A Zwei. B rot', [change('r', { p: 15, i: ' rot' })])
+    await LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna)
+    expect(dokumente.get(String(doc)).lines.join('\n')).toBe('Eins. Zwei.')
+    expect((await gespeichert(l)).status).toBe('zurueckgenommen')
+  })
+
+  it('findet die Stelle mit kürzerem Kontext, wenn ein offener Change im gespeicherten Kontext stand', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    opsAnwenden()
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    // Beim Annehmen von „ B“ stand der offene rote Einschub „ rot“ eine Zeile weiter im Kontext.
+    const text = 'Eins. Zwei. B\n\nDrei Satz. rot'
+    const rot = change('r', { p: 25, i: ' rot' }, '2026-11-07T10:02:00Z')
+    docSetzen(text, [change('b', { p: 11, i: ' B' }, '2026-11-07T10:01:00Z'), rot])
+    await LaufAktionen.annehmen(projekt, l, anna, ['b'], { laufOffenLassen: true })
+    docSetzen(text, [rot])
+    await LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna)
+    expect(dokumente.get(String(doc)).lines.join('\n')).toBe('Eins. Zwei.\n\nDrei Satz.')
+  })
+
+  it('ändert bei einem Konflikt nichts, auch die offenen Changes bleiben', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    await LaufAktionen.automatikSetzen(projekt, anna, true)
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    docSetzen('Eins. A Zwei.', [change('a', { p: 5, i: ' A' })])
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    docSetzen('Ganz anders. rot', [change('r', { p: 12, i: ' rot' })])
+    expect(await fehlerVon(LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna))).toMatchObject({ status: 409 })
+    expect(spurUpdate).not.toHaveBeenCalled()
+    expect((await gespeichert(l)).status).toBe('offen')
+  })
+})
+
+describe('Alles Offene jetzt annehmen', () => {
+  const SPAETER = '2026-11-07T11:10:00.000Z'
+  beforeEach(() => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    docSetzen('a b c rot', [
+      change('a', { p: 0, i: 'a' }),
+      change('b', { p: 2, i: 'b' }, SPAETER),
+      change('r', { p: 6, i: 'rot' }, '2026-11-07T11:20:00.000Z'),
+      change('fremd', { p: 4, i: 'c' }, SPAETER, String(new ObjectId())),
+    ])
+  })
+
+  async function zweiLaeufe() {
+    const fertig = await lauf()
+    const offen = await lauf({ status: 'offen', gestartet: new Date('2026-11-07T11:00:00Z'), beendet: undefined, rotAenderungen: ['r'] })
+    return { fertig, offen }
+  }
+
+  it('zählt offene Changes des eigenen Bots über alle Läufe ohne rote und nennt die roten gesondert', async () => {
+    await zweiLaeufe()
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 2, dateien: 1, rot: 1 })
+  })
+
+  it('nimmt alles außer roten Zitaten an; ein offener Lauf bleibt offen', async () => {
+    const { fertig, offen } = await zweiLaeufe()
+    expect(await LaufAktionen.allesAnnehmen(projekt, bot, anna)).toEqual({ angenommen: 2 })
+    expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a'], anna)
+    expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['b'], anna)
+    expect(acceptChanges).not.toHaveBeenCalledWith(projekt, doc, expect.arrayContaining(['r']), anna)
+    expect((await gespeichert(fertig)).status).toBe('angenommen')
+    expect((await gespeichert(offen)).status).toBe('offen')
+  })
+
+  it('lässt auch Stücke eines geteilten roten Einschubs offen (gleiche Zeit, neue ID)', async () => {
+    await zweiLaeufe()
+    await datenbank.db.collection('spurRuns').updateMany({ status: 'offen' }, { $set: { rotZeiten: ['2026-11-07T11:20:00.000Z'] } })
+    docSetzen('a b c rot', [change('b', { p: 2, i: 'b' }, SPAETER), change('r-stueck', { p: 6, i: 'ro' }, '2026-11-07T11:20:00.000Z')])
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 1, dateien: 1, rot: 1 })
+  })
+
+  it('verlangt Schreibrecht', async () => {
+    await zweiLaeufe()
+    recht.vergeben(anna, projekt, { stufe: 'review' })
+    expect(await fehlerVon(LaufAktionen.allesAnnehmen(projekt, bot, anna))).toMatchObject({ status: 403 })
+    expect(acceptChanges).not.toHaveBeenCalled()
+  })
+})
+

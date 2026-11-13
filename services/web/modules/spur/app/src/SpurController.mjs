@@ -37,6 +37,10 @@ async function dateiSenden(pfad, res) {
 const projektId = req => new ObjectId(req.params.project_id)
 const nutzerId = req => SessionManager.getLoggedInUserId(req.session)
 
+// „Alice Beth Smith“ wird „A. B. Smith“; ohne Vornamen bleibt der Nachname.
+const autorKurz = ({ given, family }) =>
+  [...(given ?? '').split(/\s+/).filter(Boolean).map(teil => `${teil[0]}.`), family].filter(Boolean).join(' ')
+
 function quelleFuerClient(q) {
   return {
     id: q._id,
@@ -47,6 +51,8 @@ function quelleFuerClient(q) {
     status: q.status,
     doi: q.doi,
     titel: q.meta?.titel ?? null,
+    autoren: (q.meta?.autoren ?? []).map(autorKurz),
+    jahr: q.meta?.jahr ?? null,
     fassung: q.fassung,
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
@@ -124,7 +130,9 @@ export const quellenSuche = mitProblemen(async (req, res) => {
     imDateinamen: true,
     quelle: quelleFuerClient(q),
   }))
-  res.json({ treffer: [...imNamen, ...imText] })
+  res.json({
+    treffer: [...imNamen, ...imText.map(t => (t.quelle ? { ...t, quelle: quelleFuerClient(t.quelle) } : t))],
+  })
 })
 
 export const quelleSeite = mitProblemen(async (req, res) => {
@@ -134,16 +142,35 @@ export const quelleSeite = mitProblemen(async (req, res) => {
   res.json({ text, label, seite, seitenzahl: quelle.seitenzahl, art: quelle.art, ocrKonfidenz })
 })
 
-export const quelleBild = mitProblemen(async (req, res) => {
+// Breite in Pixeln für scharfes Zoomen: auf 200 px aufgerundet (wenige Varianten im Ablageordner), höchstens 4800.
+const BILD_SCHRITT = 200
+const BILD_MAX = 4800
+function bildBreite(wert) {
+  const breite = Number.parseInt(wert, 10)
+  if (!(breite > 0)) return null
+  return Math.min(BILD_MAX, Math.ceil(breite / BILD_SCHRITT) * BILD_SCHRITT)
+}
+
+async function pdfSeite(req) {
   const quelle = await QuellenManager.holen(projektId(req), req.params.quelle_id)
   const nummer = Number.parseInt(req.params.seite, 10)
   await QuellenManager.seite(quelle, nummer)
   if (quelle.art !== 'pdf') {
     throw new Problem(404, 'kein_bild', 'spur_fehler_kein_seitenbild')
   }
-  const pfad = await QuellenManager.bild(quelle, nummer)
+  return { quelle, nummer }
+}
+
+export const quelleBild = mitProblemen(async (req, res) => {
+  const { quelle, nummer } = await pdfSeite(req)
+  const pfad = await QuellenManager.bild(quelle, nummer, bildBreite(req.query?.breite))
   res.type('png')
   await dateiSenden(pfad, res)
+})
+
+export const quelleTextebene = mitProblemen(async (req, res) => {
+  const { quelle, nummer } = await pdfSeite(req)
+  res.json(await QuellenManager.textEbene(quelle, nummer))
 })
 
 export const quelleDatei = mitProblemen(async (req, res) => {
@@ -322,6 +349,14 @@ export const pruefbericht = mitProblemen(async (req, res) => {
   res.json(await PruefManager.bericht(projektId(req)))
 })
 
+export const pruefMakros = mitProblemen(async (req, res) => {
+  res.json(await PruefManager.makroUebersicht(projektId(req)))
+})
+
+export const pruefMakrosSetzen = mitProblemen(async (req, res) => {
+  res.json(await PruefManager.makroEinstellungSetzen(projektId(req), req.body))
+})
+
 export const claudeTokens = mitProblemen(async (req, res) => {
   res.json({ tokens: await ClaudeZugang.tokens(nutzerId(req)) })
 })
@@ -340,21 +375,42 @@ async function botDesNutzers(req) {
   return await ClaudeZugang.botFuer(mensch)
 }
 
+// Läufe des eigenen Bots, neueste zuerst, je mit ihren offenen Changes.
+async function laeufeDaten(req, bot, vor) {
+  const { laeufe, weitere } = await LaufManager.laeufeListe(projektId(req), bot._id, { vor })
+  return {
+    laeufe: await Promise.all(laeufe.map(lauf => LaufAktionen.laufDaten(projektId(req), lauf))),
+    weitereLaeufe: weitere,
+  }
+}
+
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)
-  const [{ nachrichten, aeltere }, lauf, verbunden, automatik] = await Promise.all([
+  const [{ nachrichten, aeltere }, verbunden, automatik, offen, laeufe] = await Promise.all([
     Inbox.verlauf(projektId(req), bot._id),
-    LaufManager.letzterLauf(projektId(req), bot._id),
     Inbox.verbunden(bot._id),
     LaufAktionen.automatik(projektId(req), new ObjectId(nutzerId(req))),
+    LaufAktionen.offenZaehlen(projektId(req), bot._id),
+    laeufeDaten(req, bot),
   ])
   res.json({
     verbunden,
     nachrichten: nachrichten.reverse().map(n => ({ id: n._id, von: n.von, text: n.text, am: n.am })),
     aeltere,
     automatik,
-    ...(await LaufAktionen.laufDaten(projektId(req), lauf)),
+    offen,
+    ...laeufe,
   })
+})
+
+export const claudeLaeufe = mitProblemen(async (req, res) => {
+  const vor = typeof req.query.vor === 'string' ? req.query.vor : undefined
+  res.json(await laeufeDaten(req, await botDesNutzers(req), vor))
+})
+
+export const allesAnnehmen = mitProblemen(async (req, res) => {
+  const bot = await botDesNutzers(req)
+  res.json(await LaufAktionen.allesAnnehmen(projektId(req), bot._id, new ObjectId(nutzerId(req))))
 })
 
 export const claudeAuftrag = mitProblemen(async (req, res) => {
@@ -396,10 +452,19 @@ const changeIds = req => {
   return ids
 }
 
+const roteMit = req => {
+  const wert = req.body?.rote_mit
+  if (wert === undefined) return false
+  if (typeof wert !== 'boolean') throw new Problem(422, 'rote_mit', 'spur_fehler_rote_mit')
+  return wert
+}
+
 export const laufAnnehmen = mitProblemen(async (req, res) => {
   const lauf = await LaufAktionen.laufHolen(projektId(req), req.params.lauf_id)
   res.json(
-    await LaufAktionen.annehmen(projektId(req), lauf, new ObjectId(nutzerId(req)), changeIds(req))
+    await LaufAktionen.annehmen(projektId(req), lauf, new ObjectId(nutzerId(req)), changeIds(req), {
+      roteMit: roteMit(req),
+    })
   )
 })
 

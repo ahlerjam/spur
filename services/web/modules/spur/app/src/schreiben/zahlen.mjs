@@ -1,6 +1,6 @@
 // Heuristik für Zahlen in Claudes Text, die nicht aus ergebnisse.tex stammen.
 // Gemeldet: Zahlen im Fließtext, Werte in \num, \qty, \SI, \SIrange und in Formeln Dezimalzahlen und Zahlen
-// ab drei Stellen. Nicht gemeldet: Seitenangaben, Jahreszahlen, Befehlsargumente, Kommentare, Grafiken (TikZ,
+// ab drei Stellen. Nicht gemeldet: Seitenangaben, Jahreszahlen, Datum, Uhrzeit (auch „9 Uhr“), Versionsnummern (auch „Python 3.12“), Befehlsargumente, Kommentare, Grafiken (TikZ,
 // pgfplots), Farbangaben, optionale Argumente und einzelne Ganzzahlen bis zwei Stellen in Formeln (Exponenten,
 // Indizes).
 const MATHE = [
@@ -26,6 +26,28 @@ const BEFEHL_ARGUMENTE =
   /\\(?:\w*cite\w*|ref|eqref|pageref|autoref|cref|Cref|label|input|include|includegraphics|url|href|v?space|hspace|setlength|setcounter|addtocounter|documentclass|usepackage|begin|end|section|subsection|subsubsection|chapter|paragraph|caption)\*?(?:\s*\{[^{}]*\})*/g
 const SEITE = /\b(?:S\.|Seiten?|p\.|pp\.|pages?|Kap\.|Kapitel|Abb\.|Tab\.|Abschnitt)\s*~?\s*\d+(?:\s*(?:--?|–)\s*\d+)?/g
 const JAHR = /(?<![\d.,])(?:1[5-9]\d\d|20\d\d)[a-z]?(?![\d.,]\d)/g
+// Datum, Uhrzeit und Versionsnummern sind keine Messwerte.
+const MONAT =
+  '(?:Januar|Jänner|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|January|February|' +
+  'March|May|June|July|October|December|Jan|Feb|Mär|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Okt|Oct|Nov|Dez|Dec)\\.?'
+const DATUM = [
+  /(?<![\d.,])(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.(?:\d{4}|\d{2})(?![\d,]|\.\d)/g,
+  // Ohne Jahr nur zweistellig (12.11.), sonst wäre „bei 12.5.“ am Satzende ein Datum.
+  /(?<![\d.,])(?:0[1-9]|[12]\d|3[01])\.(?:0[1-9]|1[0-2])\.(?![\d,]|\.\d)/g,
+  /(?<![\d.,-])\d{4}-\d{2}-\d{2}(?![\d-])/g,
+  new RegExp(`(?<![\\d.,])\\d{1,2}\\.?\\s*${MONAT}(?:\\s+\\d{4})?(?![\\p{L}\\d])`, 'gu'),
+  new RegExp(`${MONAT}\\s+\\d{1,2}(?:st|nd|rd|th)?,?(?:\\s+\\d{4})?(?![\\d])`, 'g'),
+]
+const UHRZEIT = /(?<![\d.,:])(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?![\d:])/g
+const VERSION = [/\b(?:Version|Vers\.|v|V)\s*\d+(?:\.\d+)*/g, /(?<![\d.,])\d+(?:\.\d+){2,}(?![\d.,]\d)/g]
+// „9 Uhr“, „9.30 Uhr“; ohne „Uhr“ bleibt 9.30 eine Dezimalzahl.
+const UHR = /(?<![\d.,])\d{1,2}(?:[.:]\d{2})?\s*Uhr\b/g
+// Namen, hinter denen eine ganze Zahl eine Version ist, und Namen, die auch Vornamen oder Alltagswörter sind (Julia,
+// Excel, Linux): dort zählt nur eine Version mit Punkt. Nur Leerzeichen, kein Zeilenumbruch dazwischen.
+const SOFTWARE = [
+  /\b(?:Python|SPSS|SAS|Stata|MATLAB|Matlab|Node|Java|Windows|macOS|Ubuntu|TeX Live|LaTeX|NVivo|MAXQDA|JASP|jamovi|Zotero)[ \t]+\d+(?:\.\d+)*/g,
+  /\b(?:Julia|Excel|Linux)[ \t]+\d+(?:\.\d+)+/g,
+]
 const ZAHL = /(?<![\p{L}\d\\\-.,])\d+(?:[.,]\d+)*(?![\p{L}\d])/gu
 
 const dezimalzeichen = text => text.replace(/\{,\}/g, ',')
@@ -50,6 +72,8 @@ export function zahlenOhneBeleg(text, belegt = []) {
   rest = rest.replace(FARBDEFINITION, ' ').replace(FARBE, ' ').replace(FARBMISCHUNG, ' ').replace(OPTIONAL, '$1 ')
   // Formeln an Ort und Stelle durch ihre meldenswerten Zahlen ersetzen, damit die Reihenfolge bleibt.
   for (const muster of MATHE) rest = rest.replace(muster, formel => ` ${unbelegt(formelZahlen(formel))} `)
-  rest = rest.replace(BEFEHL_ARGUMENTE, ' ').replace(SEITE, ' ').replace(JAHR, ' ')
+  rest = rest.replace(BEFEHL_ARGUMENTE, ' ').replace(SEITE, ' ')
+  for (const muster of [...DATUM, UHRZEIT, UHR, ...VERSION, ...SOFTWARE]) rest = rest.replace(muster, ' ')
+  rest = rest.replace(JAHR, ' ')
   return [...new Set(rest.match(ZAHL) ?? [])]
 }

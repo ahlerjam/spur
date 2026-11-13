@@ -1,0 +1,2 @@
+\ProvidesFile{ot1carlito.fd}[2026/11/12 spur test font definitions]
+\DeclareFontFamily{OT1}{carlito}{}

@@ -149,6 +149,7 @@ describe('Abfragen', () => {
     expect(treffer[0]).toMatchObject({ dateiname: 'smith2024.pdf', art: 'pdf', seite: 3, label: '347' })
     expect(treffer[0].position).toBe(19)
     expect(treffer[0].auszug).toContain('Sleep supports the consolidation')
+    expect(treffer[0].quelle).toMatchObject({ _id: smith._id, dateiname: 'smith2024.pdf' })
   })
 
   it('suchen sucht wörtlich, auch mit Anführungszeichen, und findet in Transkripten', async () => {
@@ -173,6 +174,18 @@ describe('Abfragen', () => {
     expect(pfad).toMatch(/\.png$/)
     expect(existsSync(pfad)).toBe(true)
     expect(await Quellen.bild(smith, 2)).toBe(pfad)
+  })
+
+  it('bild legt je Breite ein eigenes Bild ab', async () => {
+    const schmal = await Quellen.bild(smith, 2)
+    const breit = await Quellen.bild(smith, 2, 1600)
+    expect(breit).not.toBe(schmal)
+    expect(breit).toMatch(/-w1600\.png$/)
+  })
+
+  it('textEbene gibt es nur bei erkanntem Text', async () => {
+    expect((await Quellen.textEbene(smith, 1)).zeilen.length).toBeGreaterThan(5)
+    expect(await Quellen.textEbene({ ...smith, status: 'ocr' }, 1)).toEqual({ breite: null, hoehe: null, zeilen: [] })
   })
 
   it('projekteMitQuellen nennt Projekte des Nutzers, die Quellen haben', async () => {

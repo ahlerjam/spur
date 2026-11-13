@@ -9,21 +9,22 @@ export type Seite = {
   ocrKonfidenz: number | null
 }
 
+// `seite` gehört immer zu `nummer`; `zuletzt` bleibt beim Blättern stehen, bis die neue Seite da ist.
 export function useSeite(quelleId: string, nummer: number) {
-  const [seite, setSeite] = useState<Seite | null>(null)
+  const [zuletzt, setZuletzt] = useState<Seite | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
 
   useEffect(() => {
     let aktuell = true
-    setSeite(null)
     setFehler(null)
     anfrage<Seite>(projektPfad(`/quellen/${quelleId}/seiten/${nummer}`))
-      .then(s => aktuell && setSeite(s))
+      .then(s => aktuell && setZuletzt(s))
       .catch(e => aktuell && setFehler(e.message))
     return () => {
       aktuell = false
     }
   }, [quelleId, nummer])
 
-  return { seite, fehler }
+  const seite = zuletzt?.seite === nummer ? zuletzt : null
+  return { seite, zuletzt, fehler }
 }

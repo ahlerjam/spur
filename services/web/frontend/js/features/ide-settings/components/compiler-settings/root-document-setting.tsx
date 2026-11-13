@@ -33,13 +33,13 @@ export default function RootDocumentSetting() {
     if (!rootDocId) {
       mappedDocs.unshift({
         value: '',
-        label: 'None',
+        label: t('none'),
         disabled: true,
       })
     }
 
     return mappedDocs
-  }, [docs, rootDocId])
+  }, [docs, rootDocId, t])
 
   return (
     <DropdownSetting

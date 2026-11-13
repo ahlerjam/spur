@@ -94,7 +94,7 @@ function DefaultNavbar(
               <Navbar.Toggle
                 aria-controls="navbar-main-collapse"
                 aria-expanded="false"
-                aria-label={t('primary')}
+                label={t('toggle_navigation')}
               >
                 {showCloseIcon && expanded ? (
                   <X />

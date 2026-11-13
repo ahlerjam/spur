@@ -68,6 +68,7 @@ export function schalterAttrappe() {
     semantikAn: () => schalter.semantik ?? false,
     fakeEmbeddings: () => true,
     umgebung: name => process.env[name],
+    testSchalter: name => schalter.test?.[name],
   }
   return schalter
 }

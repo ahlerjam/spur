@@ -70,9 +70,9 @@ export default function Semantik({ quellenAnzahl, oeffnen }: { quellenAnzahl: nu
 
   return (
     <section className="spur-semantik" aria-labelledby="spur-semantik-titel">
-      <h3 id="spur-semantik-titel" className="spur-zitationen-titel">
+      <h5 id="spur-semantik-titel" className="spur-zitationen-titel">
         {t('spur_sinngemaess_suchen')}
-      </h3>
+      </h5>
       <p className="spur-zeile-meta" role="status">
         {stand.indexiert < stand.gesamt
           ? t('spur_indexiert', { fertig: stand.indexiert, gesamt: stand.gesamt })

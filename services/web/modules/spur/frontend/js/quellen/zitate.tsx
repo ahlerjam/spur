@@ -36,13 +36,13 @@ export default function Zitate({
   quelle,
   seite,
   textElement,
-  ohneEinfuegen = false,
+  ueberschrift: Ueberschrift = 'h5',
 }: {
   quelle: Quelle
   seite: number
   textElement: HTMLElement | null
-  // In der großen Ansicht läge der Editor hinter dem Dialog.
-  ohneEinfuegen?: boolean
+  // Im Panel folgt die Liste auf den Panel-Titel (h4), in der großen Ansicht auf deren Abschnitte (h2).
+  ueberschrift?: 'h3' | 'h5'
 }) {
   const { t } = useTranslation()
   const {
@@ -59,7 +59,7 @@ export default function Zitate({
   const [notizen, setNotizen] = useState<Notizen>({})
   const auswahl = useAuswahlIn(textElement)
   const basis = `/quellen/${quelle.id}/zitate`
-  const kannEinfuegen = darfSchreiben && Boolean(view) && !ohneEinfuegen
+  const kannEinfuegen = darfSchreiben && Boolean(view)
 
   const laden = useCallback(async () => {
     const antwort = await anfrage<{ zitate: Zitat[] }>(projektPfad(basis))
@@ -157,9 +157,9 @@ export default function Zitate({
           {t('spur_zitat_speichern')}
         </OLButton>
       )}
-      <h5 id="spur-zitate-titel" className="spur-zitate-titel">
+      <Ueberschrift id="spur-zitate-titel" className="spur-zitate-titel">
         {t('spur_gespeicherte_zitate')}
-      </h5>
+      </Ueberschrift>
       {fehler && <Notification type="error" content={fehler} />}
       {!geladen && !fehler && <OLSpinner size="sm" />}
       {alle.length > 0 && (
@@ -183,7 +183,7 @@ export default function Zitate({
       {alle.length > 0 && sichtbar.length === 0 && (
         <p className="spur-leer">{t('spur_keine_eigenen_zitate')}</p>
       )}
-      {!kannEinfuegen && alle.length > 0 && (
+      {!darfSchreiben && alle.length > 0 && (
         <p className="spur-zeile-meta" id="spur-einfuegen-hinweis">
           {t('spur_keine_schreibrechte')}
         </p>
@@ -222,7 +222,7 @@ export default function Zitate({
               variant="secondary"
               size="sm"
               disabled={!kannEinfuegen}
-              aria-describedby={kannEinfuegen ? undefined : 'spur-einfuegen-hinweis'}
+              aria-describedby={darfSchreiben ? undefined : 'spur-einfuegen-hinweis'}
               onClick={() => einfuegen(zitat)}
             >
               {t('spur_einfuegen')}

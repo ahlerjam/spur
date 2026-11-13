@@ -1,6 +1,6 @@
 //- Title
 if metadata && metadata.title
-	title(translate='no')= metadata.title + ' - ' + settings.appName + ', ' + translate('online_latex_editor')
+	title(translate='no')= metadata.title + ' – ' + settings.appName
 	meta(name='twitter:title' content=metadata.title)
 	meta(name='og:title' content=metadata.title)
 else if typeof title == 'undefined'
@@ -14,7 +14,7 @@ else if typeof title == 'undefined'
 		content=settings.appName + ', ' + translate('online_latex_editor')
 	)
 else
-	title(translate='no')= translate(title) + ' - ' + settings.appName + ', ' + translate('online_latex_editor')
+	title(translate='no')= translate(title) + ' – ' + settings.appName
 	//- to do - not translate?
 	meta(name='twitter:title' content=translate(title))
 	meta(name='og:title' content=translate(title))

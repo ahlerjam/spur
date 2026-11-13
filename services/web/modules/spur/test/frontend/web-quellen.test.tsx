@@ -21,6 +21,8 @@ const webQuelle: Quelle = {
   status: 'text',
   doi: null,
   titel: 'Schlafhygiene im Schichtdienst',
+  autoren: [],
+  jahr: null,
   fassung: '',
   versatz: null,
   versatzQuelle: null,
@@ -49,12 +51,13 @@ describe('Webseiten als Schnappschuss', function () {
       return { status: 201, body: webQuelle }
     })
     render(<QuellenPanel />, { wrapper: EditorProviders })
-    await screen.findByText('Noch keine Quellen')
-    const knopf = screen.getByRole('button', { name: 'Webseite aufnehmen' })
+    await screen.findByText(/^Noch keine Quellen\./)
+    const knopf = screen.getByRole('button', { name: 'Weitere Aktionen' })
     fireEvent.click(knopf)
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Webseite aufnehmen' }))
     fireEvent.change(screen.getByLabelText('Adresse der Webseite'), { target: { value: 'https://example.org/schlaf' } })
     fireEvent.click(screen.getByRole('button', { name: 'Aufnehmen' }))
-    await screen.findByRole('button', { name: 'Schlafhygiene im Schichtdienst' })
+    await screen.findByRole('button', { name: /^Schlafhygiene im Schichtdienst/ })
     screen.getByText('Webseite · abgerufen am 1. November 2026')
     screen.getByText('https://example.org/schlaf')
     expect(JSON.parse(fetchMock.callHistory.lastCall(WEB)!.options.body as string)).to.deep.equal({ url: 'https://example.org/schlaf' })
@@ -78,13 +81,29 @@ describe('Webseiten als Schnappschuss', function () {
       body: { detail: 'Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.' },
     })
     render(<QuellenPanel />, { wrapper: EditorProviders })
-    await screen.findByText('Noch keine Quellen')
-    fireEvent.click(screen.getByRole('button', { name: 'Webseite aufnehmen' }))
+    await screen.findByText(/^Noch keine Quellen\./)
+    fireEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Webseite aufnehmen' }))
     const feld = screen.getByLabelText('Adresse der Webseite')
     fireEvent.change(feld, { target: { value: 'http://nicht-erreichbar.invalid/' } })
     fireEvent.click(screen.getByRole('button', { name: 'Aufnehmen' }))
     await screen.findByText('Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.')
     expect(feld).to.have.property('value', 'http://nicht-erreichbar.invalid/')
-    screen.getByText('Noch keine Quellen')
+    screen.getByText(/^Noch keine Quellen\./)
+  })
+
+  it('meldet eine ungültige Adresse am Feld und behält sie', async function () {
+    fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
+    render(<QuellenPanel />, { wrapper: EditorProviders })
+    await screen.findByText(/^Noch keine Quellen\./)
+    fireEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Webseite aufnehmen' }))
+    const feld = screen.getByLabelText('Adresse der Webseite')
+    fireEvent.change(feld, { target: { value: 'kein link' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aufnehmen' }))
+    await screen.findByText('Bitte eine vollständige Adresse mit http:// oder https:// eingeben.')
+    expect(feld).to.have.property('value', 'kein link')
+    expect(feld.getAttribute('aria-invalid')).to.equal('true')
+    expect(fetchMock.callHistory.called(WEB)).to.equal(false)
   })
 })

@@ -4,6 +4,21 @@ import InviteNotValid from '@/features/share-project/invite-not-valid'
 import getMeta from '@/utils/meta'
 import { useFeatureFlag } from '@/shared/context/split-test-context'
 
+// spur: derselbe Schriftzug wie loading-branded.tsx; die Füllung wird von unten freigelegt.
+const SchriftzugMitFortschritt: FC<{ hoehe: string }> = ({ hoehe }) => (
+  <div className="loading-screen-brand-container">
+    <div className="loading-screen-brand" aria-hidden="true">
+      <span className="loading-screen-brand-grund">spur</span>
+      <span
+        className="loading-screen-brand-fuellung"
+        style={{ clipPath: `inset(calc(100% - ${hoehe}) 0 0 0)` }}
+      >
+        spur
+      </span>
+    </div>
+  </div>
+)
+
 export const AccessAttemptScreen: FC<{
   loadingScreenBrandHeight: string
   inflight: boolean
@@ -21,12 +36,7 @@ export const AccessAttemptScreen: FC<{
     return (
       <div className="vertically-centered-content">
         <div className="loading-screen">
-          <div className="loading-screen-brand-container">
-            <div
-              className="loading-screen-brand"
-              style={{ height: loadingScreenBrandHeight }}
-            />
-          </div>
+          <SchriftzugMitFortschritt hoehe={loadingScreenBrandHeight} />
 
           <h3 className="loading-screen-label text-center">
             {t('join_project')}
@@ -39,12 +49,7 @@ export const AccessAttemptScreen: FC<{
 
   return (
     <div className="loading-screen">
-      <div className="loading-screen-brand-container">
-        <div
-          className="loading-screen-brand"
-          style={{ height: loadingScreenBrandHeight }}
-        />
-      </div>
+      <SchriftzugMitFortschritt hoehe={loadingScreenBrandHeight} />
 
       <h3 className="loading-screen-label text-center">
         {t('join_project')}

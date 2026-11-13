@@ -3,6 +3,7 @@ import type { Message as MessageType } from '@/features/chat/context/chat-contex
 import { useUserContext } from '@/shared/context/user-context'
 import { User } from '../../../../../types/user'
 import MessageGroup from '@/features/chat/components/message-group'
+import { formatTime, relativeDate } from '@/features/utils/format-date'
 
 const FIVE_MINUTES = 5 * 60 * 1000
 const TIMESTAMP_GROUP_SIZE = FIVE_MINUTES
@@ -11,7 +12,7 @@ function formatTimestamp(date: moment.MomentInput) {
   if (!date) {
     return 'N/A'
   } else {
-    return `${moment(date).format('h:mm a')} ${moment(date).calendar()}`
+    return `${formatTime(date)} ${relativeDate(date)}`
   }
 }
 

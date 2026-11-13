@@ -10,16 +10,17 @@ export default function EinladungsLink({ url, perMail }: { url: string; perMail?
   const { t } = useTranslation()
   const id = useId()
   const feld = useRef<HTMLInputElement>(null)
-  const [kopiert, setKopiert] = useState(false)
+  const [kopiert, setKopiert] = useState<boolean | null>(null)
 
+  // „Kopiert“ nur, wenn es wirklich geklappt hat; sonst bleibt der Link markiert zum Kopieren von Hand.
   const kopieren = async () => {
     try {
       await navigator.clipboard.writeText(url)
+      setKopiert(true)
     } catch {
       feld.current?.select()
-      document.execCommand('copy')
+      setKopiert(document.execCommand('copy'))
     }
-    setKopiert(true)
   }
 
   return (
@@ -47,6 +48,11 @@ export default function EinladungsLink({ url, perMail }: { url: string; perMail?
           {kopiert ? t('copied') : t('copy')}
         </OLButton>
       </div>
+      {kopiert === false && (
+        <p className="form-text text-danger" role="alert">
+          {t('spur_kopieren_von_hand')}
+        </p>
+      )}
       <p className="form-text">{t('spur_einladungslink_gueltig')}</p>
     </div>
   )

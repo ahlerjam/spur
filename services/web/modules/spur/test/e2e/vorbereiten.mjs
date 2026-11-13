@@ -3,10 +3,11 @@
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import logger from '@overleaf/logger'
-import { db } from '../../../../app/src/infrastructure/mongodb.mjs'
+import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import UserRegistrationHandler from '../../../../app/src/Features/User/UserRegistrationHandler.mjs'
 import ProjectDeleter from '../../../../app/src/Features/Project/ProjectDeleter.mjs'
 import ProjectEntityHandler from '../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
+import ProjectEntityUpdateHandler from '../../../../app/src/Features/Project/ProjectEntityUpdateHandler.mjs'
 import DocumentUpdaterHandler from '../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
 import Settings from '@overleaf/settings'
 import { fetchNothing } from '@overleaf/fetch-utils'
@@ -19,6 +20,7 @@ import {
   ereignisse,
   herzschlaege,
   einstellungen,
+  laeufe,
   nachrichten,
   quellen,
   quellenSeiten,
@@ -231,6 +233,15 @@ export async function e2eDatenVorbereiten() {
     'references.bib': BERICHT_BIB,
   })
   await quelleAusFixture(bericht._id, a._id, 'smith2024.pdf')
+  // P9: nur grüne Stellen, damit ein Filter des Prüfberichts leer bleibt.
+  const gruen = await neuAnlegen(a, 'E2E Bericht Grün', {
+    'main.tex': BERICHT_MAIN.replace(/\\section\{Eins\}[\s\S]*\\input\{kapitel\}/, '\\input{kapitel}'),
+    'kapitel.tex': BERICHT_KAPITEL,
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(gruen._id, a._id, 'smith2024.pdf')
+  // P9: Lese-Konto für die Großansicht ohne Schreibrecht.
+  await db.projects.updateOne({ _id: bericht._id }, { $set: { readOnly_refs: [leser._id] } })
   await quelleAusFixture(bericht._id, a._id, 'retracted.pdf')
 
   const schreiben = await neuAnlegen(a, 'E2E Schreiben', {
@@ -321,6 +332,70 @@ Delta Satz.
   await neuAnlegen(a, 'E2E Beschaffung', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Import', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Literatur', { 'main.tex': LEER })
+  // P9: leeres Projekt für den ersten Upload.
+  await neuAnlegen(a, 'E2E Leer', { 'main.tex': LEER })
+
+  // P9: Schalter „Alles von Claude automatisch annehmen“. Das alte Häkchen war für e2e-a und e2e-schreib gesetzt.
+  const schreiber = await konto('e2e-schreib@example.org')
+  const automatik = await neuAnlegen(a, 'E2E Automatik', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Alpha Satz.
+
+Beta Satz.
+
+Gamma Satz.
+
+Delta Satz.
+
+Eins. Zwei. Drei. Vier. Fünf.
+\end{document}`,
+    'extra.tex': 'Sechs. Sieben. Acht. Neun. Zehn. Elf.',
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(automatik._id, a._id, 'smith2024.pdf')
+  await db.projects.updateOne(
+    { _id: automatik._id },
+    { $set: { collaberator_refs: [schreiber._id], readOnly_refs: [leser._id], reviewer_refs: [pruefer._id] } }
+  )
+  await (await einstellungen()).insertMany(
+    [a, schreiber].map(person => ({ projectId: automatik._id, userId: person._id, autoAnnehmen: true }))
+  )
+
+  // P10: Rote Zitate im Claude-Panel, einmal mit Schalter an, einmal aus (neue Läufe, unabhängig von „E2E Automatik“).
+  const rotText = { 'main.tex': ROT_MAIN, 'references.bib': BERICHT_BIB }
+  const rotAuto = await neuAnlegen(a, 'E2E Rot Auto', rotText)
+  await neuAnlegen(a, 'E2E Rot Hand', rotText)
+  await neuAnlegen(a, 'E2E Rot Umgeschrieben', rotText)
+  await neuAnlegen(a, 'E2E Rot Geteilt', rotText)
+  await (await einstellungen()).insertOne({ projectId: rotAuto._id, userId: a._id, autoAnnehmen: true })
+
+  // P9: zuletzt vor zwei Tagen von e2e-a bearbeitet („vor 2 Tagen von dir“ in der Projektliste).
+  const alt = await neuAnlegen(a, 'E2E Alt', { 'main.tex': LEER })
+  await db.projects.updateOne(
+    { _id: alt._id },
+    { $set: { lastUpdated: new Date(Date.now() - 2 * 24 * 3600 * 1000 - 3600 * 1000), lastUpdatedBy: a._id } }
+  )
+
+  // P9: Verlauf der Läufe im Claude-Panel; „E2E Viele Läufe“ hat 22 abgeschlossene Läufe für „Ältere laden“.
+  await neuAnlegen(a, 'E2E Läufe', { 'main.tex': 'Eins.\n\nZwei.\n\nDrei.\n\nVier.\n\nFünf.\n\nSechs.\n' })
+  const vieleLaeufe = await neuAnlegen(a, 'E2E Viele Läufe', { 'main.tex': LEER })
+  const botA = await botFuer(a)
+  await (await laeufe()).insertMany(
+    Array.from({ length: 22 }, (_, i) => ({
+      projectId: vieleLaeufe._id,
+      botId: botA._id,
+      status: 'abgelehnt',
+      gestartet: new Date(Date.UTC(2026, 10, 1, 8, i)),
+      beendet: new Date(Date.UTC(2026, 10, 1, 8, i, 30)),
+      docs: [],
+      aenderungen: 0,
+      rot: [],
+      zusammenfassung: `Lauf ${i + 1}`,
+    }))
+  )
   await neuAnlegen(a, 'E2E Compile', {
     'main.tex': String.raw`\documentclass{article}
 \begin{document}
@@ -346,7 +421,7 @@ Text davor.
 \end{document}
 `,
   })
-  await TexPakete.begrenzer.delete(String(a._id))
+  await TexPakete.drosselZuruecksetzen(a._id)
   await neuAnlegen(a, 'E2E Hochladen', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Hochladen B', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Semantik', {
@@ -471,6 +546,143 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await quelleAusFixture(p6Bericht._id, a._id, 'smith2024.pdf')
   await neuAnlegen(a, 'E2E P6 Zahlen', { 'main.tex': LEER, 'quellen.bib': '@article{p6,\n  title = {Zahlen}\n}\n' })
   await grenzenVorbereiten()
+  await p8Vorbereiten(a)
+}
+
+const CARLITO = String.raw`\documentclass{article}
+\usepackage{carlito}
+\begin{document}
+\carlitoaktiv
+\end{document}
+`
+
+const ROT_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Alpha Satz.
+
+Beta Satz.
+
+Gamma Satz.
+
+Delta Satz.
+\end{document}`
+
+async function p8Vorbereiten(a) {
+  await neuAnlegen(a, 'E2E P8 Zahlen', { 'main.tex': LEER })
+  for (const name of ['E2E P8 Pakete', 'E2E P8 Pakete B', 'E2E P8 Pakete Fehler', 'E2E P8 Pakete Abbruch']) await neuAnlegen(a, name, { 'main.tex': CARLITO })
+  // Reste eines abgebrochenen Versuchs: ein leerer Ordner und ein Ordner mit einer Datei, beide ohne Eintrag.
+  const leer = await neuAnlegen(a, 'E2E P8 Pakete Rest', { 'main.tex': CARLITO })
+  await ProjectEntityUpdateHandler.promises.mkdirp(leer._id, '/tex-pakete/carlito', a._id)
+  const eine = await neuAnlegen(a, 'E2E P8 Pakete Rest B', { 'main.tex': CARLITO })
+  await ProjectEntityUpdateHandler.promises.upsertDocWithPath(eine._id, '/tex-pakete/carlito/carlito.sty', ['% Rest'], 'spur-seed', a._id)
+  await p8GrenzenVorbereiten()
+  await neuAnlegen(a, 'E2E P8 Anlegen', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E P8 Warten', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E P8 Proxy', { 'main.tex': LEER })
+  const dateien = await neuAnlegen(a, 'E2E P8 Anlegen Dateien', { 'main.tex': LEER })
+  await platzhalterDateien(dateien._id, ['abb', 'ergebnisse.tex'])
+  const voll = await neuAnlegen(a, 'E2E P8 Anlegen Voll', { 'main.tex': LEER })
+  await eintraegeAuffuellen(voll._id, 2000)
+  const leser = await konto('e2e-leser@example.org')
+  const makros = await neuAnlegen(a, 'E2E P8 Makros', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\usepackage{spurzitate}
+\newcommand{\zitat}[1]{\enquote{#1}}
+\begin{document}
+\zitat{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
+
+\zitat{Sleep invented the consolidation.} \autocite[347]{smith2024}
+
+\wort{Memory traces are strengthened during slow-wave sleep} \autocite[347]{smith2024}
+\end{document}`,
+    'spurzitate.sty': String.raw`\newcommand{\wort}[1]{\enquote{#1}}`,
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(makros._id, a._id, 'smith2024.pdf')
+  await db.projects.updateOne({ _id: makros._id }, { $set: { readOnly_refs: [leser._id] } })
+  const vermerke = await neuAnlegen(a, 'E2E P8 Vermerke', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\usepackage{xcolor}
+\newcommand{\note}[1]{}
+\begin{document}
+\enquote{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
+\note{\enquote{Erfunden.} \autocite{brown2005}}
+\iffalse \parencite{wider2023} \fi
+\end{document}`,
+    'references.bib': `${BERICHT_BIB}
+@article{brown2005,
+  title = {Brown}
+}
+@article{wider2023,
+  title = {Wider}
+}`,
+  })
+  await quelleAusFixture(vermerke._id, a._id, 'smith2024.pdf')
+  const zaehlung = await neuAnlegen(a, 'E2E P8 Zählung', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage{csquotes}
+\begin{document}
+\enquote{Sleep supports the consolidation of declarative memory.} \autocite[347]{smith2024}
+Schlaf hilft dem Gedächtnis \parencite{smith2024}.
+\end{document}`,
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(zaehlung._id, a._id, 'smith2024.pdf')
+  await neuAnlegen(a, 'E2E P8 DOI', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage[backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Crossref \parencite{smith2024}.
+arXiv \parencite{arxiv2024}.
+Nirgends \parencite{nirgends}.
+Andere \parencite{andere}.
+\end{document}`,
+    'references.bib': `@article{smith2024,
+  title = {Sleep and Memory},
+  doi = {10.5555/spur.2024.001}
+}
+@article{arxiv2024,
+  title = {Sleep-like replay improves memory consolidation},
+  doi = {10.48550/arXiv.2401.01234}
+}
+@article{nirgends,
+  title = {Gibt es nirgends},
+  doi = {10.9999/nirgends.1}
+}
+@article{andere,
+  title = {Bei einer anderen Registrierstelle},
+  doi = {10.3333/andere.1}
+}`,
+  })
+}
+
+// Binärdateien als reine Einträge im Baum, ohne Inhalt: genug für Pfad- und Zählprüfungen.
+async function platzhalterDateien(projectId, namen) {
+  const neu = namen.map(name => ({ _id: new ObjectId(), name, created: new Date() }))
+  await db.projects.updateOne({ _id: projectId }, { $push: { 'rootFolder.0.fileRefs': { $each: neu } }, $inc: { version: 1 } })
+}
+
+// Füllt ein Projekt mit Platzhalter-Dateien bis auf `gesamt` Einträge.
+async function eintraegeAuffuellen(projectId, gesamt) {
+  const { rootFolder } = await db.projects.findOne({ _id: projectId }, { projection: { rootFolder: 1 } })
+  const wurzel = rootFolder[0]
+  const vorhanden = wurzel.docs.length + wurzel.fileRefs.length + wurzel.folders.length
+  await platzhalterDateien(projectId, Array.from({ length: gesamt - vorhanden }, (_, i) => `platzhalter-${i}.bin`))
+}
+
+// P8 Paketgrenzen: eigene Konten ohne Admin-Rechte, damit die Drossel bei null beginnt.
+async function p8GrenzenVorbereiten() {
+  const [p, pb] = await Promise.all(['e2e-pakete', 'e2e-pakete-b'].map(n => konto(`${n}@example.org`)))
+  for (const name of ['A', 'B', 'C']) await neuAnlegen(p, `E2E P8 Grenzen ${name}`, { 'main.tex': LEER })
+  const voll = await neuAnlegen(p, 'E2E P8 Grenzen Voll', { 'main.tex': LEER })
+  await eintraegeAuffuellen(voll._id, 1997)
+  await neuAnlegen(pb, 'E2E P8 Drossel', { 'main.tex': LEER })
+  await Promise.all([p, pb].map(k => TexPakete.drosselZuruecksetzen(k._id)))
 }
 
 // P7 Grenzen: eigene Konten ohne Admin-Rechte, damit die Projektzahlen klein und bekannt sind.

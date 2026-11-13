@@ -34,8 +34,14 @@ beforeEach(async () => {
       laufFuerClient: vi.fn(l => l && { id: l._id, status: l.status }),
     },
     LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
-    Inbox: { warteAufEreignis: vi.fn(), seit: vi.fn(), antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })) },
-    Crossref: { werk: vi.fn() },
+    Inbox: {
+      warteAufEreignis: vi.fn(),
+      seit: vi.fn(),
+      letzterCursor: vi.fn(async () => 'c9'),
+      standardWarteSekunden: () => 100,
+      antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })),
+    },
+    Crossref: { pruefen: vi.fn() },
     Beschaffung: { hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })) },
     Literatur: { vorschlagen: vi.fn(async () => ({ quelle_id: 'q', spalte: 'Methode' })) },
     Kompilieren: {
@@ -272,8 +278,8 @@ describe('Lesen im Projekt', () => {
     expect(ergebnis).not.toHaveProperty('abschnitte')
   })
 
-  it('bib_list nennt den Crossref-Status je Eintrag', async () => {
-    m.Crossref.werk.mockImplementation(async doi =>
+  it('bib_list nennt den Status der DOI je Eintrag', async () => {
+    m.Crossref.pruefen.mockImplementation(async doi =>
       ({ '10.1/a': { gefunden: true, retraction: 'zurueckgezogen' }, '10.1/c': { gefunden: false }, '10.1/d': null })[doi]
     )
     const { eintraege } = await aufruf('bib_list', { project_id: projekt })
@@ -299,6 +305,7 @@ describe('Schreiben', () => {
     expect(m.SchreibManager.docEdit).toHaveBeenCalledWith({
       projectId: new ObjectId(projekt),
       botId: bot,
+      menschId: anna,
       docId: undefined,
       pfad: 'a.tex',
       alt: 'x',
@@ -309,7 +316,7 @@ describe('Schreiben', () => {
 
   it('doc_create reicht Pfad und Inhalt weiter', async () => {
     await aufruf('doc_create', { project_id: projekt, pfad: 'neu.tex', inhalt: 'Text', idempotenz_schluessel: 'schluessel-0001' })
-    expect(m.SchreibManager.docCreate).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), botId: bot, pfad: 'neu.tex', inhalt: 'Text', schluessel: 'schluessel-0001' })
+    expect(m.SchreibManager.docCreate).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), botId: bot, menschId: anna, pfad: 'neu.tex', inhalt: 'Text', schluessel: 'schluessel-0001' })
   })
 
   it('reply speichert die Antwort für den Bot', async () => {
@@ -344,7 +351,7 @@ describe('Schreiben', () => {
   it('run_finish beendet den offenen Lauf und stößt die Automatik an', async () => {
     const ergebnis = await aufruf('run_finish', { project_id: projekt, zusammenfassung: 'Geglättet.' })
     expect(m.LaufManager.beenden).toHaveBeenCalledWith({ _id: 'l1' }, 'Geglättet.')
-    expect(m.LaufAktionen.nachLaufende).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1' }, anna)
+    expect(m.LaufAktionen.nachLaufende).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1' })
     expect(ergebnis).toEqual({ lauf: { id: 'l1', status: 'offen' } })
   })
 
@@ -356,18 +363,24 @@ describe('Schreiben', () => {
 })
 
 describe('Ereignisse', () => {
-  it('wait_for_event liefert den Auftrag', async () => {
-    m.Inbox.warteAufEreignis.mockResolvedValue({ id: 'e1', typ: 'task_created' })
+  it('wait_for_event liefert den Auftrag mit seiner ID als Cursor', async () => {
+    m.Inbox.warteAufEreignis.mockResolvedValue({ ereignis: { id: 'e1', typ: 'task_created' }, abgeloest: false })
     const ctx = { mcpReq: { signal: 'signal', _meta: {} } }
-    expect(await aufruf('wait_for_event', { max_sekunden: 10 }, kontext, ctx)).toEqual({ ereignis: { id: 'e1', typ: 'task_created' } })
+    expect(await aufruf('wait_for_event', { max_sekunden: 10 }, kontext, ctx)).toEqual({ ereignis: { id: 'e1', typ: 'task_created' }, cursor: 'e1' })
     expect(m.Inbox.warteAufEreignis).toHaveBeenCalledWith(bot, expect.objectContaining({ signal: 'signal', maxMs: 10000 }))
   })
 
-  it('wait_for_event bittet ohne Auftrag um erneuten Aufruf, standardmäßig nach 30 Minuten', async () => {
-    m.Inbox.warteAufEreignis.mockResolvedValue(null)
+  it('wait_for_event kehrt ohne Auftrag nach 100 Sekunden mit Cursor und Hinweis zurück', async () => {
+    m.Inbox.warteAufEreignis.mockResolvedValue({ ereignis: null, abgeloest: false })
     const ergebnis = await aufruf('wait_for_event', {}, kontext, { mcpReq: { signal: null, _meta: {} } })
-    expect(ergebnis).toEqual({ ereignis: null, hinweis: meldung('spur_fehler_kein_auftrag') })
-    expect(m.Inbox.warteAufEreignis.mock.calls[0][1].maxMs).toBe(1800000)
+    expect(ergebnis).toEqual({ ereignis: null, cursor: 'c9', hinweis: meldung('spur_warten_kein_auftrag') })
+    expect(m.Inbox.warteAufEreignis.mock.calls[0][1].maxMs).toBe(100000)
+  })
+
+  it('wait_for_event meldet abgeloest, wenn ein neuerer Aufruf wartet, und bittet, nicht erneut aufzurufen', async () => {
+    m.Inbox.warteAufEreignis.mockResolvedValue({ ereignis: null, abgeloest: true })
+    const ergebnis = await aufruf('wait_for_event', {}, kontext, { mcpReq: { signal: null, _meta: {} } })
+    expect(ergebnis).toEqual({ ereignis: null, abgeloest: true, cursor: 'c9', hinweis: meldung('spur_warten_abgeloest') })
   })
 
   it('wait_for_event meldet Fortschritt nur, wenn der Client ein Token mitgeschickt hat', async () => {
@@ -375,7 +388,7 @@ describe('Ereignisse', () => {
     m.Inbox.warteAufEreignis.mockImplementation(async (_bot, { fortschritt }) => {
       await fortschritt(30)
       await fortschritt(60)
-      return null
+      return { ereignis: null, abgeloest: false }
     })
     await aufruf('wait_for_event', {}, kontext, { mcpReq: { _meta: { progressToken: 'pt' }, notify } })
     expect(notify.mock.calls.map(([n]) => n.params)).toEqual([
