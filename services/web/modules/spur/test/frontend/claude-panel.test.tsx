@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ClaudePanel from '@modules/spur/frontend/js/claude/claude-panel'
 import { START } from './helpers/start'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
@@ -109,6 +109,19 @@ describe('Claude-Panel', function () {
     freigeben()
     await waitFor(() => expect(schalter.getAttribute('aria-busy')).to.equal(null))
     expect(document.activeElement).to.equal(schalter)
+  })
+
+  it('sendet bei zwei schnellen Wechseln vor dem nächsten Rendern nur eine Anfrage', async function () {
+    fetchMock.get(STATUS, status({}))
+    fetchMock.put(AUTOMATIK, () => new Promise(() => {}))
+    zeigen()
+    const schalter = await screen.findByRole('switch', { name: 'Alles von Claude automatisch annehmen' })
+    act(() => {
+      schalter.click()
+      schalter.click()
+    })
+    await waitFor(() => expect(fetchMock.callHistory.called(AUTOMATIK)).to.equal(true))
+    expect(fetchMock.callHistory.calls(AUTOMATIK)).to.have.length(1)
   })
 
   it('springt zurück und nennt den Grund, wenn das Speichern scheitert', async function () {

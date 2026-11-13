@@ -105,18 +105,32 @@ test('Schließen, Speichern und Kopieren kommen je aus einem Sprachschlüssel', 
 })
 
 // Ein ladender OLButton ist `disabled` und verliert den Fokus; spur baut ladende Knöpfe darum über LadeKnopf.
-export function ladendeOLButtons(quelltext) {
-  return [...quelltext.matchAll(/<OLButton\b[^>]*?\bisLoading=/gs)].length
+// Das öffnende Tag endet am ersten `>` außerhalb geschweifter Klammern (Pfeilfunktionen und Vergleiche stehen in `{}`).
+function ladenderOLButton(quelltext) {
+  for (let start = quelltext.indexOf('<OLButton'); start >= 0; start = quelltext.indexOf('<OLButton', start + 1)) {
+    let tiefe = 0
+    let ende = start
+    for (; ende < quelltext.length; ende++) {
+      const zeichen = quelltext[ende]
+      if (zeichen === '{') tiefe++
+      else if (zeichen === '}') tiefe--
+      else if (zeichen === '>' && tiefe === 0) break
+    }
+    if (/^<OLButton\b[\s\S]*\bisLoading=/.test(quelltext.slice(start, ende))) return true
+  }
+  return false
 }
 
-test('ladendeOLButtons findet isLoading auch über mehrere Zeilen und lässt andere Knöpfe stehen', () => {
-  assert.equal(ladendeOLButtons('<OLButton\n  variant="primary"\n  isLoading={x}\n>'), 1)
-  assert.equal(ladendeOLButtons('<OLButton onClick={f}>a</OLButton><LadeKnopf isLoading={x} />'), 0)
+test('ladenderOLButton findet isLoading über mehrere Zeilen und hinter Pfeilfunktionen', () => {
+  assert.equal(ladenderOLButton('<OLButton\n  variant="primary"\n  isLoading={x}\n>'), true)
+  assert.equal(ladenderOLButton('<OLButton onClick={() => x()} disabled={a > b} isLoading={busy}>'), true)
+  assert.equal(ladenderOLButton('<OLButton onClick={f}>a</OLButton><LadeKnopf isLoading={x} />'), false)
+  assert.equal(ladenderOLButton('<OLButtonGroup isLoading={x}>'), false)
 })
 
 test('spur nutzt für ladende Knöpfe LadeKnopf statt OLButton', () => {
   const treffer = dateien(join(WEB, 'modules/spur/frontend/js'))
     .filter(datei => /\.tsx$/.test(datei) && !datei.endsWith('/lade-knopf.tsx'))
-    .filter(datei => ladendeOLButtons(readFileSync(datei, 'utf8')) > 0)
+    .filter(datei => ladenderOLButton(readFileSync(datei, 'utf8')))
   assert.deepEqual(treffer, [])
 })

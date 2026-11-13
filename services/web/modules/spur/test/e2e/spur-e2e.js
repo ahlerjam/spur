@@ -5584,7 +5584,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await modal().getByRole('button', { name: 'Abbrechen' }).click()
     await modal().waitFor({ state: 'detached' })
     ok((await karte.locator('.spur-lauf-aenderung', { hasText: 'Nachtrag' }).count()) === 1, 'Abbrechen hat angenommen')
-    await page.waitForFunction(() => document.activeElement?.textContent === 'Alles Offene jetzt annehmen')
+    await fokusAuf(sammel, 'nach „Abbrechen“')
     // Per Tastatur: Enter öffnet, Enter auf „Annehmen“ nimmt an; danach liegt der Fokus auf „Nichts offen“.
     await sammel.focus()
     await page.keyboard.press('Enter')

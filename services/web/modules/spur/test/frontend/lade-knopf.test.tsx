@@ -19,37 +19,56 @@ function Formular({ dauer }: { dauer: Promise<void> }) {
         Speichern
       </LadeKnopf>
       <button type="button">Anderes</button>
+      <p>Text</p>
     </>
   )
 }
 
+// Chrome lässt den Fokus von einem gesperrten Knopf auf die Seite fallen; jsdom nicht. Das holen die Tests nach.
+function fokusFaellt() {
+  document.body.tabIndex = -1
+  document.body.focus()
+  document.body.removeAttribute('tabindex')
+}
+
+function starten() {
+  let fertig = () => {}
+  render(<Formular dauer={new Promise<void>(resolve => { fertig = resolve })} />)
+  const knopf = screen.getByRole('button', { name: 'Speichern' })
+  knopf.focus()
+  fireEvent.click(knopf)
+  return { knopf, fertig }
+}
+
 describe('LadeKnopf', function () {
   it('gibt den Fokus nach dem Laden an den Knopf zurück', async function () {
-    let fertig = () => {}
-    render(<Formular dauer={new Promise<void>(resolve => { fertig = resolve })} />)
-    const knopf = screen.getByRole('button', { name: 'Speichern' })
-    knopf.focus()
-    fireEvent.click(knopf)
+    const { knopf, fertig } = starten()
     await waitFor(() => expect(knopf).to.have.property('disabled', true))
-    // Der Browser lässt den Fokus von einem gesperrten Knopf fallen.
-    knopf.blur()
+    fokusFaellt()
+    expect(document.activeElement).to.equal(document.body)
     fertig()
     await waitFor(() => expect(knopf).to.have.property('disabled', false))
     await waitFor(() => expect(document.activeElement).to.equal(knopf))
   })
 
   it('nimmt den Fokus nicht, wenn man inzwischen woanders ist', async function () {
-    let fertig = () => {}
-    render(<Formular dauer={new Promise<void>(resolve => { fertig = resolve })} />)
-    const knopf = screen.getByRole('button', { name: 'Speichern' })
-    knopf.focus()
-    fireEvent.click(knopf)
+    const { knopf, fertig } = starten()
     await waitFor(() => expect(knopf).to.have.property('disabled', true))
     const anderes = screen.getByRole('button', { name: 'Anderes' })
     anderes.focus()
     fertig()
     await waitFor(() => expect(knopf).to.have.property('disabled', false))
     expect(document.activeElement).to.equal(anderes)
+  })
+
+  it('nimmt den Fokus nicht, wenn man während des Ladens in den Text geklickt hat', async function () {
+    const { knopf, fertig } = starten()
+    await waitFor(() => expect(knopf).to.have.property('disabled', true))
+    fokusFaellt()
+    fireEvent.pointerDown(screen.getByText('Text'))
+    fertig()
+    await waitFor(() => expect(knopf).to.have.property('disabled', false))
+    expect(document.activeElement).to.equal(document.body)
   })
 
   it('reicht die Referenz weiter', function () {

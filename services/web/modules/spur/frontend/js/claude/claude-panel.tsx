@@ -111,7 +111,8 @@ function Automatik({
   const [fragen, setFragen] = useState(false)
   const [nimmtAn, setNimmtAn] = useState(false)
   const knopf = useRef<HTMLButtonElement>(null)
-  // Nach dem Dialog kehrt der Fokus auf den Knopf zurück, auch wenn er inzwischen „Nichts offen“ zeigt.
+  // Nach jedem Schließen des Dialogs (Annehmen, Abbrechen, Esc) kehrt der Fokus auf den Knopf zurück. Overleafs Modal
+  // versucht das auch, scheitert aber, sobald der Knopf „Nichts offen“ zeigt und darum nicht mehr bereit war.
   const warOffen = useRef(false)
   useEffect(() => {
     if (warOffen.current && !fragen) knopf.current?.focus()
@@ -122,9 +123,12 @@ function Automatik({
     if (!speichert) setWert(an)
   }, [an, speichert])
 
+  // Gesperrt wird nicht über `disabled`: Der Browser nähme dem Schalter sonst den Fokus. Ein Ref statt des Zustands,
+  // damit auch zwei Wechsel vor dem nächsten Rendern nur eine Anfrage auslösen.
+  const laeuft = useRef(false)
   const umschalten = async (neu: boolean) => {
-    // Gesperrt wird nicht über `disabled`: Der Browser nähme dem Schalter sonst den Fokus.
-    if (speichert) return
+    if (laeuft.current) return
+    laeuft.current = true
     setWert(neu)
     setFehler(null)
     setSpeichert(true)
@@ -135,6 +139,7 @@ function Automatik({
       setWert(!neu)
       setFehler((error as Error).message)
     } finally {
+      laeuft.current = false
       setSpeichert(false)
     }
   }

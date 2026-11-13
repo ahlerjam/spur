@@ -55,6 +55,14 @@
   nach dem Dialog per Effekt statt `requestAnimationFrame`, E2E-Helfer `fokusAuf`, Repo-Prüfung gegen ladende
   `OLButton`. Übersprungen (Vorschlag): Overleafs `OLButton` selbst beim Laden mit `aria-disabled` statt `disabled`
   bauen (Kern-Patch, ändert alle ladenden Knöpfe von Overleaf und deren Upstream-Tests).
+- /code-review (medium, `b252f41fcb..HEAD`): behoben: Repo-Prüfung übersah `isLoading` hinter Props mit `>` (jetzt
+  Scan mit Klammertiefe); `LadeKnopf` schrieb beim Rendern in ein Ref (jetzt beim Auslösen) und holte den Fokus auch
+  nach einem Klick in den Seitentext zurück (jetzt nicht mehr, `pointerdown` woanders verwirft ihn); zwei schnelle
+  Wechsel des Schalters vor dem nächsten Rendern (Ref statt Zustand); E2E-Warten ohne Meldung. Übersprungen: „Nichts
+  offen“ ist fokussierbar, aber wirkungslos – gewollt, damit der Fokus nach dem Annehmen nicht auf der Seite landet.
+  jsdom lässt den Fokus auf gesperrten Knöpfen; die Tests setzen ihn darum selbst auf die Seite wie Chrome.
+- Security: Der Fix ändert nur Fokus und ARIA im Browser, keine Route, keine Rechte, keine Eingaben an den Server;
+  keine eigene Sicherheitsprüfung nötig.
 
 ## Needs decision
 
