@@ -74,6 +74,6 @@ describe('Proxy-Sperre', function () {
     expect(meldung.closest('[role="alert"]')).to.exist
     gesperrt = false
     fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
-    await screen.findByText('Noch keine Quellen')
+    await screen.findByText(/^Noch keine Quellen\./)
   })
 })

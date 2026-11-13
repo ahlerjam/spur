@@ -72,6 +72,7 @@ async function laden({ dev = false } = {}) {
     e2eVorbereiten: Object.assign(() => {}, { handler: 'e2eVorbereiten' }),
     quelleVergroessern: Object.assign(() => {}, { handler: 'quelleVergroessern' }),
     proxySperre: name => Object.assign(() => {}, { handler: `proxySperre:${name}` }),
+    speicherFehler: name => Object.assign(() => {}, { handler: `speicherFehler:${name}` }),
     pdfUmleiten: Object.assign(() => {}, { handler: 'pdfUmleiten' }),
   }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
@@ -125,6 +126,8 @@ describe('Rechte der Routen', () => {
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/ablehnen', 'pruefen', 'laufAblehnen'],
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/zuruecknehmen', 'schreiben', 'laufZuruecknehmen'],
     ['put', '/spur/project/:project_id/claude/automatik', 'schreiben', 'automatikSetzen'],
+    ['post', '/spur/project/:project_id/claude/alles-annehmen', 'schreiben', 'allesAnnehmen'],
+    ['get', '/spur/project/:project_id/claude/laeufe', 'lesen', 'claudeLaeufe'],
     ['get', '/spur/project/:project_id/recherche', 'lesen', 'rechercheSuchen'],
     ['get', '/spur/project/:project_id/recherche/zitationen', 'lesen', 'rechercheZitationen'],
     ['get', '/spur/project/:project_id/recherche/protokoll', 'lesen', 'suchprotokoll'],
@@ -221,6 +224,16 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(route('post', '/project/:Project_id/compile'))).toBe('pdfUmleiten')
     const quellen = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/quellen')
     expect(quellen.map(handlerVon)).toEqual(['proxySperre:SPUR_PROXY_API', 'quellenListe'])
+    const automatik = routen.filter(r => r.methode === 'put' && r.pfad === '/spur/project/:project_id/claude/automatik')
+    expect(automatik.map(handlerVon)).toEqual(['speicherFehler:SPUR_AUTOMATIK_FEHLER', 'automatikSetzen'])
+    const claude = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/claude')
+    expect(claude.map(handlerVon)).toEqual(['proxySperre:SPUR_CLAUDE_FEHLER', 'claudeStatus'])
+    const zellen = routen.filter(r => r.methode === 'put' && r.pfad === '/spur/project/:project_id/matrix/zellen')
+    expect(zellen.map(handlerVon).at(0)).toBe('speicherFehler:SPUR_MATRIX_FEHLER')
+    const bericht = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/pruefbericht')
+    expect(bericht.map(handlerVon).at(0)).toBe('proxySperre:SPUR_PRUEFBERICHT_FEHLER')
+    const bild = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/quellen/:quelle_id/seiten/:seite/bild')
+    expect(bild.map(handlerVon)).toEqual(['proxySperre:SPUR_SEITENBILD_FEHLER', 'quelleBild'])
   })
 })
 

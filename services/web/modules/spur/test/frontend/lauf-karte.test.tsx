@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import LaufKarte, { type Lauf } from '@modules/spur/frontend/js/claude/lauf-karte'
 import { deutschAktivieren } from './helpers/deutsch'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
@@ -45,7 +45,6 @@ function zeigen(rolle: PermissionsLevel) {
     <LaufKarte
       lauf={lauf}
       aenderungen={aenderungen}
-      automatik={false}
       neuLaden={async () => {}}
     />,
     { wrapper: mitRolle(rolle) }
@@ -71,7 +70,7 @@ describe('Lauf-Karte', function () {
 
   it('zeigt Lesenden keine Schaltflächen zum Entscheiden', function () {
     zeigen('readOnly')
-    expect(screen.queryByRole('button')).to.not.exist
+    expect(screen.getAllByRole('button').map(b => b.getAttribute('aria-expanded'))).to.deep.equal(['true'])
   })
 
   it('warnt bei Zahlen ohne Beleg', function () {
@@ -79,18 +78,16 @@ describe('Lauf-Karte', function () {
       <LaufKarte
         lauf={{ ...lauf, zahlen: [{ zahl: '412', pfad: 'main.tex' }] }}
         aenderungen={aenderungen}
-        automatik={false}
-        neuLaden={async () => {}}
+          neuLaden={async () => {}}
       />,
       { wrapper: mitRolle('owner') }
     )
-    expect(screen.getByText('Zahl ohne Beleg')).to.exist
-    expect(screen.getByText('„412“ in main.tex: Bitte als Makro aus ergebnisse.tex einsetzen.')).to.exist
+    expect(screen.getByText('Zahl ohne Beleg: 412')).to.exist
   })
 
   it('zeigt ohne Zahlen keine Warnung', function () {
     zeigen('owner')
-    expect(screen.queryByText('Zahl ohne Beleg')).to.not.exist
+    expect(screen.queryByText(/^Zahl ohne Beleg/)).to.not.exist
   })
 
   it('listet angelegte Dateien und bietet „Lauf rückgängig“ auch vor dem Annehmen', function () {
@@ -98,8 +95,7 @@ describe('Lauf-Karte', function () {
       <LaufKarte
         lauf={{ ...lauf, aenderungen: 0, angelegt: [{ art: 'ordner', pfad: 'tex-pakete/foo' }, { art: 'datei', pfad: 'latexmkrc' }] }}
         aenderungen={[]}
-        automatik={false}
-        neuLaden={async () => {}}
+          neuLaden={async () => {}}
       />,
       { wrapper: mitRolle('owner') }
     )
@@ -113,11 +109,44 @@ describe('Lauf-Karte', function () {
       <LaufKarte
         lauf={{ ...lauf, angelegt: [{ art: 'datei', pfad: 'latexmkrc' }] }}
         aenderungen={[]}
-        automatik={false}
-        neuLaden={async () => {}}
+          neuLaden={async () => {}}
       />,
       { wrapper: mitRolle('readOnly') }
     )
     expect(screen.queryByRole('button', { name: 'Lauf rückgängig' })).to.not.exist
   })
+
+  it('stellt rote Zitate unter „Bitte prüfen“ an den Anfang und nennt automatisch Angenommenes', function () {
+    render(
+      <LaufKarte
+        lauf={{
+          ...lauf,
+          status: 'offen',
+          rotAenderungen: ['rot'],
+          automatisch: [{ pfad: 'main.tex', zeile: 2, art: 'einfuegung', text: 'Von 240 Befragten antworteten 90.' }],
+        }}
+        aenderungen={[...aenderungen, { ...aenderungen[0], id: 'rot', text: '\\footfullcite{smith2024}' }]}
+        neuLaden={async () => {}}
+      />,
+      { wrapper: mitRolle('owner') }
+    )
+    const texte = [...document.querySelectorAll('.spur-lauf-aenderung .spur-nachricht-text')].map(e => e.textContent)
+    expect(texte).to.deep.equal(['\\footfullcite{smith2024}', 'Neuer Satz.', 'Von 240 Befragten antworteten 90.'])
+    expect(screen.getByText('Bitte prüfen')).to.exist
+    expect(screen.getByText('Automatisch angenommen')).to.exist
+    expect(screen.getByRole('button', { name: 'Lauf rückgängig' })).to.exist
+  })
+
+  it('zeigt eingeklappt Status und Zahl offener Änderungen und klappt auf', function () {
+    render(<LaufKarte lauf={lauf} aenderungen={aenderungen} neuLaden={async () => {}} aufgeklappt={false} />, {
+      wrapper: mitRolle('owner'),
+    })
+    const kopf = screen.getByRole('button', { name: /^Lauf/ })
+    expect(kopf.textContent).to.contain('Fertig')
+    expect(kopf.textContent).to.contain('1 offen')
+    expect(screen.queryByRole('button', { name: 'Alle annehmen' })).to.not.exist
+    fireEvent.click(kopf)
+    expect(screen.getByRole('button', { name: 'Alle annehmen' })).to.exist
+  })
 })
+

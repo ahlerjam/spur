@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
 import Notification from '@/shared/components/notification'
+import {
+  OLModal,
+  OLModalBody,
+  OLModalFooter,
+  OLModalHeader,
+  OLModalTitle,
+} from '@/shared/components/ol/ol-modal'
 import getMeta from '@/utils/meta'
 import { anfrage, jsonAnfrage } from '../api'
 import BefehlKasten from './befehl-kasten'
@@ -47,6 +54,10 @@ export default function ClaudeVerbinden() {
   const [tokens, setTokens] = useState<Token[] | null>(null)
   const [neu, setNeu] = useState<string | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
+  const [erzeugt, setErzeugt] = useState(false)
+  // Ein schneller Doppelklick käme vor dem nächsten Render zweimal hier an: darum ein Ref statt nur des Zustands.
+  const laeuft = useRef(false)
+  const [frage, setFrage] = useState<Token | null>(null)
 
   const laden = useCallback(async () => {
     try {
@@ -61,6 +72,9 @@ export default function ClaudeVerbinden() {
   }, [laden])
 
   const erzeugen = async () => {
+    if (laeuft.current) return
+    laeuft.current = true
+    setErzeugt(true)
     setFehler(null)
     try {
       const { token } = await jsonAnfrage<{ token: string }>('POST', '/spur/claude/tokens')
@@ -68,10 +82,14 @@ export default function ClaudeVerbinden() {
       await laden()
     } catch (error) {
       setFehler((error as Error).message)
+    } finally {
+      laeuft.current = false
+      setErzeugt(false)
     }
   }
 
   const widerrufen = async (id: string) => {
+    setFrage(null)
     setFehler(null)
     try {
       await jsonAnfrage('DELETE', `/spur/claude/tokens/${id}`)
@@ -114,7 +132,7 @@ export default function ClaudeVerbinden() {
                   ? t('spur_token_abgelaufen')
                   : t('spur_token_gueltig_bis', { datum: datum(token.ablauf) })}
               </span>
-              <OLButton variant="danger-ghost" size="sm" onClick={() => widerrufen(token.id)}>
+              <OLButton variant="danger-ghost" size="sm" onClick={() => setFrage(token)}>
                 {t('spur_widerrufen')}
               </OLButton>
             </li>
@@ -122,10 +140,28 @@ export default function ClaudeVerbinden() {
         </ul>
       </div>
       <div>
-        <OLButton variant="secondary" onClick={erzeugen}>
+        <OLButton variant="secondary" isLoading={erzeugt} loadingLabel={t('spur_laedt')} onClick={erzeugen}>
           {t('spur_token_erzeugen')}
         </OLButton>
       </div>
+      {frage && (
+        <OLModal show onHide={() => setFrage(null)}>
+          <OLModalHeader>
+            <OLModalTitle>{t('spur_token_widerrufen')}</OLModalTitle>
+          </OLModalHeader>
+          <OLModalBody>
+            <p>{t('spur_token_widerrufen_frage')}</p>
+          </OLModalBody>
+          <OLModalFooter>
+            <OLButton variant="secondary" onClick={() => setFrage(null)}>
+              {t('cancel')}
+            </OLButton>
+            <OLButton variant="danger" onClick={() => widerrufen(frage.id)}>
+              {t('spur_widerrufen')}
+            </OLButton>
+          </OLModalFooter>
+        </OLModal>
+      )}
     </div>
   )
 }

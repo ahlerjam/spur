@@ -122,7 +122,7 @@ export default function PruefEinstellungen() {
           {makros && <p className="spur-zeile-meta">{t('spur_makros_hilfe')}</p>}
           {makros && write && (
             <OLButton type="submit" variant="primary" size="sm" disabled={laeuft}>
-              {t('spur_speichern')}
+              {t('save')}
             </OLButton>
           )}
         </form>

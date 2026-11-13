@@ -50,7 +50,7 @@ export default function QuellenHolenModal({
   }
 
   return (
-    <OLModal show onHide={schliessen}>
+    <OLModal themed show onHide={schliessen}>
       <OLModalHeader>
         <OLModalTitle>{t('spur_aus_projekt_holen')}</OLModalTitle>
       </OLModalHeader>

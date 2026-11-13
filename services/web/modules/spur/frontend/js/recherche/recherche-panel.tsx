@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { type KeyboardEvent, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-header'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
-import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { anfrage, ApiFehler, jsonAnfrage, projektPfad } from '../api'
@@ -21,6 +20,22 @@ const ANSICHTEN: { id: Ansicht; titel: string }[] = [
   { id: 'beschaffung', titel: 'spur_beschaffung' },
 ]
 
+function TrefferPlatzhalter() {
+  const { t } = useTranslation()
+  return (
+    <ul className="spur-liste" aria-busy="true" aria-label={t('spur_suche_laeuft')}>
+      {[0, 1, 2].map(i => (
+        <li key={i} className="spur-zeile spur-platzhalter-zeile" aria-hidden="true">
+          <span className="placeholder col-10" />
+          <span className="placeholder col-6" />
+          <span className="placeholder col-8" />
+          <span className="placeholder col-4" />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export default function RecherchePanel() {
   const { t } = useTranslation()
   const [begriff, setBegriff] = useState('')
@@ -31,6 +46,19 @@ export default function RecherchePanel() {
   const { write: darfSchreiben } = usePermissionsContext()
   const [meldungen, setMeldungen] = useState<Record<string, { typ: 'success' | 'info' | 'error'; text: string }>>({})
   const [arbeitet, setArbeitet] = useState<string | null>(null)
+  const [gesucht, setGesucht] = useState('')
+  const reiter = useRef<Record<Ansicht, HTMLButtonElement | null>>({ treffer: null, protokoll: null, beschaffung: null })
+
+  // Reiter wie in WAI-ARIA: Pfeiltasten, Pos1 und Ende wählen den Reiter und setzen den Fokus.
+  const reiterTaste = (e: KeyboardEvent) => {
+    const i = ANSICHTEN.findIndex(a => a.id === ansicht)
+    const ziel = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: ANSICHTEN.length - 1 }[e.key]
+    if (ziel === undefined) return
+    e.preventDefault()
+    const neu = ANSICHTEN[(ziel + ANSICHTEN.length) % ANSICHTEN.length].id
+    setAnsicht(neu)
+    reiter.current[neu]?.focus()
+  }
 
   const aktion = async (treffer: PaperTreffer, ziel: 'aufnehmen' | 'beschaffen') => {
     const doi = treffer.doi!
@@ -59,6 +87,7 @@ export default function RecherchePanel() {
     try {
       const parameter = new URLSearchParams({ anfrage: begriff.trim(), seite: String(seite) })
       setErgebnis(await anfrage<SuchErgebnis>(projektPfad(`/recherche?${parameter}`)))
+      setGesucht(begriff.trim())
     } catch (error) {
       setFehler((error as Error).message)
     } finally {
@@ -89,30 +118,33 @@ export default function RecherchePanel() {
           {t('spur_suchen')}
         </OLButton>
       </form>
-      <div className="spur-reiter" role="tablist" aria-label={t('spur_recherche_ansicht')}>
+      <div className="spur-reiter" role="tablist" aria-label={t('spur_recherche_ansicht')} onKeyDown={reiterTaste}>
         {ANSICHTEN.map(a => (
           <button
             key={a.id}
+            ref={el => {
+              reiter.current[a.id] = el
+            }}
             type="button"
             role="tab"
+            id={`spur-reiter-${a.id}`}
+            aria-controls="spur-reiter-inhalt"
             className="spur-reiter-knopf"
             aria-selected={ansicht === a.id}
+            tabIndex={ansicht === a.id ? 0 : -1}
             onClick={() => setAnsicht(a.id)}
           >
             {t(a.titel)}
           </button>
         ))}
       </div>
+      <div className="spur-reiter-inhalt" role="tabpanel" id="spur-reiter-inhalt" aria-labelledby={`spur-reiter-${ansicht}`}>
       {ansicht === 'protokoll' && <Suchprotokoll />}
       {ansicht === 'beschaffung' && <Beschaffung />}
       {ansicht === 'treffer' && (
       <div className="spur-panel-inhalt" aria-busy={laedt}>
         {fehler && <Notification type="error" content={fehler} />}
-        {laedt && (
-          <p className="spur-leer" role="status">
-            <OLSpinner size="sm" /> {t('spur_suche_laeuft')}
-          </p>
-        )}
+        {laedt && <TrefferPlatzhalter />}
         {!laedt && !ergebnis && !fehler && <p className="spur-leer">{t('spur_recherche_leer')}</p>}
         {!laedt && ergebnis && (
           <>
@@ -121,7 +153,7 @@ export default function RecherchePanel() {
             ))}
             {ergebnis.hinweis && <Notification type="warning" content={ergebnis.hinweis} />}
             {ergebnis.treffer.length === 0 ? (
-              !ergebnis.hinweis && <p className="spur-leer">{t('spur_keine_treffer')}</p>
+              !ergebnis.hinweis && <p className="spur-leer">{t('spur_keine_treffer_fuer', { begriff: gesucht })}</p>
             ) : (
               <ul className="spur-liste">
                 {ergebnis.treffer.map(treffer => (
@@ -187,6 +219,7 @@ export default function RecherchePanel() {
         )}
       </div>
       )}
+      </div>
     </div>
   )
 }

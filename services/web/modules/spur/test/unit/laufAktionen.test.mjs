@@ -392,31 +392,101 @@ describe('Automatik am Laufende', () => {
     expect(await LaufAktionen.automatik(projekt, anna)).toBe(false)
   })
 
-  it('nimmt bei eingeschalteter Automatik ohne rote Status alles an', async () => {
+  it('nimmt am Laufende nichts nachträglich an, auch bei eingeschaltetem Schalter', async () => {
     await LaufAktionen.automatikSetzen(projekt, anna, true)
     const l = await lauf()
-    await LaufAktionen.nachLaufende(projekt, l, anna)
+    await LaufAktionen.nachLaufende(projekt, l)
+    expect(acceptChanges).not.toHaveBeenCalled()
+    expect((await gespeichert(l)).status).toBe('fertig')
+  })
+
+  it('schließt einen Lauf als angenommen, wenn der Schalter alles angenommen hat', async () => {
+    docSetzen('Text mit neu.', [])
+    const l = await lauf({ angenommen: [{ automatisch: true, docId: doc, op: { p: 9, i: 'neu' } }] })
+    await LaufAktionen.nachLaufende(projekt, l)
     expect((await gespeichert(l)).status).toBe('angenommen')
   })
+})
 
-  it('tut nichts bei ausgeschalteter Automatik', async () => {
-    const l = await lauf()
-    await LaufAktionen.nachLaufende(projekt, l, anna)
-    expect(acceptChanges).not.toHaveBeenCalled()
+describe('Sofort annehmen (Schalter „Alles von Claude automatisch annehmen“)', () => {
+  beforeEach(() => {
+    docSetzen('Text mit neu.', [change('a', { p: 9, i: 'neu' })])
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
   })
 
-  it('übernimmt nie Läufe mit roten Status', async () => {
+  it('nimmt die neuen Changes sofort an, vermerkt sie als automatisch und lässt den Lauf offen', async () => {
     await LaufAktionen.automatikSetzen(projekt, anna, true)
-    await LaufAktionen.nachLaufende(projekt, await lauf({ rot: [{ grund: 'nicht_pruefbar' }] }), anna)
-    expect(acceptChanges).not.toHaveBeenCalled()
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a'], anna)
+    const danach = await gespeichert(l)
+    expect(danach.status).toBe('offen')
+    expect(danach.angenommen).toEqual([
+      expect.objectContaining({ docId: doc, op: { p: 9, i: 'neu' }, automatisch: true, pfad: 'kapitel.tex', zeile: 1 }),
+    ])
   })
 
-  it('übernimmt nichts mehr, wenn der Mensch inzwischen nur noch lesen oder prüfen darf', async () => {
+  it('tut nichts bei ausgeschaltetem Schalter oder ohne Schreibrecht', async () => {
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
     await LaufAktionen.automatikSetzen(projekt, anna, true)
     for (const stufe of ['readOnly', 'review']) {
       recht.vergeben(anna, projekt, { stufe })
-      await LaufAktionen.nachLaufende(projekt, await lauf(), anna)
+      await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
     }
     expect(acceptChanges).not.toHaveBeenCalled()
   })
+
+  it('„Lauf rückgängig“ entfernt auch sofort angenommene Changes eines offenen Laufs und lehnt den Rest ab', async () => {
+    await LaufAktionen.automatikSetzen(projekt, anna, true)
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    docSetzen('Text mit neu. rot', [change('r', { p: 14, i: 'rot' })])
+    await LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna)
+    expect(spurUpdate).toHaveBeenCalledWith(projekt, doc, [expect.objectContaining({ p: 14, d: 'rot' })], 7, { userId: anna })
+    expect(spurUpdate).toHaveBeenCalledWith(projekt, doc, [{ p: 9, d: 'neu' }], 7, { userId: anna, tracked: true })
+    expect((await gespeichert(l)).status).toBe('zurueckgenommen')
+  })
 })
+
+describe('Alles Offene jetzt annehmen', () => {
+  const SPAETER = '2026-11-07T11:10:00.000Z'
+  beforeEach(() => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    docSetzen('a b c rot', [
+      change('a', { p: 0, i: 'a' }),
+      change('b', { p: 2, i: 'b' }, SPAETER),
+      change('r', { p: 6, i: 'rot' }, '2026-11-07T11:20:00.000Z'),
+      change('fremd', { p: 4, i: 'c' }, SPAETER, String(new ObjectId())),
+    ])
+  })
+
+  async function zweiLaeufe() {
+    const fertig = await lauf()
+    const offen = await lauf({ status: 'offen', gestartet: new Date('2026-11-07T11:00:00Z'), beendet: undefined, rotAenderungen: ['r'] })
+    return { fertig, offen }
+  }
+
+  it('zählt offene Changes des eigenen Bots über alle Läufe ohne rote', async () => {
+    await zweiLaeufe()
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 2, dateien: 1 })
+  })
+
+  it('nimmt alles außer roten Zitaten an; ein offener Lauf bleibt offen', async () => {
+    const { fertig, offen } = await zweiLaeufe()
+    expect(await LaufAktionen.allesAnnehmen(projekt, bot, anna)).toEqual({ angenommen: 2 })
+    expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['a'], anna)
+    expect(acceptChanges).toHaveBeenCalledWith(projekt, doc, ['b'], anna)
+    expect(acceptChanges).not.toHaveBeenCalledWith(projekt, doc, expect.arrayContaining(['r']), anna)
+    expect((await gespeichert(fertig)).status).toBe('angenommen')
+    expect((await gespeichert(offen)).status).toBe('offen')
+  })
+
+  it('verlangt Schreibrecht', async () => {
+    await zweiLaeufe()
+    recht.vergeben(anna, projekt, { stufe: 'review' })
+    expect(await fehlerVon(LaufAktionen.allesAnnehmen(projekt, bot, anna))).toMatchObject({ status: 403 })
+    expect(acceptChanges).not.toHaveBeenCalled()
+  })
+})
+

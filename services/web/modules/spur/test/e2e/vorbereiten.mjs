@@ -20,6 +20,7 @@ import {
   ereignisse,
   herzschlaege,
   einstellungen,
+  laeufe,
   nachrichten,
   quellen,
   quellenSeiten,
@@ -232,6 +233,8 @@ export async function e2eDatenVorbereiten() {
     'references.bib': BERICHT_BIB,
   })
   await quelleAusFixture(bericht._id, a._id, 'smith2024.pdf')
+  // P9: Lese-Konto für die Großansicht ohne Schreibrecht.
+  await db.projects.updateOne({ _id: bericht._id }, { $set: { readOnly_refs: [leser._id] } })
   await quelleAusFixture(bericht._id, a._id, 'retracted.pdf')
 
   const schreiben = await neuAnlegen(a, 'E2E Schreiben', {
@@ -322,6 +325,55 @@ Delta Satz.
   await neuAnlegen(a, 'E2E Beschaffung', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Import', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Literatur', { 'main.tex': LEER })
+  // P9: leeres Projekt für den ersten Upload.
+  await neuAnlegen(a, 'E2E Leer', { 'main.tex': LEER })
+
+  // P9: Schalter „Alles von Claude automatisch annehmen“. Das alte Häkchen war für e2e-a und e2e-schreib gesetzt.
+  const schreiber = await konto('e2e-schreib@example.org')
+  const automatik = await neuAnlegen(a, 'E2E Automatik', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Alpha Satz.
+
+Beta Satz.
+
+Gamma Satz.
+
+Delta Satz.
+
+Eins. Zwei. Drei. Vier. Fünf.
+\end{document}`,
+    'extra.tex': 'Sechs. Sieben. Acht. Neun. Zehn. Elf.',
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(automatik._id, a._id, 'smith2024.pdf')
+  await db.projects.updateOne(
+    { _id: automatik._id },
+    { $set: { collaberator_refs: [schreiber._id], readOnly_refs: [leser._id], reviewer_refs: [pruefer._id] } }
+  )
+  await (await einstellungen()).insertMany(
+    [a, schreiber].map(person => ({ projectId: automatik._id, userId: person._id, autoAnnehmen: true }))
+  )
+
+  // P9: Verlauf der Läufe im Claude-Panel; „E2E Viele Läufe“ hat 22 abgeschlossene Läufe für „Ältere laden“.
+  await neuAnlegen(a, 'E2E Läufe', { 'main.tex': 'Eins.\n\nZwei.\n\nDrei.\n\nVier.\n\nFünf.\n\nSechs.\n' })
+  const vieleLaeufe = await neuAnlegen(a, 'E2E Viele Läufe', { 'main.tex': LEER })
+  const botA = await botFuer(a)
+  await (await laeufe()).insertMany(
+    Array.from({ length: 22 }, (_, i) => ({
+      projectId: vieleLaeufe._id,
+      botId: botA._id,
+      status: 'abgelehnt',
+      gestartet: new Date(Date.UTC(2026, 10, 1, 8, i)),
+      beendet: new Date(Date.UTC(2026, 10, 1, 8, i, 30)),
+      docs: [],
+      aenderungen: 0,
+      rot: [],
+      zusammenfassung: `Lauf ${i + 1}`,
+    }))
+  )
   await neuAnlegen(a, 'E2E Compile', {
     'main.tex': String.raw`\documentclass{article}
 \begin{document}

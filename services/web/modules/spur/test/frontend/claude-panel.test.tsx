@@ -10,6 +10,9 @@ const STATUS = /\/spur\/project\/[^/]+\/claude$/
 const AUFTRAG = /\/spur\/project\/[^/]+\/claude\/auftrag$/
 const WORKFLOWS = /\/spur\/project\/[^/]+\/workflows$/
 const STARTEN = /\/workflows\/methodenteil\/starten$/
+const AUTOMATIK = /\/spur\/project\/[^/]+\/claude\/automatik$/
+const ALLES = /\/spur\/project\/[^/]+\/claude\/alles-annehmen$/
+const LAEUFE = /\/spur\/project\/[^/]+\/claude\/laeufe\?vor=\w+$/
 const LISTE = {
   workflows: [
     { name: 'literaturueberblick', titel: 'Literaturüberblick', beschreibung: 'L' },
@@ -30,8 +33,9 @@ const status = (teil: object) => ({
   verbunden: true,
   nachrichten: [],
   automatik: false,
-  lauf: null,
-  aenderungen: [],
+  offen: { aenderungen: 0, dateien: 0 },
+  laeufe: [],
+  weitereLaeufe: false,
   ...teil,
 })
 
@@ -45,13 +49,14 @@ describe('Claude-Panel', function () {
   beforeEach(function () {
     fetchMock.removeRoutes().clearHistory()
     fetchMock.get(WORKFLOWS, LISTE)
+    window.localStorage.clear()
   })
 
   afterEach(function () {
     fetchMock.removeRoutes().clearHistory()
   })
 
-  it('zeigt ohne Verbindung den Startbefehl und kein Eingabefeld', async function () {
+  it('zeigt ohne Verbindung den Startbefehl, den Weg zu den Tokens und ein gesperrtes Eingabefeld', async function () {
     fetchMock.get(STATUS, status({ verbunden: false }))
     zeigen()
     await screen.findByText('Claude nicht verbunden')
@@ -59,8 +64,88 @@ describe('Claude-Panel', function () {
       'Starte Claude Code im Terminal mit diesem Befehl. Claude wartet danach von selbst auf Aufträge aus diesem Panel:'
     )
     screen.getByText(START)
-    expect(screen.queryByLabelText('Auftrag an Claude')).to.equal(null)
-    expect(screen.queryByRole('button', { name: 'Senden' })).to.equal(null)
+    expect(screen.getByRole('link', { name: 'Token verwalten' }).getAttribute('href')).to.equal('/user/settings#language-feedback')
+    expect(screen.getByLabelText('Auftrag an Claude')).to.have.property('disabled', true)
+    screen.getByText('Verbinde zuerst Claude')
+    expect(screen.getByRole('button', { name: 'Senden' })).to.have.property('disabled', true)
+  })
+
+  it('klappt den Startbefehl ein, sobald Claude verbunden ist', async function () {
+    window.localStorage.clear()
+    fetchMock.get(STATUS, status({ verbunden: true }))
+    zeigen()
+    const knopf = await screen.findByRole('button', { name: 'Startbefehl anzeigen' })
+    expect(screen.queryByText(START)).to.equal(null)
+    fireEvent.click(knopf)
+    screen.getByText(START)
+  })
+
+  it('zeigt den Schalter schon vor dem ersten Lauf und speichert ihn', async function () {
+    fetchMock.get(STATUS, status({}))
+    fetchMock.put(AUTOMATIK, 204)
+    zeigen()
+    const schalter = await screen.findByRole('switch', { name: 'Alles von Claude automatisch annehmen' })
+    screen.getByText('Rote Zitate bleiben offen.')
+    fireEvent.click(schalter)
+    await waitFor(() => expect(fetchMock.callHistory.called(AUTOMATIK)).to.equal(true))
+    expect(JSON.parse(fetchMock.callHistory.lastCall(AUTOMATIK)!.options.body as string)).to.deep.equal({ an: true })
+  })
+
+  it('springt zurück und nennt den Grund, wenn das Speichern scheitert', async function () {
+    fetchMock.get(STATUS, status({}))
+    fetchMock.put(AUTOMATIK, { status: 503, headers: { 'Content-Type': 'application/problem+json' }, body: { detail: 'Die Einstellung ließ sich nicht speichern.' } })
+    zeigen()
+    const schalter = await screen.findByRole('switch', { name: 'Alles von Claude automatisch annehmen' })
+    fireEvent.click(schalter)
+    await screen.findByText('Die Einstellung ließ sich nicht speichern.')
+    expect(schalter).to.have.property('checked', false)
+  })
+
+  it('fragt vor „Alles Offene jetzt annehmen“ nach und ist ohne Offenes gesperrt', async function () {
+    let offen = { aenderungen: 12, dateien: 2 }
+    fetchMock.get(STATUS, () => status({ offen }))
+    fetchMock.post(ALLES, () => {
+      offen = { aenderungen: 0, dateien: 0 }
+      return { angenommen: 12 }
+    })
+    zeigen()
+    fireEvent.click(await screen.findByRole('button', { name: 'Alles Offene jetzt annehmen' }))
+    const dialog = await screen.findByRole('dialog')
+    within(dialog).getByText('12 Änderungen in 2 Dateien annehmen? Rote Zitate bleiben offen.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annehmen' }))
+    const nichts = await screen.findByRole('button', { name: 'Nichts offen' })
+    expect(nichts).to.have.property('disabled', true)
+  })
+
+  it('zeigt Reviewern weder Schalter noch Sammelannahme', async function () {
+    fetchMock.get(STATUS, status({ offen: { aenderungen: 3, dateien: 1 } }))
+    render(<ClaudePanel />, {
+      wrapper: ({ children }) => (
+        <EditorProviders permissionsLevel="review" projectFeatures={{ trackChanges: true }}>
+          {children}
+        </EditorProviders>
+      ),
+    })
+    await screen.findByText('Claude verbunden')
+    expect(screen.queryByRole('switch')).to.equal(null)
+    expect(screen.queryByRole('button', { name: 'Alles Offene jetzt annehmen' })).to.equal(null)
+  })
+
+  it('zeigt ohne Aufträge den Hinweis direkt über dem Eingabefeld', async function () {
+    fetchMock.get(STATUS, status({}))
+    zeigen()
+    const hinweis = await screen.findByText('Noch keine Aufträge. Schreib unten, was Claude tun soll.')
+    const eingabe = document.querySelector('.spur-chat-eingabe')!
+    expect(hinweis.nextElementSibling === eingabe || hinweis.parentElement!.nextElementSibling === eingabe || hinweis.nextElementSibling?.nextElementSibling === eingabe).to.equal(true)
+  })
+
+  it('lässt eine gescheiterte Abfrage nach der nächsten gelungenen verschwinden', async function () {
+    let scheitern = true
+    fetchMock.get(STATUS, () => (scheitern ? { status: 500, body: { detail: 'Abfrage gescheitert' } } : status({})))
+    zeigen()
+    await screen.findByText('Abfrage gescheitert')
+    scheitern = false
+    await waitFor(() => expect(screen.queryByText('Abfrage gescheitert')).to.equal(null), { timeout: 4000 })
   })
 
   it('zeigt eine neue Verbindung binnen 5 s, auch kurz nach einer Abfrage', async function () {
@@ -206,33 +291,24 @@ describe('Claude-Panel', function () {
     expect(screen.queryByText('Workflows')).to.equal(null)
   })
 
-  it('zeigt die Lauf-Karte dort im Verlauf, wo der Lauf begann', async function () {
-    fetchMock.get(
-      STATUS,
-      status({
-        nachrichten: [nachricht(1, 'mensch', 'Fasse Abschnitt 2 zusammen'), nachricht(5, 'claude', 'Fertig.')],
-        lauf: {
-          id: 'l1',
-          status: 'fertig',
-          gestartet: new Date(2026, 10, 8, 10, 3).toISOString(),
-          dateien: 1,
-          aenderungen: 1,
-          rot: [],
-          zahlen: [],
-          zusammenfassung: null,
-        },
-      })
-    )
+  it('zeigt den neuesten Lauf offen, ältere eingeklappt, und lädt ältere nach', async function () {
+    const lauf = (id: string, laufStatus: string) => ({
+      lauf: { id, status: laufStatus, gestartet: '2026-11-08T10:00:00Z', dateien: 1, aenderungen: 2, rot: [], zahlen: [], zusammenfassung: null },
+      aenderungen: [
+        { id: `${id}-a`, docId: 'd', pfad: 'main.tex', zeile: 1, art: 'einfuegung', text: 'a' },
+        { id: `${id}-b`, docId: 'd', pfad: 'main.tex', zeile: 2, art: 'einfuegung', text: 'b' },
+      ],
+    })
+    fetchMock.get(STATUS, status({ laeufe: [lauf('l3', 'offen'), lauf('l2', 'fertig'), lauf('l1', 'fertig')], weitereLaeufe: true }))
+    fetchMock.get(LAEUFE, { laeufe: [lauf('l0', 'fertig')], weitereLaeufe: false })
     zeigen()
-    const log = await screen.findByRole('log', { name: 'Unterhaltung mit Claude' })
-    const klassen = within(log)
-      .getAllByRole('listitem')
-      .filter(li => li.parentElement === log)
-      .map(li => li.className)
-    expect(klassen).to.deep.equal([
-      'spur-chat-nachricht spur-nachricht-mensch',
-      'spur-chat-lauf',
-      'spur-chat-nachricht spur-nachricht-claude',
-    ])
+    await screen.findAllByText('Fertig')
+    const koepfe = [...document.querySelectorAll('.spur-lauf-kopf button')]
+    expect(koepfe.map(k => k.getAttribute('aria-expanded'))).to.deep.equal(['true', 'false', 'false'])
+    expect(koepfe[1].textContent).to.contain('2 offen')
+    fireEvent.click(screen.getByRole('button', { name: 'Ältere laden' }))
+    await waitFor(() => expect(document.querySelectorAll('.spur-lauf-kopf button')).to.have.length(4))
+    expect(screen.queryByRole('button', { name: 'Ältere laden' })).to.equal(null)
+    expect(fetchMock.callHistory.lastCall(LAEUFE)!.url).to.match(/vor=l1$/)
   })
 })

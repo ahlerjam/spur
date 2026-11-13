@@ -26,7 +26,7 @@
     "Ein leeres Projekt zeigt „Noch keine Quellen. Lade ein PDF hoch oder nimm eine Webseite auf.“ mit dem Knopf „Quelle hinzufügen“; während des Ladens stehen Platzhalter in Form der Listeneinträge; scheitert das Laden (Dev-Schalter), steht dort die Meldung mit „Erneut versuchen“",
     "Bei 240 px Panelbreite bleiben Knopf, Menü und Suchfeld vollständig sichtbar"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {
@@ -90,7 +90,7 @@
     "In den Kontoeinstellungen erzeugt ein schneller Doppelklick auf „Token erzeugen“ genau ein Token; „Widerrufen“ fragt in einem Dialog nach",
     "Ohne Aufträge zeigt das Panel „Noch keine Aufträge. Schreib unten, was Claude tun soll.“ direkt über dem Eingabefeld, nicht am unteren Rand einer leeren Fläche; nicht verbunden ist das Eingabefeld sichtbar, aber deaktiviert mit dem Hinweis „Verbinde zuerst Claude“"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

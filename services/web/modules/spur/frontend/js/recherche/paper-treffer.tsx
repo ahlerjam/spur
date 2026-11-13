@@ -34,12 +34,18 @@ export default function PaperEintrag({
           </OLBadge>
         )}
         {treffer.frei === false && (
-          <OLBadge bg="light" className="spur-paper-badge">
+          <OLBadge bg="secondary" className="spur-paper-badge">
             {t('spur_nicht_frei')}
           </OLBadge>
         )}
       </p>
-      {treffer.doi && <p className="spur-zeile-meta spur-paper-doi">{treffer.doi}</p>}
+      {treffer.doi && (
+        <p className="spur-zeile-meta spur-paper-doi">
+          <a href={`https://doi.org/${treffer.doi}`} target="_blank" rel="noopener noreferrer">
+            {treffer.doi}
+          </a>
+        </p>
+      )}
       {children}
     </li>
   )

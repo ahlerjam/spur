@@ -90,7 +90,7 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
         <OLFormControl as="textarea" id={id} rows={12} value={text} onChange={e => setText(e.target.value)} />
         <div className="spur-vorschlag-aktionen">
           <OLButton type="submit" variant="primary" size="sm" isLoading={laeuft}>
-            {t('spur_workflow_speichern')}
+            {t('save')}
           </OLButton>
           {workflow.angepasst && (
             <OLButton

@@ -25,6 +25,8 @@ const scan = (extra: Partial<Quelle> = {}): Quelle => ({
   status: 'kein_text',
   doi: null,
   titel: null,
+  autoren: [],
+  jahr: null,
   fassung: '',
   versatz: null,
   versatzQuelle: null,

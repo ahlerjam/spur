@@ -14,7 +14,7 @@ import * as VorschlaegeController from './vorschlaege/VorschlaegeController.mjs'
 import * as WorkflowsAdminController from './workflows/WorkflowsAdminController.mjs'
 import * as GrenzenController from './grenzen/GrenzenController.mjs'
 import * as UploadLinkController from './hochladen/UploadLinkController.mjs'
-import { e2eVorbereiten, pdfUmleiten, proxySperre, quelleVergroessern, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
+import { e2eVorbereiten, pdfUmleiten, proxySperre, quelleVergroessern, speicherFehler, testseite, zeitSetzen } from './dev/DevSchalter.mjs'
 import { mailFakeLesen, mailFakeSteuern } from './dev/MailFake.mjs'
 import { paperFake } from './dev/PaperFake.mjs'
 import { mcpAnfrage } from './mcp/McpEndpunkt.mjs'
@@ -89,6 +89,11 @@ export default {
       webRouter.post('/project/:Project_id/compile', pdfUmleiten)
       webRouter.get('/spur/dev/proxy-pdf/output.pdf', proxySperre('SPUR_PROXY_PDF'))
       webRouter.get(QUELLEN, proxySperre('SPUR_PROXY_API'))
+      webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/bild`, proxySperre('SPUR_SEITENBILD_FEHLER'))
+      webRouter.put('/spur/project/:project_id/claude/automatik', speicherFehler('SPUR_AUTOMATIK_FEHLER'))
+      webRouter.get('/spur/project/:project_id/claude', proxySperre('SPUR_CLAUDE_FEHLER'))
+      webRouter.put('/spur/project/:project_id/matrix/zellen', speicherFehler('SPUR_MATRIX_FEHLER'))
+      webRouter.get('/spur/project/:project_id/pruefbericht', proxySperre('SPUR_PRUEFBERICHT_FEHLER'))
     }
     webRouter.get(QUELLEN, ...lesen, SpurController.quellenListe)
     webRouter.post(QUELLEN, ...schreiben, hochladenMitGrenze, SpurController.quelleHochladen)
@@ -131,6 +136,7 @@ export default {
     )
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite`, ...lesen, SpurController.quelleSeite)
     webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/bild`, ...lesen, SpurController.quelleBild)
+    webRouter.get(`${QUELLEN}/:quelle_id/seiten/:seite/textebene`, ...lesen, SpurController.quelleTextebene)
     webRouter.get(`${QUELLEN}/:quelle_id/datei`, ...lesen, SpurController.quelleDatei)
     webRouter.patch(`${QUELLEN}/:quelle_id`, ...schreiben, SpurController.quelleAendern)
     webRouter.get('/spur/project/:project_id/pruefbericht', ...lesen, SpurController.pruefbericht)
@@ -158,6 +164,8 @@ export default {
     webRouter.post(`${LAUF}/ablehnen`, ...pruefen, SpurController.laufAblehnen)
     webRouter.post(`${LAUF}/zuruecknehmen`, ...schreiben, SpurController.laufZuruecknehmen)
     webRouter.put('/spur/project/:project_id/claude/automatik', ...schreiben, SpurController.automatikSetzen)
+    webRouter.post('/spur/project/:project_id/claude/alles-annehmen', ...schreiben, SpurController.allesAnnehmen)
+    webRouter.get('/spur/project/:project_id/claude/laeufe', ...lesen, SpurController.claudeLaeufe)
     const VORSCHLAEGE = '/spur/project/:project_id/vorschlaege'
     webRouter.get(VORSCHLAEGE, ...lesen, VorschlaegeController.status)
     webRouter.put(`${VORSCHLAEGE}/eigene`, ...lesen, VorschlaegeController.eigeneSetzen)

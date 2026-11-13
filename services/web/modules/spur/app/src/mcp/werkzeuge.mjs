@@ -331,6 +331,7 @@ Object.assign(WERKZEUGE, {
       return await SchreibManager.docEdit({
         projectId,
         botId,
+        menschId,
         docId: args.doc_id,
         pfad: args.pfad,
         alt: args.alt,
@@ -353,6 +354,7 @@ Object.assign(WERKZEUGE, {
       return await SchreibManager.docCreate({
         projectId,
         botId,
+        menschId,
         pfad: args.pfad,
         inhalt: args.inhalt,
         schluessel: args.idempotenz_schluessel,
@@ -377,7 +379,7 @@ Object.assign(WERKZEUGE, {
       const lauf = await LaufManager.offenerLauf(projectId, botId)
       if (!lauf) throw new WerkzeugFehler('kein_lauf', 'spur_fehler_kein_lauf')
       await LaufManager.beenden(lauf, zusammenfassung)
-      await LaufAktionen.nachLaufende(projectId, lauf, menschId)
+      await LaufAktionen.nachLaufende(projectId, lauf)
       return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
     },
   },

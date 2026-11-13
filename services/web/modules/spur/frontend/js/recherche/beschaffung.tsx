@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import {
+  OLDropdown,
+  OLDropdownItem,
+  OLDropdownMenu,
+  OLDropdownToggle,
+} from '@/shared/components/ol/ol-dropdown-menu'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
@@ -142,7 +148,7 @@ export default function Beschaffung() {
                 onChange={e => setVorlage(e.target.value)}
               />
               <OLButton type="submit" variant="secondary" size="sm">
-                {t('spur_speichern')}
+                {t('save')}
               </OLButton>
             </div>
             <p id="spur-bibliothek-hilfe" className="spur-zeile-meta">
@@ -171,18 +177,23 @@ export default function Beschaffung() {
                 </OLButton>
               </>
             )}
-            {FORMATE.map(f => (
-              <OLButton
-                key={f.format}
-                variant="secondary"
-                size="sm"
-                href={projektPfad(`/beschaffung/export/${f.format}`)}
-                download
-                aria-label={t('spur_exportieren_als', { format: f.name })}
-              >
-                {f.name}
-              </OLButton>
-            ))}
+            <OLDropdown>
+              <OLDropdownToggle id="spur-beschaffung-export" variant="secondary" size="sm">
+                {t('spur_liste_exportieren')}
+              </OLDropdownToggle>
+              <OLDropdownMenu>
+                {FORMATE.map(f => (
+                  <OLDropdownItem
+                    key={f.format}
+                    href={projektPfad(`/beschaffung/export/${f.format}`)}
+                    download
+                    aria-label={t('spur_exportieren_als', { format: f.name })}
+                  >
+                    {f.name}
+                  </OLDropdownItem>
+                ))}
+              </OLDropdownMenu>
+            </OLDropdown>
           </div>
           <div role="status">{meldung && <Notification type={meldung.typ} content={meldung.text} />}</div>
           {ohneDoi && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
+import OLSpinner from '@/shared/components/ol/ol-spinner'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLFormSelect from '@/shared/components/ol/ol-form-select'
 import {
@@ -33,6 +34,10 @@ export default function ImportModal({
   const [zotero, setZotero] = useState<ZoteroErgebnis | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [dateien, setDateien] = useState<DateiStatus[]>([])
+  const [nachfragen, setNachfragen] = useState(false)
+  const laedtHoch = dateien.some(d => d.zustand === 'laeuft')
+  // Während eines Uploads fragt Schließen nach: Die übrigen Dateien kämen sonst nicht mehr an.
+  const zu = () => (laedtHoch ? setNachfragen(true) : schliessen())
 
   useEffect(() => {
     anfrage<{ sammlungen: Sammlung[] }>(projektPfad('/import/zotero'))
@@ -92,7 +97,7 @@ export default function ImportModal({
           : d.text
 
   return (
-    <OLModal show onHide={schliessen}>
+    <OLModal themed show onHide={zu}>
       <OLModalHeader>
         <OLModalTitle>{t('spur_bestand_importieren')}</OLModalTitle>
       </OLModalHeader>
@@ -100,6 +105,11 @@ export default function ImportModal({
         <section className="spur-import-teil" aria-labelledby="spur-import-zotero">
           <h3 id="spur-import-zotero" className="spur-import-titel">{t('spur_aus_zotero')}</h3>
           {zoteroFehler && <Notification type="error" content={zoteroFehler} />}
+          {sammlungen === null && !zoteroFehler && (
+            <p className="spur-zeile-meta" role="status">
+              <OLSpinner size="sm" /> {t('spur_sammlungen_laden')}
+            </p>
+          )}
           {sammlungen && sammlungen.length === 0 && <p>{t('spur_keine_sammlungen')}</p>}
           {sammlungen && sammlungen.length > 0 && (
             <>
@@ -149,8 +159,9 @@ export default function ImportModal({
           />
           {dateien.length > 0 && (
             <ul className="spur-import-liste" aria-live="polite">
-              {dateien.map(d => (
-                <li key={d.name} className={d.zustand === 'fehler' ? 'spur-import-fehler' : undefined}>
+              {/* Zwei Dateien können gleich heißen: Jede Zeile gehört zu ihrer Position in der Auswahl. */}
+              {dateien.map((d, i) => (
+                <li key={i} className={d.zustand === 'fehler' ? 'spur-import-fehler' : undefined}>
                   <span className="spur-import-name">{d.name}</span> · <span>{statusText(d)}</span>
                 </li>
               ))}
@@ -159,9 +170,23 @@ export default function ImportModal({
         </section>
       </OLModalBody>
       <OLModalFooter>
-        <OLButton variant="secondary" onClick={schliessen}>
-          {t('spur_schliessen')}
-        </OLButton>
+        {nachfragen && laedtHoch ? (
+          <>
+            <p className="spur-import-frage" role="alert">
+              {t('spur_import_schliessen_frage')}
+            </p>
+            <OLButton variant="secondary" onClick={() => setNachfragen(false)}>
+              {t('spur_weiter_hochladen')}
+            </OLButton>
+            <OLButton variant="danger" onClick={schliessen}>
+              {t('spur_trotzdem_schliessen')}
+            </OLButton>
+          </>
+        ) : (
+          <OLButton variant="secondary" onClick={zu}>
+            {t('close')}
+          </OLButton>
+        )}
       </OLModalFooter>
     </OLModal>
   )

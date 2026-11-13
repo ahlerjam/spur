@@ -13,6 +13,7 @@ import { bearbeitungen } from '../sammlungen.mjs'
 import { anzahlEintraege, maxEintraege } from '../projektEintraege.mjs'
 import { jetzt, testSchalter } from '../schalter.mjs'
 import * as LaufManager from './LaufManager.mjs'
+import * as LaufAktionen from './LaufAktionen.mjs'
 import { zahlenIn, zahlenOhneBeleg } from './zahlen.mjs'
 import { opsFuer } from './ops.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
@@ -104,10 +105,14 @@ async function pruefSperre(projectId, neuerText, von, bis) {
         'spur_fehler_zitat_ohne_quelle', { key: z.key }
       )
     }
-    // Nicht prüfbar (unbekannte Form oder Quelle ohne lesbaren Wortlaut): annehmen, aber rot,
-    // damit die Automatik es nie still übernimmt.
+    // Schreiben ja, aber rot, damit die Automatik es nie still übernimmt: unbekannte Form oder Quelle ohne lesbaren
+    // Wortlaut, DOI bei keiner Registrierstelle, zurückgezogene Quelle.
     if (z.form === 'unbekannt' || z.wortlaut === 'nicht_pruefbar') {
       rot.push({ grund: 'nicht_pruefbar', auszug: z.auszug })
+    } else if (z.referenz === 'nicht_gefunden') {
+      rot.push({ grund: 'doi_unbekannt', auszug: z.auszug })
+    } else if (z.retraction === 'zurueckgezogen') {
+      rot.push({ grund: 'zurueckgezogen', auszug: z.auszug })
     }
   }
   return rot
@@ -173,15 +178,26 @@ async function mitSchluessel({ projectId, botId, schluessel, argumente }, schrei
   return ergebnis
 }
 
-export async function docEdit({ projectId, botId, docId, pfad, alt, neu, schluessel }) {
+export async function docEdit({ projectId, botId, menschId, docId, pfad, alt, neu, schluessel }) {
   if (pfad !== undefined) pruefePfad(pfad)
   const argumente = { werkzeug: 'doc_edit', docId, pfad, alt, neu }
   return await mitSchluessel({ projectId, botId, schluessel, argumente }, () =>
-    bearbeiten({ projectId, botId, docId, pfad, alt, neu })
+    bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
   )
 }
 
-async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
+// Nach dem Schreiben: rote Zitate am Lauf merken, sonst nimmt der Schalter des Menschen die neuen Changes an.
+async function nachDemSchreiben({ projectId, lauf, menschId, docId, vorher, rot }) {
+  const { ranges } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
+  const alt = new Set((vorher ?? []).map(c => c.id))
+  const neu = (ranges?.changes ?? []).filter(c => !alt.has(c.id)).map(c => c.id)
+  if (rot.length) return await LaufManager.rotMerken(lauf, neu)
+  // Der Lauf kann eben erst angelegt sein: Das Dokument steht dann nur in der Datenbank schon in `docs`.
+  const docs = lauf.docs.some(d => String(d) === docId) ? lauf.docs : [...lauf.docs, docId]
+  if (menschId) await LaufAktionen.sofortAnnehmen(projectId, { ...lauf, docs }, menschId, neu)
+}
+
+async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu }) {
   const doc = await docAufloesen(projectId, docId, pfad)
   const { lines, version, ranges } = await DocumentUpdaterHandler.promises.getDocument(
     projectId,
@@ -221,10 +237,11 @@ async function bearbeiten({ projectId, botId, docId, pfad, alt, neu }) {
         rot,
         zahlen: zahlen.map(zahl => ({ zahl, pfad: doc.pfad })),
       })
+      await nachDemSchreiben({ projectId, lauf, menschId, docId: doc.docId, vorher: ranges?.changes, rot })
     } catch (error) {
-      // Geschrieben ist geschrieben: Ein Fehler beim Mitzählen darf die Reservierung nicht freigeben,
-      // sonst schriebe eine Wiederholung doppelt.
-      logger.error({ err: error, projectId, docId: doc.docId }, 'spur: Änderung nicht am Lauf vermerkt')
+      // Geschrieben ist geschrieben: Ein Fehler beim Mitzählen oder Annehmen darf die Reservierung nicht freigeben,
+      // sonst schriebe eine Wiederholung doppelt. Die Changes bleiben dann offen.
+      logger.error({ err: error, projectId, docId: doc.docId }, 'spur: Änderung nicht am Lauf vermerkt oder angenommen')
     }
   }
   return ergebnis
@@ -299,7 +316,7 @@ async function aufraeumen({ projectId, botId, docId, ziel, ursache }) {
   }
 }
 
-export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) {
+export async function docCreate({ projectId, botId, menschId, pfad, inhalt, schluessel }) {
   pruefePfad(pfad)
   const ziel = `/${pfad.replace(/^\//, '')}`
   const argumente = { werkzeug: 'doc_create', pfad, inhalt }
@@ -323,7 +340,7 @@ export async function docCreate({ projectId, botId, pfad, inhalt, schluessel }) 
     }
     try {
       if (testSchalter('SPUR_DOC_CREATE_FEHLER')) throw new Error('Testschalter: unbekannter Fehler in doc_create')
-      const ergebnis = await bearbeiten({ projectId, botId, docId, alt: '', neu: inhalt })
+      const ergebnis = await bearbeiten({ projectId, botId, menschId, docId, alt: '', neu: inhalt })
       if (gefunden) await (await bearbeitungen()).deleteOne({ botId, schluessel: restSchluessel(projectId, ziel) })
       return ergebnis
     } catch (error) {

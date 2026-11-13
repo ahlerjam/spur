@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { appendFile } from 'node:fs/promises'
 import { db } from '../../../../../app/src/infrastructure/mongodb.mjs'
+import { Problem, problemSenden } from '../probleme.mjs'
 import { dateiPfad } from '../QuellenManager.mjs'
 import { quellen } from '../sammlungen.mjs'
 import { testSchalter, zeitFestlegen } from '../schalter.mjs'
@@ -71,4 +72,12 @@ export function pdfUmleiten(_req, res, next) {
     return json(body)
   }
   next()
+}
+
+// Lässt ein Speichern scheitern (Testschalter `name`), damit die Oberfläche ihren Fehlerzustand zeigt.
+export function speicherFehler(name) {
+  return (_req, res, next) => {
+    if (!testSchalter(name)) return next()
+    problemSenden(res, new Problem(503, 'speichern_gescheitert', 'spur_fehler_speichern_gescheitert'))
+  }
 }

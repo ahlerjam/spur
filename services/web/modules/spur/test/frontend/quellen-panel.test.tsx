@@ -6,6 +6,26 @@ import { EditorProviders } from '../../../../test/frontend/helpers/editor-provid
 import { deutschAktivieren } from './helpers/deutsch'
 
 const QUELLEN = /\/spur\/project\/[^/]+\/quellen$/
+const QUELLEN_SEITE_2 = /\/spur\/project\/[^/]+\/quellen\?seite=1$/
+
+const quelle = (id: string, extra = {}) => ({
+  id,
+  dateiname: `${id}.pdf`,
+  key: id,
+  art: 'pdf',
+  seitenzahl: 8,
+  status: 'text',
+  doi: null,
+  titel: null,
+  autoren: [],
+  jahr: null,
+  fassung: '',
+  versatz: null,
+  versatzQuelle: null,
+  ocr: null,
+  web: null,
+  ...extra,
+})
 const ANDERE = /\/spur\/project\/[^/]+\/quellen\/andere$/
 const ZUGEWIESEN = /\/spur\/project\/[^/]+\/zitate\/zugewiesen$/
 
@@ -29,7 +49,7 @@ describe('Quellen-Panel', function () {
   it('zeigt „Noch keine Quellen“ ohne Daten', async function () {
     fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
     zeigen()
-    await screen.findByText('Noch keine Quellen')
+    await screen.findByText(/^Noch keine Quellen/)
   })
 
   it('zeigt vorhandene Quellen mit Dateiname', async function () {
@@ -44,6 +64,8 @@ describe('Quellen-Panel', function () {
           status: 'text',
           doi: null,
           titel: null,
+          autoren: [],
+          jahr: null,
           fassung: '',
           versatz: null,
           versatzQuelle: null,
@@ -54,7 +76,7 @@ describe('Quellen-Panel', function () {
     })
     zeigen()
     await screen.findByText('mueller2020.pdf')
-    expect(screen.queryByText('Noch keine Quellen')).to.not.exist
+    expect(screen.queryByText(/^Noch keine Quellen/)).to.not.exist
   })
 
   it('zeigt Zitate, die mir zugewiesen sind, und öffnet sie', async function () {
@@ -92,7 +114,7 @@ describe('Quellen-Panel', function () {
     fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
     fetchMock.post(QUELLEN, { status: 201, body: {} })
     zeigen()
-    await screen.findByText('Noch keine Quellen')
+    await screen.findByText(/^Noch keine Quellen/)
     const feld = screen.getByLabelText('Datei wählen')
     fireEvent.change(feld, { target: { files: [new File(['WEBVTT'], 'interview.vtt')] } })
     await screen.findByText(HINWEIS)
@@ -107,6 +129,62 @@ describe('Quellen-Panel', function () {
     })
     zeigen()
     await screen.findByText('Quellen nicht erreichbar')
-    expect(screen.queryByText('Noch keine Quellen')).to.not.exist
+    expect(screen.queryByText(/^Noch keine Quellen/)).to.not.exist
+  })
+
+  it('hat eine Hauptaktion und die übrigen Aktionen im Menü „Weitere Aktionen“', async function () {
+    fetchMock.get(QUELLEN, { quellen: [], gesamt: 0 })
+    zeigen()
+    await screen.findAllByRole('button', { name: 'Quelle hinzufügen' })
+    fireEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }))
+    const eintraege = (await screen.findAllByRole('menuitem')).map(e => e.textContent)
+    expect(eintraege).to.deep.equal([
+      'Webseite aufnehmen',
+      'Aus anderem Projekt holen',
+      'Importieren',
+      'Quellen exportieren',
+      'Literaturmatrix',
+    ])
+  })
+
+  it('zeigt Titel, Autoren und Jahr, ohne Metadaten den Dateinamen', async function () {
+    fetchMock.get(QUELLEN, {
+      quellen: [
+        quelle('smith2024', { titel: 'Sleep and Memory', autoren: ['A. Smith'], jahr: 2024 }),
+        quelle('viele', { titel: 'Viele', autoren: ['A. Erst', 'B. Zweit', 'C. Dritt'], jahr: 2020 }),
+        quelle('ohne'),
+      ],
+      gesamt: 3,
+    })
+    zeigen()
+    await screen.findByText('Sleep and Memory')
+    screen.getByText('A. Smith · 2024')
+    screen.getByText('A. Erst u. a. · 2020')
+    expect(screen.getAllByText('8 Seiten · Text erkannt')).to.have.length(3)
+    screen.getByText('ohne.pdf')
+  })
+
+  it('lädt weitere Quellen nach und nennt den Stand', async function () {
+    fetchMock.get(QUELLEN, { quellen: [quelle('a')], gesamt: 3 })
+    fetchMock.get(QUELLEN_SEITE_2, { quellen: [quelle('b')], gesamt: 3 })
+    zeigen()
+    await screen.findByText('1 von 3')
+    fireEvent.click(screen.getByRole('button', { name: 'Weitere Quellen laden' }))
+    await screen.findByText('2 von 3')
+    screen.getByText('a.pdf')
+    screen.getByText('b.pdf')
+  })
+
+  it('erklärt den leeren Zustand und zeigt beim Laden Platzhalter', async function () {
+    let freigeben = () => {}
+    fetchMock.get(QUELLEN, new Promise(resolve => {
+      freigeben = () => resolve({ quellen: [], gesamt: 0 })
+    }))
+    zeigen()
+    await waitFor(() => expect(document.querySelectorAll('.spur-platzhalter-zeile').length).to.be.greaterThan(0))
+    freigeben()
+    await screen.findByText('Noch keine Quellen. Lade ein PDF hoch oder nimm eine Webseite auf.')
+    expect(screen.getAllByRole('button', { name: 'Quelle hinzufügen' })).to.have.length(2)
+    expect(document.querySelector('.spur-platzhalter-zeile')).to.not.exist
   })
 })

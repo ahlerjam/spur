@@ -10,6 +10,8 @@ export type Quelle = {
   status: 'text' | 'kein_text' | 'ocr'
   doi: string | null
   titel: string | null
+  autoren: string[]
+  jahr: number | null
   fassung: string
   versatz: number | null
   nurProjekt?: boolean

@@ -14,11 +14,12 @@ let upsertDocWithPath
 let deleteEntity
 let bereichPruefen
 let laufManager
+let laufAktionen
 let binaer
 let eintraege
 const projekt = new ObjectId()
 const bot = new ObjectId()
-const lauf = { _id: new ObjectId() }
+const lauf = { _id: new ObjectId(), docs: [] }
 const KAPITEL = new ObjectId()
 
 beforeAll(async () => {
@@ -39,7 +40,9 @@ beforeEach(async () => {
   laufManager = {
     laufFuerSchreiben: vi.fn(async () => lauf),
     aenderungMerken: vi.fn(async () => {}),
+    rotMerken: vi.fn(async () => {}),
   }
+  laufAktionen = { sofortAnnehmen: vi.fn(async () => {}) }
   vi.resetModules()
   ;({ default: Errors } = await import('../../../../app/src/Features/Errors/Errors.js'))
   upsertDocWithPath = vi.fn(async (_projekt, pfad) => {
@@ -82,6 +85,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/schreiben/spurUpdate.mjs', () => ({ spurUpdate }))
   vi.doMock('../../app/src/projektEintraege.mjs', () => ({ anzahlEintraege: async () => eintraege, maxEintraege: () => 2000 }))
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => laufManager)
+  vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => laufAktionen)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ bereichPruefen }))
   SchreibManager = await import('../../app/src/schreiben/SchreibManager.mjs')
 })
@@ -473,3 +477,37 @@ describe('Idempotenz', () => {
     }
   })
 })
+
+describe('Sofort annehmen nach dem Schreiben', () => {
+  const mensch = new ObjectId()
+  // Nach dem Schreiben liefert document-updater einen neuen Change des Bots.
+  function neuerChange(id) {
+    spurUpdate.mockImplementation(async (_p, docId) => {
+      const alt = dokumente.get(String(docId))
+      dokumente.set(String(docId), { ...alt, ranges: { changes: [...(alt.ranges?.changes ?? []), { id, op: { p: 0, i: 'x' } }] } })
+    })
+  }
+
+  it('reicht die neuen Changes zum Annehmen weiter', async () => {
+    docSetzen(KAPITEL, 'Erster Satz. Zweiter Satz.', [{ id: 'alt', op: { p: 0, i: 'E' } }])
+    neuerChange('neu')
+    await bearbeiten({ menschId: mensch })
+    // Ein eben angelegter Lauf kennt das Dokument nur in der Datenbank.
+    expect(laufAktionen.sofortAnnehmen).toHaveBeenCalledWith(projekt, { ...lauf, docs: [String(KAPITEL)] }, mensch, ['neu'])
+    expect(laufManager.rotMerken).not.toHaveBeenCalled()
+  })
+
+  it('lässt rote Zitate offen und merkt sie am Lauf, auch bei zurückgezogener Quelle oder unbekannter DOI', async () => {
+    for (const rot of [{ form: 'unbekannt' }, { retraction: 'zurueckgezogen' }, { referenz: 'nicht_gefunden' }]) {
+      laufAktionen.sofortAnnehmen.mockClear()
+      bereichPruefen.mockResolvedValue([{ auszug: 'x', key: 'smith2024', wortlaut: 'exakt', ...rot }])
+      docSetzen(KAPITEL, 'Erster Satz. Zweiter Satz.')
+      neuerChange('rot')
+      const ergebnis = await bearbeiten({ menschId: mensch, neu: '\\footfullcite{smith2024}', schluessel: `rot-${Object.keys(rot)[0]}` })
+      expect(ergebnis.rot).toHaveLength(1)
+      expect(laufManager.rotMerken).toHaveBeenCalledWith(lauf, ['rot'])
+      expect(laufAktionen.sofortAnnehmen).not.toHaveBeenCalled()
+    }
+  })
+})
+

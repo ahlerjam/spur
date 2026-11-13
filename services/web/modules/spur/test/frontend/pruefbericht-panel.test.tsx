@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import PruefberichtPanel from '@modules/spur/frontend/js/pruefung/pruefbericht-panel'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
 import { pruefen } from '@modules/spur/frontend/js/pruefung/pruef-store'
@@ -48,18 +48,51 @@ describe('Prüfbericht-Panel', function () {
     fetchMock.removeRoutes().clearHistory()
   })
 
-  it('blendet mit „Nur Probleme“ grüne Zeilen aus', async function () {
+  it('filtert nach Befund mit Zahlen und erklärt einen leeren Filter', async function () {
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
     await screen.findByText('Ein stimmiges Zitat')
-    expect(screen.getByText('Ein fehlerhaftes Zitat')).to.exist
-
-    fireEvent.click(screen.getByLabelText('Nur Probleme'))
-
+    const filter = (name: RegExp) => screen.getByRole('radio', { name })
+    for (const name of ['Alle 4', 'Markiert 1', 'Ohne Quelle 1', 'Nicht prüfbar 1']) screen.getByRole('radio', { name })
+    fireEvent.click(filter(/^Markiert/))
     expect(screen.queryByText('Ein stimmiges Zitat')).to.not.exist
     expect(screen.getByText('Ein fehlerhaftes Zitat')).to.exist
-
-    fireEvent.click(screen.getByLabelText('Nur Probleme'))
+    fireEvent.click(filter(/^Nicht prüfbar/))
+    screen.getByText('Ausfall')
+    expect(screen.queryByText('Ein fehlerhaftes Zitat')).to.not.exist
+    fireEvent.click(filter(/^Alle/))
     expect(screen.getByText('Ein stimmiges Zitat')).to.exist
+  })
+
+  it('gruppiert nach Datei mit Zahl der Stellen und der markierten, einklappbar', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, {
+      zeilen: [zeile('gruen', false), { ...zeile('rot', true), pfad: 'kapitel.tex' }, { ...zeile('zwei', true), pfad: 'kapitel.tex', auszug: 'Zweites' }],
+      zaehlung: { geprueft: 3, markiert: 2, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 },
+    })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    const kapitel = await screen.findByRole('button', { name: /^kapitel\.tex\s*2 Stellen, 2 markiert$/ })
+    screen.getByRole('button', { name: /^main\.tex\s*1 Stelle, 0 markiert$/ })
+    expect(kapitel.getAttribute('aria-expanded')).to.equal('true')
+    fireEvent.click(kapitel)
+    expect(kapitel.getAttribute('aria-expanded')).to.equal('false')
+    expect(screen.queryByText('Zweites')).to.not.exist
+    screen.getByText('Ein stimmiges Zitat')
+  })
+
+  it('nennt den Zeitpunkt der Prüfung und lässt den alten Bericht während der Prüfung stehen', async function () {
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    await screen.findByText(/^Zuletzt geprüft: heute, \d{2}:\d{2}$/)
+    let freigeben = () => {}
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, new Promise(resolve => {
+      freigeben = () => resolve({ zeilen: [], zaehlung: { geprueft: 0, markiert: 0, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 } })
+    }))
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut prüfen' }))
+    await screen.findByText('Prüfung läuft …')
+    screen.getByText('Ein stimmiges Zitat')
+    freigeben()
+    await waitFor(() => expect(screen.queryByText('Prüfung läuft …')).to.not.exist)
   })
 
   it('zählt die Zitierstellen nach Status und nennt je nicht geprüfter Stelle den Grund', async function () {

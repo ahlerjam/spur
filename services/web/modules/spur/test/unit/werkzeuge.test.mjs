@@ -305,6 +305,7 @@ describe('Schreiben', () => {
     expect(m.SchreibManager.docEdit).toHaveBeenCalledWith({
       projectId: new ObjectId(projekt),
       botId: bot,
+      menschId: anna,
       docId: undefined,
       pfad: 'a.tex',
       alt: 'x',
@@ -315,7 +316,7 @@ describe('Schreiben', () => {
 
   it('doc_create reicht Pfad und Inhalt weiter', async () => {
     await aufruf('doc_create', { project_id: projekt, pfad: 'neu.tex', inhalt: 'Text', idempotenz_schluessel: 'schluessel-0001' })
-    expect(m.SchreibManager.docCreate).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), botId: bot, pfad: 'neu.tex', inhalt: 'Text', schluessel: 'schluessel-0001' })
+    expect(m.SchreibManager.docCreate).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), botId: bot, menschId: anna, pfad: 'neu.tex', inhalt: 'Text', schluessel: 'schluessel-0001' })
   })
 
   it('reply speichert die Antwort für den Bot', async () => {
@@ -350,7 +351,7 @@ describe('Schreiben', () => {
   it('run_finish beendet den offenen Lauf und stößt die Automatik an', async () => {
     const ergebnis = await aufruf('run_finish', { project_id: projekt, zusammenfassung: 'Geglättet.' })
     expect(m.LaufManager.beenden).toHaveBeenCalledWith({ _id: 'l1' }, 'Geglättet.')
-    expect(m.LaufAktionen.nachLaufende).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1' }, anna)
+    expect(m.LaufAktionen.nachLaufende).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1' })
     expect(ergebnis).toEqual({ lauf: { id: 'l1', status: 'offen' } })
   })
 
