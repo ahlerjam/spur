@@ -44,7 +44,7 @@
     "Über MCP: zwei gleichzeitige `tex_package_add carlito` im Projekt „E2E P8 Pakete B“ ergeben genau einen Ordner `tex-pakete/carlito` mit fünf Dateien",
     "D9 in `.slice/decisions.md` ist als erledigt mit Ursache vermerkt"
   ]},
-  {"id": "f8", "title": "Doku beschreibt die Nachbesserungen", "passes": false, "steps": [
+  {"id": "f8", "title": "Doku beschreibt die Nachbesserungen", "passes": true, "steps": [
     "README-Abschnitt zum Prüfbericht erklärt „markiert“ in einem Satz; zum Claude-Panel die Rückfrage bei roten Zitaten",
     "`docs/mcp-contract.md` nennt die neue Bedeutung von `zaehlung.markiert` und welche Uhrzeiten und Versionen `zahlen_ohne_beleg` nicht meldet",
     "`docs/backlog.md` ist aktuell"
