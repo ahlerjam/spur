@@ -8,6 +8,7 @@ import { OverallThemeMeta } from '@ol-types/project-settings'
 import { isIEEEBranded } from '@/utils/is-ieee-branded'
 import { useLayoutContext } from '@/shared/context/layout-context'
 import { OverallTheme } from '@/shared/utils/styles'
+import useOverallThemeName from '@/features/ide-settings/hooks/use-overall-theme-name'
 
 export default function OverallThemeSetting() {
   const { t } = useTranslation()
@@ -18,20 +19,15 @@ export default function OverallThemeSetting() {
   const { loadingStyleSheet } = useLayoutContext()
   const { overallTheme, setOverallTheme } = useProjectSettingsContext()
 
-  // Die Namen kommen vom Server auf Englisch (Dark, Light, System); spur zeigt sie übersetzt.
-  const options: Array<Option<OverallTheme>> = useMemo(() => {
-    const namen: Record<string, string> = {
-      Dark: t('overall_theme_dark'),
-      Light: t('overall_theme_light'),
-      System: t('overall_theme_system'),
-    }
-    return (
+  const themeName = useOverallThemeName()
+  const options: Array<Option<OverallTheme>> = useMemo(
+    () =>
       overallThemes?.map(({ name, val }) => ({
         value: val,
-        label: namen[name] ?? name,
-      })) ?? []
-    )
-  }, [overallThemes, t])
+        label: themeName(name),
+      })) ?? [],
+    [overallThemes, themeName]
+  )
 
   if (!overallThemes || isIEEEBranded()) {
     return null

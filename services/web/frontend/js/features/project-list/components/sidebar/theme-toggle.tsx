@@ -5,6 +5,7 @@ import { useUserSettingsContext } from '@/shared/context/user-settings-context'
 import getMeta from '@/utils/meta'
 import { OverallThemeMeta } from '@ol-types/project-settings'
 import { useTranslation } from 'react-i18next'
+import useOverallThemeName from '@/features/ide-settings/hooks/use-overall-theme-name'
 
 const getIcon = (theme: OverallThemeMeta) => {
   switch (theme.val) {
@@ -24,6 +25,7 @@ export default function ThemeToggle() {
   const setOverallTheme = useSetOverallTheme()
   const overallThemes = getMeta('ol-overallThemes')
   const { t } = useTranslation()
+  const themeName = useOverallThemeName()
 
   return (
     <fieldset className="dropdown-item theme-toggle">
@@ -32,7 +34,7 @@ export default function ThemeToggle() {
         {overallThemes.map(theme => (
           <OLTooltip
             key={theme.val}
-            description={theme.name}
+            description={themeName(theme.name)}
             id={`theme-switch-${theme.name}-tooltip`}
           >
             <div className="theme-toggle-radio">
@@ -45,7 +47,7 @@ export default function ThemeToggle() {
               />
               <label
                 htmlFor={`theme-switch-${theme.name}`}
-                aria-label={theme.name}
+                aria-label={themeName(theme.name)}
               >
                 <MaterialIcon type={getIcon(theme)} />
               </label>
