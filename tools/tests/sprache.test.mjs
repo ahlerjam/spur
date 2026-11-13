@@ -30,6 +30,9 @@ export const FLAECHEN = {
   Dateibaum: [`${JS}/features/file-tree`],
   'Teilen-Dialog': [`${JS}/features/share-project-modal`],
   Verlauf: [`${JS}/features/history`],
+  Chat: [`${JS}/features/chat`],
+  Wortzahl: [`${JS}/features/word-count-modal`],
+  Befehlspalette: [`${JS}/features/command-palette`],
 }
 
 function dateien(pfad) {

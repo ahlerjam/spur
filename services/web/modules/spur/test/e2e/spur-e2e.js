@@ -6530,6 +6530,15 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.getByText('Der Compiler versteht einen deiner Befehle nicht', { exact: false }).first().waitFor({ state: 'attached', timeout: 30000 })
     ok((await page.getByText('The compiler is having trouble').count()) === 0, 'Englischer Hinweis im Log-Bereich')
     ok((await page.getByText(/^Learn more$/).count()) === 0, '„Learn more“ im Log-Bereich')
+
+    // Chat in der Seitenleiste: Titel, leerer Zustand und Eingabefeld auf Deutsch.
+    await panelOeffnen('Chat')
+    await page.getByText('Chat mit Mitarbeitenden', { exact: true }).first().waitFor({ timeout: 15000 })
+    await page.getByText('Noch keine Nachrichten', { exact: true }).waitFor({ timeout: 15000 })
+    const chatText = await page.locator('.rail-panel-title').first().locator('xpath=ancestor::*[contains(@class,"rail-panel") or @role="tabpanel"][1]').innerText().catch(() => '')
+    ok(!/Collaborator chat|No messages yet|Start the conversation|Send a message/.test(chatText), `Englische Reste im Chat: ${chatText.slice(0, 200)}`)
+    const eingabe = await page.locator('textarea:visible').last().getAttribute('placeholder')
+    ok(/Mitarbeitenden/.test(eingabe ?? ''), `Chat-Eingabefeld: ${eingabe}`)
   }
 
   features.p10f6 = async () => {
