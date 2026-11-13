@@ -1,5 +1,5 @@
 {"features": [
-  {"id": "f1", "title": "Prüfbericht zählt „markiert“ einheitlich", "ui": true, "passes": false, "steps": [
+  {"id": "f1", "title": "Prüfbericht zählt „markiert“ einheitlich", "ui": true, "passes": true, "steps": [
     "Projekt „E2E Bericht“: Die Nutzerin öffnet den Prüfbericht und klickt „Erneut prüfen“. Die Zahl hinter „Markiert“ im Filter, die Zahl „markiert“ in der Kopfzeile und die Summe der „markiert“-Angaben in den Dateizeilen sind gleich (der Builder zählt am Testprojekt nach und schreibt die Zahl in den E2E-Schritt)",
     "Die Kopfzeile beginnt mit der Gesamtzahl der Stellen und der markierten und schlüsselt danach auf, z. B. „9 Stellen, 6 markiert: 3 mit Befund, 2 ohne Quelle, 1 nicht prüfbar“; „Beleg ohne Wortlaut“ und „übersprungen“ stehen weiter wie bisher",
     "Mit dem Filter „Markiert“ ist die Zahl der sichtbaren Zeilen genau die Zahl aus Kopfzeile und Filter",
