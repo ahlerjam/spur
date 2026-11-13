@@ -1,8 +1,8 @@
 // Eigene Werte; alles andere kommt aus Overleafs Variablen.
 // Innenabstand der Panels wie Overleafs Kopfzeile (.rail-panel-header).
 $spur-rand: var(--spacing-04);
-// Breakpoints wie Bootstrap: unter md einspaltig, unter sm Handy.
-$spur-md: 767.98px;
+// Großansicht bis einschließlich Tablet-Breite (768 px) einspaltig; unter sm Handy.
+$spur-md: 768px;
 $spur-sm: 575.98px;
 
 .spur-panel {
@@ -116,6 +116,8 @@ $spur-sm: 575.98px;
   padding: 0;
   text-align: left;
   white-space: normal;
+  // Overleafs Linkfarbe ist für helle Seiten; im dunklen Panel die Variante des Editors.
+  color: var(--link-ui-themed);
 }
 
 .spur-quelle-titel {
@@ -813,6 +815,11 @@ $spur-sm: 575.98px;
 
 .spur-paper-doi {
   overflow-wrap: anywhere;
+
+  // Overleafs Linkfarbe ist für helle Seiten; im dunklen Panel die Variante des Editors.
+  a {
+    color: var(--link-ui-themed);
+  }
 }
 
 .spur-paper-aktionen {
@@ -1050,19 +1057,18 @@ $spur-sm: 575.98px;
 // Ein Auslöser je Zeile: Name links, Auswahl rechts; im schmalen Panel untereinander.
 .spur-vorschlag-zeile {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-02) var(--spacing-03);
+  gap: var(--spacing-03);
   margin-bottom: var(--spacing-03);
 
   .form-label {
+    flex: 1 1 0;
+    min-width: 0;
     margin: 0;
   }
 
   .form-select {
-    flex: 0 1 11rem;
-    min-width: 8rem;
+    flex: 0 0 8.5rem;
   }
 }
 
@@ -1084,7 +1090,7 @@ $spur-sm: 575.98px;
   }
 
   .form-control {
-    width: 6rem;
+    width: 4.5rem;
   }
 }
 
@@ -1163,26 +1169,12 @@ $spur-sm: 575.98px;
 }
 
 .spur-workflows-admin {
-  max-width: 900px;
-  margin: 0 auto;
-  padding-left: var(--spacing-05);
-  padding-right: var(--spacing-05);
-
   textarea {
     font-family: var(--font-monospace, monospace);
     font-size: var(--font-size-02);
   }
 }
 
-.spur-workflow-admin {
-  padding: var(--spacing-06) 0;
-  border-top: 1px solid var(--border-divider-themed);
-
-  h2 {
-    font-size: var(--font-size-05);
-    margin: 0 0 var(--spacing-02);
-  }
-}
 
 // @claude im Kommentar: blau wie Overleafs Erwähnungen (.mention-badge), in beiden Designs.
 .spur-claude-erwaehnung {
@@ -1200,14 +1192,15 @@ $spur-sm: 575.98px;
   }
 }
 
-.spur-grenzen-admin {
+// Admin-Seiten (Grenzen, Workflows): gleiche Breite und gleicher Aufbau aus Titel, Satz und Abschnitten.
+.spur-admin-seite {
   max-width: 1100px;
   margin: 0 auto;
   padding-left: var(--spacing-05);
   padding-right: var(--spacing-05);
 }
 
-.spur-grenzen-abschnitt {
+.spur-admin-abschnitt {
   padding: var(--spacing-06) 0;
   border-top: 1px solid var(--border-divider-themed);
 
@@ -1215,6 +1208,11 @@ $spur-sm: 575.98px;
     font-size: var(--font-size-05);
     margin: 0 0 var(--spacing-04);
   }
+}
+
+.spur-admin-suche {
+  max-width: 24rem;
+  margin-bottom: var(--spacing-04);
 }
 
 .spur-grenzen-stand {
@@ -1295,7 +1293,7 @@ $spur-sm: 575.98px;
 }
 
 // Visuell versteckte Elemente (position: absolute) in den Tabellen sollen im Scroll-Container bleiben.
-.spur-grenzen-admin .table-responsive {
+.spur-admin-seite .table-responsive {
   position: relative;
 }
 

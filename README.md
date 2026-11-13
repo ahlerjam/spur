@@ -86,9 +86,9 @@ OVERLEAF_EMAIL_SMTP_PASS=your-password
 
 Without these variables spur sends no email, and it says so: the test email on `/launchpad` reports that no email is set up, and "Forgot password" tells people to ask an admin. Admins pass invitation links on themselves. After "Create account" in the user list (Admin → Manage Users) or on Admin → Register Users, spur shows the link with a copy button. For an existing account, the link icon in the user list creates a new one. A link works for one week.
 
-### Limits
+### Grenzen
 
-Under Admin → Limits you set a default for everyone: projects per user and storage per project in GB. An empty field means unlimited, which is also the default after an update, so no installation is suddenly blocked. For each user you can set an exception (a number, 0, or unlimited); the storage exception applies to all projects the user owns. Limits apply to admins too.
+Under Admin → Grenzen (limits) you set a default for everyone: projects per user and storage per project in GB. An empty field means unlimited, which is also the default after an update, so no installation is suddenly blocked. For each user you can set an exception (a number, 0, or unlimited); the storage exception applies to all projects the user owns. These caps apply to admins too.
 
 The same page has a "TeX-Pakete" part with three fields: size per package in MB (default 100), all packages of a project in MB (default 300) and installations per hour and person (default 60). An empty field restores the default; only whole numbers from 1 are accepted.
 
@@ -96,7 +96,7 @@ Projects count when the user owns them, including archived ones and those in the
 
 ### TeX packages
 
-The image contains TeX Live with a fixed list of packages. If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. By default a package may have 100 MB unpacked, all packages of a project together 300 MB, and each person can add 60 packages per hour; only successful installations count. Admins change these values under Admin → Limits. The storage limit of the project and Overleaf's 2000 files per project still apply. On a server error or a network problem spur tries three times, then the second mirror `https://mirror.ctan.org/systems/texlive/tlnet`. If an installation breaks off, spur removes what it had created, and the next call starts clean. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
+The image contains TeX Live with a fixed list of packages. If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. By default a package may have 100 MB unpacked, all packages of a project together 300 MB, and each person can add 60 packages per hour; only successful installations count. Admins change these values under Admin → Grenzen. The storage limit of the project and Overleaf's 2000 files per project still apply. On a server error or a network problem spur tries three times, then the second mirror `https://mirror.ctan.org/systems/texlive/tlnet`. If an installation breaks off, spur removes what it had created, and the next call starts clean. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
 
 ### Research services
 
@@ -211,13 +211,47 @@ You start the four ready-made workflows in the Claude panel under "Workflows", o
 
 An admin adjusts the texts under `/spur/admin/workflows`.
 
+#### Accepting changes
+
+Claude always writes as a track change. At the top of the Claude panel is the switch "Alles von Claude automatisch annehmen" ("Accept everything from Claude automatically" in the English interface) with the note "Rote Zitate bleiben offen." When it is on, spur accepts every change that Claude writes with `doc_edit` or `doc_create` on the server right after writing. This works without an open browser and without `run_finish`, and also for runs with hints such as "Zahl ohne Beleg".
+
+- Red citations stay open. A change counts as red when the quoted wording differs from the source, the citation form is not recognised, the DOI is unknown at every registration agency, or the source has been retracted. These changes are listed at the top of the run card under "Bitte prüfen".
+- The switch is set per project and per person and only affects your own Claude. Switching it on accepts nothing retroactively. If you no longer have write access to the project, nothing is accepted.
+- It replaces the old checkbox for accepting at the end of a run. The old setting carries over.
+- The run card marks accepted changes with "Automatisch angenommen".
+- "Alles Offene jetzt annehmen" accepts all open changes of your own Claude across runs, except red citations. A dialog asks first and names the amount, for example "12 changes in 2 files".
+- "Lauf rückgängig" also reverts the automatically accepted changes of that run.
+
+Reviewers and members with read-only access see neither the switch nor the button; the server answers 403. Claude itself has no tool to accept anything: acceptance is a setting of the person, never a decision of Claude.
+
+The panel shows the last 20 runs. The newest is expanded, older ones are collapsed with their status and the number of open changes; "Ältere laden" loads 20 more. While Claude is not connected, the panel links to "Token verwalten". Once Claude has connected, the start command is collapsed.
+
 Content that Claude reads goes to Anthropic. This includes documents and sources, interviews too. You are responsible for it.
 
 Transcripts are sent to the AI provider when Claude reads them. Ideally, pseudonymise interviews before uploading them. spur shows this notice when you upload any VTT file; there are no further rules for interviews.
 
+## Sources
+
+The source panel has one main button, "Quelle hinzufügen". Further actions are in the menu "Weitere Aktionen": capture a web page, fetch from another project, import, export sources and the literature matrix. The list shows title, authors (from three authors the first one with "u. a."), year, pages and the text status. "Weitere Quellen laden" loads 100 more.
+
+"Groß öffnen" opens the full view of a source:
+
+- The frame is dark in the dark theme; the page itself stays white.
+- Zoom runs from 50 to 300 %. The page image is rendered again at the matching resolution, so it stays sharp. "An Breite anpassen" fits the page to the width.
+- Keys: arrow left and right or Page Up and Page Down turn pages, `+` and `-` zoom, `0` fits the width, Esc closes.
+- Text can be selected directly on the page image (a transparent text layer lies over it). A selection can be saved as a quote and inserted at the cursor in the editor.
+- A sidebar shows source details, the note and the saved quotes. It can be collapsed; spur remembers the state per person.
+- "Original herunterladen" downloads the original file. It is in the full view and in the small preview.
+- Closing the full view returns the preview to the same page.
+- Up to a width of 768 px, inclusive, the view has a single column.
+
 ## The check report
 
 The check report in the editor lists every citation with its verdict: is the wording in the source, does the page match, is the reference registered, has the paper been retracted. The header counts them, for example "Zitierstellen: 74 geprüft, davon 13 markiert, 2 ohne Quelle, 1 nicht prüfbar"; "markiert" are the rows that stay visible with "Nur Probleme". A citation that names a source without quoting it counts as "Beleg ohne Wortlaut".
+
+The report groups the citations per file, with the number of citations and of flagged ones; each group can be collapsed. The filters "Alle", "Markiert", "Ohne Quelle" and "Nicht prüfbar" show their counts. "Zuletzt geprüft: heute, HH:MM" says when the check ran. While a new check runs, the old report stays visible.
+
+In the editor, the red and yellow marks show a tooltip with the finding, with the same text as the badges in the report. It appears when you hover over the mark and when you move the cursor into it with the keyboard.
 
 - Quote macros: spur recognises your own macros for quotations when their definition in a `.tex` file of the project maps to `\enquote`, `\textquote`, `\blockquote` or quotation marks, and checks their wording like `\enquote`. Claude cannot write invented wording into them either. Macros from a `.sty` file you add under "Einstellungen der Prüfung" → "Zitatmakros".
 - Hidden notes: citations that do not appear in the PDF do not count. That covers macros defined as empty (such as `\newcommand{\note}[1]{}`), `\iffalse … \fi` and Beamer's `\note{…}` without `\setbeameroption{show notes}`. The report says how many it skipped. Further macros go under "Ausgeblendete Makros".

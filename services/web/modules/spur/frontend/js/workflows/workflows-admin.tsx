@@ -5,6 +5,7 @@ import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
+import OLFormText from '@/shared/components/ol/ol-form-text'
 import Notification from '@/shared/components/notification'
 import { anfrage, jsonAnfrage } from '../api'
 import { workflowBefehl } from '../claude/workflow-befehl'
@@ -12,6 +13,7 @@ import { workflowBefehl } from '../claude/workflow-befehl'
 type Workflow = { name: string; titel: string; beschreibung: string; text: string; angepasst: boolean }
 
 const PFAD = '/spur/admin/workflows'
+const MAX_TEXT = 20000
 
 export default function WorkflowsAdmin() {
   const { isReady } = useWaitForI18n()
@@ -34,7 +36,7 @@ export default function WorkflowsAdmin() {
   if (!isReady) return null
 
   return (
-    <main id="main-content" className="content spur-workflows-admin">
+    <main id="main-content" className="content spur-admin-seite spur-workflows-admin">
       <h1>{t('spur_workflows')}</h1>
       <p>{t('spur_workflows_admin_hinweis')}</p>
       {fehler && <Notification type="error" content={fehler} />}
@@ -45,10 +47,11 @@ export default function WorkflowsAdmin() {
 }
 
 function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLaden: () => Promise<void> }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [text, setText] = useState(workflow.text)
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'error'; text: string } | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  const [zuLang, setZuLang] = useState(false)
   useEffect(() => setText(workflow.text), [workflow.text])
   const id = `spur-workflow-text-${workflow.name}`
 
@@ -67,7 +70,7 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
   }
 
   return (
-    <section className="spur-workflow-admin" aria-labelledby={`${id}-titel`}>
+    <section className="spur-admin-abschnitt" aria-labelledby={`${id}-titel`}>
       <div className="spur-lauf-kopf">
         <h2 id={`${id}-titel`}>{workflow.titel}</h2>
         {workflow.angepasst ? (
@@ -81,17 +84,44 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
         {workflow.beschreibung}
       </p>
       <form
+        noValidate
         onSubmit={e => {
           e.preventDefault()
+          // Wie der Server (Workflows.mjs): höchstens 20 000 Zeichen; der Text bleibt zum Kürzen stehen.
+          if (text.length > MAX_TEXT) return setZuLang(true)
           ausfuehren('PUT', { text }, t('spur_workflow_gespeichert'))
         }}
       >
         <OLFormLabel htmlFor={id}>{t('spur_workflow_text', { titel: workflow.titel })}</OLFormLabel>
-        <OLFormControl as="textarea" id={id} rows={12} value={text} onChange={e => setText(e.target.value)} />
+        <OLFormControl
+          as="textarea"
+          id={id}
+          rows={12}
+          value={text}
+          isInvalid={zuLang}
+          aria-invalid={zuLang || undefined}
+          aria-describedby={zuLang ? `${id}-fehler` : undefined}
+          onChange={e => {
+            setText(e.target.value)
+            setZuLang(false)
+            setMeldung(null)
+          }}
+        />
+        {zuLang && (
+          <OLFormText type="error" id={`${id}-fehler`}>
+            {t('spur_workflow_zu_lang', {
+              anzahl: text.length.toLocaleString(i18n.language),
+              grenze: MAX_TEXT.toLocaleString(i18n.language),
+            })}
+          </OLFormText>
+        )}
         <div className="spur-vorschlag-aktionen">
           <OLButton type="submit" variant="primary" size="sm" isLoading={laeuft}>
             {t('save')}
           </OLButton>
+          <span role="status" className={meldung?.typ === 'error' ? 'form-text text-danger' : 'spur-zeile-meta'}>
+            {meldung?.text}
+          </span>
           {workflow.angepasst && (
             <OLButton
               variant="secondary"
@@ -103,7 +133,6 @@ function WorkflowBearbeiten({ workflow, neuLaden }: { workflow: Workflow; neuLad
             </OLButton>
           )}
         </div>
-        <div role="status">{meldung && <Notification type={meldung.typ} content={meldung.text} />}</div>
       </form>
     </section>
   )

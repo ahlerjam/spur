@@ -233,6 +233,13 @@ export async function e2eDatenVorbereiten() {
     'references.bib': BERICHT_BIB,
   })
   await quelleAusFixture(bericht._id, a._id, 'smith2024.pdf')
+  // P9: nur grüne Stellen, damit ein Filter des Prüfberichts leer bleibt.
+  const gruen = await neuAnlegen(a, 'E2E Bericht Grün', {
+    'main.tex': BERICHT_MAIN.replace(/\\section\{Eins\}[\s\S]*\\input\{kapitel\}/, '\\input{kapitel}'),
+    'kapitel.tex': BERICHT_KAPITEL,
+    'references.bib': BERICHT_BIB,
+  })
+  await quelleAusFixture(gruen._id, a._id, 'smith2024.pdf')
   // P9: Lese-Konto für die Großansicht ohne Schreibrecht.
   await db.projects.updateOne({ _id: bericht._id }, { $set: { readOnly_refs: [leser._id] } })
   await quelleAusFixture(bericht._id, a._id, 'retracted.pdf')
@@ -355,6 +362,13 @@ Eins. Zwei. Drei. Vier. Fünf.
   )
   await (await einstellungen()).insertMany(
     [a, schreiber].map(person => ({ projectId: automatik._id, userId: person._id, autoAnnehmen: true }))
+  )
+
+  // P9: zuletzt vor zwei Tagen von e2e-a bearbeitet („vor 2 Tagen von dir“ in der Projektliste).
+  const alt = await neuAnlegen(a, 'E2E Alt', { 'main.tex': LEER })
+  await db.projects.updateOne(
+    { _id: alt._id },
+    { $set: { lastUpdated: new Date(Date.now() - 2 * 24 * 3600 * 1000 - 3600 * 1000), lastUpdatedBy: a._id } }
   )
 
   // P9: Verlauf der Läufe im Claude-Panel; „E2E Viele Läufe“ hat 22 abgeschlossene Läufe für „Ältere laden“.

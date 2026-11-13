@@ -4213,5 +4213,12 @@
   "spur_trotzdem_schliessen": "Close anyway",
   "spur_zitate_zaehlen": "Counting affected citations …",
   "spur_zitate_unbekannt": "The affected citations could not be determined.",
-  "spur_kopieren_von_hand": "Copying is not possible. Select the link and copy it by hand."
+  "spur_kopieren_von_hand": "Copying is not possible. Select the link and copy it by hand.",
+  "spur_nutzer_suchen": "Search by name or email",
+  "spur_nutzerseiten": "User list pages",
+  "spur_keine_nutzer": "No users yet",
+  "spur_keine_nutzer_fuer": "No users for “__begriff__”",
+  "spur_keine_projekte": "No projects yet",
+  "spur_workflow_zu_lang": "The text has __anzahl__ characters; at most __grenze__ are allowed. Please shorten it.",
+  "last_updated_date_by_you": "__lastUpdatedDate__ by you"
 }

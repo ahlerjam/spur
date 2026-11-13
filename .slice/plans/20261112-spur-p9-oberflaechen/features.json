@@ -103,7 +103,7 @@
     "Während der Suche stehen Platzhalter in Form der Treffer; eine Suche ohne Treffer zeigt „Keine Treffer für „xyzxyz“. Prüf die Schreibweise oder such nach der DOI.“",
     "In „Beschaffung“ steht „PDF hochladen“ als Hauptaktion, die Exporte `.bib`, `.ris`, `CSV` liegen in einem Menü „Liste exportieren“; die leere Liste erklärt den nächsten Schritt"
    ],
-   "passes": false,
+   "passes": true,
    "ui": true
   },
   {

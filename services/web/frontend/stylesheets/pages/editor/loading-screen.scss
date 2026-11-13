@@ -65,33 +65,29 @@
     justify-content: center;
   }
 
-  // Schriftzug statt Overleaf-Logo; die Füllung von unten zeigt den Ladefortschritt (Höhe inline).
+  // Schriftzug statt Overleaf-Logo; die Füllung zeigt den Ladefortschritt von unten (clip-path inline).
   .loading-screen-brand {
     position: relative;
+    display: inline-block;
     font-size: 96px;
     font-weight: 600;
     line-height: 1;
     letter-spacing: 0.02em;
+    color: var(--loading-screen-brand-color);
+  }
 
-    &::before {
-      content: 'spur';
-      display: block;
-      color: var(--loading-screen-brand-color);
-      opacity: 0.2;
-    }
+  .loading-screen-brand-grund {
+    display: block;
+    opacity: 0.2;
+  }
 
-    &::after {
-      content: 'spur';
-      position: absolute;
-      height: inherit;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      display: flex;
-      align-items: flex-end;
-      overflow: hidden;
-      color: var(--loading-screen-brand-color);
-      transition: height 0.5s;
+  .loading-screen-brand-fuellung {
+    position: absolute;
+    inset: 0;
+    transition: clip-path 0.5s;
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
     }
   }
 

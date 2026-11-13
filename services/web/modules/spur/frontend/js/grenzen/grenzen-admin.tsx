@@ -75,7 +75,7 @@ export default function GrenzenAdmin() {
   if (!isReady) return null
 
   return (
-    <main id="main-content" className="content spur-grenzen-admin">
+    <main id="main-content" className="content spur-admin-seite spur-grenzen-admin">
       <h1>{t('spur_grenzen')}</h1>
       <p>{t('spur_grenzen_hinweis')}</p>
       {fehler && <Notification type="error" content={fehler} />}
@@ -151,7 +151,7 @@ function StandardFormular({
   )
 
   return (
-    <section className="spur-grenzen-abschnitt" aria-labelledby={`${id}-titel`}>
+    <section className="spur-admin-abschnitt" aria-labelledby={`${id}-titel`}>
       <h2 id={`${id}-titel`}>{t('spur_grenzen_standard')}</h2>
       <dl className="spur-grenzen-stand">
         <div>
@@ -200,17 +200,54 @@ function SortierKnopf({ aktiv, onClick }: { aktiv: boolean; onClick: () => void 
   )
 }
 
+const PRO_SEITE = 50
+
 function NutzerTabelle({ nutzer, neuLaden }: { nutzer: Nutzer[]; neuLaden: () => Promise<void> }) {
   const { t } = useTranslation()
   const zahl = useZahl()
   const [sortiert, setSortiert] = useState(false)
   const [bearbeitet, setBearbeitet] = useState<string | null>(null)
-  const liste = sortiert
-    ? [...nutzer].sort((a, b) => auslastung(b.projekte, b.grenze) - auslastung(a.projekte, a.grenze))
-    : nutzer
+  const [suche, setSuche] = useState('')
+  const [seite, setSeite] = useState(0)
+  const begriff = suche.trim().toLowerCase()
+  const gefiltert = nutzer.filter(n => !begriff || `${n.name ?? ''} ${n.email}`.toLowerCase().includes(begriff))
+  const sortierteListe = sortiert
+    ? [...gefiltert].sort((a, b) => auslastung(b.projekte, b.grenze) - auslastung(a.projekte, a.grenze))
+    : gefiltert
+  const seiten = Math.max(1, Math.ceil(sortierteListe.length / PRO_SEITE))
+  const aktuelleSeite = Math.min(seite, seiten - 1)
+  const liste = sortierteListe.slice(aktuelleSeite * PRO_SEITE, (aktuelleSeite + 1) * PRO_SEITE)
   return (
-    <section className="spur-grenzen-abschnitt" aria-labelledby="spur-grenzen-nutzer">
+    <section className="spur-admin-abschnitt" aria-labelledby="spur-grenzen-nutzer">
       <h2 id="spur-grenzen-nutzer">{t('spur_grenzen_nutzer')}</h2>
+      <div className="spur-admin-suche">
+        <OLFormLabel htmlFor="spur-nutzer-suche">{t('spur_nutzer_suchen')}</OLFormLabel>
+        <OLFormControl
+          id="spur-nutzer-suche"
+          type="search"
+          value={suche}
+          onChange={e => {
+            setSuche(e.target.value)
+            setSeite(0)
+          }}
+        />
+      </div>
+      {seiten > 1 && (
+        <nav className="spur-blaettern" aria-label={t('spur_nutzerseiten')}>
+          <OLButton variant="secondary" size="sm" disabled={aktuelleSeite === 0} onClick={() => setSeite(aktuelleSeite - 1)}>
+            {t('spur_vorherige_seite')}
+          </OLButton>
+          <span>{t('spur_seite_von', { seite: aktuelleSeite + 1, gesamt: seiten })}</span>
+          <OLButton
+            variant="secondary"
+            size="sm"
+            disabled={aktuelleSeite >= seiten - 1}
+            onClick={() => setSeite(aktuelleSeite + 1)}
+          >
+            {t('spur_naechste_seite')}
+          </OLButton>
+        </nav>
+      )}
       <div className="table-responsive">
         <table className="table spur-grenzen-tabelle">
           <thead>
@@ -224,6 +261,13 @@ function NutzerTabelle({ nutzer, neuLaden }: { nutzer: Nutzer[]; neuLaden: () =>
             </tr>
           </thead>
           <tbody>
+            {liste.length === 0 && (
+              <tr>
+                <td colSpan={4} className="spur-leer">
+                  {begriff ? t('spur_keine_nutzer_fuer', { begriff: suche.trim() }) : t('spur_keine_nutzer')}
+                </td>
+              </tr>
+            )}
             {liste.map(n => (
               <tr key={n.id} data-email={n.email}>
                 <td>
@@ -375,7 +419,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
   }
 
   return (
-    <section className="spur-grenzen-abschnitt" aria-labelledby="spur-grenzen-projekte">
+    <section className="spur-admin-abschnitt" aria-labelledby="spur-grenzen-projekte">
       <h2 id="spur-grenzen-projekte">{t('spur_grenzen_projekte')}</h2>
       {fehler && <Notification type="error" content={fehler} />}
       <div className="table-responsive">
@@ -394,6 +438,13 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
             </tr>
           </thead>
           <tbody>
+            {liste.length === 0 && (
+              <tr>
+                <td colSpan={5} className="spur-leer">
+                  {t('spur_keine_projekte')}
+                </td>
+              </tr>
+            )}
             {liste.map(p => (
               <tr key={p.id} data-projekt={p.name}>
                 <td>{p.name}</td>

@@ -11,7 +11,7 @@ import * as Grenzen from './Grenzen.mjs'
 const SEITE = Path.resolve(Path.dirname(fileURLToPath(import.meta.url)), '../../views/grenzen-admin')
 
 export function seite(_req, res) {
-  res.render(SEITE, { title: 'Limits' })
+  res.render(SEITE, { title: 'spur_grenzen' })
 }
 
 // Liest jedes Feld für sich, damit das Formular den Fehler am richtigen Feld zeigt.

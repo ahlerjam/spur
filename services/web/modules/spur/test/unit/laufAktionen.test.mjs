@@ -193,7 +193,9 @@ describe('annehmen', () => {
     expect(emitToRoom).toHaveBeenCalledWith(projekt, 'accept-changes', doc, ['a'])
     const danach = await gespeichert(l)
     expect(danach.status).toBe('angenommen')
-    expect(danach.angenommen).toEqual([{ docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }) }])
+    expect(danach.angenommen).toEqual([
+      { docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }), stapel: expect.any(String) },
+    ])
   })
 
   it('nimmt auf Wunsch nur gewählte Changes an und lässt den Lauf offen für den Rest', async () => {
@@ -446,6 +448,63 @@ describe('Sofort annehmen (Schalter „Alles von Claude automatisch annehmen“)
     expect(spurUpdate).toHaveBeenCalledWith(projekt, doc, [expect.objectContaining({ p: 14, d: 'rot' })], 7, { userId: anna })
     expect(spurUpdate).toHaveBeenCalledWith(projekt, doc, [{ p: 9, d: 'neu' }], 7, { userId: anna, tracked: true })
     expect((await gespeichert(l)).status).toBe('zurueckgenommen')
+  })
+})
+
+describe('Lauf rückgängig nach Schalter und Sammelannahme', () => {
+  // document-updater wendet die Ops nacheinander an; das Dokument im Test folgt ihnen.
+  function opsAnwenden() {
+    spurUpdate.mockImplementation(async (_p, docId, ops) => {
+      const d = dokumente.get(String(docId))
+      let text = d.lines.join('\n')
+      for (const op of ops) {
+        text = op.i !== undefined ? text.slice(0, op.p) + op.i + text.slice(op.p) : text.slice(0, op.p) + text.slice(op.p + op.d.length)
+      }
+      const offen = d.ranges.changes.filter(c => !ops.some(o => o.u && o.p === c.op.p))
+      dokumente.set(String(docId), { ...d, lines: text.split('\n'), ranges: { changes: offen } })
+    })
+  }
+
+  it('nimmt nacheinander Angenommenes zurück, auch wenn spätere Änderungen den Kontext verändert haben', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    await LaufAktionen.automatikSetzen(projekt, anna, true)
+    opsAnwenden()
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    // Erst „ A“ hinter „Eins.“, dann „ B“ hinter „Zwei.“ (im Kontext von A), dann ein offener roter Einschub.
+    docSetzen('Eins. A Zwei.', [change('a', { p: 5, i: ' A' })])
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    docSetzen('Eins. A Zwei. B', [change('b', { p: 13, i: ' B' })])
+    await LaufAktionen.sofortAnnehmen(projekt, await gespeichert(l), anna, ['b'])
+    docSetzen('Eins. A Zwei. B rot', [change('r', { p: 15, i: ' rot' })])
+    await LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna)
+    expect(dokumente.get(String(doc)).lines.join('\n')).toBe('Eins. Zwei.')
+    expect((await gespeichert(l)).status).toBe('zurueckgenommen')
+  })
+
+  it('findet die Stelle mit kürzerem Kontext, wenn ein offener Change im gespeicherten Kontext stand', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    opsAnwenden()
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    // Beim Annehmen von „ B“ stand der offene rote Einschub „ rot“ eine Zeile weiter im Kontext.
+    const text = 'Eins. Zwei. B\n\nDrei Satz. rot'
+    const rot = change('r', { p: 25, i: ' rot' }, '2026-11-07T10:02:00Z')
+    docSetzen(text, [change('b', { p: 11, i: ' B' }, '2026-11-07T10:01:00Z'), rot])
+    await LaufAktionen.annehmen(projekt, l, anna, ['b'], { laufOffenLassen: true })
+    docSetzen(text, [rot])
+    await LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna)
+    expect(dokumente.get(String(doc)).lines.join('\n')).toBe('Eins. Zwei.\n\nDrei Satz.')
+  })
+
+  it('ändert bei einem Konflikt nichts, auch die offenen Changes bleiben', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'readAndWrite' })
+    await LaufAktionen.automatikSetzen(projekt, anna, true)
+    const l = await lauf({ status: 'offen', beendet: undefined })
+    docSetzen('Eins. A Zwei.', [change('a', { p: 5, i: ' A' })])
+    await LaufAktionen.sofortAnnehmen(projekt, l, anna, ['a'])
+    docSetzen('Ganz anders. rot', [change('r', { p: 12, i: ' rot' })])
+    expect(await fehlerVon(LaufAktionen.zuruecknehmen(projekt, await gespeichert(l), anna))).toMatchObject({ status: 409 })
+    expect(spurUpdate).not.toHaveBeenCalled()
+    expect((await gespeichert(l)).status).toBe('offen')
   })
 })
 

@@ -13,10 +13,10 @@ export const LastUpdatedBy: FC<{
 
   return (
     <>
-      {t('last_updated_date_by_x', {
-        lastUpdatedDate,
-        person: userName === 'You' ? t('you') : userName,
-      })}
+      {/* spur: „von dir“ statt „von Du“; die Person steht im Satz im Dativ */}
+      {userName === 'You'
+        ? t('last_updated_date_by_you', { lastUpdatedDate })
+        : t('last_updated_date_by_x', { lastUpdatedDate, person: userName })}
     </>
   )
 }

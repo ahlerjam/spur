@@ -123,6 +123,8 @@ export async function annehmen(projectId, lauf, userId, nurIds, { automatisch = 
   mussOffenSein(lauf)
   const liste = await aenderungen(projectId, lauf)
   const angenommen = []
+  // Ein Stapel teilt sich den Text, aus dem sein Kontext stammt; „Lauf rückgängig“ nimmt Stapel nacheinander zurück.
+  const stapel = String(new ObjectId())
   for (const d of liste) {
     // Wie beim Ablehnen: ein gespaltener Einschub wird ganz angenommen, sonst blieben Restmarken.
     const ids = mitGanzenEinschueben(d.changes, nurIds).map(c => c.id)
@@ -135,6 +137,7 @@ export async function annehmen(projectId, lauf, userId, nurIds, { automatisch = 
         docId: d.docId,
         op: c.op,
         ...kontextUm(d.text, c.op),
+        stapel,
         ...(automatisch && { automatisch: true, pfad: d.pfad, zeile: d.text.slice(0, c.op.p).split('\n').length }),
       })
     }
@@ -183,9 +186,10 @@ function konflikt(text, p) {
 // Rücknahme eines angenommenen Laufs als neue Track Changes; bei Überschneidung nichts ändern.
 export async function zuruecknehmen(projectId, lauf, userId) {
   const offen = lauf.status === 'offen' || lauf.status === 'fertig'
-  // Ein noch nicht angenommener Lauf: offene Changes ablehnen, Angelegtes entfernen und, was der Schalter schon
-  // angenommen hat, zurücknehmen.
+  // Ein noch nicht angenommener Lauf: offene Changes ablehnen, Angelegtes entfernen und, was Schalter oder
+  // Sammelannahme schon angenommen haben, zurücknehmen. Erst ein Probelauf: Ein Konflikt ändert gar nichts.
   if (offen && (lauf.angelegt?.length || lauf.angenommen?.length)) {
+    if (lauf.angenommen?.length) await rueckPlan(projectId, lauf, { offeneAbziehen: true })
     await ablehnen(projectId, lauf, userId)
     if (lauf.angenommen?.length) await angenommenesZuruecknehmen(projectId, lauf, userId)
     await statusSetzen(lauf, 'zurueckgenommen')
@@ -199,20 +203,66 @@ export async function zuruecknehmen(projectId, lauf, userId) {
   await statusSetzen(lauf, 'zurueckgenommen')
 }
 
-async function angenommenesZuruecknehmen(projectId, lauf, userId) {
-  const plan = []
-  for (const docId of [...new Set(lauf.angenommen.map(a => a.docId))]) {
-    const { lines, version } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
-    const text = lines.join('\n')
-    const ops = []
-    for (const eintrag of lauf.angenommen.filter(a => a.docId === docId)) {
-      // Ohne gespeicherten Kontext lässt sich die Stelle nicht sicher finden: lieber Konflikt.
-      const p = eintrag.vor === undefined ? null : heutigePosition(text, eintrag)
-      if (p === null) throw konflikt(text, eintrag.op.p)
-      ops.push({ ...eintrag.op, p })
-    }
-    plan.push({ docId, version, ops: umkehrOps(ops.map(op => ({ op }))).map(({ u, ...op }) => op) })
+function opsAnwenden(text, ops) {
+  return ops.reduce(
+    (t, op) => (op.i !== undefined ? t.slice(0, op.p) + op.i + t.slice(op.p) : t.slice(0, op.p) + t.slice(op.p + op.d.length)),
+    text
+  )
+}
+
+// Aufeinanderfolgende Einträge desselben Stapels; alte Einträge ohne Stapel gelten als einer.
+function stapelVon(eintraege) {
+  const gruppen = []
+  for (const e of eintraege) {
+    if (gruppen.length && gruppen.at(-1)[0].stapel === e.stapel) gruppen.at(-1).push(e)
+    else gruppen.push([e])
   }
+  return gruppen
+}
+
+// Der Kontext eines Stapels kann offene Changes enthalten, die beim Zurücknehmen schon herausgerechnet sind
+// (oder umgekehrt). Dann mit kürzerem Kontext auf beiden Seiten suchen; bei mehreren Treffern gilt weiter der nächste
+// zur alten Stelle.
+function positionMitKuerzeremKontext(text, eintrag) {
+  for (const laenge of [40, 20, 10]) {
+    const p = heutigePosition(text, { ...eintrag, vor: eintrag.vor.slice(-laenge), nach: eintrag.nach.slice(0, laenge) })
+    if (p !== null) return p
+  }
+  return null
+}
+
+// Ops, die das Angenommene je Dokument zurücknehmen: der jüngste Stapel zuerst, jeder gegen den Text, aus dem sein
+// Kontext stammt. Mit `offeneAbziehen` rechnet der Plan die offenen Changes des Laufs vorher heraus (Probelauf).
+async function rueckPlan(projectId, lauf, { offeneAbziehen = false } = {}) {
+  const offeneJeDoc = new Map()
+  if (offeneAbziehen) {
+    for (const d of await aenderungen(projectId, lauf)) offeneJeDoc.set(String(d.docId), d.changes)
+  }
+  const plan = []
+  const docs = new Map(lauf.angenommen.map(a => [String(a.docId), a.docId]))
+  for (const [schluessel, docId] of docs) {
+    const { lines, version } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
+    let text = opsAnwenden(lines.join('\n'), umkehrOps(offeneJeDoc.get(schluessel) ?? []))
+    const ops = []
+    for (const gruppe of stapelVon(lauf.angenommen.filter(a => String(a.docId) === schluessel)).reverse()) {
+      const gefunden = []
+      for (const eintrag of gruppe) {
+        // Ohne gespeicherten Kontext lässt sich die Stelle nicht sicher finden: lieber Konflikt.
+        const p = eintrag.vor === undefined ? null : positionMitKuerzeremKontext(text, eintrag)
+        if (p === null) throw konflikt(text, eintrag.op.p)
+        gefunden.push({ op: { ...eintrag.op, p } })
+      }
+      const rueck = umkehrOps(gefunden).map(({ u, ...op }) => op)
+      text = opsAnwenden(text, rueck)
+      ops.push(...rueck)
+    }
+    plan.push({ docId, version, ops })
+  }
+  return plan
+}
+
+async function angenommenesZuruecknehmen(projectId, lauf, userId) {
+  const plan = await rueckPlan(projectId, lauf)
   for (const { docId, version, ops } of plan) {
     await spurUpdate(projectId, docId, ops, version, { userId, tracked: true })
   }

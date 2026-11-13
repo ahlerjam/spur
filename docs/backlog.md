@@ -46,9 +46,6 @@ Deferred, not discarded. Check here before new plans.
 - Use SSRF protection (`netz.mjs`) for `linked-url-proxy` as well and respect `Settings.blockedNetworks`
 
 ## Interface
-- The "Nicht frei" badge in research has too little contrast
-- Narrow research panel: search field cut off, tabs stacked
-- Mixed menu languages in the editor (File, Insert, View next to Bearbeiten, Hilfe)
 - Also highlight markings in the page text of the source preview
 
 ## Before the respective plan, into the image
@@ -61,7 +58,7 @@ Deferred, not discarded. Check here before new plans.
 - Consumer Terms section 11 for EEA users in university research
 
 ## Translations
-- Overleaf's German language file lacks 1616 keys that the English one has (`services/web/locales/de.json` has 2445 keys, `en.json` has 4060; one key exists only in `de.json`)
+- Overleaf's German language file still lacks 1419 keys that the English one has (`services/web/locales/de.json` against `en.json`); P9 added about 200 for the menu bar, rail, review panel, PDF area, editor settings, project list and account menu
 
 ## Ideas for P10 (owner, 2026-11-12)
 - Claim check: also check paraphrased statements against the source. For every sentence with a citation, find the passage in the source and show "supported (p. 347)", "passage not found" or "source says something else", with a jump to the passage. Always show the passage found, never a verdict without evidence, because a language model judges this and can be wrong. Extends the "paraphrases" switch under Proactivity.

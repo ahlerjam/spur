@@ -34,7 +34,7 @@ export default function PaperEintrag({
           </OLBadge>
         )}
         {treffer.frei === false && (
-          <OLBadge bg="secondary" className="spur-paper-badge">
+          <OLBadge bg="light" text="dark" className="spur-paper-badge">
             {t('spur_nicht_frei')}
           </OLBadge>
         )}

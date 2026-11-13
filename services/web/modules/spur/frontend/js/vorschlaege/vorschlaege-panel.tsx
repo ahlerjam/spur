@@ -144,14 +144,14 @@ function Einstellungen({
                 setLimitFehler(false)
               }}
             />
-            <OLButton type="submit" variant="secondary" size="sm">
-              {t('save')}
-            </OLButton>
             <span className="spur-zeile-meta" id="spur-limit-stand" role="status">
               {stand.limitErreicht
                 ? t('spur_vorschlag_limit_erreicht')
                 : t('spur_vorschlag_heute', { heute: stand.heute, limit: stand.limit })}
             </span>
+            <OLButton type="submit" variant="secondary" size="sm">
+              {t('save')}
+            </OLButton>
           </div>
           {limitFehler && (
             <OLFormText type="error" id="spur-limit-fehler">
