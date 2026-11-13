@@ -28,13 +28,17 @@ moment.locale('en')
 
 const sprache = () => getMeta('ol-i18n')?.currentLangCode ?? 'en'
 
+// Deutsch zeigt Uhrzeiten ohne am/pm: „h:mm a“ wird „H:mm“.
+const auf24Stunden = (format: string) =>
+  sprache() === 'de' ? format.replace(/\bh:mm a\b/, 'H:mm') : format
+
 export function formatTime(
   date: moment.MomentInput,
   format = 'h:mm a',
   utc = false
 ) {
   const momentDate = utc ? moment.utc(date) : moment(date)
-  return momentDate.locale(sprache()).format(format)
+  return momentDate.locale(sprache()).format(auf24Stunden(format))
 }
 
 export function relativeDate(date: moment.MomentInput) {
