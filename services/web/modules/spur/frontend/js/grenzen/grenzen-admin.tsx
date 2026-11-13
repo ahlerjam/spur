@@ -28,7 +28,9 @@ type Daten = { standard: Standard; texStandard: TexGrenzen; nutzer: Nutzer[]; pr
 type Feld = 'projekte' | 'speicherGb' | keyof TexGrenzen
 
 const PFAD = '/spur/admin/grenzen'
-const GB = 1024 ** 3
+const KB = 1024
+const MB = KB ** 2
+const GB = KB ** 3
 
 const auslastung = (wert: number, grenze: number | null) =>
   grenze === null ? 0 : grenze === 0 ? (wert > 0 ? Infinity : 1) : wert / grenze
@@ -203,6 +205,22 @@ function SortierKnopf({ aktiv, onClick }: { aktiv: boolean; onClick: () => void 
 
 const PRO_SEITE = 50
 
+function Blaettern({ label, seite, seiten, setSeite }: { label: string; seite: number; seiten: number; setSeite: (seite: number) => void }) {
+  const { t } = useTranslation()
+  if (seiten <= 1) return null
+  return (
+    <nav className="spur-blaettern" aria-label={label}>
+      <OLButton variant="secondary" size="sm" disabled={seite === 0} onClick={() => setSeite(seite - 1)}>
+        {t('spur_vorherige_seite')}
+      </OLButton>
+      <span>{t('spur_seite_von', { seite: seite + 1, gesamt: seiten })}</span>
+      <OLButton variant="secondary" size="sm" disabled={seite >= seiten - 1} onClick={() => setSeite(seite + 1)}>
+        {t('spur_naechste_seite')}
+      </OLButton>
+    </nav>
+  )
+}
+
 function NutzerTabelle({ nutzer, neuLaden }: { nutzer: Nutzer[]; neuLaden: () => Promise<void> }) {
   const { t } = useTranslation()
   const zahl = useZahl()
@@ -233,22 +251,7 @@ function NutzerTabelle({ nutzer, neuLaden }: { nutzer: Nutzer[]; neuLaden: () =>
           }}
         />
       </div>
-      {seiten > 1 && (
-        <nav className="spur-blaettern" aria-label={t('spur_nutzerseiten')}>
-          <OLButton variant="secondary" size="sm" disabled={aktuelleSeite === 0} onClick={() => setSeite(aktuelleSeite - 1)}>
-            {t('spur_vorherige_seite')}
-          </OLButton>
-          <span>{t('spur_seite_von', { seite: aktuelleSeite + 1, gesamt: seiten })}</span>
-          <OLButton
-            variant="secondary"
-            size="sm"
-            disabled={aktuelleSeite >= seiten - 1}
-            onClick={() => setSeite(aktuelleSeite + 1)}
-          >
-            {t('spur_naechste_seite')}
-          </OLButton>
-        </nav>
-      )}
+      <Blaettern label={t('spur_nutzerseiten')} seite={aktuelleSeite} seiten={seiten} setSeite={setSeite} />
       <div className="table-responsive">
         <table className="table spur-grenzen-tabelle">
           <thead>
@@ -403,8 +406,15 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
   const [sortiert, setSortiert] = useState(false)
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
-  const liste = sortiert ? [...projekte].sort((a, b) => auslastung(b.bytes, b.grenze) - auslastung(a.bytes, a.grenze)) : projekte
-  const gb = (bytes: number) => `${zahl(bytes / GB)} GB`
+  const [suche, setSuche] = useState('')
+  const [seite, setSeite] = useState(0)
+  const begriff = suche.trim().toLowerCase()
+  const gefiltert = projekte.filter(p => !begriff || `${p.name} ${p.eigentuemer}`.toLowerCase().includes(begriff))
+  const sortierteListe = sortiert ? [...gefiltert].sort((a, b) => auslastung(b.bytes, b.grenze) - auslastung(a.bytes, a.grenze)) : gefiltert
+  const seiten = Math.max(1, Math.ceil(sortierteListe.length / PRO_SEITE))
+  const aktuelleSeite = Math.min(seite, seiten - 1)
+  const liste = sortierteListe.slice(aktuelleSeite * PRO_SEITE, (aktuelleSeite + 1) * PRO_SEITE)
+  const groesse = (bytes: number) => (bytes >= GB ? `${zahl(bytes / GB)} GB` : bytes >= MB ? `${zahl(bytes / MB)} MB` : `${zahl(bytes / KB)} KB`)
 
   const neuBerechnen = async (p: Projekt) => {
     setLaeuft(p.id)
@@ -423,6 +433,18 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
     <section className="spur-admin-abschnitt" aria-labelledby="spur-grenzen-projekte">
       <h2 id="spur-grenzen-projekte">{t('spur_grenzen_projekte')}</h2>
       {fehler && <Notification type="error" content={fehler} />}
+      <div className="spur-admin-suche">
+        <OLFormLabel htmlFor="spur-projekt-suche">{t('spur_projekte_suchen')}</OLFormLabel>
+        <OLFormControl
+          id="spur-projekt-suche"
+          type="search"
+          value={suche}
+          onChange={e => {
+            setSuche(e.target.value)
+            setSeite(0)
+          }}
+        />
+      </div>
       <div className="table-responsive">
         <table className="table spur-grenzen-tabelle">
           <thead>
@@ -442,7 +464,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
             {liste.length === 0 && (
               <tr>
                 <td colSpan={5} className="spur-leer">
-                  {t('spur_keine_projekte')}
+                  {begriff ? t('spur_keine_projekte_gefunden') : t('spur_keine_projekte')}
                 </td>
               </tr>
             )}
@@ -450,7 +472,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
               <tr key={p.id} data-projekt={p.name}>
                 <td>{p.name}</td>
                 <td className="spur-zeile-meta">{p.eigentuemer}</td>
-                <td className="spur-grenzen-zahl">{p.grenze === null ? gb(p.bytes) : `${gb(p.bytes)} / ${gb(p.grenze)}`}</td>
+                <td className="spur-grenzen-zahl">{p.grenze === null ? groesse(p.bytes) : `${groesse(p.bytes)} / ${groesse(p.grenze)}`}</td>
                 <td>
                   <Markierung anteil={auslastung(p.bytes, p.grenze)} />
                 </td>
@@ -470,6 +492,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
           </tbody>
         </table>
       </div>
+      <Blaettern label={t('spur_projektseiten')} seite={aktuelleSeite} seiten={seiten} setSeite={setSeite} />
     </section>
   )
 }

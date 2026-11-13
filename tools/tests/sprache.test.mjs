@@ -16,7 +16,10 @@ export const FLAECHEN = {
     `${JS}/shared/components/menu-bar`,
     `${JS}/features/source-editor/hooks/use-toolbar-menu-editor-commands.tsx`,
     `${JS}/features/source-editor/components/tabs`,
+    `${JS}/features/source-editor/components/toolbar`,
+    `${JS}/features/source-editor/components/editor-switch.tsx`,
     `${JS}/features/file-tree/components/file-tree-action-buttons.tsx`,
+    `${JS}/features/file-tree/components/file-tree-toolbar.tsx`,
   ],
   Leiste: [`${JS}/features/ide-react/components/rail`],
   'Review-Panel': [`${JS}/features/review-panel`],
@@ -50,4 +53,12 @@ test('jeder Schlüssel der täglichen Flächen steht in de.json', () => {
     if (fehlt.length) fehlend[flaeche] = fehlt
   }
   assert.deepEqual(fehlend, {})
+})
+
+test('bekannte englische Reste sind übersetzt', () => {
+  const de = JSON.parse(readFileSync(join(WEB, 'locales/de.json'), 'utf8'))
+  assert.equal(de.raw_logs, 'Rohprotokoll')
+  assert.equal(de.raw_logs_description, 'Rohprotokoll vom LaTeX-Compiler')
+  assert.equal(de.hide_file_tree, 'Dateibaum ausblenden')
+  assert.equal(de.show_file_tree, 'Dateibaum einblenden')
 })

@@ -144,8 +144,10 @@ describe('bericht', () => {
       wurzelDoc
     )
     const erster = await PruefManager.bericht(projekt)
-    // markiert: geprüfte Stellen mit Problem (hier „Das steht nirgends.“); die übrigen Schlüssel bleiben.
-    const ZAEHLUNG = { geprueft: 2, markiert: 1, ohne_quelle: 1, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 1, nicht_pruefbar: 0 }
+    // markiert: alle Stellen mit Problem, wie der Filter „Markiert“; die Status-Schlüssel zählen unabhängig davon.
+    const markiert = erster.zeilen.filter(z => z.problem).length
+    expect(markiert).toBeGreaterThan(1)
+    const ZAEHLUNG = { geprueft: 2, markiert, ohne_quelle: 1, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 1, nicht_pruefbar: 0 }
     expect(erster.zaehlung).toEqual(ZAEHLUNG)
     expect(erster.zeilen.map(z => [z.status, z.grund])).toEqual([
       ['geprueft', null],

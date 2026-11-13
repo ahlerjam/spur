@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
 import LadeKnopf from '../lade-knopf'
+import { OLModal, OLModalBody, OLModalFooter, OLModalHeader, OLModalTitle } from '@/shared/components/ol/ol-modal'
 import MaterialIcon from '@/shared/components/material-icon'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
@@ -77,6 +78,14 @@ export default function LaufKarte({
   const [offen, setOffen] = useState(aufgeklappt)
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, setLaeuft] = useState(false)
+  const [fragen, setFragen] = useState(false)
+  const alleAnnehmen = useRef<HTMLButtonElement>(null)
+  // Nach jedem Schließen des Dialogs (Annehmen, Abbrechen, Esc) liegt der Fokus wieder auf „Alle annehmen“.
+  const warOffen = useRef(false)
+  useEffect(() => {
+    if (warOffen.current && !fragen) alleAnnehmen.current?.focus()
+    warOffen.current = fragen
+  }, [fragen])
   const pfad = (aktion: string) => projektPfad(`/laeufe/${lauf.id}/${aktion}`)
   const laufOffen = lauf.status === 'offen' || lauf.status === 'fertig'
   const changes = aenderungen.filter(a => !a.geloescht)
@@ -98,6 +107,11 @@ export default function LaufKarte({
     } finally {
       setLaeuft(false)
     }
+  }
+
+  const mitDialogAnnehmen = async (daten?: unknown) => {
+    await aktion('POST', pfad('annehmen'), daten)
+    setFragen(false)
   }
 
   const knoepfe = (a: Aenderung) => (
@@ -193,7 +207,13 @@ export default function LaufKarte({
           )}
           <div className="spur-panel-werkzeuge spur-ohne-rand">
             {laufOffen && write && changes.length > 0 && (
-              <LadeKnopf variant="primary" size="sm" isLoading={laeuft} onClick={() => aktion('POST', pfad('annehmen'))}>
+              <LadeKnopf
+                ref={alleAnnehmen}
+                variant="primary"
+                size="sm"
+                isLoading={laeuft}
+                onClick={() => (zuPruefen.length > 0 ? setFragen(true) : aktion('POST', pfad('annehmen')))}
+              >
                 {t('spur_alle_annehmen')}
               </LadeKnopf>
             )}
@@ -209,6 +229,33 @@ export default function LaufKarte({
             )}
           </div>
           <p className="spur-zeile-meta">{t('spur_label_hinweis')}</p>
+          {fragen && (
+            <OLModal themed show onHide={() => setFragen(false)}>
+              <OLModalHeader>
+                <OLModalTitle>{t('spur_rote_mitannehmen_titel', { count: zuPruefen.length })}</OLModalTitle>
+              </OLModalHeader>
+              <OLModalBody>
+                <p>{t('spur_rote_mitannehmen_text')}</p>
+              </OLModalBody>
+              <OLModalFooter>
+                <OLButton
+                  variant="primary"
+                  autoFocus
+                  disabled={uebrige.length === 0}
+                  onClick={() => mitDialogAnnehmen({ change_ids: uebrige.map(a => a.id) })}
+                >
+                  {t('spur_nur_die_anderen')}
+                </OLButton>
+                <LadeKnopf
+                  variant="secondary"
+                  isLoading={laeuft}
+                  onClick={() => mitDialogAnnehmen()}
+                >
+                  {t('spur_alle_annehmen')}
+                </LadeKnopf>
+              </OLModalFooter>
+            </OLModal>
+          )}
         </div>
       )}
     </section>

@@ -255,7 +255,7 @@ export async function bericht(projectId) {
     }
   }
   const zaehlung = Object.fromEntries(STELLEN_STATUS.map(status => [status, zeilen.filter(z => z.status === status).length]))
-  // Markiert: geprüfte Stellen, die „Nur Probleme“ weiter zeigt.
-  zaehlung.markiert = zeilen.filter(z => z.status === 'geprueft' && z.problem).length
+  // Markiert: alle Stellen mit Problem, genau die, die der Filter „Markiert“ im Prüfbericht zeigt.
+  zaehlung.markiert = zeilen.filter(z => z.problem).length
   return { zeilen, zaehlung, uebersprungen, abschnitte: nutzung, stand: jetzt() }
 }

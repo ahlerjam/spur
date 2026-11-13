@@ -308,19 +308,24 @@ async function offeneOhneRot(projectId, lauf) {
   const rot = new Set(lauf.rotAenderungen ?? [])
   const rotZeiten = new Set(lauf.rotZeiten ?? [])
   const istRot = c => rot.has(c.id) || rotZeiten.has(String(c.metadata?.ts))
-  return (await aenderungen(projectId, lauf)).map(d => ({ ...d, changes: d.changes.filter(c => !istRot(c)) }))
+  return (await aenderungen(projectId, lauf)).map(d => {
+    const changes = d.changes.filter(c => !istRot(c))
+    return { ...d, changes, rot: d.changes.length - changes.length }
+  })
 }
 
 export async function offenZaehlen(projectId, botId) {
   let anzahl = 0
+  let rot = 0
   const dateien = new Set()
   for (const lauf of await offeneLaeufe(projectId, botId)) {
     for (const d of await offeneOhneRot(projectId, lauf)) {
       anzahl += d.changes.length
+      rot += d.rot
       if (d.changes.length) dateien.add(String(d.docId))
     }
   }
-  return { aenderungen: anzahl, dateien: dateien.size }
+  return { aenderungen: anzahl, dateien: dateien.size, rot }
 }
 
 // „Alles Offene jetzt annehmen“: alle Läufe des eigenen Bots, rote Zitate bleiben offen.

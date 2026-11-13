@@ -92,7 +92,7 @@ Under Admin → Grenzen (limits) you set a default for everyone: projects per us
 
 The same page has a "TeX-Pakete" part with three fields: size per package in MB (default 100), all packages of a project in MB (default 300) and installations per hour and person (default 60). An empty field restores the default; only whole numbers from 1 are accepted.
 
-Projects count when the user owns them, including archived ones and those in the trash. Storage counts uploaded files, sources and TeX packages, but not the history or the compile output. Anyone already above a limit keeps everything; only new projects and uploads are blocked, and writing in the editor keeps working. The page also lists projects per user and storage per project, marks those at 80 % or more, and can recalculate the storage of a project.
+Projects count when the user owns them, including archived ones and those in the trash. Storage counts uploaded files, sources and TeX packages, but not the history or the compile output. Anyone already above a limit keeps everything; only new projects and uploads are blocked, and writing in the editor keeps working. The page also lists projects per user and storage per project, marks those at 80 % or more, and can recalculate the storage of a project. Both tables have a search field (user name or address; project name or owner) and show 50 rows per page. Storage is shown in KB, MB or GB.
 
 ### TeX packages
 
@@ -219,7 +219,9 @@ Claude always writes as a track change. At the top of the Claude panel is the sw
 - The switch is set per project and per person and only affects your own Claude. Switching it on accepts nothing retroactively. If you no longer have write access to the project, nothing is accepted.
 - It replaces the old checkbox for accepting at the end of a run. The old setting carries over.
 - The run card marks accepted changes with "Automatisch angenommen".
-- "Alles Offene jetzt annehmen" accepts all open changes of your own Claude across runs, except red citations. A dialog asks first and names the amount, for example "12 changes in 2 files".
+- "Alles Offene jetzt annehmen (N)" accepts all open changes of your own Claude across runs, except red citations. A dialog asks first and names the amount, for example "12 changes in 2 files". When only red citations are open, the button reads "Nur rote Zitate offen (N)", is greyed out and says that red citations are checked one by one; "Nichts offen" means that nothing at all is open.
+- "Alle annehmen" in the run card asks when red citations are among the changes: the dialog "1 rotes Zitat mit annehmen?" offers "Nur die anderen" (the default, the red citation stays open under "Bitte prüfen") and "Alle annehmen". Esc closes the dialog without accepting anything. Without red citations there is no question.
+- `doc_edit` and `doc_create` hint at "Zahl ohne Beleg" for numbers that do not come from `ergebnisse.tex`. Times with "Uhr" ("9 Uhr", "9.30 Uhr") and versions right after a software name ("Python 3.12", "R 4.3.1", "SPSS 29", "LaTeX2e") do not count as numbers.
 - "Lauf rückgängig" also reverts the automatically accepted changes of that run.
 
 Reviewers and members with read-only access see neither the switch nor the button; the server answers 403. Claude itself has no tool to accept anything: acceptance is a setting of the person, never a decision of Claude.
@@ -247,7 +249,7 @@ The source panel has one main button, "Quelle hinzufügen". Further actions are 
 
 ## The check report
 
-The check report in the editor lists every citation with its verdict: is the wording in the source, does the page match, is the reference registered, has the paper been retracted. The header counts them, for example "Zitierstellen: 74 geprüft, davon 13 markiert, 2 ohne Quelle, 1 nicht prüfbar"; "markiert" are the rows that stay visible with "Nur Probleme". A citation that names a source without quoting it counts as "Beleg ohne Wortlaut".
+The check report in the editor lists every citation with its verdict: is the wording in the source, does the page match, is the reference registered, has the paper been retracted. The header starts with the number of citations and the number flagged, then breaks the flagged ones down, for example "76 Stellen, 16 markiert: 13 mit Befund, 2 ohne Quelle, 1 nicht prüfbar". "Markiert" always means the citations that the filter "Markiert" shows, in the header, in the filter and in the files' rows. A citation that names a source without quoting it counts as "Beleg ohne Wortlaut".
 
 The report groups the citations per file, with the number of citations and of flagged ones; each group can be collapsed. The filters "Alle", "Markiert", "Ohne Quelle" and "Nicht prüfbar" show their counts. "Zuletzt geprüft: heute, HH:MM" says when the check ran. While a new check runs, the old report stays visible.
 

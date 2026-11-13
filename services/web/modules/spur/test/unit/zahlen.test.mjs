@@ -102,6 +102,14 @@ describe('Datum, Uhrzeit und Versionsnummern', () => {
     'Version 4.2',
     'Version 7',
     'R 4.3.2',
+    '9 Uhr',
+    '9.30 Uhr',
+    '9:30 Uhr',
+    'Python 3.12',
+    'R 4.3.1',
+    'SPSS 29',
+    'LaTeX2e',
+    'Node 20',
   ])('meldet „%s“ nicht', text => {
     expect(zahlenOhneBeleg(`Erhoben ${text} im Labor.`)).toEqual([])
   })
@@ -116,6 +124,11 @@ describe('Datum, Uhrzeit und Versionsnummern', () => {
 
   it.each(['12.5', '4.2'])('meldet die Dezimalzahl %s am Satzende', zahl => {
     expect(zahlenOhneBeleg(`Der Mittelwert liegt bei ${zahl}.`)).toEqual([zahl])
+  })
+
+  it('meldet Gruppennummern und Messwerte neben Uhrzeiten und Versionen', () => {
+    expect(zahlenOhneBeleg('Gruppe 2 hatte 17 Teilnehmende.')).toContain('17')
+    expect(zahlenOhneBeleg('Um 9 Uhr waren es 240 mit Python 3.12 und 3.14 Punkten.')).toEqual(['240', '3.14'])
   })
 
   it('meldet im Satz aus der Spec nur die Messwerte', () => {

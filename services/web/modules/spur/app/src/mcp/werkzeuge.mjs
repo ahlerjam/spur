@@ -213,8 +213,8 @@ export const WERKZEUGE = {
     description:
       'Prüfbericht des Projekts wie im Browser. zaehlung zählt die Zitierstellen nach status (geprueft, ohne_quelle, ' +
       'ohne_seitenangabe, beleg_ohne_wortlaut, nicht_pruefbar); jede nicht geprüfte Stelle nennt ihren grund. ' +
-      'markiert zählt die geprüften Stellen mit problem: true, beleg_ohne_wortlaut die Stellen, die eine Quelle nur ' +
-      'zitieren, ohne ihren Wortlaut wiederzugeben. uebersprungen zählt Stellen in ausgeblendeten Bereichen ' +
+      'markiert zählt alle Stellen mit problem: true, auch ohne Quelle und nicht prüfbare, wie der Filter „Markiert“; ' +
+      'beleg_ohne_wortlaut sind die Stellen, die eine Quelle nur zitieren, ohne ihren Wortlaut wiederzugeben. uebersprungen zählt Stellen in ausgeblendeten Bereichen ' +
       '(leer definierte Makros, \\iffalse, Beamer-Notizen, Einstellung „Ausgeblendete Makros“).',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {

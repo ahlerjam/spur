@@ -1,5 +1,6 @@
 import { expect } from 'chai'
-import { fireEvent, render, screen } from '@testing-library/react'
+import fetchMock from 'fetch-mock'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import LaufKarte, { type Lauf } from '@modules/spur/frontend/js/claude/lauf-karte'
 import { deutschAktivieren } from './helpers/deutsch'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
@@ -148,5 +149,64 @@ describe('Lauf-Karte', function () {
     fireEvent.click(kopf)
     expect(screen.getByRole('button', { name: 'Alle annehmen' })).to.exist
   })
-})
 
+  describe('mit rotem Zitat', function () {
+    const rotLauf: Lauf = { ...lauf, rotAenderungen: ['a2'] }
+    const beide = [...aenderungen, { ...aenderungen[0], id: 'a2', text: '\\parencite{unbekannt}' }]
+    let anfragen: unknown[]
+
+    beforeEach(function () {
+      anfragen = []
+      fetchMock.removeRoutes().clearHistory()
+      fetchMock.post(/\/laeufe\/lauf-1\/annehmen$/, (call: { options: { body?: unknown } }) => {
+        anfragen.push(JSON.parse(String(call.options.body ?? 'null')))
+        return {}
+      })
+    })
+    afterEach(function () {
+      fetchMock.removeRoutes().clearHistory()
+    })
+
+    const zeigenRot = (daten = beide) =>
+      render(<LaufKarte lauf={rotLauf} aenderungen={daten} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
+
+    it('fragt vor „Alle annehmen“ nach; „Nur die anderen“ hat den Fokus und lässt das rote Zitat offen', async function () {
+      zeigenRot()
+      const alle = screen.getByRole('button', { name: 'Alle annehmen' })
+      alle.focus()
+      fireEvent.click(alle)
+      const dialog = await screen.findByRole('dialog')
+      within(dialog).getByText('1 rotes Zitat mit annehmen?')
+      const nurAndere = within(dialog).getByRole('button', { name: 'Nur die anderen' })
+      await waitFor(() => expect(document.activeElement).to.equal(nurAndere))
+      fireEvent.click(nurAndere)
+      await waitFor(() => expect(anfragen).to.deep.equal([{ change_ids: ['a1'] }]))
+    })
+
+    it('nimmt mit „Alle annehmen“ im Dialog auch das rote Zitat an', async function () {
+      zeigenRot()
+      fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Alle annehmen' }))
+      await waitFor(() => expect(anfragen).to.deep.equal([null]))
+    })
+
+    it('schließt mit Esc, ohne etwas anzunehmen, und gibt den Fokus zurück', async function () {
+      zeigenRot()
+      const alle = screen.getByRole('button', { name: 'Alle annehmen' })
+      alle.focus()
+      fireEvent.click(alle)
+      await screen.findByRole('dialog')
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape', code: 'Escape', keyCode: 27 })
+      await waitFor(() => expect(screen.queryByRole('dialog')).to.equal(null))
+      await waitFor(() => expect(document.activeElement).to.equal(alle))
+      expect(anfragen).to.deep.equal([])
+    })
+
+    it('nimmt ohne rote Zitate ohne Dialog an', async function () {
+      render(<LaufKarte lauf={lauf} aenderungen={aenderungen} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
+      fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
+      await waitFor(() => expect(anfragen).to.deep.equal([null]))
+      expect(screen.queryByRole('dialog')).to.equal(null)
+    })
+  })
+})

@@ -526,9 +526,9 @@ describe('Alles Offene jetzt annehmen', () => {
     return { fertig, offen }
   }
 
-  it('zählt offene Changes des eigenen Bots über alle Läufe ohne rote', async () => {
+  it('zählt offene Changes des eigenen Bots über alle Läufe ohne rote und nennt die roten gesondert', async () => {
     await zweiLaeufe()
-    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 2, dateien: 1 })
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 2, dateien: 1, rot: 1 })
   })
 
   it('nimmt alles außer roten Zitaten an; ein offener Lauf bleibt offen', async () => {
@@ -545,7 +545,7 @@ describe('Alles Offene jetzt annehmen', () => {
     await zweiLaeufe()
     await datenbank.db.collection('spurRuns').updateMany({ status: 'offen' }, { $set: { rotZeiten: ['2026-11-07T11:20:00.000Z'] } })
     docSetzen('a b c rot', [change('b', { p: 2, i: 'b' }, SPAETER), change('r-stueck', { p: 6, i: 'ro' }, '2026-11-07T11:20:00.000Z')])
-    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 1, dateien: 1 })
+    expect(await LaufAktionen.offenZaehlen(projekt, bot)).toEqual({ aenderungen: 1, dateien: 1, rot: 1 })
   })
 
   it('verlangt Schreibrecht', async () => {

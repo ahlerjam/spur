@@ -513,9 +513,37 @@ $spur-sm: 575.98px;
 
 .spur-filter {
   padding: 0 $spur-rand var(--spacing-03);
+  container-type: inline-size;
 
+  // Schmal 2×2 gleich breite Knöpfe, breit vier in einer Zeile; kein Knopf bricht einzeln um.
   .btn-group {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--spacing-02);
+
+    > .btn {
+      margin: 0;
+      padding-inline: var(--spacing-02);
+      border-radius: var(--border-radius-base);
+      font-size: var(--font-size-02);
+      white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.25;
+    }
+  }
+
+  // Breit: vier Knöpfe in einer Zeile, Beschriftung und Zahl nebeneinander.
+  @container (min-width: 22rem) {
+    .btn-group {
+      grid-template-columns: repeat(4, auto);
+
+      > .btn {
+        flex-direction: row;
+        gap: var(--spacing-02);
+      }
+    }
   }
 }
 

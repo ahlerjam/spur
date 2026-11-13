@@ -45,7 +45,7 @@ function EditorSwitch() {
     >
       <form>
         <fieldset className="toggle-switch">
-          <legend className="visually-hidden">Editor mode.</legend>
+          <legend className="visually-hidden">{t('editor_mode')}</legend>
 
           <input
             type="radio"
