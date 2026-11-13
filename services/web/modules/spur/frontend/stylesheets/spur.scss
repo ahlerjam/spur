@@ -526,7 +526,10 @@ $spur-sm: 575.98px;
       padding-inline: var(--spacing-01);
       border-radius: var(--border-radius-base);
       font-size: var(--font-size-02);
-      white-space: nowrap;
+      // Schmal darf die Beschriftung im Knopf umbrechen, statt abgeschnitten zu werden (Schriftbreiten je System).
+      white-space: normal;
+      overflow-wrap: anywhere;
+      text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -550,6 +553,7 @@ $spur-sm: 575.98px;
       > .btn {
         flex-direction: row;
         gap: var(--spacing-02);
+        white-space: nowrap;
       }
     }
   }
