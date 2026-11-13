@@ -3672,7 +3672,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       let antwort
       for (let versuch = 0; versuch < 3; versuch++) {
         antwort = await page.request.get(link, { timeout: 20000, maxRedirects: 5 }).catch(e => ({ status: () => e.message.split('\n')[0] }))
-        if (Number.isInteger(antwort.status())) break
+        if (Number.isInteger(antwort.status()) || versuch === 2) break
         await page.waitForTimeout(5000)
       }
       if (!(Number(antwort.status()) < 400)) kaputt.push(`${link}: ${antwort.status()}`)
@@ -6491,10 +6491,12 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const englischeAttribute = async () =>
       await page.evaluate(woerter => [...document.querySelectorAll('[title],[aria-label]')].map(e => e.getAttribute('title') || e.getAttribute('aria-label')).filter(t => woerter.includes(t)), ENGLISCH)
     ok((await page.locator('[title="Größe ändern"]').count()) >= 1, 'Resizer ohne deutschen Tooltip')
-    ok(JSON.stringify(await englischeAttribute()) === '[]', `Englische Attribute im Editor: ${await englischeAttribute()}`)
+    const imEditor = await englischeAttribute()
+    ok(imEditor.length === 0, `Englische Attribute im Editor: ${imEditor}`)
     await page.getByRole('button', { name: 'Teilen' }).first().click()
     await page.getByRole('button', { name: 'Dialog schließen' }).first().waitFor()
-    ok(JSON.stringify(await englischeAttribute()) === '[]', `Englische Attribute im Dialog: ${await englischeAttribute()}`)
+    const imDialog = await englischeAttribute()
+    ok(imDialog.length === 0, `Englische Attribute im Dialog: ${imDialog}`)
     await page.keyboard.press('Escape')
     const baum = page.getByRole('button', { name: 'Dateibaum ausblenden', exact: true })
     await baum.waitFor()

@@ -94,6 +94,7 @@ export default function LaufKarte({
   const uebrige = changes.filter(a => !a.id || !rot.has(a.id))
   const automatisch = lauf.automatisch ?? []
   const angelegt = lauf.angelegt ?? []
+  const rotMitAuszug = lauf.rot.filter(r => r.auszug)
   const koerperId = `spur-lauf-${lauf.id}`
 
   const aktion = async (methode: string, url: string, daten?: unknown) => {
@@ -161,11 +162,11 @@ export default function LaufKarte({
               </ul>
             </div>
           )}
-          {laufOffen && zuPruefen.length === 0 && lauf.rot.some(r => r.auszug) && (
+          {laufOffen && zuPruefen.length === 0 && rotMitAuszug.length > 0 && (
             <div className="spur-lauf-rot" role="status">
               <OLBadge bg="danger">{t('spur_bitte_pruefen')}</OLBadge>
               <ul className="spur-liste">
-                {lauf.rot.filter(r => r.auszug).map((r, i) => (
+                {rotMitAuszug.map((r, i) => (
                   <li key={i} className="spur-zeile-meta">
                     {t('spur_nicht_pruefbar')}: {r.auszug}
                   </li>
