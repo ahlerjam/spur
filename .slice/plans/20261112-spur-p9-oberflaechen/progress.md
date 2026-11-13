@@ -75,6 +75,7 @@
 - /code-review (medium, `6454eca7f6..HEAD`): behoben: `fokusAuf` nimmt den ersten Treffer, wartet auf „attached“ statt
   „sichtbar“ und nennt das tiefste fokussierte Element hinter Shadow-Hosts; die Meldung in p6f3 wartet nicht 30 s auf ein
   verschwundenes Feld. Kein Handlungsbedarf: `ok()` wirft nur und zählt nichts.
+- Letzter voller E2E-Lauf nach der letzten Code-Änderung (`ae3e86ef95`): alle Features grün, f1 bis p9f12.
 - Security (Subagent, `b252f41fcb..HEAD`): keine sicherheitsrelevanten Befunde. `alles-annehmen` und `automatik`
   verlangen auf dem Server Schreibrecht (`schreiben`-Kette, `darfSchreiben`); `aria-disabled` statt `disabled`
   schwächt nichts, der Knopf öffnet nur den Rückfragedialog. Keine neuen Dev-Routen, kein `innerHTML`.
