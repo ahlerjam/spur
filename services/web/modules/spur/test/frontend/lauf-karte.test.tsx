@@ -150,7 +150,6 @@ describe('Lauf-Karte', function () {
   })
 
   describe('mit rotem Zitat', function () {
-    const rotLauf: Lauf = lauf
     const beide = [...aenderungen, { ...aenderungen[0], id: 'a2', rot: true, text: '\\parencite{unbekannt}' }]
     let anfragen: unknown[]
 
@@ -167,7 +166,7 @@ describe('Lauf-Karte', function () {
     })
 
     const zeigenRot = (daten = beide) =>
-      render(<LaufKarte lauf={rotLauf} aenderungen={daten} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
+      render(<LaufKarte lauf={lauf} aenderungen={daten} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
 
     it('fragt vor „Alle annehmen“ nach; „Nur die anderen“ hat den Fokus und lässt das rote Zitat offen', async function () {
       zeigenRot()
@@ -202,7 +201,7 @@ describe('Lauf-Karte', function () {
     })
 
     it('fragt bei nur roten Zitaten ohne „Nur die anderen“ und fokussiert „Abbrechen“; die Zeile nimmt das rote ausdrücklich an', async function () {
-      render(<LaufKarte lauf={rotLauf} aenderungen={[beide[1]]} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
+      render(<LaufKarte lauf={lauf} aenderungen={[beide[1]]} neuLaden={async () => {}} />, { wrapper: mitRolle('owner') })
       fireEvent.click(screen.getByRole('button', { name: 'Alle annehmen' }))
       const dialog = await screen.findByRole('dialog')
       expect(within(dialog).queryByRole('button', { name: 'Nur die anderen' })).to.equal(null)

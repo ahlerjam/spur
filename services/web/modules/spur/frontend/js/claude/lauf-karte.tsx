@@ -116,8 +116,8 @@ export default function LaufKarte({
     if (await aktion('POST', pfad('annehmen'), daten)) setFragen(false)
   }
 
-  // Ohne Rückfrage nur, was die Karte kennt: Ein rotes Zitat, das erst nach dem Laden dazukam, bleibt offen.
-  const ohneRote = () => aktion('POST', pfad('annehmen'), { rote_mit: false })
+  // Der Server lässt rote Zitate ohne rote_mit offen, auch solche, die erst nach dem Laden der Karte dazukamen.
+  const ohneRote = () => mitDialogAnnehmen({ rote_mit: false })
 
   const knoepfe = (a: Aenderung) => (
     <div className="spur-panel-werkzeuge spur-ohne-rand">
@@ -244,15 +244,9 @@ export default function LaufKarte({
               </OLModalBody>
               <OLModalFooter>
                 {/* Ist nur Rotes offen, gibt es keine „anderen“: Der Fokus liegt dann auf „Abbrechen“, nicht auf der Annahme. */}
-                {uebrige.length > 0 ? (
-                  <OLButton variant="primary" autoFocus onClick={() => mitDialogAnnehmen({ rote_mit: false })}>
-                    {t('spur_nur_die_anderen')}
-                  </OLButton>
-                ) : (
-                  <OLButton variant="primary" autoFocus onClick={() => setFragen(false)}>
-                    {t('cancel')}
-                  </OLButton>
-                )}
+                <OLButton variant="primary" autoFocus onClick={uebrige.length > 0 ? ohneRote : () => setFragen(false)}>
+                  {uebrige.length > 0 ? t('spur_nur_die_anderen') : t('cancel')}
+                </OLButton>
                 <LadeKnopf
                   variant="secondary"
                   isLoading={laeuft}

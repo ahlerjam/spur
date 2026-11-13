@@ -192,14 +192,13 @@ export async function docEdit({ projectId, botId, menschId, docId, pfad, alt, ne
 async function nachDemSchreiben({ projectId, lauf, menschId, docId, vorher, rot, bereich }) {
   const { ranges } = await DocumentUpdaterHandler.promises.getDocument(projectId, docId, -1)
   const alt = new Set((vorher ?? []).map(c => c.id))
-  const neueChanges = (ranges?.changes ?? []).filter(c => !alt.has(c.id))
-  const neu = neueChanges.map(c => c.id)
+  const alle = ranges?.changes ?? []
+  const istNeu = c => !alt.has(c.id)
   if (rot.length) {
-    const beruehrt = (ranges?.changes ?? []).filter(
-      c => !alt.has(c.id) || (c.op.i !== undefined && c.op.p < bereich.bis && c.op.p + c.op.i.length > bereich.von)
-    )
-    return await LaufManager.rotMerken(lauf, beruehrt)
+    const imBereich = c => c.op.i !== undefined && c.op.p < bereich.bis && c.op.p + c.op.i.length > bereich.von
+    return await LaufManager.rotMerken(lauf, alle.filter(c => istNeu(c) || imBereich(c)))
   }
+  const neu = alle.filter(istNeu).map(c => c.id)
   // Der Lauf kann eben erst angelegt sein: Das Dokument steht dann nur in der Datenbank schon in `docs`.
   const docs = lauf.docs.some(d => String(d) === docId) ? lauf.docs : [...lauf.docs, docId]
   if (menschId) await LaufAktionen.sofortAnnehmen(projectId, { ...lauf, docs }, menschId, neu)

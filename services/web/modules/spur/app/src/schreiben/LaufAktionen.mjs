@@ -55,7 +55,7 @@ export async function aenderungen(projectId, lauf) {
 
 // Der Server entscheidet, welche Changes rot sind: nach ID oder nach Zeitstempel. Der Zeitstempel bleibt erhalten,
 // wenn jemand in einen roten Einschub tippt und ihn in Stücke mit neuen IDs teilt.
-export function rotPruefer(lauf) {
+function rotPruefer(lauf) {
   const ids = new Set(lauf.rotAenderungen ?? [])
   const zeiten = new Set(lauf.rotZeiten ?? [])
   return c => ids.has(c.id) || zeiten.has(String(c.metadata?.ts))
