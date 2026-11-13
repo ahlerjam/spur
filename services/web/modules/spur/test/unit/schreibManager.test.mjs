@@ -14,9 +14,12 @@ let upsertDocWithPath
 let deleteEntity
 let bereichPruefen
 let laufManager
+let laufAktionen
+let binaer
+let eintraege
 const projekt = new ObjectId()
 const bot = new ObjectId()
-const lauf = { _id: new ObjectId() }
+const lauf = { _id: new ObjectId(), docs: [] }
 const KAPITEL = new ObjectId()
 
 beforeAll(async () => {
@@ -28,6 +31,8 @@ beforeEach(async () => {
   await datenbank.leeren()
   schalter = schalterAttrappe()
   projektDateien = new Map([['kapitel.tex', KAPITEL]])
+  binaer = new Set()
+  eintraege = 10
   dokumente = new Map()
   spurUpdate = vi.fn(async () => {})
   bereichPruefen = vi.fn(async () => [])
@@ -35,7 +40,9 @@ beforeEach(async () => {
   laufManager = {
     laufFuerSchreiben: vi.fn(async () => lauf),
     aenderungMerken: vi.fn(async () => {}),
+    rotMerken: vi.fn(async () => {}),
   }
+  laufAktionen = { sofortAnnehmen: vi.fn(async () => {}) }
   vi.resetModules()
   ;({ default: Errors } = await import('../../../../app/src/Features/Errors/Errors.js'))
   upsertDocWithPath = vi.fn(async (_projekt, pfad) => {
@@ -66,15 +73,19 @@ beforeEach(async () => {
           return { element: { _id: id }, path: { fileSystem: `/${pfad}` } }
         },
         findElementByPath: async ({ path }) => {
-          const id = projektDateien.get(path.replace(/^\//, ''))
+          const pfad = path.replace(/^\//, '')
+          if (binaer.has(pfad)) return { element: { _id: new ObjectId(), name: pfad }, type: 'file' }
+          const id = projektDateien.get(pfad)
           if (!id) throw new Errors.NotFoundError('weg')
-          return { element: { _id: id } }
+          return { element: { _id: id }, type: 'doc' }
         },
       },
     },
   }))
   vi.doMock('../../app/src/schreiben/spurUpdate.mjs', () => ({ spurUpdate }))
+  vi.doMock('../../app/src/projektEintraege.mjs', () => ({ anzahlEintraege: async () => eintraege, maxEintraege: () => 2000 }))
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => laufManager)
+  vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => laufAktionen)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => ({ bereichPruefen }))
   SchreibManager = await import('../../app/src/schreiben/SchreibManager.mjs')
 })
@@ -271,9 +282,83 @@ describe('docCreate', () => {
   })
 })
 
+describe('docCreate: Ursachen statt „interner Fehler“', () => {
+  const anlegen = (felder = {}) =>
+    SchreibManager.docCreate({ projectId: projekt, botId: bot, pfad: 'kapitel/einleitung.tex', inhalt: 'Text.', schluessel: `s-${Math.random()}`, ...felder })
+  // Wie RequestFailedError von @overleaf/fetch-utils: Die Antwort hängt am Fehler.
+  const dienstFehler = () => Object.assign(new Error('request failed'), { response: new Response('', { status: 500 }) })
+
+  it('meldet pfad_ist_datei, wenn ein Pfadteil eine Datei ist, und legt nichts an', async () => {
+    binaer.add('abb')
+    const fehler = await fehlerVon(anlegen({ pfad: 'abb/x.tex' }))
+    expect(fehler).toMatchObject({ code: 'pfad_ist_datei', message: meldung('spur_fehler_pfad_ist_datei', { teil: 'abb' }) })
+    expect(upsertDocWithPath).not.toHaveBeenCalled()
+  })
+
+  it('meldet projekt_zu_viele_dateien bei 2000 Einträgen, bevor etwas entsteht', async () => {
+    eintraege = 2000
+    const fehler = await fehlerVon(anlegen())
+    expect(fehler).toMatchObject({ code: 'projekt_zu_viele_dateien', message: meldung('spur_fehler_projekt_zu_viele_dateien', { anzahl: 2000, grenze: 2000 }) })
+    expect(upsertDocWithPath).not.toHaveBeenCalled()
+  })
+
+  it('übersetzt TooManyFilesError von Overleaf in projekt_zu_viele_dateien', async () => {
+    upsertDocWithPath.mockRejectedValueOnce(new Errors.TooManyFilesError('voll'))
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'projekt_zu_viele_dateien' })
+  })
+
+  it('meldet dienst_nicht_erreichbar bei 500 des document-updater, räumt auf und lässt den zweiten Versuch zu', async () => {
+    spurUpdate.mockRejectedValueOnce(dienstFehler())
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'dienst_nicht_erreichbar' })
+    expect(deleteEntity).toHaveBeenCalledTimes(1)
+    projektDateien.delete('kapitel/einleitung.tex')
+    expect((await anlegen()).aenderung).toBe(true)
+  })
+
+  it('meldet bei gescheitertem Aufräumen den ersten Fehler, und der nächste Versuch nimmt das leere Dokument', async () => {
+    spurUpdate.mockRejectedValueOnce(dienstFehler())
+    deleteEntity.mockRejectedValueOnce(new Error('Aufräumen gescheitert'))
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'dienst_nicht_erreichbar' })
+    expect(upsertDocWithPath).toHaveBeenCalledTimes(1)
+    const ergebnis = await anlegen()
+    expect(ergebnis.aenderung).toBe(true)
+    expect(upsertDocWithPath).toHaveBeenCalledTimes(1)
+  })
+
+  it('lässt ein leeres Dokument eines anderen Bots oder mit Inhalt nicht überschreiben', async () => {
+    spurUpdate.mockRejectedValueOnce(dienstFehler())
+    deleteEntity.mockRejectedValueOnce(new Error('Aufräumen gescheitert'))
+    await fehlerVon(anlegen())
+    const fremd = await fehlerVon(SchreibManager.docCreate({ projectId: projekt, botId: new ObjectId(), pfad: 'kapitel/einleitung.tex', inhalt: 'x', schluessel: 'fremd-0001' }))
+    expect(fremd).toMatchObject({ code: 'konflikt' })
+    docSetzen(projektDateien.get('kapitel/einleitung.tex'), 'Jemand hat geschrieben.')
+    expect(await fehlerVon(anlegen())).toMatchObject({ code: 'konflikt' })
+  })
+
+  it('nennt bei konflikt den Pfad', async () => {
+    await anlegen()
+    const fehler = await fehlerVon(anlegen())
+    expect(fehler).toMatchObject({ code: 'konflikt' })
+    expect(fehler.message).toContain('kapitel/einleitung.tex')
+  })
+
+  it('gelingt mit Zahlen, auch wenn ergebnisse.tex eine Binärdatei ist', async () => {
+    binaer.add('ergebnisse.tex')
+    const ergebnis = await anlegen({ inhalt: 'Es waren 412 Personen.' })
+    expect(ergebnis.zahlen_ohne_beleg).toEqual(['412'])
+  })
+})
+
 describe('Zitatprüfung beim Schreiben', () => {
   const ZITAT = '\\enquote{Sleep supports.} \\autocite[3]{smith2024}'
   const mitZitat = () => bearbeiten({ alt: 'Zweiter Satz.', neu: ZITAT })
+
+  it('prüft auch, wenn nur der Wortlaut in einem Zitat oder eigenen Zitatmakro geändert wird', async () => {
+    docSetzen(KAPITEL, 'Vorher \\enquote{exakter Wortlaut} \\cite[3]{k} und \\zitat{eigener Wortlaut} \\cite[3]{k}.')
+    await bearbeiten({ alt: 'exakter Wortlaut', neu: 'erfundener Wortlaut' })
+    await bearbeiten({ alt: 'eigener Wortlaut', neu: 'anderer Wortlaut', schluessel: 'schluessel-0098' })
+    expect(bereichPruefen).toHaveBeenCalledTimes(2)
+  })
 
   it('prüft nur, wenn die Änderung ein Zitat berührt', async () => {
     await bearbeiten()
@@ -392,3 +477,37 @@ describe('Idempotenz', () => {
     }
   })
 })
+
+describe('Sofort annehmen nach dem Schreiben', () => {
+  const mensch = new ObjectId()
+  // Nach dem Schreiben liefert document-updater einen neuen Change des Bots.
+  function neuerChange(id) {
+    spurUpdate.mockImplementation(async (_p, docId) => {
+      const alt = dokumente.get(String(docId))
+      dokumente.set(String(docId), { ...alt, ranges: { changes: [...(alt.ranges?.changes ?? []), { id, op: { p: 0, i: 'x' } }] } })
+    })
+  }
+
+  it('reicht die neuen Changes zum Annehmen weiter', async () => {
+    docSetzen(KAPITEL, 'Erster Satz. Zweiter Satz.', [{ id: 'alt', op: { p: 0, i: 'E' } }])
+    neuerChange('neu')
+    await bearbeiten({ menschId: mensch })
+    // Ein eben angelegter Lauf kennt das Dokument nur in der Datenbank.
+    expect(laufAktionen.sofortAnnehmen).toHaveBeenCalledWith(projekt, { ...lauf, docs: [String(KAPITEL)] }, mensch, ['neu'])
+    expect(laufManager.rotMerken).not.toHaveBeenCalled()
+  })
+
+  it('lässt rote Zitate offen und merkt sie am Lauf, auch bei zurückgezogener Quelle oder unbekannter DOI', async () => {
+    for (const rot of [{ form: 'unbekannt' }, { retraction: 'zurueckgezogen' }, { referenz: 'nicht_gefunden' }]) {
+      laufAktionen.sofortAnnehmen.mockClear()
+      bereichPruefen.mockResolvedValue([{ auszug: 'x', key: 'smith2024', wortlaut: 'exakt', ...rot }])
+      docSetzen(KAPITEL, 'Erster Satz. Zweiter Satz.')
+      neuerChange('rot')
+      const ergebnis = await bearbeiten({ menschId: mensch, neu: '\\footfullcite{smith2024}', schluessel: `rot-${Object.keys(rot)[0]}` })
+      expect(ergebnis.rot).toHaveLength(1)
+      expect(laufManager.rotMerken).toHaveBeenCalledWith(lauf, [expect.objectContaining({ id: 'rot' })])
+      expect(laufAktionen.sofortAnnehmen).not.toHaveBeenCalled()
+    }
+  })
+})
+

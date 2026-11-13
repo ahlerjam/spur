@@ -16,6 +16,7 @@ import usePresentationMode from '../hooks/use-presentation-mode'
 import useMouseWheelZoom from '../hooks/use-mouse-wheel-zoom'
 import { PDFJS } from '../util/pdf-js'
 import { PDFFile } from '@ol-types/compile'
+import { fremdeAntwort, proxyFehlerVon } from '../util/proxy-sperre'
 
 type PdfJsViewerProps = {
   url: string
@@ -178,13 +179,20 @@ function PdfJsViewer({ url, pdfFile }: PdfJsViewerProps) {
       setStartFetch(performance.now())
 
       const abortController = new AbortController()
+      // spur: Eine Proxy-Sperre ist kein Wiedergabefehler (siehe proxy-sperre.ts).
+      const fehlerMelden = (fehler: string) => {
+        fremdeAntwort(url).then(fremd => {
+          if (abortController.signal.aborted) return
+          setError(fremd ? proxyFehlerVon(fremd.status) : fehler)
+        })
+      }
       const handleFetchError = (err: any) => {
         if (abortController.signal.aborted) return
         // The error is already logged at the call-site with additional context.
         if (err instanceof PDFJS.ResponseException && err.missing) {
-          setError('rendering-error-expected')
+          fehlerMelden('rendering-error-expected')
         } else {
-          setError('rendering-error')
+          fehlerMelden('rendering-error')
         }
       }
       pdfJsWrapper
@@ -197,7 +205,7 @@ function PdfJsViewer({ url, pdfFile }: PdfJsViewerProps) {
         .catch(error => {
           if (abortController.signal.aborted) return
           debugConsole.error(error)
-          setError('rendering-error')
+          fehlerMelden('rendering-error')
         })
       return () => {
         abortController.abort()

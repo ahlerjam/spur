@@ -7,7 +7,7 @@ import * as Workflows from './Workflows.mjs'
 const SEITE = Path.resolve(Path.dirname(fileURLToPath(import.meta.url)), '../../views/workflows-admin')
 
 export function seite(req, res) {
-  res.render(SEITE, { title: 'Workflows' })
+  res.render(SEITE, { title: 'spur_workflows' })
 }
 
 export const liste = mitProblemen(async (req, res) => {

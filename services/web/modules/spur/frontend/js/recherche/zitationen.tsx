@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import OLButton from '@/shared/components/ol/ol-button'
+import MaterialIcon from '@/shared/components/material-icon'
+import {
+  OLDropdown,
+  OLDropdownItem,
+  OLDropdownMenu,
+  OLDropdownToggle,
+} from '@/shared/components/ol/ol-dropdown-menu'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
 import Notification from '@/shared/components/notification'
 import { anfrage, projektPfad } from '../api'
@@ -48,6 +54,7 @@ function ZitationsListe({ doi, richtung }: { doi: string; richtung: Richtung }) 
   )
 }
 
+// Seltene Aktionen je Treffer: „Zitiert von“ und „Zitiert“ stehen im Menü und klappen ihre Liste unter dem Treffer auf.
 export default function Zitationen({ doi }: { doi: string }) {
   const { t } = useTranslation()
   const [offen, setOffen] = useState<Richtung[]>([])
@@ -56,17 +63,30 @@ export default function Zitationen({ doi }: { doi: string }) {
 
   return (
     <>
-      {(['zitiert_von', 'zitiert'] as const).map(richtung => (
-        <OLButton
-          key={richtung}
-          variant="secondary"
+      <OLDropdown align="end">
+        <OLDropdownToggle
+          bsPrefix="spur-menu-knopf"
+          variant="ghost"
           size="sm"
-          aria-expanded={offen.includes(richtung)}
-          onClick={() => umschalten(richtung)}
+          className="icon-button-small"
+          aria-label={t('spur_weitere_aktionen')}
         >
-          {t(richtung === 'zitiert_von' ? 'spur_zitiert_von' : 'spur_zitiert')}
-        </OLButton>
-      ))}
+          <MaterialIcon className="icon-small" type="more_vert" />
+        </OLDropdownToggle>
+        <OLDropdownMenu>
+          {(['zitiert_von', 'zitiert'] as const).map(richtung => (
+            <OLDropdownItem
+              key={richtung}
+              as="button"
+              active={offen.includes(richtung)}
+              trailingIcon={offen.includes(richtung) ? 'check' : undefined}
+              onClick={() => umschalten(richtung)}
+            >
+              {t(richtung === 'zitiert_von' ? 'spur_zitiert_von' : 'spur_zitiert')}
+            </OLDropdownItem>
+          ))}
+        </OLDropdownMenu>
+      </OLDropdown>
       {offen.map(richtung => (
         <ZitationsListe key={richtung} doi={doi} richtung={richtung} />
       ))}

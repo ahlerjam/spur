@@ -44,4 +44,13 @@ describe('Einladungslink', function () {
     await screen.findByRole('button', { name: 'Kopiert' })
     expect(befehl.calledWith('copy')).to.equal(true)
   })
+
+  it('zeigt „Kopiert“ nur, wenn das Kopieren gelungen ist', async function () {
+    zwischenablage({ writeText: () => Promise.reject(new Error('verweigert')) })
+    Object.defineProperty(document, 'execCommand', { value: sinon.stub().returns(false), configurable: true })
+    render(<EinladungsLink url={URL} perMail={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Kopieren' }))
+    await screen.findByText('Kopieren nicht möglich. Markier den Link und kopier ihn von Hand.')
+    expect(screen.queryByRole('button', { name: 'Kopiert' })).to.equal(null)
+  })
 })

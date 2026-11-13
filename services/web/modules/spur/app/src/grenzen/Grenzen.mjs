@@ -33,15 +33,46 @@ export function wertLesen(eingabe, feld) {
   return zahl
 }
 
-export async function standard() {
-  const eintrag = (await (await grenzen()).findOne({ _id: STANDARD })) ?? {}
-  return { projekte: eintrag.projekte ?? null, speicherGb: eintrag.speicherGb ?? null, texPaketeAus: Boolean(eintrag.texPaketeAus) }
+// Grenzen für tex_package_add; null im Eintrag heißt Standardwert.
+export const TEX_STANDARD = { texPaketMb: 100, texProjektMb: 300, texProStunde: 60 }
+export const TEX_FELDER = Object.keys(TEX_STANDARD)
+
+// Eingabe aus dem Formular: leer = Standard (null), sonst eine ganze Zahl ab 1.
+export function texWertLesen(eingabe) {
+  if (eingabe === null || eingabe === undefined || String(eingabe).trim() === '') return null
+  const text = String(eingabe).trim()
+  if (!/^\d+$/.test(text) || Number(text) < 1) throw new Problem(422, 'eingabe_ungueltig', 'spur_fehler_grenze_tex')
+  return Number(text)
 }
 
-export async function standardSetzen({ projekte, speicherGb, texPaketeAus = false }) {
+const texWerte = (quelle, ersatz) => Object.fromEntries(TEX_FELDER.map(f => [f, quelle[f] ?? ersatz(f)]))
+
+export async function standard() {
+  const eintrag = (await (await grenzen()).findOne({ _id: STANDARD })) ?? {}
+  return {
+    projekte: eintrag.projekte ?? null,
+    speicherGb: eintrag.speicherGb ?? null,
+    texPaketeAus: Boolean(eintrag.texPaketeAus),
+    ...texWerte(eintrag, () => null),
+  }
+}
+
+// Die geltenden TeX-Grenzen aus einem Ergebnis von standard().
+export function texGrenzen(einstellung) {
+  return texWerte(einstellung, f => TEX_STANDARD[f])
+}
+
+export async function standardSetzen({ projekte, speicherGb, texPaketeAus = false, ...tex }) {
   await (await grenzen()).updateOne(
     { _id: STANDARD },
-    { $set: { projekte, speicherGb, texPaketeAus: Boolean(texPaketeAus) } },
+    {
+      $set: {
+        projekte,
+        speicherGb,
+        texPaketeAus: Boolean(texPaketeAus),
+        ...texWerte(tex, () => null),
+      },
+    },
     { upsert: true }
   )
 }

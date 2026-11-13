@@ -1,0 +1,9 @@
+name carlito
+category Package
+revision 1
+runfiles size=5
+ texmf-dist/tex/latex/carlito/carlito.sty
+ texmf-dist/tex/latex/carlito/carlito-optionen.sty
+ texmf-dist/tex/latex/carlito/t1carlito.fd
+ texmf-dist/tex/latex/carlito/ot1carlito.fd
+ texmf-dist/tex/latex/carlito/ly1carlito.fd

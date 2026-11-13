@@ -102,3 +102,66 @@ export async function werk(doi) {
     return eintrag?.werk ?? null
   }
 }
+
+const DOI_ORG = 'https://doi.org'
+const DATACITE = 'https://api.datacite.org'
+const NICHT_ERREICHBAR = { nichtPruefbar: 'registrierstelle_nicht_erreichbar' }
+const NICHT_REGISTRIERT = { gefunden: false, registrierstelle: null }
+
+// Jeder Pfadteil einzeln kodiert: Der Schrägstrich der DOI bleibt, ?, # und % nicht; `.` und `..` nie.
+function doiPfad(doi) {
+  const teile = doi.split('/')
+  return teile.some(t => t === '.' || t === '..') ? null : teile.map(encodeURIComponent).join('/')
+}
+
+async function jsonHolen(url) {
+  const antwort = await fetch(url, { signal: AbortSignal.timeout(10000) })
+  if (!antwort.ok) throw new Error(`${url.host} antwortet ${antwort.status}`)
+  return await antwort.json()
+}
+
+async function dataciteWerk(pfad) {
+  const { data } = await jsonHolen(new URL(`${paperApiBasis() ? `${paperApiBasis()}/datacite` : DATACITE}/dois/${pfad}`))
+  const a = data?.attributes ?? {}
+  return {
+    titel: a.titles?.[0]?.title ?? null,
+    autoren: (a.creators ?? []).map(c => ({
+      family: c.familyName ?? c.name ?? '',
+      given: c.familyName ? (c.givenName ?? '') : '',
+    })),
+    jahr: a.publicationYear ? Number(a.publicationYear) : null,
+  }
+}
+
+async function registrierung(doi) {
+  const pfad = doiPfad(doi)
+  if (!pfad) return NICHT_REGISTRIERT
+  const [eintrag] = await jsonHolen(new URL(`${paperApiBasis() ? `${paperApiBasis()}/doiorg` : DOI_ORG}/doiRA/${pfad}`))
+  if (!eintrag?.RA) return NICHT_REGISTRIERT
+  const name = String(eintrag.RA)
+  const registrierstelle = name.toLowerCase()
+  if (registrierstelle !== 'datacite') {
+    return { gefunden: true, registrierstelle, registrierstelleName: name, metadaten: false, retraction: null }
+  }
+  return { gefunden: true, registrierstelle, registrierstelleName: name, ...(await dataciteWerk(pfad)), retraction: null }
+}
+
+// Für den Prüfbericht: Kennt Crossref die DOI nicht, entscheidet doi.org, wo sie registriert ist.
+// null: Crossref nicht erreichbar; { nichtPruefbar }: doi.org oder DataCite nicht erreichbar (nie gecacht).
+export async function pruefen(doi) {
+  const crossref = await werk(doi)
+  if (!crossref) return null
+  if (crossref.gefunden) return { ...crossref, registrierstelle: 'crossref' }
+  const _id = `ra:${doi.toLowerCase()}`
+  const cache = await crossrefCache()
+  const eintrag = await cache.findOne({ _id })
+  if (eintrag && jetzt() - eintrag.abgerufenAm < TAG_MS) return eintrag.werk
+  try {
+    const neu = await registrierung(doi)
+    await cache.updateOne({ _id }, { $set: { werk: neu, abgerufenAm: jetzt() } }, { upsert: true })
+    return neu
+  } catch (error) {
+    logger.warn({ err: error, doi }, 'Registrierstelle nicht erreichbar')
+    return NICHT_ERREICHBAR
+  }
+}

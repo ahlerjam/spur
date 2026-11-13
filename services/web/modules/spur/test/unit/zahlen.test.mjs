@@ -83,3 +83,45 @@ $V = 0{,}89\,\mathrm{L}$, \qty{75.7}{\percent} und $x^2$.
     expect(zahlenOhneBeleg('412 und noch einmal 412.')).toEqual(['412'])
   })
 })
+
+describe('Datum, Uhrzeit und Versionsnummern', () => {
+  it.each([
+    '12.11.2026',
+    '12.11.26',
+    'am 12.11. begann',
+    '12. November 2026',
+    '12. Nov. 2026',
+    'November 12, 2026',
+    '12 November 2026',
+    '2026-11-12',
+    '14:30',
+    '14:30:05',
+    '14:30 Uhr',
+    'v2.0.1',
+    'Version 1.2.3',
+    'Version 4.2',
+    'Version 7',
+    'R 4.3.2',
+  ])('meldet „%s“ nicht', text => {
+    expect(zahlenOhneBeleg(`Erhoben ${text} im Labor.`)).toEqual([])
+  })
+
+  it.each([
+    ['3.14', ['3.14']],
+    ['12,5', ['12,5']],
+    ['1.250', ['1.250']],
+  ])('meldet %s weiter', (zahl, erwartet) => {
+    expect(zahlenOhneBeleg(`Der Wert ist ${zahl} Einheiten.`)).toEqual(erwartet)
+  })
+
+  it.each(['12.5', '4.2'])('meldet die Dezimalzahl %s am Satzende', zahl => {
+    expect(zahlenOhneBeleg(`Der Mittelwert liegt bei ${zahl}.`)).toEqual([zahl])
+  })
+
+  it('meldet im Satz aus der Spec nur die Messwerte', () => {
+    expect(
+      zahlenOhneBeleg('Die Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.')
+    ).toEqual([])
+    expect(zahlenOhneBeleg('Von 240 Befragten antworteten 37,5 Prozent am 12.11.2026.')).toEqual(['240', '37,5'])
+  })
+})

@@ -33,13 +33,43 @@ export async function versatzAusLabels(pfad) {
   return (eintrag.label['/St'] ?? 1) - (eintrag.index + 1)
 }
 
-export async function seitenBild(pfad, seite, ziel) {
+// Ohne Breite mit 110 dpi; mit Breite genau so viele Pixel breit (die Höhe folgt dem Seitenformat).
+export async function seitenBild(pfad, seite, ziel, breite = null) {
+  const aufloesung = breite ? ['-scale-to-x', String(breite), '-scale-to-y', '-1'] : ['-r', '110']
   await ausfuehren(
     'pdftocairo',
-    ['-png', '-singlefile', '-r', '110', '-f', String(seite), '-l', String(seite), pfad, ziel],
+    ['-png', '-singlefile', ...aufloesung, '-f', String(seite), '-l', String(seite), pfad, ziel],
     GRENZEN
   )
   return `${ziel}.png`
+}
+
+const ENTITAETEN = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
+const entschluesseln = text => text.replace(/&(amp|lt|gt|quot|apos);/g, (_m, name) => ENTITAETEN[name])
+const runden = zahl => Math.round(zahl * 1000) / 1000
+
+// Zeilen aus `pdftotext -bbox-layout`: Lage in Punkten (x, y oben links, Breite b, Höhe h) und Text.
+export function textEbeneAuswerten(xml) {
+  const seite = xml.match(/<page width="([\d.]+)" height="([\d.]+)"/)
+  const zeilen = [...xml.matchAll(/<line xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([\s\S]*?)<\/line>/g)]
+    .map(([, x0, y0, x1, y1, inhalt]) => ({
+      x: runden(Number(x0)),
+      y: runden(Number(y0)),
+      b: runden(x1 - x0),
+      h: runden(y1 - y0),
+      text: [...inhalt.matchAll(/<word[^>]*>([\s\S]*?)<\/word>/g)].map(w => entschluesseln(w[1])).join(' '),
+    }))
+    .filter(zeile => zeile.text)
+  return { breite: Number(seite[1]), hoehe: Number(seite[2]), zeilen }
+}
+
+export async function textEbene(pfad, seite) {
+  const { stdout } = await ausfuehren(
+    'pdftotext',
+    ['-bbox-layout', '-enc', 'UTF-8', '-f', String(seite), '-l', String(seite), pfad, '-'],
+    GRENZEN
+  )
+  return textEbeneAuswerten(stdout)
 }
 
 // Text einer Tesseract-TSV-Ausgabe: Wörter je Zeile, Leerzeile zwischen Blöcken und Absätzen.

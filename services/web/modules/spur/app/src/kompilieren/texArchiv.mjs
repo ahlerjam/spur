@@ -3,7 +3,7 @@ import Path from 'node:path'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
 
 export const ORDNER = 'tex-pakete'
-const FALLBACK_SPIEGEL = 'https://mirror.ctan.org/systems/texlive/tlnet'
+export const ZWEITER_SPIEGEL = 'https://mirror.ctan.org/systems/texlive/tlnet'
 const ENDUNGEN = new Set([
   '.sty', '.cls', '.def', '.cfg', '.fd', '.ldf', '.clo', '.bst', '.tex', '.lua',
   '.pfb', '.tfm', '.vf', '.map', '.enc', '.otf', '.ttf',
@@ -48,7 +48,7 @@ export function laufzeitDateien(eintraege) {
 
 export function datenbankLesen(text) {
   const namen = new Set([...text.matchAll(/^name (\S+)$/gm)].map(m => m[1]))
-  const spiegel = /^depend opt_location:(\S+)$/m.exec(text)?.[1] ?? FALLBACK_SPIEGEL
+  const spiegel = /^depend opt_location:(\S+)$/m.exec(text)?.[1] ?? ZWEITER_SPIEGEL
   return { namen, spiegel }
 }
 

@@ -67,7 +67,8 @@ nav.navbar.navbar-default.navbar-main.navbar-expand-lg(
 									+dropdown-menu-link-item(href='/admin') Manage Site
 									+dropdown-menu-link-item(href='/admin/user') Manage Users
 									+dropdown-menu-link-item(href='/admin/register') Register Users
-									+dropdown-menu-link-item(href='/spur/admin/grenzen') Limits
+									+dropdown-menu-link-item(href='/spur/admin/grenzen') #{translate('spur_grenzen')}
+									+dropdown-menu-link-item(href='/spur/admin/workflows') #{translate('spur_workflows')}
 								if canDisplayProjectUrlLookup
 									+dropdown-menu-link-item(href='/admin/project') Manage Projects
 								if canDisplayAdminRedirect

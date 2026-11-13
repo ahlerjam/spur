@@ -37,8 +37,22 @@ function MatrixZelle({
 }) {
   const { t } = useTranslation()
   const [text, setText] = useState(zelle.text)
+  // Der Stand des Speicherns steht an der Zelle; bei einem Fehler bleibt der Text zum erneuten Versuch stehen.
+  const [stand, setStand] = useState<{ gespeichert: boolean; fehler: string | null }>({ gespeichert: false, fehler: null })
   useEffect(() => setText(zelle.text), [zelle.text])
   const adresse = { quelle_id: zeile.quelle.id, spalte_id: spalte.id }
+  const statusId = `spur-zelle-${zeile.quelle.id}-${spalte.id}`
+
+  const textSpeichern = async () => {
+    setStand({ gespeichert: false, fehler: null })
+    try {
+      await jsonAnfrage('PUT', projektPfad('/matrix/zellen'), { ...adresse, text })
+      setStand({ gespeichert: true, fehler: null })
+      geaendert()
+    } catch (error) {
+      setStand({ gespeichert: false, fehler: (error as Error).message })
+    }
+  }
 
   const senden = async (pfad: string, methode = 'POST', daten: object = adresse) => {
     try {
@@ -56,11 +70,20 @@ function MatrixZelle({
         value={text}
         readOnly={!darfSchreiben}
         aria-label={t('spur_zelle', { spalte: spalte.name, quelle: zeile.quelle.dateiname })}
-        onChange={e => setText(e.target.value)}
+        aria-describedby={statusId}
+        aria-invalid={Boolean(stand.fehler) || undefined}
+        isInvalid={Boolean(stand.fehler)}
+        onChange={e => {
+          setText(e.target.value)
+          setStand({ gespeichert: false, fehler: null })
+        }}
         onBlur={() => {
-          if (text !== zelle.text) senden('/matrix/zellen', 'PUT', { ...adresse, text })
+          if (text !== zelle.text || stand.fehler) textSpeichern()
         }}
       />
+      <span id={statusId} role="status" className={stand.fehler ? 'form-text text-danger' : 'spur-zeile-meta'}>
+        {stand.fehler ?? (stand.gespeichert ? t('spur_gespeichert') : '')}
+      </span>
       {zelle.vorschlag && (
         <div className="spur-matrix-vorschlag">
           <p>
@@ -117,7 +140,7 @@ export default function MatrixModal({ schliessen }: { schliessen: () => void }) 
   const bis = matrix ? Math.min(matrix.gesamt, matrix.seite * matrix.proSeite) : 0
 
   return (
-    <OLModal show onHide={schliessen} size="lg" fullscreen="md-down" dialogClassName="spur-matrix-dialog">
+    <OLModal themed show onHide={schliessen} size="lg" fullscreen="md-down" dialogClassName="spur-matrix-dialog">
       <OLModalHeader>
         <OLModalTitle>{t('spur_literaturmatrix')}</OLModalTitle>
       </OLModalHeader>
@@ -208,7 +231,7 @@ export default function MatrixModal({ schliessen }: { schliessen: () => void }) 
       </OLModalBody>
       <OLModalFooter>
         <OLButton variant="secondary" onClick={schliessen}>
-          {t('spur_schliessen')}
+          {t('close')}
         </OLButton>
       </OLModalFooter>
     </OLModal>

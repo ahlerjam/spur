@@ -128,7 +128,7 @@ describe('Zitate einer Quelle im Team', function () {
     let abrufe = 0
     fetchMock.get(ZITATE, () => (++abrufe === 1 ? { zitate: [] } : { zitate: [fremdes] }))
     zeigen('owner', socket as unknown as Socket)
-    await screen.findByText('Markiere oben Text und speichere ihn als Zitat.')
+    await screen.findByText('Markiere Text auf der Seite und speichere ihn als Zitat.')
     socket.emitToClient('spur:zitate', { quelleId: 'andere' })
     socket.emitToClient('spur:zitate', { quelleId: 'q1' })
     await screen.findByText(/von Ben Berater/)

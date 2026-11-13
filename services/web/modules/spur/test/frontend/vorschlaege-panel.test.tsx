@@ -71,7 +71,37 @@ describe('Vorschläge-Panel', function () {
     fetchMock.get(STATUS, { stand: stand(), vorschlaege: [] })
     zeigen('readOnly')
     await screen.findByLabelText('Compile-Fehler')
-    expect(screen.queryByText('Projekt-Standard für alle Mitglieder')).to.equal(null)
+    expect(screen.queryByText('Standard für alle im Projekt')).to.equal(null)
+    screen.getByRole('heading', { name: 'Für mich' })
+  })
+
+  it('trennt „Für mich“ und „Standard für alle im Projekt“ für Schreibende', async function () {
+    fetchMock.get(STATUS, { stand: stand(), vorschlaege: [] })
+    zeigen()
+    await screen.findByRole('heading', { name: 'Für mich' })
+    screen.getByRole('heading', { name: 'Standard für alle im Projekt' })
+    screen.getByLabelText('Compile-Fehler (Projekt)')
+  })
+
+  it('nennt den Stand neben dem Feld und prüft das Tageslimit am Feld', async function () {
+    fetchMock.get(STATUS, { stand: stand({ limit: 50, heute: 0 }), vorschlaege: [] })
+    fetchMock.put(/\/spur\/vorschlaege\/limit$/, 204)
+    zeigen()
+    const feld = await screen.findByLabelText('Tageslimit, für alle Projekte')
+    screen.getByText('Heute 0 von 50 Auslösern')
+    for (const wert of ['0', 'abc']) {
+      fireEvent.change(feld, { target: { value: wert } })
+      fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+      await screen.findByText('Bitte eine ganze Zahl von 1 bis 1000 eingeben.')
+      expect(feld.getAttribute('aria-invalid')).to.equal('true')
+    }
+    expect(fetchMock.callHistory.called(/\/spur\/vorschlaege\/limit$/)).to.equal(false)
+  })
+
+  it('zeigt beim Laden einen Platzhalter', async function () {
+    fetchMock.get(STATUS, new Promise(() => {}))
+    zeigen()
+    await waitFor(() => expect(document.querySelectorAll('.spur-platzhalter-zeile').length).to.be.greaterThan(0))
   })
 
   it('zeigt „Tageslimit erreicht“', async function () {

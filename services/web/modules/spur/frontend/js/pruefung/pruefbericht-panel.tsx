@@ -4,46 +4,63 @@ import RailPanelHeader from '@/features/ide-react/components/rail/rail-panel-hea
 import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
-import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
+import OLToggleButton from '@/shared/components/ol/ol-toggle-button'
+import OLToggleButtonGroup from '@/shared/components/ol/ol-toggle-button-group'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
+import MaterialIcon from '@/shared/components/material-icon'
 import Notification from '@/shared/components/notification'
+import { befunde } from './befunde'
+import PruefEinstellungen from './pruef-einstellungen'
 import { type Bericht, pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, Zeile } from './pruef-store'
 
-type Stufe = 'success' | 'warning' | 'danger' | 'info'
+const FILTER = {
+  alle: () => true,
+  markiert: (z: Zeile) => z.problem,
+  ohne_quelle: (z: Zeile) => z.status === 'ohne_quelle',
+  nicht_pruefbar: (z: Zeile) => z.status === 'nicht_pruefbar',
+}
+type Filter = keyof typeof FILTER
 
-function useBadges(zeile: Zeile) {
+function Gruppe({ pfad, zeilen }: { pfad: string; zeilen: Zeile[] }) {
   const { t } = useTranslation()
-  const badges: { text: string; stufe: Stufe }[] = []
-  const add = (text: string, stufe: Stufe) => badges.push({ text, stufe })
+  const [offen, setOffen] = useState(true)
+  const id = `spur-gruppe-${pfad.replace(/[^\w-]/g, '_')}`
+  return (
+    <section className="spur-gruppe">
+      <h5 className="spur-gruppe-kopf">
+        <button type="button" aria-expanded={offen} aria-controls={id} onClick={() => setOffen(!offen)}>
+          <MaterialIcon type={offen ? 'expand_more' : 'chevron_right'} />
+          <span className="spur-gruppe-name">{pfad}</span>
+          <span className="spur-zeile-meta">
+            {t('spur_gruppe_zahl', { count: zeilen.length, markiert: zeilen.filter(z => z.problem).length })}
+          </span>
+        </button>
+      </h5>
+      {offen && (
+        <ul className="spur-liste" id={id}>
+          {zeilen.map(zeile => (
+            <BerichtZeile key={zeile.id} zeile={zeile} />
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
 
-  if (zeile.wortlaut === 'exakt') add(t('spur_wortlaut_exakt'), 'success')
-  if (zeile.wortlaut === 'trennung') add(t('spur_wortlaut_trennung'), 'success')
-  if (zeile.wortlaut === 'abweichend') add(t('spur_wortlaut_abweichend'), 'danger')
-  if (zeile.wortlaut === 'nicht_pruefbar') add(t('spur_nicht_pruefbar'), 'warning')
-  if (zeile.wortlaut === 'quelle_fehlt') add(t('spur_quelle_fehlt'), 'danger')
-  if (zeile.wortlaut === 'ocr_unbestaetigt') add(t('spur_wortlaut_ocr'), 'warning')
-  if (zeile.wortlaut === 'bestaetigt') add(t('spur_wortlaut_bestaetigt'), 'success')
-
-  if (zeile.seite === 'stimmt') add(t('spur_seite_stimmt'), 'success')
-  if (zeile.seite === 'bestaetigt') add(t('spur_seite_bestaetigt'), 'success')
-  if (zeile.seite === 'nicht_pruefbar') add(t('spur_seite_nicht_pruefbar'), 'warning')
-  if (zeile.seite === 'gefunden') {
-    add(t('spur_gefunden_auf', { seite: zeile.gefundenAuf }), 'warning')
-  }
-
-  if (zeile.referenz === 'nicht_gefunden') add(t('spur_referenz_nicht_gefunden'), 'danger')
-  // Ein Ausfall bei Crossref ist kein Befund über die Arbeit: neutral, nicht als Fehler.
-  if (zeile.referenz === 'nicht_pruefbar') add(t('spur_referenz_nicht_pruefbar'), 'info')
-  if (zeile.retraction === 'zurueckgezogen') add(t('spur_zurueckgezogen'), 'danger')
-  if (zeile.retraction === 'korrektur') add(t('spur_korrektur'), 'warning')
-  if (zeile.retraction === 'keine_meldung') add(t('spur_keine_meldung'), 'info')
-  return badges
+function Zeitpunkt({ am }: { am: number | null }) {
+  const { t, i18n } = useTranslation()
+  if (!am) return null
+  const datum = new Date(am)
+  const uhrzeit = datum.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
+  const heute = datum.toDateString() === new Date().toDateString()
+  const zeit = heute ? t('spur_heute_um', { uhrzeit }) : `${datum.toLocaleDateString(i18n.language)}, ${uhrzeit}`
+  return <p className="spur-zeile-meta spur-zeitpunkt">{t('spur_zuletzt_geprueft', { zeit })}</p>
 }
 
 function BerichtZeile({ zeile }: { zeile: Zeile }) {
   const { t } = useTranslation()
   const { openDocWithId } = useEditorManagerContext()
-  const badges = useBadges(zeile)
+  const badges = befunde(zeile, t)
   return (
     <li className="spur-zeile">
       <OLButton
@@ -56,9 +73,12 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
       </OLButton>
       {zeile.key && <span className="spur-zeile-key">{zeile.key}</span>}
       {zeile.auszug && <p className="spur-zeile-auszug">{zeile.auszug}</p>}
-      {/* Den Crossref-Ausfall nennt schon die Marke darunter. */}
-      {zeile.grund && zeile.referenz !== 'nicht_pruefbar' && (
+      {/* Den Ausfall und den Beleg ohne Wortlaut nennt schon die Marke darunter. */}
+      {zeile.grund && zeile.referenz !== 'nicht_pruefbar' && zeile.status !== 'beleg_ohne_wortlaut' && (
         <p className="spur-zeile-meta">{t(`spur_grund_${zeile.grund}`)}</p>
+      )}
+      {zeile.registrierstelle === 'datacite' && zeile.referenz === 'gefunden' && (
+        <p className="spur-zeile-meta">{t('spur_referenz_datacite_hinweis')}</p>
       )}
       <div className="spur-badges" aria-label={t('spur_status')}>
         {badges.map(b => (
@@ -73,43 +93,68 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
 
 function Zaehlung({ zaehlung }: { zaehlung: Bericht['zaehlung'] }) {
   const { t } = useTranslation()
-  const teile = STELLEN_STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s] }))
+  const teile = STELLEN_STATUS.filter(s => zaehlung[s] > 0).map(s => t(`spur_stellen_${s}`, { anzahl: zaehlung[s], count: zaehlung[s] }))
+  if (zaehlung.geprueft > 0) {
+    teile[0] += zaehlung.markiert > 0 ? `, ${t('spur_stellen_markiert', { anzahl: zaehlung.markiert })}` : `, ${t('spur_stellen_keine_markiert')}`
+  }
   return <p className="spur-zeile-meta">{t('spur_zitierstellen', { liste: teile.join(', ') })}</p>
 }
 
 export default function PruefberichtPanel() {
   const { t } = useTranslation()
   const zustand = useSyncExternalStore(pruefStore.abonnieren, pruefStore.zustand)
-  const [nurProbleme, setNurProbleme] = useState(false)
-  const { bericht, status, fehler } = zustand
+  const [filter, setFilter] = useState<Filter>('alle')
+  const { bericht, status, fehler, geprueftAm } = zustand
 
   useEffect(() => {
     pruefenWennNoetig()
   }, [])
 
-  const zeilen = useMemo(
-    () =>
-      (bericht?.zeilen ?? []).filter(z => !nurProbleme || z.problem),
-    [bericht, nurProbleme]
-  )
+  const alleZeilen = useMemo(() => bericht?.zeilen ?? [], [bericht])
+  const gruppen = useMemo(() => {
+    const nachDatei = new Map<string, Zeile[]>()
+    for (const zeile of alleZeilen.filter(FILTER[filter])) {
+      nachDatei.set(zeile.pfad, [...(nachDatei.get(zeile.pfad) ?? []), zeile])
+    }
+    return [...nachDatei]
+  }, [alleZeilen, filter])
 
   return (
     <div className="spur-panel">
       <RailPanelHeader title={t('spur_pruefbericht')} />
       <div className="spur-panel-werkzeuge">
-        <OLFormCheckbox
-          id="spur-nur-probleme"
-          label={t('spur_nur_probleme')}
-          checked={nurProbleme}
-          onChange={e => setNurProbleme(e.target.checked)}
-        />
         <OLButton variant="secondary" size="sm" onClick={pruefen}>
           {t('spur_erneut_pruefen')}
         </OLButton>
+        <PruefEinstellungen />
+        <Zeitpunkt am={geprueftAm} />
       </div>
-      <div className="spur-panel-inhalt" aria-live="polite">
-        {status === 'laeuft' && <OLSpinner size="sm" />}
-        {status === 'laeuft' && !bericht && <span> {t('spur_pruefung_laeuft')}</span>}
+      {bericht && bericht.zeilen.length > 0 && (
+        <div className="spur-filter">
+          <OLToggleButtonGroup
+            type="radio"
+            name="spur-bericht-filter"
+            size="sm"
+            value={filter}
+            onChange={(wert: Filter) => setFilter(wert)}
+            aria-label={t('spur_bericht_filtern')}
+          >
+            {(Object.keys(FILTER) as Filter[]).map(art => (
+              <OLToggleButton key={art} id={`spur-filter-${art}`} variant="secondary" value={art}>
+                {t(`spur_filter_${art}`)} <span className="spur-filter-zahl">{alleZeilen.filter(FILTER[art]).length}</span>
+              </OLToggleButton>
+            ))}
+          </OLToggleButtonGroup>
+        </div>
+      )}
+      <div className="spur-panel-inhalt">
+        <div role="status">
+          {status === 'laeuft' && (
+            <p className="spur-zeile-meta">
+              <OLSpinner size="sm" /> {t('spur_pruefung_laeuft')}
+            </p>
+          )}
+        </div>
         {status === 'fehler' && (
           <Notification
             type="error"
@@ -119,15 +164,16 @@ export default function PruefberichtPanel() {
         {bericht?.zeilen.length === 0 && status !== 'fehler' && (
           <p className="spur-leer">{t('spur_keine_zitate')}</p>
         )}
-        {bericht && bericht.zeilen.length > 0 && zeilen.length === 0 && (
-          <p className="spur-leer">{t('spur_keine_probleme')}</p>
-        )}
         {bericht && bericht.zeilen.length > 0 && <Zaehlung zaehlung={bericht.zaehlung} />}
-        <ul className="spur-liste">
-          {zeilen.map(zeile => (
-            <BerichtZeile key={zeile.id} zeile={zeile} />
-          ))}
-        </ul>
+        {bericht && bericht.uebersprungen > 0 && (
+          <p className="spur-zeile-meta">{t('spur_uebersprungen', { count: bericht.uebersprungen })}</p>
+        )}
+        {bericht && bericht.zeilen.length > 0 && gruppen.length === 0 && (
+          <p className="spur-leer">{t('spur_filter_leer')}</p>
+        )}
+        {gruppen.map(([pfad, zeilen]) => (
+          <Gruppe key={pfad} pfad={pfad} zeilen={zeilen} />
+        ))}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import fetchMock from 'fetch-mock'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import RecherchePanel from '@modules/spur/frontend/js/recherche/recherche-panel'
 import { EditorProviders } from '../../../../test/frontend/helpers/editor-providers'
 import { deutschAktivieren } from './helpers/deutsch'
@@ -72,10 +72,35 @@ describe('Recherche-Panel', function () {
     screen.getByText('The memory function of sleep')
   })
 
-  it('zeigt „Keine Treffer“ ohne Ergebnis', async function () {
+  it('nennt bei keinem Treffer den Begriff und den nächsten Schritt', async function () {
     fetchMock.get(SUCHE, ergebnis({ treffer: [] }))
-    suchen('xyzzy')
-    await screen.findByText('Keine Treffer')
+    suchen('xyzxyz')
+    await screen.findByText('Keine Treffer für „xyzxyz“. Prüf die Schreibweise oder such nach der DOI.')
+  })
+
+  it('zeigt während der Suche Platzhalter in Form der Treffer', async function () {
+    let freigeben = () => {}
+    fetchMock.get(SUCHE, new Promise(resolve => {
+      freigeben = () => resolve(ergebnis({}))
+    }))
+    suchen('sleep')
+    await waitFor(() => expect(document.querySelectorAll('.spur-platzhalter-zeile').length).to.be.greaterThan(0))
+    freigeben()
+    await screen.findByText('The memory function of sleep')
+    expect(document.querySelector('.spur-platzhalter-zeile')).to.equal(null)
+  })
+
+  it('wechselt die Reiter mit den Pfeiltasten', async function () {
+    render(<RecherchePanel />, { wrapper: EditorProviders })
+    const treffer = screen.getByRole('tab', { name: 'Treffer' })
+    expect(treffer.getAttribute('tabindex')).to.equal('0')
+    fireEvent.keyDown(treffer, { key: 'ArrowRight' })
+    const protokoll = screen.getByRole('tab', { name: 'Suchprotokoll' })
+    expect(protokoll.getAttribute('aria-selected')).to.equal('true')
+    expect(document.activeElement).to.equal(protokoll)
+    fireEvent.keyDown(protokoll, { key: 'ArrowLeft' })
+    expect(screen.getByRole('tab', { name: 'Treffer' }).getAttribute('aria-selected')).to.equal('true')
+    screen.getByRole('tabpanel', { name: 'Treffer' })
   })
 
   it('blättert zur nächsten Seite', async function () {
@@ -97,13 +122,14 @@ describe('Recherche-Panel', function () {
       fehler: [],
     })
     suchen('sleep')
-    fireEvent.click(await screen.findByRole('button', { name: 'Zitiert von' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Weitere Aktionen' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Zitiert von' }))
     const liste = await screen.findByRole('region', { name: 'Zitiert von' })
     await screen.findByText('Sleep spindles')
     expect(liste.textContent).to.contain('10.1/b')
     const url = fetchMock.callHistory.calls().find(c => ZITATIONEN.test(c.url))!.url
     expect(url).to.contain('richtung=zitiert_von')
-    expect(screen.getByRole('button', { name: 'Zitiert von' }).getAttribute('aria-expanded')).to.equal('true')
+    expect(screen.getByRole('link', { name: '10.1038/nrn2762' }).getAttribute('href')).to.equal('https://doi.org/10.1038/nrn2762')
   })
 
   it('listet das Suchprotokoll und bietet den Export an', async function () {

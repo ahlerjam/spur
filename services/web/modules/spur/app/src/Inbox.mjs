@@ -1,7 +1,7 @@
-import { EventEmitter, once } from 'node:events'
+import { EventEmitter } from 'node:events'
 import { ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { ereignisse, herzschlaege, nachrichten } from './sammlungen.mjs'
-import { jetzt } from './schalter.mjs'
+import { jetzt, testSchalter } from './schalter.mjs'
 
 // Wecker im selben Prozess; der Takt fängt Ereignisse aus anderen Prozessen auf.
 const wecker = new EventEmitter()
@@ -11,6 +11,12 @@ const TAKT_MS = 5000
 const HERZSCHLAG_MS = 5000
 const VERBUNDEN_MS = 45 * 1000
 const FORTSCHRITT_MS = 30 * 1000
+// Unter Claude Codes 120 s, nach denen ein MCP-Aufruf in den Hintergrund wandert.
+const STANDARD_WARTEN_S = 100
+
+export function standardWarteSekunden() {
+  return Number(testSchalter('SPUR_WARTEN_S')) || STANDARD_WARTEN_S
+}
 
 export async function ereignisAnlegen({ projectId, botId, typ, daten }) {
   await (await ereignisse()).insertOne({ botId, projectId, typ, daten, am: jetzt(), zugestellt: false })
@@ -57,14 +63,24 @@ const fuerClient = e => ({
   am: e.am,
 })
 
+// Mit Cursor die Ereignisse danach, ohne Cursor die neuesten. Was hier gelesen wird, gilt als zugestellt.
 export async function seit(botId, cursor) {
-  const filter = { botId }
-  if (cursor && ObjectId.isValid(cursor)) filter._id = { $gt: new ObjectId(cursor) }
-  const liste = await (await ereignisse()).find(filter).sort({ _id: 1 }).limit(100).toArray()
+  const sammlung = await ereignisse()
+  const liste =
+    cursor && ObjectId.isValid(cursor)
+      ? await sammlung.find({ botId, _id: { $gt: new ObjectId(cursor) } }).sort({ _id: 1 }).limit(100).toArray()
+      : (await sammlung.find({ botId }).sort({ _id: -1 }).limit(100).toArray()).reverse()
+  const offen = liste.filter(e => !e.zugestellt).map(e => e._id)
+  if (offen.length) await sammlung.updateMany({ _id: { $in: offen } }, { $set: { zugestellt: true } })
   return {
     ereignisse: liste.map(fuerClient),
     cursor: liste.at(-1)?._id ?? cursor ?? null,
   }
+}
+
+export async function letzterCursor(botId) {
+  const [neuestes] = await (await ereignisse()).find({ botId }).sort({ _id: -1 }).limit(1).toArray()
+  return neuestes?._id ?? null
 }
 
 async function herzschlag(botId) {
@@ -80,23 +96,40 @@ export async function verbunden(botId) {
   return Boolean(eintrag && jetzt() - eintrag.zuletzt < VERBUNDEN_MS)
 }
 
-function bisWeckerOderTakt(botId, ms, signal) {
-  const abbruch = new AbortController()
-  const ende = () => abbruch.abort()
-  signal?.addEventListener('abort', ende, { once: true })
-  const zeit = setTimeout(ende, ms)
-  return once(wecker, String(botId), { signal: abbruch.signal })
-    .catch(() => {})
-    .finally(() => {
-      clearTimeout(zeit)
-      signal?.removeEventListener('abort', ende)
-    })
+// Der Wecker hört ab dem Start des Wartens mit: Ein Auftrag, der zwischen Abfrage und Schlaf eintrifft, weckt sofort.
+function weckerFuer(botId, signal) {
+  let geweckt = false
+  let aufwachen = () => {}
+  const wecken = () => {
+    geweckt = true
+    aufwachen()
+  }
+  wecker.on(String(botId), wecken)
+  signal?.addEventListener('abort', wecken, { once: true })
+  return {
+    vorAbfrage: () => (geweckt = false),
+    schlafen: ms =>
+      geweckt
+        ? Promise.resolve()
+        : new Promise(weiter => {
+            const zeit = setTimeout(weiter, ms)
+            aufwachen = () => {
+              clearTimeout(zeit)
+              weiter()
+            }
+          }),
+    ende: () => {
+      wecker.off(String(botId), wecken)
+      signal?.removeEventListener('abort', wecken)
+    },
+  }
 }
 
 // Long-Poll: liefert das nächste nicht zugestellte Ereignis des Bots. Laufende Aufrufe sind der Herzschlag.
 // Pro Bot höchstens ein offener Long-Poll: Ein neuer Aufruf beendet den älteren.
 const wartende = new Map()
 
+// `abgeloest`: Ein neuerer Aufruf desselben Bots wartet jetzt; dieser endet still.
 export async function warteAufEreignis(botId, { signal: aussen, maxMs, fortschritt }) {
   const schluessel = String(botId)
   wartende.get(schluessel)?.abort()
@@ -104,18 +137,29 @@ export async function warteAufEreignis(botId, { signal: aussen, maxMs, fortschri
   wartende.set(schluessel, eigener)
   const signal = aussen ? AbortSignal.any([aussen, eigener.signal]) : eigener.signal
   try {
-    return await warten(botId, { signal, maxMs, fortschritt })
+    const ereignis = await warten(botId, { signal, maxMs, fortschritt })
+    return { ereignis, abgeloest: !ereignis && eigener.signal.aborted && !aussen?.aborted }
   } finally {
     if (wartende.get(schluessel) === eigener) wartende.delete(schluessel)
   }
 }
 
 async function warten(botId, { signal, maxMs, fortschritt }) {
+  const takt = weckerFuer(botId, signal)
+  try {
+    return await abfragen(botId, { signal, maxMs, fortschritt, takt })
+  } finally {
+    takt.ende()
+  }
+}
+
+async function abfragen(botId, { signal, maxMs, fortschritt, takt }) {
   const sammlung = await ereignisse()
   const start = Date.now()
   let letzterSchlag = 0
   let letzterFortschritt = start
   while (!signal?.aborted && Date.now() - start < maxMs) {
+    takt.vorAbfrage()
     if (Date.now() - letzterSchlag >= HERZSCHLAG_MS) {
       await herzschlag(botId)
       letzterSchlag = Date.now()
@@ -136,7 +180,7 @@ async function warten(botId, { signal, maxMs, fortschritt }) {
       await fortschritt(Math.round((Date.now() - start) / 1000))
     }
     const bisFortschritt = FORTSCHRITT_MS - (Date.now() - letzterFortschritt)
-    await bisWeckerOderTakt(botId, Math.max(10, Math.min(TAKT_MS, bisFortschritt)), signal)
+    await takt.schlafen(Math.max(10, Math.min(TAKT_MS, bisFortschritt, maxMs - (Date.now() - start))))
   }
   return null
 }

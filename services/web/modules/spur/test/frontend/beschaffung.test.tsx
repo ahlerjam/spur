@@ -54,7 +54,8 @@ describe('Beschaffungsliste', function () {
     expect(links).to.have.length(1)
     expect(links[0].getAttribute('href')).to.equal(OFFEN.link)
     expect(screen.getByLabelText('Link zur Bibliothek')).to.have.property('value', 'https://bibliothek.example/?doi={doi}')
-    expect(screen.getByRole('link', { name: 'Als .ris exportieren' }).getAttribute('href')).to.match(/\/beschaffung\/export\/ris$/)
+    fireEvent.click(screen.getByRole('button', { name: 'Liste exportieren' }))
+    expect(screen.getByRole('menuitem', { name: 'Als .ris exportieren' }).getAttribute('href')).to.match(/\/beschaffung\/export\/ris$/)
   })
 
   it('fragt nach dem Eintrag, wenn das hochgeladene PDF keine DOI trägt', async function () {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import useWaitForI18n from '@/shared/hooks/use-wait-for-i18n'
 import OLBadge from '@/shared/components/ol/ol-badge'
 import OLButton from '@/shared/components/ol/ol-button'
+import LadeKnopf from '../lade-knopf'
 import OLFormCheckbox from '@/shared/components/ol/ol-form-checkbox'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
@@ -10,7 +11,10 @@ import OLFormSelect from '@/shared/components/ol/ol-form-select'
 import Notification from '@/shared/components/notification'
 import { anfrage, ApiFehler, jsonAnfrage } from '../api'
 
-type Standard = { projekte: number | null; speicherGb: number | null; texPaketeAus: boolean }
+type TexGrenzen = { texPaketMb: number; texProjektMb: number; texProStunde: number }
+type Standard = { projekte: number | null; speicherGb: number | null; texPaketeAus: boolean } & {
+  [F in keyof TexGrenzen]: number | null
+}
 type Nutzer = {
   id: string
   email: string
@@ -20,8 +24,8 @@ type Nutzer = {
   ausnahme: { projekte?: number | null; speicherGb?: number | null }
 }
 type Projekt = { id: string; name: string; eigentuemer: string; bytes: number; grenze: number | null }
-type Daten = { standard: Standard; nutzer: Nutzer[]; projekte: Projekt[] }
-type Feld = 'projekte' | 'speicherGb'
+type Daten = { standard: Standard; texStandard: TexGrenzen; nutzer: Nutzer[]; projekte: Projekt[] }
+type Feld = 'projekte' | 'speicherGb' | keyof TexGrenzen
 
 const PFAD = '/spur/admin/grenzen'
 const GB = 1024 ** 3
@@ -72,14 +76,14 @@ export default function GrenzenAdmin() {
   if (!isReady) return null
 
   return (
-    <main id="main-content" className="content spur-grenzen-admin">
+    <main id="main-content" className="content spur-admin-seite spur-grenzen-admin">
       <h1>{t('spur_grenzen')}</h1>
       <p>{t('spur_grenzen_hinweis')}</p>
       {fehler && <Notification type="error" content={fehler} />}
       {!daten && !fehler && <p aria-busy="true">{t('loading')}</p>}
       {daten && (
         <>
-          <StandardFormular standard={daten.standard} neuLaden={laden} />
+          <StandardFormular standard={daten.standard} texStandard={daten.texStandard} neuLaden={laden} />
           <NutzerTabelle nutzer={daten.nutzer} neuLaden={laden} />
           <ProjektTabelle projekte={daten.projekte} neuLaden={laden} />
         </>
@@ -88,12 +92,26 @@ export default function GrenzenAdmin() {
   )
 }
 
-function StandardFormular({ standard, neuLaden }: { standard: Standard; neuLaden: () => Promise<void> }) {
+function StandardFormular({
+  standard,
+  texStandard,
+  neuLaden,
+}: {
+  standard: Standard
+  texStandard: TexGrenzen
+  neuLaden: () => Promise<void>
+}) {
   const { t } = useTranslation()
   const zahl = useZahl()
   const id = useId()
   const alsText = (wert: number | null) => (wert === null ? '' : zahl(wert))
-  const [werte, setWerte] = useState({ projekte: alsText(standard.projekte), speicherGb: alsText(standard.speicherGb) })
+  const [werte, setWerte] = useState<Record<Feld, string>>({
+    projekte: alsText(standard.projekte),
+    speicherGb: alsText(standard.speicherGb),
+    texPaketMb: alsText(standard.texPaketMb),
+    texProjektMb: alsText(standard.texProjektMb),
+    texProStunde: alsText(standard.texProStunde),
+  })
   const [texPaketeErlaubt, setTexPaketeErlaubt] = useState(!standard.texPaketeAus)
   const [feldFehler, setFeldFehler] = useState<Record<string, string>>({})
   const [meldung, setMeldung] = useState<{ typ: 'success' | 'error'; text: string } | null>(null)
@@ -116,14 +134,14 @@ function StandardFormular({ standard, neuLaden }: { standard: Standard; neuLaden
     }
   }
 
-  const feld = (name: Feld, label: string) => (
+  const feld = (name: Feld, label: string, platzhalter = t('spur_unbegrenzt')) => (
     <div className="spur-grenzen-feld">
       <OLFormLabel htmlFor={`${id}-${name}`}>{label}</OLFormLabel>
       <OLFormControl
         id={`${id}-${name}`}
-        inputMode="decimal"
+        inputMode={name.startsWith('tex') ? 'numeric' : 'decimal'}
         value={werte[name]}
-        placeholder={t('spur_unbegrenzt')}
+        placeholder={platzhalter}
         isInvalid={Boolean(feldFehler[name])}
         aria-invalid={Boolean(feldFehler[name])}
         aria-describedby={feldFehler[name] ? `${id}-${name}-fehler` : undefined}
@@ -134,7 +152,7 @@ function StandardFormular({ standard, neuLaden }: { standard: Standard; neuLaden
   )
 
   return (
-    <section className="spur-grenzen-abschnitt" aria-labelledby={`${id}-titel`}>
+    <section className="spur-admin-abschnitt" aria-labelledby={`${id}-titel`}>
       <h2 id={`${id}-titel`}>{t('spur_grenzen_standard')}</h2>
       <dl className="spur-grenzen-stand">
         <div>
@@ -152,15 +170,22 @@ function StandardFormular({ standard, neuLaden }: { standard: Standard; neuLaden
           {feld('speicherGb', t('spur_speicher_je_projekt_gb'))}
         </div>
         <p className="form-text">{t('spur_grenzen_leer_hinweis')}</p>
+        <h3 className="spur-grenzen-unter">{t('spur_tex_pakete')}</h3>
         <OLFormCheckbox
           id={`${id}-tex`}
           label={t('spur_tex_pakete_erlaubt')}
           checked={texPaketeErlaubt}
           onChange={e => setTexPaketeErlaubt(e.target.checked)}
         />
-        <OLButton type="submit" variant="primary" isLoading={laeuft} className="mt-3">
+        <div className="spur-grenzen-felder mt-2">
+          {feld('texPaketMb', t('spur_tex_paket_mb'), zahl(texStandard.texPaketMb))}
+          {feld('texProjektMb', t('spur_tex_projekt_mb'), zahl(texStandard.texProjektMb))}
+          {feld('texProStunde', t('spur_tex_pro_stunde'), zahl(texStandard.texProStunde))}
+        </div>
+        <p className="form-text">{t('spur_tex_grenzen_hinweis')}</p>
+        <LadeKnopf type="submit" variant="primary" isLoading={laeuft} className="mt-3">
           {t('save')}
-        </OLButton>
+        </LadeKnopf>
       </form>
       {meldung && <Notification className="mt-3" type={meldung.typ} content={meldung.text} />}
     </section>
@@ -176,17 +201,54 @@ function SortierKnopf({ aktiv, onClick }: { aktiv: boolean; onClick: () => void 
   )
 }
 
+const PRO_SEITE = 50
+
 function NutzerTabelle({ nutzer, neuLaden }: { nutzer: Nutzer[]; neuLaden: () => Promise<void> }) {
   const { t } = useTranslation()
   const zahl = useZahl()
   const [sortiert, setSortiert] = useState(false)
   const [bearbeitet, setBearbeitet] = useState<string | null>(null)
-  const liste = sortiert
-    ? [...nutzer].sort((a, b) => auslastung(b.projekte, b.grenze) - auslastung(a.projekte, a.grenze))
-    : nutzer
+  const [suche, setSuche] = useState('')
+  const [seite, setSeite] = useState(0)
+  const begriff = suche.trim().toLowerCase()
+  const gefiltert = nutzer.filter(n => !begriff || `${n.name ?? ''} ${n.email}`.toLowerCase().includes(begriff))
+  const sortierteListe = sortiert
+    ? [...gefiltert].sort((a, b) => auslastung(b.projekte, b.grenze) - auslastung(a.projekte, a.grenze))
+    : gefiltert
+  const seiten = Math.max(1, Math.ceil(sortierteListe.length / PRO_SEITE))
+  const aktuelleSeite = Math.min(seite, seiten - 1)
+  const liste = sortierteListe.slice(aktuelleSeite * PRO_SEITE, (aktuelleSeite + 1) * PRO_SEITE)
   return (
-    <section className="spur-grenzen-abschnitt" aria-labelledby="spur-grenzen-nutzer">
+    <section className="spur-admin-abschnitt" aria-labelledby="spur-grenzen-nutzer">
       <h2 id="spur-grenzen-nutzer">{t('spur_grenzen_nutzer')}</h2>
+      <div className="spur-admin-suche">
+        <OLFormLabel htmlFor="spur-nutzer-suche">{t('spur_nutzer_suchen')}</OLFormLabel>
+        <OLFormControl
+          id="spur-nutzer-suche"
+          type="search"
+          value={suche}
+          onChange={e => {
+            setSuche(e.target.value)
+            setSeite(0)
+          }}
+        />
+      </div>
+      {seiten > 1 && (
+        <nav className="spur-blaettern" aria-label={t('spur_nutzerseiten')}>
+          <OLButton variant="secondary" size="sm" disabled={aktuelleSeite === 0} onClick={() => setSeite(aktuelleSeite - 1)}>
+            {t('spur_vorherige_seite')}
+          </OLButton>
+          <span>{t('spur_seite_von', { seite: aktuelleSeite + 1, gesamt: seiten })}</span>
+          <OLButton
+            variant="secondary"
+            size="sm"
+            disabled={aktuelleSeite >= seiten - 1}
+            onClick={() => setSeite(aktuelleSeite + 1)}
+          >
+            {t('spur_naechste_seite')}
+          </OLButton>
+        </nav>
+      )}
       <div className="table-responsive">
         <table className="table spur-grenzen-tabelle">
           <thead>
@@ -200,6 +262,13 @@ function NutzerTabelle({ nutzer, neuLaden }: { nutzer: Nutzer[]; neuLaden: () =>
             </tr>
           </thead>
           <tbody>
+            {liste.length === 0 && (
+              <tr>
+                <td colSpan={4} className="spur-leer">
+                  {begriff ? t('spur_keine_nutzer_fuer', { begriff: suche.trim() }) : t('spur_keine_nutzer')}
+                </td>
+              </tr>
+            )}
             {liste.map(n => (
               <tr key={n.id} data-email={n.email}>
                 <td>
@@ -317,9 +386,9 @@ function AusnahmeFormular({ nutzer, fertig, abbrechen }: { nutzer: Nutzer; ferti
       {feld('speicherGb', t('spur_speicher_je_projekt_gb'))}
       <FeldFehler id={`${id}-fehler`} text={feldFehler.allgemein} />
       <div className="spur-panel-werkzeuge spur-ohne-rand">
-        <OLButton type="submit" variant="primary" size="sm" isLoading={laeuft}>
+        <LadeKnopf type="submit" variant="primary" size="sm" isLoading={laeuft}>
           {t('save')}
-        </OLButton>
+        </LadeKnopf>
         <OLButton variant="secondary" size="sm" onClick={abbrechen}>
           {t('cancel')}
         </OLButton>
@@ -351,7 +420,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
   }
 
   return (
-    <section className="spur-grenzen-abschnitt" aria-labelledby="spur-grenzen-projekte">
+    <section className="spur-admin-abschnitt" aria-labelledby="spur-grenzen-projekte">
       <h2 id="spur-grenzen-projekte">{t('spur_grenzen_projekte')}</h2>
       {fehler && <Notification type="error" content={fehler} />}
       <div className="table-responsive">
@@ -370,6 +439,13 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
             </tr>
           </thead>
           <tbody>
+            {liste.length === 0 && (
+              <tr>
+                <td colSpan={5} className="spur-leer">
+                  {t('spur_keine_projekte')}
+                </td>
+              </tr>
+            )}
             {liste.map(p => (
               <tr key={p.id} data-projekt={p.name}>
                 <td>{p.name}</td>
@@ -379,7 +455,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
                   <Markierung anteil={auslastung(p.bytes, p.grenze)} />
                 </td>
                 <td>
-                  <OLButton
+                  <LadeKnopf
                     variant="secondary"
                     size="sm"
                     isLoading={laeuft === p.id}
@@ -387,7 +463,7 @@ function ProjektTabelle({ projekte, neuLaden }: { projekte: Projekt[]; neuLaden:
                     onClick={() => neuBerechnen(p)}
                   >
                     {t('spur_speicher_neu_berechnen')}
-                  </OLButton>
+                  </LadeKnopf>
                 </td>
               </tr>
             ))}

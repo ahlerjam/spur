@@ -33,6 +33,12 @@ async function laden({ dev = false } = {}) {
       ensureUserIsSiteAdmin: marken.admin,
     },
   }))
+  vi.doMock('../../../../app/src/Features/Authorization/AuthorizationManager.mjs', () => ({
+    default: { promises: { isUserSiteAdmin: async userId => userId === 'admin-id' } },
+  }))
+  vi.doMock('../../../../app/src/Features/Authentication/SessionManager.mjs', () => ({
+    default: { getLoggedInUserId: session => session.userId },
+  }))
   vi.doMock('../../../../app/src/Features/Authentication/AuthenticationController.mjs', () => ({
     default: { requireLogin: () => marken.angemeldet },
   }))
@@ -56,7 +62,6 @@ async function laden({ dev = false } = {}) {
   vi.doMock('../../app/src/grenzen/GrenzenController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/hochladen/UploadLinkController.mjs', handlerAttrappe)
   vi.doMock('../../app/src/dev/PaperFake.mjs', () => ({ paperFake: Object.assign(() => {}, { handler: 'paperFake' }) }))
-  vi.doMock('../../app/src/dev/TexLiveFake.mjs', () => ({ texLiveFake: Object.assign(() => {}, { handler: 'texLiveFake' }) }))
   vi.doMock('../../app/src/dev/MailFake.mjs', () => ({
     mailFakeSteuern: Object.assign(() => {}, { handler: 'mailFakeSteuern' }),
     mailFakeLesen: Object.assign(() => {}, { handler: 'mailFakeLesen' }),
@@ -66,6 +71,9 @@ async function laden({ dev = false } = {}) {
     zeitSetzen: Object.assign(() => {}, { handler: 'zeitSetzen' }),
     e2eVorbereiten: Object.assign(() => {}, { handler: 'e2eVorbereiten' }),
     quelleVergroessern: Object.assign(() => {}, { handler: 'quelleVergroessern' }),
+    proxySperre: name => Object.assign(() => {}, { handler: `proxySperre:${name}` }),
+    speicherFehler: name => Object.assign(() => {}, { handler: `speicherFehler:${name}` }),
+    pdfUmleiten: Object.assign(() => {}, { handler: 'pdfUmleiten' }),
   }))
   vi.doMock('../../app/src/mcp/McpEndpunkt.mjs', () => ({ mcpAnfrage: Object.assign(() => {}, { handler: 'mcpAnfrage' }) }))
   const Router = (await import('../../app/src/SpurRouter.mjs')).default
@@ -118,6 +126,8 @@ describe('Rechte der Routen', () => {
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/ablehnen', 'pruefen', 'laufAblehnen'],
     ['post', '/spur/project/:project_id/laeufe/:lauf_id/zuruecknehmen', 'schreiben', 'laufZuruecknehmen'],
     ['put', '/spur/project/:project_id/claude/automatik', 'schreiben', 'automatikSetzen'],
+    ['post', '/spur/project/:project_id/claude/alles-annehmen', 'schreiben', 'allesAnnehmen'],
+    ['get', '/spur/project/:project_id/claude/laeufe', 'lesen', 'claudeLaeufe'],
     ['get', '/spur/project/:project_id/recherche', 'lesen', 'rechercheSuchen'],
     ['get', '/spur/project/:project_id/recherche/zitationen', 'lesen', 'rechercheZitationen'],
     ['get', '/spur/project/:project_id/recherche/protokoll', 'lesen', 'suchprotokoll'],
@@ -159,16 +169,29 @@ describe('Rechte der Routen', () => {
 
   it.each([
     ['get', '/spur/admin/grenzen', ['admin'], 'seite'],
-    ['get', '/spur/admin/grenzen.json', ['admin'], 'daten'],
-    ['put', '/spur/admin/grenzen/standard', ['admin'], 'standardSetzen'],
-    ['put', '/spur/admin/grenzen/nutzer/:user_id', ['admin'], 'nutzerSetzen'],
-    ['post', '/spur/admin/grenzen/projekt/:project_id/neu-berechnen', ['admin'], 'neuBerechnen'],
+    ['get', '/spur/admin/grenzen.json', ['angemeldet'], 'daten'],
+    ['put', '/spur/admin/grenzen/standard', ['angemeldet'], 'standardSetzen'],
+    ['put', '/spur/admin/grenzen/nutzer/:user_id', ['angemeldet'], 'nutzerSetzen'],
+    ['post', '/spur/admin/grenzen/projekt/:project_id/neu-berechnen', ['angemeldet'], 'neuBerechnen'],
     ['get', '/spur/grenzen/projekte', ['angemeldet'], 'meineProjekte'],
     ['get', '/spur/project/:project_id/speicher', ['angemeldet', 'eingeschraenkt', 'lesen'], 'projektSpeicher'],
   ])('Grenzen: %s %s prüft %j', (methode, pfad, pruefer, handler) => {
     const r = route(methode, pfad)
     expect(prueferVon(r)).toEqual(pruefer)
     expect(handlerVon(r)).toBe(handler)
+  })
+
+  it('antwortet Nicht-Admins an den Grenzen-Routen mit 403 statt einer Umleitung', async () => {
+    for (const [methode, pfad] of [['put', '/spur/admin/grenzen/standard'], ['get', '/spur/admin/grenzen.json']]) {
+      const pruefung = route(methode, pfad).kette.at(-2)
+      const res = new Antwort()
+      const next = vi.fn()
+      await pruefung(anfrage({ session: { userId: 'nutzer-id' } }), res, next)
+      expect(res.statusCode, pfad).toBe(403)
+      expect(next).not.toHaveBeenCalled()
+      await pruefung(anfrage({ session: { userId: 'admin-id' } }), new Antwort(), next)
+      expect(next).toHaveBeenCalledWith()
+    }
   })
 
   it('nimmt Uploads per Einmal-Link öffentlich an: erst Link prüfen, dann Datei, dann Aufnahme', () => {
@@ -184,7 +207,7 @@ describe('Rechte der Routen', () => {
     expect(handlerVon(r)).toBe('mcpAnfrage')
   })
 
-  it('registriert die Dev-Routen (Paper-Fake, Testseite, Zeit, E2E-Daten, Mail-Fake, TeX-Live-Fake) nur in der Dev-Umgebung', async () => {
+  it('registriert die Dev-Routen (Paper-Fake mit TeX-Live-Fake, Testseite, Zeit, E2E-Daten, Mail-Fake) nur in der Dev-Umgebung', async () => {
     const dev = [
       ['use', '/spur/dev/crossref', 'paperFake'],
       ['get', '/spur/dev/web/testseite', 'testseite'],
@@ -192,12 +215,25 @@ describe('Rechte der Routen', () => {
       ['post', '/spur/dev/e2e/vorbereiten', 'e2eVorbereiten'],
       ['post', '/spur/dev/mail', 'mailFakeSteuern'],
       ['get', '/spur/dev/mail', 'mailFakeLesen'],
-      ['get', '/spur/dev/texlive/archive/:datei', 'texLiveFake'],
       ['post', '/spur/dev/quelle-vergroessern', 'quelleVergroessern'],
     ]
     for (const [methode, pfad] of dev) expect(route(methode, pfad)).toBeUndefined()
     await laden({ dev: true })
     for (const [methode, pfad, handler] of dev) expect(handlerVon(route(methode, pfad))).toBe(handler)
+    expect(handlerVon(route('get', '/spur/dev/proxy-pdf/output.pdf'))).toBe('proxySperre:SPUR_PROXY_PDF')
+    expect(handlerVon(route('post', '/project/:Project_id/compile'))).toBe('pdfUmleiten')
+    const quellen = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/quellen')
+    expect(quellen.map(handlerVon)).toEqual(['proxySperre:SPUR_PROXY_API', 'quellenListe'])
+    const automatik = routen.filter(r => r.methode === 'put' && r.pfad === '/spur/project/:project_id/claude/automatik')
+    expect(automatik.map(handlerVon)).toEqual(['speicherFehler:SPUR_AUTOMATIK_FEHLER', 'automatikSetzen'])
+    const claude = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/claude')
+    expect(claude.map(handlerVon)).toEqual(['proxySperre:SPUR_CLAUDE_FEHLER', 'claudeStatus'])
+    const zellen = routen.filter(r => r.methode === 'put' && r.pfad === '/spur/project/:project_id/matrix/zellen')
+    expect(zellen.map(handlerVon).at(0)).toBe('speicherFehler:SPUR_MATRIX_FEHLER')
+    const bericht = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/pruefbericht')
+    expect(bericht.map(handlerVon).at(0)).toBe('proxySperre:SPUR_PRUEFBERICHT_FEHLER')
+    const bild = routen.filter(r => r.methode === 'get' && r.pfad === '/spur/project/:project_id/quellen/:quelle_id/seiten/:seite/bild')
+    expect(bild.map(handlerVon)).toEqual(['proxySperre:SPUR_SEITENBILD_FEHLER', 'quelleBild'])
   })
 })
 

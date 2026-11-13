@@ -94,9 +94,9 @@ describe('warteAufEreignis', () => {
   it('liefert den ältesten offenen Auftrag genau einmal', async () => {
     await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'erster' })
     await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'zweiter' })
-    const a = await Inbox.warteAufEreignis(bot, kurz(2000))
-    const b = await Inbox.warteAufEreignis(bot, kurz(2000))
-    const c = await Inbox.warteAufEreignis(bot, kurz(150))
+    const { ereignis: a } = await Inbox.warteAufEreignis(bot, kurz(2000))
+    const { ereignis: b } = await Inbox.warteAufEreignis(bot, kurz(2000))
+    const { ereignis: c } = await Inbox.warteAufEreignis(bot, kurz(150))
     expect([a.daten.text, b.daten.text, c]).toEqual(['erster', 'zweiter', null])
     expect(a).toMatchObject({ typ: 'task_created', project_id: projekt })
   })
@@ -106,14 +106,14 @@ describe('warteAufEreignis', () => {
     await new Promise(r => setTimeout(r, 100))
     const start = Date.now()
     await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'neu' })
-    const ereignis = await wartend
+    const { ereignis } = await wartend
     expect(ereignis.daten.text).toBe('neu')
     expect(Date.now() - start).toBeLessThan(1000)
   })
 
   it('liefert keine Aufträge anderer Bots', async () => {
     await Inbox.auftragAnlegen({ projectId: projekt, botId: new ObjectId(), text: 'fremd' })
-    expect(await Inbox.warteAufEreignis(bot, kurz(150))).toBeNull()
+    expect(await Inbox.warteAufEreignis(bot, kurz(150))).toEqual({ ereignis: null, abgeloest: false })
   })
 
   it('beendet den älteren Aufruf, wenn derselbe Bot erneut wartet', async () => {
@@ -121,9 +121,9 @@ describe('warteAufEreignis', () => {
     await new Promise(r => setTimeout(r, 100))
     // Großzügig: Der Aufruf endet, sobald der Auftrag da ist; unter Last (Overleafs Gesamtlauf) dauert das länger.
     const neu = Inbox.warteAufEreignis(bot, kurz(15000))
-    expect(await alt).toBeNull()
+    expect(await alt).toEqual({ ereignis: null, abgeloest: true })
     await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'für den neuen' })
-    expect((await neu).daten.text).toBe('für den neuen')
+    expect((await neu).ereignis.daten.text).toBe('für den neuen')
   }, 30000)
 
   it('gibt einen Auftrag wieder frei, wenn der Aufruf abgebrochen wird, während er ihn holt', async () => {
@@ -148,12 +148,29 @@ describe('warteAufEreignis', () => {
     }
     try {
       await laden()
-      expect(await Inbox.warteAufEreignis(bot, { signal: abbruch.signal, maxMs: 60000 })).toBeNull()
+      expect((await Inbox.warteAufEreignis(bot, { signal: abbruch.signal, maxMs: 60000 })).ereignis).toBeNull()
     } finally {
       datenbank.mongodbModul.getCollectionInternal = echt
     }
     await laden()
-    expect((await Inbox.warteAufEreignis(bot, kurz(2000))).daten.text).toBe('darf nicht verloren gehen')
+    expect((await Inbox.warteAufEreignis(bot, kurz(2000))).ereignis.daten.text).toBe('darf nicht verloren gehen')
+  })
+
+  it('liefert zehn Aufträge in Folge mit je einem neuen Aufruf genau einmal', async () => {
+    const angekommen = []
+    for (let i = 0; i < 10; i++) {
+      const wartend = Inbox.warteAufEreignis(bot, kurz(5000))
+      await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: `auftrag ${i}` })
+      angekommen.push((await wartend).ereignis.daten.text)
+    }
+    expect(angekommen).toEqual(Array.from({ length: 10 }, (_, i) => `auftrag ${i}`))
+    expect((await Inbox.warteAufEreignis(bot, kurz(150))).ereignis).toBeNull()
+  })
+
+  it('wartet ohne Angabe 100 Sekunden, im Dev-Stack über den Testschalter kürzer', async () => {
+    expect(Inbox.standardWarteSekunden()).toBe(100)
+    schalter.test = { SPUR_WARTEN_S: '2' }
+    expect(Inbox.standardWarteSekunden()).toBe(2)
   })
 })
 
@@ -170,6 +187,29 @@ describe('verbunden', () => {
 })
 
 describe('seit', () => {
+  it('liefert ohne Cursor die neuesten 100 Ereignisse in zeitlicher Folge', async () => {
+    for (let i = 0; i < 105; i++) await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: `e${i}` })
+    const { ereignisse, cursor } = await Inbox.seit(bot)
+    expect(ereignisse).toHaveLength(100)
+    expect(ereignisse[0].daten.text).toBe('e5')
+    expect(ereignisse.at(-1).daten.text).toBe('e104')
+    expect(cursor).toEqual(ereignisse.at(-1).id)
+  })
+
+  it('stellt gelesene Ereignisse nicht noch einmal über warteAufEreignis zu', async () => {
+    await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'gelesen' })
+    await Inbox.seit(bot)
+    expect((await Inbox.warteAufEreignis(bot, kurz(150))).ereignis).toBeNull()
+  })
+
+  it('letzterCursor nennt das neueste Ereignis des Bots', async () => {
+    expect(await Inbox.letzterCursor(bot)).toBe(null)
+    await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'a' })
+    await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text: 'b' })
+    const { ereignisse } = await Inbox.seit(bot)
+    expect(String(await Inbox.letzterCursor(bot))).toBe(String(ereignisse.at(-1).id))
+  })
+
   it('liefert Ereignisse nach dem Cursor und den neuen Cursor', async () => {
     for (const text of ['a', 'b', 'c']) await Inbox.auftragAnlegen({ projectId: projekt, botId: bot, text })
     const alle = await Inbox.seit(bot)

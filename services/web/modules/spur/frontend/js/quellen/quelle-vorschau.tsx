@@ -6,6 +6,7 @@ import OLIconButton from '@/shared/components/ol/ol-icon-button'
 import OLFormControl from '@/shared/components/ol/ol-form-control'
 import OLFormLabel from '@/shared/components/ol/ol-form-label'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
+import MaterialIcon from '@/shared/components/material-icon'
 import Notification from '@/shared/components/notification'
 import { usePermissionsContext } from '@/features/ide-react/context/permissions-context'
 import { jsonAnfrage, projektPfad } from '../api'
@@ -67,15 +68,25 @@ export default function QuelleVorschau({
         ) : (
           <SeitenBlaettern quelle={quelle} nummer={nummer} seite={seite} setNummer={setNummer} />
         )}
-        {seite && (
-          <OLIconButton
+        {!quelle.web && (
+          <OLButton
             variant="ghost"
             size="sm"
-            icon="open_in_full"
-            accessibilityLabel={t('spur_gross_oeffnen')}
-            onClick={() => setGross(true)}
-          />
+            className="icon-button-small"
+            href={projektPfad(`${basis}/datei`)}
+            download={quelle.dateiname}
+            aria-label={t('spur_original_herunterladen')}
+          >
+            <MaterialIcon className="icon-small" type="download" />
+          </OLButton>
         )}
+        <OLIconButton
+          variant="ghost"
+          size="sm"
+          icon="open_in_full"
+          accessibilityLabel={t('spur_gross_oeffnen')}
+          onClick={() => setGross(true)}
+        />
       </div>
       <div className="spur-panel-inhalt">
         {seitenFehler && <Notification type="warning" content={seitenFehler} />}
@@ -162,7 +173,14 @@ export default function QuelleVorschau({
         )}
       </div>
       {gross && (
-        <QuelleGross quelle={quelle} startSeite={nummer} schliessen={() => setGross(false)} />
+        <QuelleGross
+          quelle={quelle}
+          startSeite={nummer}
+          schliessen={letzte => {
+            setNummer(letzte)
+            setGross(false)
+          }}
+        />
       )}
       {loeschDialog && (
         <QuelleLoeschenModal

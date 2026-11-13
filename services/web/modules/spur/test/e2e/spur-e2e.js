@@ -111,20 +111,44 @@ async page => {
     if (begriff) await feld.press('Enter')
   }
 
+  // Filter des Prüfberichts („Alle“, „Markiert“, …); ohne Stellen gibt es keinen Filter.
+  async function berichtFilter(name) {
+    const knopf = page.locator('.spur-filter label', { hasText: new RegExp(`^${name} \\d+$`) })
+    if (await knopf.isVisible()) await knopf.click()
+  }
+
+  // Seltene Aktionen des Quellen-Panels stehen im Menü „Weitere Aktionen“.
+  async function quellenMenue(name) {
+    await page.locator('.spur-panel').getByRole('button', { name: 'Weitere Aktionen' }).click()
+    await page.getByRole('menuitem', { name, exact: true }).click()
+  }
+
   async function quelleHolen(projekt) {
-    await page.getByRole('button', { name: 'Aus anderem Projekt holen' }).click()
+    await quellenMenue('Aus anderem Projekt holen')
     await page.getByLabel('Projekt', { exact: true }).selectOption({ label: projekt })
     await page.locator('.modal').getByRole('button', { name: 'Holen', exact: true }).click()
     await page.locator('.modal').waitFor({ state: 'detached' })
   }
 
+  // Markiert `text` im Seitentext, auch über mehrere Zeilen der Textebene über dem Seitenbild.
   async function textMarkieren(text, bereich = page) {
-    await bereich.locator('.spur-seitentext').evaluate((el, gesucht) => {
-      const knoten = el.firstChild
-      const start = knoten.textContent.indexOf(gesucht)
+    await bereich.locator('.spur-seitentext', { hasText: text.split(' ')[0] }).first().evaluate((el, gesucht) => {
+      const knoten = []
+      const gang = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      while (gang.nextNode()) knoten.push(gang.currentNode)
+      const ganz = knoten.map(k => k.textContent).join('')
+      const start = ganz.indexOf(gesucht)
+      if (start < 0) throw new Error(`Nicht im Seitentext: ${gesucht}`)
+      const stelle = ziel => {
+        let rest = ziel
+        for (const k of knoten) {
+          if (rest <= k.textContent.length) return [k, rest]
+          rest -= k.textContent.length
+        }
+      }
       const bereich = document.createRange()
-      bereich.setStart(knoten, start)
-      bereich.setEnd(knoten, start + gesucht.length)
+      bereich.setStart(...stelle(start))
+      bereich.setEnd(...stelle(start + gesucht.length))
       const auswahl = document.getSelection()
       auswahl.removeAllRanges()
       auswahl.addRange(bereich)
@@ -293,6 +317,12 @@ async page => {
     ok(r.status() === 204, `Fake-Steuerung: ${r.status()}`)
   }
 
+  // „Zitiert von“ und „Zitiert“ stehen je Treffer im Menü „Weitere Aktionen“.
+  async function trefferMenue(treffer, name) {
+    await treffer.getByRole('button', { name: 'Weitere Aktionen' }).click()
+    await page.getByRole('menuitem', { name, exact: true }).click()
+  }
+
   async function paperSuchen(anfrage) {
     await page.getByRole('searchbox', { name: 'Paper suchen' }).fill(anfrage)
     await page.getByRole('button', { name: 'Suchen', exact: true }).click()
@@ -304,6 +334,8 @@ async page => {
   async function trefferDois() {
     return await page.locator('.spur-paper-doi').allTextContents()
   }
+
+  const ZAEHLUNG_BERICHT = 'Zitierstellen: 6 geprüft, davon 3 markiert, 2 ohne Quelle, 1 nicht prüfbar'
 
   const features = {
     async f1() {
@@ -429,8 +461,8 @@ async page => {
       await panelOeffnen('Quellen')
       await page.getByRole('button', { name: 'smith2024.pdf' }).waitFor()
       ok(
-        (await page.getByRole('button', { name: 'Hochladen' }).count()) === 0,
-        'read-Mitglied sieht Hochladen'
+        (await page.getByRole('button', { name: 'Quelle hinzufügen' }).count()) === 0,
+        'read-Mitglied sieht „Quelle hinzufügen“'
       )
       await page.getByRole('button', { name: 'smith2024.pdf' }).click()
       await page.locator('img.spur-seitenbild').waitFor()
@@ -484,7 +516,7 @@ async page => {
 
       await projektOeffnen('E2E Viele')
       await panelOeffnen('Quellen')
-      await sichtbar('100 von 300 angezeigt')
+      await sichtbar('100 von 300')
       const start = Date.now()
       await suchen('seltene Wortfolge')
       await page.locator('.spur-zeile-auszug', { hasText: 'seltene Wortfolge' }).waitFor()
@@ -509,7 +541,7 @@ async page => {
       await anmelden('e2e-a@example.org')
       await projektOeffnen('E2E APA')
       await panelOeffnen('Quellen')
-      await page.getByRole('button', { name: 'Aus anderem Projekt holen' }).click()
+      await quellenMenue('Aus anderem Projekt holen')
       await page.getByLabel('Projekt', { exact: true }).selectOption({ label: 'Demo' })
       await page.getByRole('button', { name: 'Holen', exact: true }).click()
       await sichtbar('1 Quelle geholt')
@@ -525,7 +557,7 @@ async page => {
 
       const [download] = await Promise.all([
         page.waitForEvent('download'),
-        page.getByRole('link', { name: 'Quellen exportieren' }).click(),
+        quellenMenue('Quellen exportieren'),
       ])
       ok(download.suggestedFilename() === 'quellen.zip', 'ZIP-Name falsch')
 
@@ -631,6 +663,8 @@ async page => {
         await zeile(text).getByText(status, { exact: true }).waitFor({ timeout: 30000 })
       }
       await zeigt('kapitel.tex', 'Wortlaut: exakt')
+      // P8 f2: Kopfzeile auf den frischen Testdaten, bevor dieser Schritt das Projekt ändert.
+      await page.getByText(ZAEHLUNG_BERICHT, { exact: true }).waitFor({ timeout: 30000 })
       await zeigt('Sleep supports […] declarative memory.', 'Wortlaut: exakt')
       await zeigt('Sleep strongly supports', 'Wortlaut: abweichend')
       await zeigt('hippocampus replays', 'Wortlaut: mit Trennungstoleranz')
@@ -651,7 +685,7 @@ async page => {
       )
       await zeigt('korrigiert', 'Korrektur vorhanden')
       await zeigt('Sleep supports […] declarative memory.', 'Keine Meldung in Crossref')
-      await zeigt('unbekannt', 'DOI bei Crossref unbekannt')
+      await zeigt('unbekannt', 'DOI nicht registriert')
       await zeigt('footfullcite', 'Nicht prüfbar')
 
       await panelOeffnen('Quellen')
@@ -666,14 +700,14 @@ async page => {
       await zeigt('Sleep supports […] declarative memory.', 'Seite: bestätigt')
 
       const alle = await page.locator('.spur-zeile').count()
-      await page.getByLabel('Nur Probleme').check()
+      await berichtFilter('Markiert')
       const probleme = await page.locator('.spur-zeile').count()
       ok(probleme < alle, `Filter: ${probleme} von ${alle}`)
       ok(
         (await page.locator('.spur-zeile', { hasText: 'kapitel.tex' }).count()) === 0,
         'Grüne Zeile trotz Filter'
       )
-      await page.getByLabel('Nur Probleme').uncheck()
+      await berichtFilter('Alle')
 
       // P6: Der Cache von Abschnitten erscheint nicht mehr; die Zählung der Zitierstellen bleibt gleich.
       const zaehlung = await page.getByText(/^Zitierstellen: /).innerText()
@@ -716,6 +750,7 @@ async page => {
       await page.goto(`${BASE}/user/settings`)
       await page.locator('.spur-token').first().waitFor()
       await page.locator('.spur-token').first().getByRole('button', { name: 'Widerrufen' }).click()
+      await page.locator('.modal').getByRole('button', { name: 'Widerrufen' }).click()
       let status = 200
       for (let versuch = 0; versuch < 20 && status !== 401; versuch++) {
         await page.waitForTimeout(250)
@@ -947,7 +982,7 @@ async page => {
     await imEditor('Ergänzt von Claude.')
     ok((await page.locator('.modal').count()) === 0, 'Modal erschienen')
     // Ohne Neuladen: Das Review-Panel nennt Claude, nicht „Deleted user“ (Bot ist kein Mitglied).
-    await panelSichern('Review panel', page.locator('.review-panel-entry-user').first())
+    await panelSichern('Überprüfung', page.locator('.review-panel-entry-user').first())
     await page
       .locator('.review-panel-entry-user', { hasText: 'Claude (e2e-a)' })
       .first()
@@ -955,7 +990,7 @@ async page => {
       .catch(async () =>
         fail(`Review-Panel: ${(await page.locator('.review-panel-entry-user').allInnerTexts()).join(' | ')}`)
       )
-    await railTab('Review panel').click()
+    await railTab('Überprüfung').click()
     const bots = await jsonVon(`/project/${pid}/changes/users`)
     ok(bots.some(u => u.first_name === 'Claude' && u.last_name === '(e2e-a)'), `Autoren: ${JSON.stringify(bots)}`)
     const ranges = await jsonVon(`/project/${pid}/ranges`)
@@ -1092,7 +1127,9 @@ async page => {
   const laufAktion = (pid, laufId, aktion, body = {}) =>
     seitenPost(`/spur/project/${pid}/laeufe/${laufId}/${aktion}`, body)
 
-  const karte = () => page.locator('.spur-lauf-karte')
+  // Die neueste Lauf-Karte steht oben im Claude-Panel.
+  const karte = () => page.locator('.spur-lauf-karte').first()
+  const AUTOMATIK = { name: 'Alles von Claude automatisch annehmen' }
 
   features.f13 = async () => {
     const { pid, token, edit, fertig, lauf, changesVonClaude } = await laufProjekt()
@@ -1226,13 +1263,13 @@ async page => {
     const { pid, token, edit, fertig, lauf, changesVonClaude } = await laufProjekt()
     const offen = await lauf()
     if (offen?.status === 'offen') await laufAktion(pid, offen.id, 'ablehnen')
+    // Der Schalter wirkt ab dem nächsten Schreiben (P9); erst auf die Antwort warten, dann schreiben.
+    const schalter = page.getByRole('switch', AUTOMATIK)
+    await schalter.waitFor({ timeout: 20000 })
+    if (!(await schalter.isChecked())) {
+      await Promise.all([page.waitForResponse(r => r.url().endsWith('/claude/automatik')), schalter.check()])
+    }
     ok(!(await edit({ alt: 'Gamma', neu: 'Gamma eins' })).fehler, 'Start')
-    await karte().waitFor({ timeout: 20000 })
-    // Erst auf die Antwort warten, dann klicken: sonst kann sie vor dem Warten schon da sein.
-    await Promise.all([
-      page.waitForResponse(r => r.url().endsWith('/claude/automatik')),
-      page.getByLabel('Automatisch annehmen, wenn ein Lauf ohne Probleme endet').check(),
-    ])
     await fertig('Grüner Lauf')
     ok((await lauf()).status === 'angenommen', 'Grüner Lauf nicht angenommen')
     ok(!(await changesVonClaude()).some(c => c.op.i?.includes(' eins')), 'Changes nach Automatik')
@@ -1303,7 +1340,7 @@ async page => {
     await anmelden('e2e-review@example.org')
     await laufProjekt('e2e-review@example.org')
     ok(
-      (await page.getByLabel('Automatisch annehmen, wenn ein Lauf ohne Probleme endet').count()) === 0,
+      (await page.getByRole('switch', AUTOMATIK).count()) === 0,
       'review sieht Automatik'
     )
     const reviewPut = await page.evaluate(async p => {
@@ -1362,7 +1399,7 @@ async page => {
     ok(Math.abs(arxiv[1] - arxiv[0]) >= 3000, `arXiv-Abstand ${Math.abs(arxiv[1] - arxiv[0])} ms`)
 
     await paperSuchen('xyzzy')
-    await page.locator('.spur-panel-inhalt').getByText('Keine Treffer', { exact: true }).waitFor()
+    await page.locator('.spur-panel-inhalt').getByText('Keine Treffer für „xyzzy“. Prüf die Schreibweise oder such nach der DOI.', { exact: true }).waitFor()
   }
 
   features.p2f2 = async () => {
@@ -1372,10 +1409,10 @@ async page => {
     await page.getByRole('tab', { name: 'Treffer' }).click()
     await paperSuchen('sleep memory consolidation')
     const treffer = paperTreffer('The memory function of sleep')
-    await treffer.getByRole('button', { name: 'Zitiert von', exact: true }).click()
+    await trefferMenue(treffer, 'Zitiert von')
     const zitiertVon = treffer.getByRole('region', { name: 'Zitiert von' })
     await zitiertVon.getByText('Sleep spindles predict overnight memory consolidation').waitFor()
-    await treffer.getByRole('button', { name: 'Zitiert', exact: true }).click()
+    await trefferMenue(treffer, 'Zitiert')
     const zitiert = treffer.getByRole('region', { name: 'Zitiert', exact: true })
     await zitiert.getByText('Sleep and Memory', { exact: true }).waitFor()
     const imPanel = await zitiertVon.locator('.spur-paper-doi').allTextContents()
@@ -1477,7 +1514,9 @@ async page => {
     const dois = text => [...text.matchAll(/10\.\d{4,9}\/[^\s},"]+/g)].map(t => t[0]).sort().join()
     const erwartet = '10.1038/nrn2762,10.5555/spur.2024.001'
     for (const format of ['.bib', '.ris', 'CSV']) {
-      const knopf = page.getByRole('link', { name: `Als ${format} exportieren` })
+      // P9: Die Exporte stehen im Menü „Liste exportieren“.
+      await page.getByRole('button', { name: 'Liste exportieren' }).click()
+      const knopf = page.getByRole('menuitem', { name: `Als ${format} exportieren` })
       const [download] = await Promise.all([page.waitForEvent('download'), knopf.click()])
       const text = await (await page.request.get(download.url())).text()
       ok(dois(text) === erwartet, `${format}: ${dois(text)}`)
@@ -1502,7 +1541,7 @@ async page => {
     await panelOeffnen('Quellen')
     const dialog = page.locator('.modal')
     const zotero = async () => {
-      await page.getByRole('button', { name: 'Importieren', exact: true }).click()
+      await quellenMenue('Importieren')
       await dialog.getByLabel('Sammlung').selectOption({ label: 'Schlaf und Gedächtnis' })
       await dialog.getByRole('button', { name: 'Aus Zotero importieren' }).click()
     }
@@ -1523,7 +1562,7 @@ async page => {
     await zeile('kapitel.tex').getByText('Dieser Dateityp wird nicht unterstützt', { exact: false }).waitFor({ timeout: 30000 })
     await dialog.getByRole('button', { name: 'Schließen' }).click()
     await dialog.waitFor({ state: 'detached' })
-    const quellen = page.locator('.spur-panel .spur-liste .spur-zeile-link')
+    const quellen = page.locator('.spur-panel .spur-liste .spur-quelle-titel')
     await page.locator('.spur-panel').getByRole('button', { name: 'retracted.pdf' }).waitFor()
     ok((await quellen.count()) === 2, `Quellen: ${await quellen.allTextContents()}`)
 
@@ -1579,7 +1618,7 @@ async page => {
 
     const dialog = page.locator('.modal')
     const matrixOeffnen = async () => {
-      await page.getByRole('button', { name: 'Literaturmatrix' }).click()
+      await quellenMenue('Literaturmatrix')
       await dialog.locator('caption').waitFor({ timeout: 10000 })
     }
     await matrixOeffnen()
@@ -1730,8 +1769,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     ok(JSON.stringify(frei.inhalt.zahlen_ohne_beleg) === '["412"]', `Fließtext: ${JSON.stringify(frei.inhalt)}`)
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Satz mit Zahl' })
     await karte().getByText('Satz mit Zahl').waitFor({ timeout: 20000 })
-    await karte().getByText('Zahl ohne Beleg', { exact: true }).waitFor()
-    await karte().getByText('„412“ in main.tex: Bitte als Makro aus ergebnisse.tex einsetzen.').waitFor()
+    await karte().getByText('Zahl ohne Beleg: 412', { exact: true }).waitFor()
 
     const erlaubt = await aufruf('doc_edit', {
       pfad: 'main.tex',
@@ -1889,7 +1927,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await projektOeffnen('E2E Team')
     await panelOeffnen('Quellen')
     await quelleSeite3('smith2024.pdf')
-    await sichtbar('Markiere oben Text und speichere ihn als Zitat.')
+    await sichtbar('Markiere Text auf der Seite und speichere ihn als Zitat.')
 
     const a = await zweiteSeite()
     try {
@@ -2036,7 +2074,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await sichtbar('Noch keine Quellen')
     await zeitSetzen('2026-11-01T09:00:00.000Z')
     try {
-      await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+      await quellenMenue('Webseite aufnehmen')
       await page.getByLabel('Adresse der Webseite').fill(TESTSEITE)
       // Erst nach der Antwort freigeben: Der Server liest die Zeit beim Speichern.
       await Promise.all([
@@ -2069,7 +2107,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     // Nicht erreichbar: Meldung, keine neue Quelle.
     await railTab('Quellen').click()
     await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
-    await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+    await quellenMenue('Webseite aufnehmen')
     await page.getByLabel('Adresse der Webseite').fill('http://nicht-erreichbar.invalid/')
     await page.getByRole('button', { name: 'Aufnehmen', exact: true }).click()
     await sichtbar('Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.')
@@ -2079,6 +2117,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     )
     const quellenListe = page.getByRole('tabpanel', { name: 'Quellen' }).locator('.spur-liste li')
     ok((await quellenListe.count()) === 1, `Nicht erreichbare Seite gespeichert: ${await quellenListe.count()}`)
+    await page.keyboard.press('Escape')
   }
 
   // Liest eine Datei des Repos über ein Dateifeld (das run-code-Werkzeug hat kein fs).
@@ -2102,7 +2141,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await hinweis.waitFor()
     // Der Hinweis steht unter dem Upload-Knopf.
     const [knopf, text] = await Promise.all([
-      page.getByRole('button', { name: 'Hochladen', exact: true }).boundingBox(),
+      page.getByRole('button', { name: 'Quelle hinzufügen', exact: true }).first().boundingBox(),
       hinweis.boundingBox(),
     ])
     ok(text.y > knopf.y, 'Hinweis steht nicht unter dem Upload')
@@ -2134,8 +2173,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const pid = page.url().split('/').pop()
     await panelOeffnen('Claude')
     await claudePanel().getByText('Claude nicht verbunden').waitFor()
+    await startbefehlZeigen()
     await claudePanel().getByText(/claude --allowedTools/).waitFor()
-    ok((await claudePanel().getByLabel('Auftrag an Claude').count()) === 0, 'Eingabefeld ohne Verbindung')
+    ok(await claudePanel().getByLabel('Auftrag an Claude').isDisabled(), 'Eingabefeld ohne Verbindung bedienbar')
+    await claudePanel().getByText('Verbinde zuerst Claude').waitFor()
 
     await verbinden(ADA)
     const feld = claudePanel().getByLabel('Auftrag an Claude')
@@ -2157,7 +2198,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       idempotenz_schluessel: schluessel(),
     })
     ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
-    await chatLog().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
+    await claudePanel().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
     await werkzeug(ADA, 'reply', { project_id: pid, text: 'Abschnitt 2: Schlaf stärkt das Gedächtnis.' })
     await chatLog().getByText('Abschnitt 2: Schlaf stärkt das Gedächtnis.').waitFor({ timeout: 10000 })
     const reihenfolge = await chatLog().locator('.spur-chat-nachricht .spur-nachricht-text').allInnerTexts()
@@ -2191,8 +2232,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const neueste = chatLog().locator('.spur-chat-nachricht').last()
     ok(
       await neueste.evaluate(el => {
+        // P9: Der Verlauf rollt in eigenem Bereich unter den Läufen; dort steht die neueste Nachricht unten.
         const r = el.getBoundingClientRect()
-        return r.bottom <= window.innerHeight && r.top >= 0
+        const bereich = el.closest('.spur-chat-verlauf').getBoundingClientRect()
+        return r.bottom <= bereich.bottom + 1 && r.top >= bereich.top - 1
       }),
       `Neueste Nachricht nach dem Laden nicht sichtbar: ${await neueste.innerText()}`
     )
@@ -2250,7 +2293,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   // bereit ist das Panel erst, wenn der Kommentartext selbst sichtbar ist.
   async function reviewEintrag(text) {
     const eintrag = page.locator('.review-panel-entry', { hasText: text })
-    await panelSichern('Review panel', eintrag.getByText(text).first())
+    await panelSichern('Überprüfung', eintrag.getByText(text).first())
     return eintrag
   }
 
@@ -2357,7 +2400,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await projektOeffnen('E2E Vorschläge')
     await panelOeffnen('Vorschläge')
     await auswahlIst('Compile-Fehler', 'Projekt: Vorschlag')
-    ok((await vorschlaegePanel().getByText('Projekt-Standard für alle Mitglieder').count()) === 1, 'Bo darf schreiben')
+    ok((await vorschlaegePanel().getByText('Standard für alle im Projekt', { exact: true }).count()) === 1, 'Bo darf schreiben')
     await aufAntwort('/vorschlaege/eigene', () => vorschlaegePanel().getByLabel('Compile-Fehler', { exact: true }).selectOption('aus'))
     await auswahlIst('Compile-Fehler', 'Aus')
 
@@ -2421,12 +2464,12 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     })
     ok(!edit.fehler, `doc_edit nach Übernehmen: ${JSON.stringify(edit.inhalt)}`)
     await panelOeffnen('Claude')
-    await chatLog().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
+    await claudePanel().locator('.spur-lauf-karte').waitFor({ timeout: 15000 })
 
     // Tageslimit 2 an einem festen Tag: der dritte Auslöser erzeugt nichts.
     await panelOeffnen('Vorschläge')
     await vorschlaegePanel().getByLabel('Tageslimit, für alle Projekte').fill('2')
-    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().getByRole('button', { name: 'Limit speichern' }).click())
+    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().locator('.spur-vorschlag-limit').getByRole('button', { name: 'Speichern' }).click())
     const docId = (await werkzeug(ADA, 'doc_list', { project_id: pid })).inhalt.eintraege.find(e => e.pfad === 'main.tex').id
     const vorLimit = (await ereignisseVon(ADA, 'suggest_trigger')).length
     await zeitSetzen('2026-11-20T09:00:00.000Z')
@@ -2449,7 +2492,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const fremd = await seitenPost(`/spur/project/${pid}/vorschlaege/tipp-pause`, { doc_id: 'a'.repeat(24) })
     ok(fremd.status === 404 && fremd.daten?.title === 'doc_fehlt', `Tipp-Pause mit unbekanntem Dokument: ${JSON.stringify(fremd)}`)
     await vorschlaegePanel().getByLabel('Tageslimit, für alle Projekte').fill('50')
-    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().getByRole('button', { name: 'Limit speichern' }).click())
+    await aufAntwort('/spur/vorschlaege/limit', () => vorschlaegePanel().locator('.spur-vorschlag-limit').getByRole('button', { name: 'Speichern' }).click())
     await vorschlaegePanel().getByText('Tageslimit erreicht').waitFor({ state: 'detached', timeout: 10000 })
 
     // 60 Sekunden Tipp-Pause: vorher nichts, danach genau ein Ereignis.
@@ -2570,6 +2613,20 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   // P5: Nachbesserungen aus der Abnahme.
   async function breite(px) {
     await page.setViewportSize({ width: px, height: px < 400 ? 740 : 690 })
+  }
+
+  // Der Fokus liegt (spätestens nach `timeout`) auf dem Element; sonst nennt die Meldung, wo er gelandet ist. Der Locator
+  // wird bei jeder Abfrage neu aufgelöst und sieht auch in Shadow-DOMs (Kommentarfelder des Review-Panels).
+  async function fokusAuf(element, wann, timeout = 5000) {
+    const da = await element.and(page.locator(':focus')).first().waitFor({ state: 'attached', timeout }).then(() => true, () => false)
+    if (da) return
+    // Das tiefste fokussierte Element, auch hinter Shadow-Hosts.
+    const wo = await page.evaluate(() => {
+      let a = document.activeElement
+      while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement
+      return a ? `${a.tagName}.${a.className}` : 'nichts'
+    })
+    ok(false, `Fokus ${wann} auf ${wo}`)
   }
 
   async function ohneSeitlichesRollen(wo) {
@@ -2721,10 +2778,16 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   ]
   const SCHREIBWERKZEUGE = ['quote_mark', 'doc_edit', 'doc_create', 'reply', 'run_finish', 'wait_for_event']
   const START_WERKZEUGE = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
-  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur."`
-  const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur."`
+  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur. Bei ereignis: null rufst du es sofort erneut auf, bei abgeloest tust du nichts; einen Auftrag erledigst du und rufst danach wait_for_event erneut auf."`
+  const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again."`
 
   // Kein Kasten ist breiter als sein Container, kein Befehl wird abgeschnitten.
+  // P9: Ist der Startbefehl schon bekannt, steht er eingeklappt hinter „Startbefehl anzeigen“.
+  async function startbefehlZeigen() {
+    const zeigen = claudePanel().getByRole('button', { name: 'Startbefehl anzeigen' })
+    if (await zeigen.isVisible()) await zeigen.click()
+  }
+
   async function kaestenGanz(wo) {
     const falsch = await page.locator('.spur-befehl-kasten').evaluateAll(kaesten =>
       kaesten
@@ -2778,6 +2841,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await projektOeffnen('Demo')
     await panelOeffnen('Claude')
     await claudePanel().getByText('Claude nicht verbunden').waitFor()
+    await startbefehlZeigen()
     const kasten = claudePanel().locator('.spur-befehl-kasten')
     ok((await kasten.locator('pre').textContent()) === START, `Startbefehl im Panel: ${await kasten.locator('pre').textContent()}`)
     await kaestenGanz('Claude-Panel')
@@ -2790,6 +2854,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
         await page.reload()
         await page.locator('.cm-content').first().waitFor()
         await panelOeffnen('Claude')
+        await startbefehlZeigen()
         const kasten = claudePanel().locator('.spur-befehl-kasten')
         await kasten.waitFor()
         const schlecht = await unlesbar(kasten)
@@ -2816,7 +2881,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
           await hochladen('smith2024.pdf')
         }
         await page.getByRole('button', { name: 'smith2024.pdf' }).click()
-        await sichtbar('Markiere oben Text und speichere ihn als Zitat.')
+        await sichtbar('Markiere Text auf der Seite und speichere ihn als Zitat.')
         await panelOeffnen('Recherche')
         await sichtbar('Suche nach einem Thema, einem Titel oder einer DOI.')
         await panelOeffnen('Vorschläge')
@@ -2921,13 +2986,22 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await groesser.click()
     await groesser.click()
     await dialog.getByText('200 %', { exact: true }).waitFor()
-    ok(await groesser.isDisabled(), 'Vergrößern bei 200 % aktiv')
     const flaeche = dialog.locator('.spur-gross-bild')
-    ok(await flaeche.evaluate(el => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight), 'Seite bei 200 % nicht rollbar')
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.spur-gross-bild')
+      return el.scrollWidth > el.clientWidth
+    })
     await ohneSeitlichesRollen('Große Ansicht 200 %')
-    for (let i = 0; i < 4; i++) await kleiner.click()
+    await groesser.click()
+    await groesser.click()
+    await dialog.getByText('300 %', { exact: true }).waitFor()
+    ok(await groesser.isDisabled(), 'Vergrößern bei 300 % aktiv')
+    for (let i = 0; i < 6; i++) await kleiner.click()
     await dialog.getByText('75 %', { exact: true }).waitFor()
-    ok(await kleiner.isDisabled(), 'Verkleinern bei 75 % aktiv')
+    await kleiner.click()
+    await dialog.getByText('50 %', { exact: true }).waitFor()
+    ok(await kleiner.isDisabled(), 'Verkleinern bei 50 % aktiv')
+    ok(await flaeche.isVisible(), 'Seitenbereich fehlt')
 
     await dialog.getByRole('button', { name: 'Nächste Seite' }).click()
     await dialog.getByRole('button', { name: 'Nächste Seite' }).click()
@@ -2948,8 +3022,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const klein = await grossOeffnen()
     const box = await klein.dialog.locator('.modal-content').boundingBox()
     ok(box.width >= 355 && box.x <= 1, `Große Ansicht bei 360 px: ${JSON.stringify(box)}`)
+    // Erst messen, wenn der Dialog fertig eingeblendet ist; währenddessen liegen die Maße kurz unter dem Endwert.
+    await klein.dialog.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished.catch(() => {}))))
     const zuKlein = await klein.dialog.getByRole('button').evaluateAll(knoepfe =>
-      knoepfe.filter(k => k.offsetParent).map(k => [k.textContent.trim() || k.getAttribute('aria-label'), k.getBoundingClientRect()]).filter(([, r]) => r.width < 24 || r.height < 24).map(([n]) => n)
+      knoepfe.filter(k => k.offsetParent).map(k => [k.textContent.trim() || k.getAttribute('aria-label'), k.getBoundingClientRect()]).filter(([, r]) => r.width < 24 || r.height < 24).map(([n, r]) => `${n} ${r.width}×${r.height}`)
     )
     ok(zuKlein.length === 0, `Knöpfe unter 24 px: ${zuKlein}`)
     await ohneSeitlichesRollen('Große Ansicht 360 px')
@@ -2971,7 +3047,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await panelOeffnen('Quellen')
     const web = page.getByRole('button', { name: 'Schlafhygiene im Schichtdienst' })
     if (!(await web.isVisible())) {
-      await page.getByRole('button', { name: 'Webseite aufnehmen' }).click()
+      await quellenMenue('Webseite aufnehmen')
       await page.getByLabel('Adresse der Webseite').fill('http://127.0.0.1/spur/dev/web/testseite')
       await page.getByRole('button', { name: 'Aufnehmen', exact: true }).click()
     }
@@ -3123,8 +3199,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
     const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
-    ok(eintraege === 35, `Backlog hat ${eintraege} Einträge statt 35`)
-    ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /1616/.test(backlog), 'Backlog ohne Transformers, Tesseract oder 1616 Übersetzungen')
+    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei.
+    ok(eintraege === 41, `Backlog hat ${eintraege} Einträge statt 41`)
+    ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /lacks \d+ keys/.test(backlog), 'Backlog ohne Transformers, Tesseract oder fehlende Übersetzungen')
   }
 
   // P6: Befunde aus der ersten echten Claude-Session.
@@ -3144,6 +3221,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await panelOeffnen('Claude')
     // Ohne laufende Session; ein Herzschlag eines früheren Features gilt noch bis zu 45 s.
     await claudePanel().getByText('Claude nicht verbunden').waitFor({ timeout: 50000 })
+    await startbefehlZeigen()
     await claudePanel()
       .getByText('Starte Claude Code im Terminal mit diesem Befehl. Claude wartet danach von selbst auf Aufträge aus diesem Panel:', { exact: true })
       .waitFor()
@@ -3231,14 +3309,23 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await breite(1280)
     await anmelden('e2e-a@example.org')
     await projektOeffnen('E2E P6 Kommentar')
+    // p6f2 lässt kapitel.tex offen, und Overleaf öffnet die zuletzt offene Datei wieder.
+    const main = page.locator('.file-tree').getByRole('treeitem', { name: 'main.tex' })
+    await panelSichern(DATEIBAUM, main)
+    await main.click()
+    await page.locator('.cm-content', { hasText: 'Ergebnisse' }).waitFor()
     await imEditorMarkieren('Ergebnisse')
     await page.getByRole('button', { name: /^(Kommentar hinzufügen|Add comment)$/ }).click()
     const feld = page.locator('.review-panel-add-comment-editor .cm-content').first()
     const formular = page.locator('form.review-panel-entry-content')
     const hinweis = formular.getByText('Claude wird benachrichtigt', { exact: true })
     await feld.waitFor()
-    await feld.click()
+    // Overleaf setzt den neuen Kommentar erst an seine Stelle und fokussiert dann selbst das Feld (im Shadow-DOM);
+    // vorher Getipptes kann mit dem ersten Eintrag verschwinden. Wie ein Mensch: erst tippen, wenn der Cursor dort steht.
+    await fokusAuf(feld, 'im neuen Kommentar', 10000)
     await page.keyboard.type('@claude bitte ansehen')
+    const angekommen = await feld.filter({ hasText: '@claude bitte ansehen' }).waitFor({ timeout: 5000 }).then(() => true, () => false)
+    if (!angekommen) ok(false, `Getipptes nicht im Kommentarfeld: „${await feld.textContent({ timeout: 1000 }).catch(() => '(Feld nicht gefunden)')}“`)
     await hinweis.waitFor({ timeout: 5000 })
     const hinweisKasten = formular.locator('.spur-claude-hinweis')
     ok(!(await unlesbar(hinweisKasten)).length, `Hinweis schlecht lesbar: ${await unlesbar(hinweisKasten)}`)
@@ -3289,7 +3376,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
         await page.reload()
         await page.locator('.cm-content').first().waitFor()
         const eintrag = page.locator('.review-panel-entry', { hasText: 'bitte ansehen an mail@claude.de' })
-        await panelSichern('Review panel', eintrag.locator('.review-panel-comment-body').first())
+        await panelSichern('Überprüfung', eintrag.locator('.review-panel-comment-body').first())
         await eintrag.locator('.spur-claude-erwaehnung').first().waitFor()
         const schlecht = await unlesbar(eintrag.locator('.review-panel-comment-body').first())
         ok(schlecht.length === 0, `Kommentar im Design „${thema || 'dunkel'}“: ${schlecht}`)
@@ -3311,19 +3398,19 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
       await projektOeffnen('E2E P6 Crossref')
       const pid = page.url().split('/').pop()
       await panelOeffnen('Prüfbericht')
-      await page.getByLabel('Nur Probleme').setChecked(false)
+      await berichtFilter('Alle')
       await zeile('foods2022').getByText('Keine Meldung in Crossref', { exact: true }).waitFor({ timeout: 30000 })
       const foods = zeile('foods2022')
       ok(!/unbekannt|nicht prüfbar/.test(await foods.innerText()), `Gedrosselte DOI: ${await foods.innerText()}`)
       const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.pfad.includes(encodeURIComponent(FOODS)))
       ok(abrufe.length === 3, `Crossref-Abrufe für die gedrosselte DOI: ${abrufe.length}`)
-      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+      await zeile('erfunden').getByText('DOI nicht registriert', { exact: true }).waitFor()
 
       await fakeSteuern({ stoerungen: { [`crossref:${FOODS}`]: { status: 503 } }, cachesLeeren: true })
       await page.getByRole('button', { name: 'Erneut prüfen' }).click()
       await zeile('foods2022').getByText(NICHT_PRUEFBAR, { exact: true }).waitFor({ timeout: 30000 })
       ok(!/unbekannt/.test(await zeile('foods2022').innerText()), 'Ausfall erscheint als unbekannt')
-      await zeile('erfunden').getByText('DOI bei Crossref unbekannt', { exact: true }).waitFor()
+      await zeile('erfunden').getByText('DOI nicht registriert', { exact: true }).waitFor()
 
       const bib = (await werkzeug(token, 'bib_list', { project_id: pid })).inhalt.eintraege
       const foodsBib = bib.find(e => e.key === 'foods2022')
@@ -3444,12 +3531,12 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
     await projektOeffnen('E2E P6 Zahlen')
     await panelOeffnen('Claude')
-    const karte = claudePanel().locator('.spur-lauf-rot', { hasText: 'Zahl ohne Beleg' })
-    await karte.getByText('„0,89“ in main.tex', { exact: false }).waitFor({ timeout: 10000 })
-    await karte.getByText('„75.7“ in main.tex', { exact: false }).waitFor()
-    const text = await karte.innerText()
+    const karte = claudePanel().locator('.spur-lauf-hinweis', { hasText: 'Zahl ohne Beleg' }).first()
+    await karte.waitFor({ timeout: 10000 })
+    const karteZahlen = (await karte.innerText()).replace(/^Zahl ohne Beleg: /, '').split(', ')
+    ok(karteZahlen.includes('0,89') && karteZahlen.includes('75.7'), `Lauf-Karte: ${karteZahlen}`)
     for (const zahl of ['169', '11', '3.5', '2.25', '30', '234', '28', '10', '2', '3570']) {
-      ok(!text.includes(`„${zahl}“`), `Lauf-Karte meldet ${zahl}`)
+      ok(!karteZahlen.includes(zahl), `Lauf-Karte meldet ${zahl}`)
     }
 
     const neu = await werkzeug(token, 'doc_create', {
@@ -3465,14 +3552,14 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await breite(1280)
     await anmelden('e2e-a@example.org')
     const token = await neuesToken()
-    const ZAEHLUNG = 'Zitierstellen: 1 geprüft, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar'
+    const ZAEHLUNG = 'Zitierstellen: 1 geprüft, keine markiert, 4 ohne Quelle, 1 ohne Seitenangabe, 1 nicht prüfbar'
     const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
     try {
       await fakeSteuern({ cachesLeeren: true, stoerungen: { [`crossref:${FOODS}`]: { status: 503 } } })
       await projektOeffnen('E2E P6 Bericht')
       const pid = page.url().split('/').pop()
       await panelOeffnen('Prüfbericht')
-      await page.getByLabel('Nur Probleme').setChecked(false)
+      await berichtFilter('Alle')
       await page.getByText(ZAEHLUNG, { exact: true }).waitFor({ timeout: 60000 })
       for (const key of ['ohneA', 'ohneB', 'ohneC', 'ohneD']) {
         await zeile(key).getByText('keine Quelle aufgenommen', { exact: true }).waitFor()
@@ -3487,7 +3574,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
       const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
       ok(
-        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, nicht_pruefbar: 1 }),
+        JSON.stringify(bericht.zaehlung) === JSON.stringify({ geprueft: 1, ohne_quelle: 4, ohne_seitenangabe: 1, beleg_ohne_wortlaut: 0, nicht_pruefbar: 1, markiert: 0 }),
         `check_report: ${JSON.stringify(bericht.zaehlung)}`
       )
       const gruende = bericht.eintraege.map(z => z.grund).filter(Boolean).sort()
@@ -3805,7 +3892,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const ausbruch = await paket('spurtest-ausbruch')
     ok(ausbruch.fehler && ausbruch.inhalt.fehler === 'archiv_unsicher', `Ausbruch: ${JSON.stringify(ausbruch.inhalt)}`)
     const riesig = await paket('spurtest-riesig')
-    ok(riesig.fehler && riesig.inhalt.fehler === 'paket_zu_gross' && riesig.inhalt.detail.includes('20 MB'), `Riesig: ${JSON.stringify(riesig.inhalt)}`)
+    ok(riesig.fehler && riesig.inhalt.fehler === 'paket_zu_gross' && riesig.inhalt.detail.includes('100 MB'), `Riesig: ${JSON.stringify(riesig.inhalt)}`)
     const danach = await pfade()
     ok(!danach.some(p => p.startsWith('/tex-pakete')), `Nach Fehlern angelegt: ${danach}`)
 
@@ -3833,6 +3920,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
   const PROJEKTE_VOLL = 'Du hast 3 von 3 Projekten. Lösche ein Projekt endgültig oder frag deinen Admin.'
 
   async function seitenAnfrage(methode, pfad, body) {
+    // Nach dem Anmelden leitet die Seite noch weiter; das Token steht erst danach sicher im Kopf.
+    await page.waitForLoadState('load')
+    await page.locator('meta[name="ol-csrfToken"]').waitFor({ state: 'attached' })
     return await page.evaluate(
       async ([m, url, daten]) => {
         const token = document.querySelector('meta[name="ol-csrfToken"]').content
@@ -3867,7 +3957,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await grenzenSetzen({ projekte: '', speicherGb: '' })
     await page.goto(`${BASE}/project`)
     await page.getByRole('menuitem', { name: 'Admin' }).click()
-    await page.getByRole('menuitem', { name: 'Limits' }).click()
+    await page.getByRole('menuitem', { name: 'Grenzen' }).click()
     await page.waitForURL(GRENZEN)
     const stand = () => standardBereich().locator('dl').innerText()
     await standardBereich().locator('dl').waitFor()
@@ -3959,7 +4049,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await kopie.waitFor({ state: 'detached' })
 
     await page.getByRole('button', { name: 'Neues Projekt' }).first().click()
-    await page.getByRole('menuitem', { name: 'Existing project (.zip)' }).click()
+    await page.getByRole('menuitem', { name: 'Vorhandenes Projekt (.zip)' }).click()
     const zip = page.locator('.modal')
     await zip.locator('input[type=file]').first().setInputFiles({ name: 'grenze.zip', mimeType: 'application/zip', buffer: zipMitDatei('main.tex', 'Hallo') })
     await zip.getByText(PROJEKTE_VOLL).waitFor({ timeout: 30000 })
@@ -4113,8 +4203,8 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-grenze-c@example.org': { projekte: '', speicherGb: '' } })
     const REPO = `${FIXTURES}/../../../../../..`
     const readme = await repoDatei(`${REPO}/README.md`)
-    const betrieb = readme.split('### Limits\n')[1]?.split('\n### ')[0] ?? ''
-    ok(betrieb.includes('Admin → Limits') && betrieb.includes('unlimited'), 'README ohne Abschnitt zu den Grenzen')
+    const betrieb = readme.split('### Grenzen\n')[1]?.split('\n### ')[0] ?? ''
+    ok(betrieb.includes('Admin → Grenzen') && betrieb.includes('unlimited'), 'README ohne Abschnitt zu den Grenzen')
   }
 
   // Binärdatei aus dem Repo als Buffer (repoDatei liest Text).
@@ -4220,6 +4310,1939 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(/chemformula: \[[^\]]*'xfrac'/.test(test), 'Der Paket-Test kennt die Pakete nicht, die chemformula nachlädt')
   }
 
+  features.p8f1 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    const badge = (text, status) => zeile(text).locator('.badge', { hasText: status }).first()
+    const istRot = async loc =>
+      await loc.evaluate(el => {
+        const [r, g, b] = getComputedStyle(el).backgroundColor.match(/\d+/g).map(Number)
+        return r > 150 && g < 100 && b < 100
+      })
+    try {
+      await fakeSteuern({ cachesLeeren: true })
+      await projektOeffnen('E2E P8 DOI')
+      const pid = page.url().split('/').pop()
+      await panelOeffnen('Prüfbericht')
+      await berichtFilter('Alle')
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await badge('arxiv2024', 'Registriert bei DataCite').waitFor({ timeout: 30000 })
+      ok(!(await istRot(badge('arxiv2024', 'Registriert bei DataCite'))), 'DataCite-Abzeichen ist rot')
+      await zeile('arxiv2024').getByText('DataCite liefert keine Rückzugsmeldungen.', { exact: true }).waitFor()
+      ok(!/nicht registriert|unbekannt/.test(await zeile('arxiv2024').innerText()), `arXiv-Zeile: ${await zeile('arxiv2024').innerText()}`)
+      const nirgends = badge('nirgends', 'DOI nicht registriert')
+      await nirgends.waitFor()
+      ok(await istRot(nirgends), 'Nicht registrierte DOI ist nicht rot')
+      const andere = badge('andere', 'Registriert bei mEDRA, Metadaten nicht geprüft')
+      await andere.waitFor()
+      ok(!(await istRot(andere)), 'Andere Registrierstelle ist rot')
+      const roteMarken = (await page.locator('.cm-content .spur-marke-rot').allTextContents()).join('')
+      ok(roteMarken.includes('nirgends') && !/arxiv2024|andere|smith2024/.test(roteMarken), `Rote Markierungen im Editor: ${roteMarken}`)
+
+      await berichtFilter('Markiert')
+      const sichtbar = await page.locator('.spur-zeile .spur-zeile-key').allTextContents()
+      ok(JSON.stringify(sichtbar) === JSON.stringify(['nirgends']), `Nur Probleme: ${JSON.stringify(sichtbar)}`)
+      await berichtFilter('Alle')
+
+      for (const name of ['check_report', 'bib_list']) {
+        const liste = (await werkzeug(token, name, { project_id: pid })).inhalt.eintraege
+        const arxiv = liste.find(e => e.key === 'arxiv2024')
+        ok(
+          arxiv.registrierstelle === 'datacite' && arxiv.titel?.startsWith('Sleep-like replay improves memory consolidation') && arxiv.jahr === 2024 && arxiv.problem !== true,
+          `${name} arXiv: ${JSON.stringify(arxiv)}`
+        )
+        ok(liste.find(e => e.key === 'nirgends').referenz === 'nicht_gefunden', `${name} nirgends: ${JSON.stringify(liste)}`)
+      }
+
+      await fakeSteuern({ ausfall: ['doiorg'], cachesLeeren: true })
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      const ausfall = badge('arxiv2024', 'nicht prüfbar – die Registrierstelle ist gerade nicht erreichbar')
+      await ausfall.waitFor({ timeout: 30000 })
+      ok(!(await istRot(ausfall)), 'Ausfall der Registrierstelle ist rot')
+      await fakeSteuern({ cachesLeeren: true })
+      await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+      await badge('arxiv2024', 'Registriert bei DataCite').waitFor({ timeout: 30000 })
+    } finally {
+      await fakeSteuern({})
+    }
+  }
+
+  features.p8f2 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    // Die genaue Kopfzeile auf frischen Daten prüft f7 (ZAEHLUNG_BERICHT); hier die Zahl hinter „davon“ gegen den Filter.
+    await projektOeffnen('E2E Bericht')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await berichtFilter('Alle')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    const kopf = page.getByText(/^Zitierstellen: /)
+    await kopf.waitFor({ timeout: 30000 })
+    const markiert = Number(/davon (\d+) markiert/.exec(await kopf.innerText())?.[1])
+    const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
+    const geprueftProbleme = bericht.eintraege.filter(z => z.status === 'geprueft' && z.problem).length
+    ok(markiert > 0 && markiert === geprueftProbleme && bericht.zaehlung.markiert === markiert, `davon ${markiert} markiert, Filter ${geprueftProbleme}, MCP ${JSON.stringify(bericht.zaehlung)}`)
+    for (const schluessel of ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'nicht_pruefbar']) {
+      ok(Number.isInteger(bericht.zaehlung[schluessel]), `zaehlung.${schluessel} fehlt: ${JSON.stringify(bericht.zaehlung)}`)
+    }
+    await berichtFilter('Markiert')
+    const sichtbar = await page.locator('.spur-zeile').count()
+    const problemeGesamt = bericht.eintraege.filter(z => z.problem).length
+    ok(sichtbar === problemeGesamt, `Nur Probleme zeigt ${sichtbar}, MCP ${problemeGesamt}`)
+    await berichtFilter('Alle')
+
+    await projektOeffnen('E2E P8 Zählung')
+    const pid2 = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.getByText('Zitierstellen: 1 geprüft, keine markiert, 1 Beleg ohne Wortlaut', { exact: true }).waitFor({ timeout: 30000 })
+    await page.locator('.spur-zeile .badge').getByText('Beleg ohne Wortlaut', { exact: true }).waitFor()
+    const zweiter = (await werkzeug(token, 'check_report', { project_id: pid2 })).inhalt.zaehlung
+    ok(zweiter.beleg_ohne_wortlaut === 1 && zweiter.geprueft === 1 && zweiter.markiert === 0, `check_report: ${JSON.stringify(zweiter)}`)
+    const { daten } = await mcp(token, 'tools/list')
+    const beschreibung = daten.result.tools.find(w => w.name === 'check_report').description
+    ok(/markiert/.test(beschreibung) && /beleg_ohne_wortlaut/.test(beschreibung), `Beschreibung: ${beschreibung}`)
+  }
+
+  const EINSTELLUNGEN = 'Einstellungen der Prüfung'
+
+  async function makrosSpeichern(feld, wert) {
+    const knopf = page.getByRole('button', { name: EINSTELLUNGEN })
+    if ((await knopf.getAttribute('aria-expanded')) !== 'true') await knopf.click()
+    await page.getByLabel(feld, { exact: true }).fill(wert)
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click()
+  }
+
+  features.p8f3 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const zeile = text => page.locator('.spur-zeile', { hasText: text }).first()
+    await projektOeffnen('E2E P8 Makros')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await berichtFilter('Alle')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await zeile('Sleep supports the consolidation').getByText('Wortlaut: exakt', { exact: true }).waitFor({ timeout: 30000 })
+    const abweichend = zeile('Sleep invented').getByText('Wortlaut: abweichend', { exact: true })
+    await abweichend.waitFor()
+    ok(/bg-danger/.test(await abweichend.evaluate(el => el.closest('.badge').className)), 'Abweichender Wortlaut im Makro ist nicht rot')
+    const wort = page.locator('.spur-zeile', { has: page.locator('.badge', { hasText: 'Beleg ohne Wortlaut' }) })
+    await wort.waitFor()
+    ok((await wort.count()) === 1, `Beleg ohne Wortlaut: ${await wort.count()} Zeilen`)
+
+    const erfunden = await werkzeug(token, 'doc_edit', {
+      project_id: pid, pfad: 'main.tex', alt: '\\end{document}', neu: '\\zitat{Erfundener Satz.} \\autocite[347]{smith2024}\n\\end{document}', idempotenz_schluessel: `p8f3-${Date.now()}`,
+    })
+    ok(erfunden.fehler && erfunden.inhalt.fehler === 'zitat_abweichend', `doc_edit mit \\zitat: ${JSON.stringify(erfunden.inhalt)}`)
+
+    const knopf = page.getByRole('button', { name: EINSTELLUNGEN })
+    await knopf.click()
+    await page.getByText('Automatisch erkannt: zitat', { exact: true }).waitFor()
+    await makrosSpeichern('Zitatmakros', 'wort 2')
+    await page.getByText('Nur Buchstaben, ohne Backslash', { exact: true }).waitFor()
+    const nichts = await jsonVon(`/spur/project/${pid}/pruefbericht/makros`)
+    ok(nichts.zitat.length === 0, `Ungültige Eingabe gespeichert: ${JSON.stringify(nichts)}`)
+    await makrosSpeichern('Zitatmakros', '\\wort')
+    await knopf.and(page.locator(':focus')).waitFor()
+    await zeile('Memory traces').getByText('Wortlaut: exakt', { exact: true }).waitFor({ timeout: 30000 })
+    const gespeichert = await jsonVon(`/spur/project/${pid}/pruefbericht/makros`)
+    ok(JSON.stringify(gespeichert.zitat) === '["wort"]', `Gespeichert: ${JSON.stringify(gespeichert)}`)
+
+    await anmelden('e2e-leser@example.org')
+    await projektOeffnen('E2E P8 Makros')
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: EINSTELLUNGEN }).click()
+    const feld = page.getByLabel('Zitatmakros', { exact: true })
+    await page.getByText('Nur wer im Projekt schreiben darf, kann die Listen ändern.').waitFor()
+    ok((await feld.inputValue()) === 'wort' && !(await feld.isEditable()), 'Leser kann die Liste ändern')
+    ok((await page.getByRole('button', { name: 'Speichern', exact: true }).count()) === 0, 'Leser sieht Speichern')
+    const status = await page.evaluate(async url => {
+      const r = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': document.querySelector('meta[name="ol-csrfToken"]').content },
+        body: JSON.stringify({ zitat: [], ausgeblendet: [] }),
+      })
+      return r.status
+    }, `${BASE}/spur/project/${pid}/pruefbericht/makros`)
+    ok(status === 403, `Speichern als Leser: ${status}`)
+  }
+
+  features.p8f4 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const keys = async () => await page.locator('.spur-zeile .spur-zeile-key').allTextContents()
+    await projektOeffnen('E2E P8 Vermerke')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Prüfbericht')
+    await berichtFilter('Alle')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.getByText('2 Stellen in ausgeblendeten Bereichen übersprungen', { exact: true }).waitFor({ timeout: 30000 })
+    ok(JSON.stringify(await keys()) === '["smith2024"]', `Zeilen: ${JSON.stringify(await keys())}`)
+    const bericht = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt
+    ok(
+      bericht.uebersprungen === 2 && !bericht.eintraege.some(z => ['brown2005', 'wider2023'].includes(z.key)),
+      `check_report: ${bericht.uebersprungen}, ${JSON.stringify(bericht.eintraege.map(z => z.key))}`
+    )
+
+    await editorErsetzen('\\newcommand{\\note}[1]{}', '\\newcommand{\\note}[1]{\\textcolor{red}{#1}}')
+    await gespeichert(token, pid, '\\textcolor{red}{#1}')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.getByText('1 Stelle in ausgeblendeten Bereichen übersprungen', { exact: true }).waitFor({ timeout: 30000 })
+    ok((await keys()).includes('brown2005'), `Nach sichtbarem \\note: ${JSON.stringify(await keys())}`)
+
+    await makrosSpeichern('Ausgeblendete Makros', 'note')
+    await page.getByText('2 Stellen in ausgeblendeten Bereichen übersprungen', { exact: true }).waitFor({ timeout: 30000 })
+    ok(!(await keys()).includes('brown2005'), `Nach der Einstellung: ${JSON.stringify(await keys())}`)
+  }
+
+  features.p8f5 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P8 Zahlen')
+    const lauf = Date.now()
+    const schreiben = async (neu, n) => {
+      const { fehler, inhalt } = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', neu, idempotenz_schluessel: `p8f5-${lauf}-${n}` })
+      ok(!fehler, `doc_edit: ${JSON.stringify(inhalt)}`)
+      return inhalt.zahlen_ohne_beleg
+    }
+    const datum = await schreiben('\nDie Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.\n', 1)
+    ok(!datum?.length, `Datum gemeldet: ${JSON.stringify(datum)}`)
+    await projektOeffnen('E2E P8 Zahlen')
+    await panelOeffnen('Claude')
+    await claudePanel().getByText('main.tex', { exact: false }).first().waitFor({ timeout: 10000 })
+    ok((await claudePanel().getByText('Zahl ohne Beleg').count()) === 0, 'Lauf-Karte meldet Datum als Zahl ohne Beleg')
+    const werte = await schreiben('\nVon 240 Befragten antworteten 37,5 Prozent am 12.11.2026.\n', 2)
+    ok(JSON.stringify(werte) === '["240","37,5"]', `Gemeldet: ${JSON.stringify(werte)}`)
+    const karte = claudePanel().locator('.spur-lauf-hinweis', { hasText: 'Zahl ohne Beleg' }).first()
+    await karte.getByText(/^Zahl ohne Beleg: .*\b240\b/).waitFor({ timeout: 10000 })
+    const karteZahlen = (await karte.innerText()).replace(/^Zahl ohne Beleg: /, '').split(', ')
+    ok(!karteZahlen.some(z => /^(12|11|2026|14|30|1\.2\.3)$/.test(z)), `Lauf-Karte: ${karteZahlen}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Datum geprüft.' })
+  }
+
+  const CARLITO_DATEIEN = ['carlito-optionen.sty', 'carlito.sty', 'ly1carlito.fd', 'ot1carlito.fd', 't1carlito.fd'].map(d => `/tex-pakete/carlito/${d}`)
+
+  async function paketPfade(pid) {
+    return (await jsonVon(`/project/${pid}/entities`)).entities.map(e => e.path).filter(p => p.startsWith('/tex-pakete/')).sort()
+  }
+
+  features.p8f6 = async () => {
+    await breite(1280)
+    // Speicher wird nur mit einer Grenze berechnet; 1 GB stört die übrigen Schritte nicht.
+    await grenzenSetzen({ projekte: '', speicherGb: '1' })
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const carlito = pid => werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'carlito' })
+    const vollstaendig = async pid => ok(JSON.stringify(await paketPfade(pid)) === JSON.stringify(CARLITO_DATEIEN), `Dateien: ${await paketPfade(pid)}`)
+    try {
+      const pid = await projektId(token, 'E2E P8 Pakete')
+      await fakeSteuern({ stoerungen: { texlive: { status: 502, mal: 2 } }, schalter: {} })
+      const nachZwei = await carlito(pid)
+      ok(!nachZwei.fehler && JSON.stringify([...nachZwei.inhalt.dateien].sort()) === JSON.stringify(CARLITO_DATEIEN.map(p => p.slice(1))), `Nach zwei 502: ${JSON.stringify(nachZwei.inhalt)}`)
+      const zweimal = await carlito(pid)
+      ok(!zweimal.fehler && zweimal.inhalt.hinweis === 'schon im Projekt' && zweimal.inhalt.dateien.length === 0, `Zweiter Aufruf: ${JSON.stringify(zweimal.inhalt)}`)
+      await vollstaendig(pid)
+
+      const pidB = await projektId(token, 'E2E P8 Pakete B')
+      await fakeSteuern({ stoerungen: { texlive: { status: 502 }, 'texlive-b': { status: 502 } } })
+      const beide = await carlito(pidB)
+      ok(
+        beide.fehler && beide.inhalt.fehler === 'spiegel_nicht_erreichbar' && beide.inhalt.detail === 'Die Paketquelle antwortet mit Fehler 502. Versuch es später erneut.',
+        `Beide Spiegel 502: ${JSON.stringify(beide.inhalt)}`
+      )
+      await projektOeffnen('E2E P8 Pakete B')
+      await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name: 'main.tex' }))
+      ok((await page.locator('.file-tree').getByRole('treeitem', { name: 'tex-pakete' }).count()) === 0, 'Ordner tex-pakete im Dateibaum')
+      await panelOeffnen('Claude')
+      ok((await claudePanel().getByText('tex-pakete/carlito').count()) === 0, 'Lauf-Karte listet das Paket')
+
+      await fakeSteuern({ schalter: { SPUR_TEX_UPLOAD_FEHLER: '3' } })
+      const vorher = (await jsonVon(`/spur/project/${pidB}/speicher`)).bytes
+      const abbruch = await carlito(pidB)
+      ok(abbruch.fehler && abbruch.inhalt.fehler === 'paket_abgebrochen', `Upload-Fehler: ${JSON.stringify(abbruch.inhalt)}`)
+      ok((await paketPfade(pidB)).length === 0, `Nach dem Upload-Fehler: ${await paketPfade(pidB)}`)
+      const ordner = (await jsonVon(`/project/${pidB}/entities`)).entities.filter(e => e.path.startsWith('/tex-pakete'))
+      ok(ordner.length === 0, `Rest: ${JSON.stringify(ordner)}`)
+      const nachher = (await jsonVon(`/spur/project/${pidB}/speicher`)).bytes
+      ok(Number.isInteger(vorher) && nachher === vorher, `Speicher vorher ${vorher}, nachher ${nachher}`)
+
+      await fakeSteuern({ stoerungen: { texlive: { status: 502 } }, schalter: {} })
+      const zweiter = await carlito(pidB)
+      ok(!zweiter.fehler && zweiter.inhalt.dateien.length === 5, `Zweiter Spiegel: ${JSON.stringify(zweiter.inhalt)}`)
+      await vollstaendig(pidB)
+      await fakeSteuern({ schalter: {} })
+
+      for (const name of ['E2E P8 Pakete Rest', 'E2E P8 Pakete Rest B']) {
+        const pidRest = await projektId(token, name)
+        const rest = await carlito(pidRest)
+        ok(!rest.fehler && rest.inhalt.dateien.length === 5, `${name}: ${JSON.stringify(rest.inhalt)}`)
+        await vollstaendig(pidRest)
+      }
+      const pidRest = await projektId(token, 'E2E P8 Pakete Rest')
+      let job
+      for (let i = 0; i < 10; i++) {
+        job = await kompiliertBeiClaude(token, pidRest)
+        if (job.ergebnis?.compile !== 'too-recently-compiled') break
+        await page.waitForTimeout(1500)
+      }
+      ok(job.ergebnis.compile === 'success', `Compile mit carlito: ${JSON.stringify(job.ergebnis)}`)
+
+      // Abbruch beim Client mitten im Upload: Der Server stellt fertig, der neue Aufruf wartet darauf.
+      const pidAbbruch = await projektId(token, 'E2E P8 Pakete Abbruch')
+      await fakeSteuern({ schalter: { SPUR_TEX_UPLOAD_PAUSE_MS: '600' } })
+      const abgebrochen = await page.request
+        .post(`${BASE}/spur/mcp`, {
+          headers: { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          data: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'tex_package_add', arguments: { project_id: pidAbbruch, paket: 'carlito' } } },
+          timeout: 1500,
+        })
+        .then(() => 'fertig', () => 'abgebrochen')
+      ok(abgebrochen === 'abgebrochen', `Aufruf nicht abgebrochen: ${abgebrochen}`)
+      const danach = await carlito(pidAbbruch)
+      ok(!danach.fehler && (danach.inhalt.hinweis === 'schon im Projekt' || danach.inhalt.dateien.length === 5), `Nach dem Abbruch: ${JSON.stringify(danach.inhalt)}`)
+      await vollstaendig(pidAbbruch)
+    } finally {
+      await fakeSteuern({ schalter: {} })
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+    }
+  }
+
+  features.p8f7 = async () => {
+    await breite(1280)
+    const TEX_FELDER = ['Größe je Paket (MB)', 'Pakete je Projekt (MB)', 'Installationen je Stunde']
+    const texFeld = name => standardBereich().getByLabel(name, { exact: true })
+    try {
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+      await anmelden('e2e-pakete@example.org')
+      const token = await neuesToken()
+      const paket = async (projekt, name) => await werkzeug(token, 'tex_package_add', { project_id: await projektId(token, projekt), paket: name })
+      const gross = await paket('E2E P8 Grenzen A', 'spurtest-gross')
+      ok(!gross.fehler && gross.inhalt.dateien.length === 1, `30 MB mit Standardgrenzen: ${JSON.stringify(gross.inhalt)}`)
+
+      await grenzenSetzen({ projekte: '', speicherGb: '' }, { 'e2e-pakete@example.org': { projekte: '', speicherGb: '0,01' } })
+      await anmelden('e2e-pakete@example.org')
+      const voll = await paket('E2E P8 Grenzen B', 'spurtest-gross')
+      ok(voll.fehler && voll.inhalt.fehler === 'speicher_voll' && /GB von 0,01 GB/.test(voll.inhalt.detail), `Speicher-Grenze: ${JSON.stringify(voll.inhalt)}`)
+      const zuViele = await paket('E2E P8 Grenzen Voll', 'carlito')
+      ok(zuViele.fehler && zuViele.inhalt.fehler === 'projekt_zu_viele_dateien' && zuViele.inhalt.detail.includes('erlaubt sind 2000'), `2000 Einträge: ${JSON.stringify(zuViele.inhalt)}`)
+      const pidVoll = await projektId(token, 'E2E P8 Grenzen Voll')
+      ok((await paketPfade(pidVoll)).length === 0, `Nach projekt_zu_viele_dateien: ${await paketPfade(pidVoll)}`)
+
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+      await page.goto(GRENZEN)
+      await standardBereich().getByRole('heading', { name: 'TeX-Pakete' }).waitFor()
+      const platzhalter = await Promise.all(TEX_FELDER.map(f => texFeld(f).getAttribute('placeholder')))
+      ok(JSON.stringify(platzhalter) === '["100","300","60"]', `Platzhalter: ${platzhalter}`)
+      for (const [feld, wert] of [['Größe je Paket (MB)', '0'], ['Pakete je Projekt (MB)', '-5'], ['Installationen je Stunde', 'abc']]) await texFeld(feld).fill(wert)
+      await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+      await standardBereich().getByText('Bitte eine ganze Zahl ab 1 eingeben', { exact: false }).first().waitFor()
+      ok((await standardBereich().getByText('Bitte eine ganze Zahl ab 1 eingeben', { exact: false }).count()) === 3, 'Nicht jedes Feld meldet den Fehler')
+      ok((await texFeld('Installationen je Stunde').getAttribute('aria-invalid')) === 'true', 'Feld nicht als ungültig markiert')
+      for (const [feld, wert] of [['Größe je Paket (MB)', '10'], ['Pakete je Projekt (MB)', '20'], ['Installationen je Stunde', '2']]) await texFeld(feld).fill(wert)
+      await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+      await standardBereich().getByText('Gespeichert').waitFor()
+      await page.reload()
+      await texFeld('Installationen je Stunde').waitFor()
+      const werte = await Promise.all(TEX_FELDER.map(f => texFeld(f).inputValue()))
+      ok(JSON.stringify(werte) === '["10","20","2"]', `Nach dem Neuladen: ${werte}`)
+
+      await anmelden('e2e-pakete@example.org')
+      const zuGross = await paket('E2E P8 Grenzen C', 'spurtest-gross')
+      ok(zuGross.fehler && zuGross.inhalt.fehler === 'paket_zu_gross' && zuGross.inhalt.detail.includes('ist entpackt 30 MB groß, erlaubt sind 10 MB.'), `10 MB: ${JSON.stringify(zuGross.inhalt)}`)
+
+      await anmelden('e2e-pakete-b@example.org')
+      const tokenB = await neuesToken()
+      const pidD = await projektId(tokenB, 'E2E P8 Drossel')
+      const holen = name => werkzeug(tokenB, 'tex_package_add', { project_id: pidD, paket: name })
+      for (const name of ['beamer', 'spurtestgibtsnicht', '../x', 'spurtest-ausbruch', 'spurtest-gross']) {
+        const r = await holen(name)
+        ok(r.inhalt.hinweis === 'schon im Image' || r.fehler, `${name}: ${JSON.stringify(r.inhalt)}`)
+      }
+      ok(!(await holen('spurfarben')).fehler, 'Erstes kleines Paket')
+      ok((await holen('spurfarben')).inhalt.hinweis === 'schon im Projekt', 'Zweiter Aufruf')
+      ok(!(await holen('beamertheme-spurtest')).fehler, 'Zweites kleines Paket')
+      const drittes = await holen('carlito')
+      ok(drittes.fehler && drittes.inhalt.fehler === 'zu_viele_anfragen' && drittes.inhalt.detail.includes('2 Installationen je Stunde'), `Drittes: ${JSON.stringify(drittes.inhalt)}`)
+
+      await page.goto(`${BASE}/project`)
+      const fremd = await seitenAnfrage('PUT', '/spur/admin/grenzen/standard', { texPaketMb: '500' })
+      ok(fremd.status === 403, `Speichern ohne Admin-Rechte: ${fremd.status}`)
+
+      await anmelden('e2e-admin@example.org')
+      await page.goto(GRENZEN)
+      await texFeld('Größe je Paket (MB)').waitFor()
+      for (const f of TEX_FELDER) await texFeld(f).fill('')
+      await standardBereich().getByRole('button', { name: 'Speichern' }).click()
+      await standardBereich().getByText('Gespeichert').waitFor()
+      await page.reload()
+      await texFeld('Größe je Paket (MB)').waitFor()
+      ok((await texFeld('Größe je Paket (MB)').inputValue()) === '' && (await texFeld('Größe je Paket (MB)').getAttribute('placeholder')) === '100', 'Leeres Feld stellt den Standard nicht her')
+    } finally {
+      await grenzenSetzen({ projekte: '', speicherGb: '' })
+    }
+  }
+
+  features.p8f8 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const lauf = Date.now()
+    let n = 0
+    const anlegen = async (projekt, pfad, inhalt = 'Die Einleitung beginnt hier.') =>
+      await werkzeug(token, 'doc_create', { project_id: await projektId(token, projekt), pfad, inhalt, idempotenz_schluessel: `p8f8-${lauf}-${n++}` })
+    const pfade = async projekt => (await jsonVon(`/project/${await projektId(token, projekt)}/entities`)).entities.map(e => e.path)
+    try {
+      const erstes = await anlegen('E2E P8 Anlegen', 'kapitel/einleitung.tex')
+      ok(!erstes.fehler && erstes.inhalt.aenderung === true, `doc_create: ${JSON.stringify(erstes.inhalt)}`)
+      const zweites = await anlegen('E2E P8 Anlegen', 'kapitel/einleitung.tex')
+      ok(zweites.fehler && zweites.inhalt.fehler === 'konflikt' && zweites.inhalt.detail.includes('kapitel/einleitung.tex'), `Zweiter Aufruf: ${JSON.stringify(zweites.inhalt)}`)
+
+      const datei = await anlegen('E2E P8 Anlegen Dateien', 'abb/x.tex')
+      ok(datei.fehler && datei.inhalt.fehler === 'pfad_ist_datei' && datei.inhalt.detail === '„abb“ ist eine Datei, kein Ordner. Wähl einen anderen Pfad.', `abb/x.tex: ${JSON.stringify(datei.inhalt)}`)
+      ok(!(await pfade('E2E P8 Anlegen Dateien')).some(p => p.startsWith('/abb/')), 'Unter abb entstand etwas')
+      const zahlen = await anlegen('E2E P8 Anlegen Dateien', 'zahlen.tex', 'Es antworteten 240 Personen.')
+      ok(!zahlen.fehler && JSON.stringify(zahlen.inhalt.zahlen_ohne_beleg) === '["240"]', `Mit binärer ergebnisse.tex: ${JSON.stringify(zahlen.inhalt)}`)
+
+      const voll = await anlegen('E2E P8 Anlegen Voll', 'neu.tex')
+      ok(
+        voll.fehler && voll.inhalt.fehler === 'projekt_zu_viele_dateien' &&
+          voll.inhalt.detail === 'Das Projekt hat 2000 von 2000 Dateien. Lösch Dateien, zum Beispiel nicht gebrauchte TeX-Pakete.',
+        `2000 Einträge: ${JSON.stringify(voll.inhalt)}`
+      )
+
+      await fakeSteuern({ schalter: { SPUR_DOKUPDATER_500: '1' } })
+      const dienst = await anlegen('E2E P8 Anlegen', 'kapitel/methoden.tex')
+      ok(dienst.fehler && dienst.inhalt.fehler === 'dienst_nicht_erreichbar' && /gleich noch einmal/.test(dienst.inhalt.detail), `500: ${JSON.stringify(dienst.inhalt)}`)
+      ok(!(await pfade('E2E P8 Anlegen')).includes('/kapitel/methoden.tex'), 'Leeres Dokument blieb liegen')
+      await fakeSteuern({ schalter: {} })
+      const nochmal = await anlegen('E2E P8 Anlegen', 'kapitel/methoden.tex')
+      ok(!nochmal.fehler, `Nach dem Abschalten: ${JSON.stringify(nochmal.inhalt)}`)
+
+      await fakeSteuern({ schalter: { SPUR_DOKUPDATER_500: '1', SPUR_DOC_AUFRAEUMEN_FEHLER: '1' } })
+      const doppelt = await anlegen('E2E P8 Anlegen', 'kapitel/ergebnisse-text.tex')
+      ok(doppelt.fehler && doppelt.inhalt.fehler === 'dienst_nicht_erreichbar', `Auch Aufräumen scheitert: ${JSON.stringify(doppelt.inhalt)}`)
+      await fakeSteuern({ schalter: {} })
+      const danach = await anlegen('E2E P8 Anlegen', 'kapitel/ergebnisse-text.tex')
+      ok(!danach.fehler, `Nach gescheitertem Aufräumen: ${JSON.stringify(danach.inhalt)}`)
+
+      // Die Log-Zeile zur Fehler-ID prüft der Builder mit spur-dev logs web (Handprüfung, siehe progress.md).
+      await fakeSteuern({ schalter: { SPUR_DOC_CREATE_FEHLER: '1' } })
+      const intern = await anlegen('E2E P8 Anlegen', 'kapitel/intern.tex', 'Geheimer Inhalt 4711')
+      ok(intern.fehler && intern.inhalt.fehler === 'interner_fehler' && /Fehler-ID [0-9a-f]{8}\.$/.test(intern.inhalt.detail), `Interner Fehler: ${JSON.stringify(intern.inhalt)}`)
+      await fakeSteuern({ schalter: {} })
+
+      await projektOeffnen('E2E P8 Anlegen')
+      const kapitel = page.locator('.file-tree').getByRole('treeitem', { name: 'kapitel' })
+      await panelSichern(DATEIBAUM, kapitel)
+      if ((await kapitel.getAttribute('aria-expanded')) !== 'true') await kapitel.click()
+      await page.locator('.file-tree').getByRole('treeitem', { name: 'einleitung.tex' }).click()
+      await page.locator('.cm-content .ol-cm-change-i', { hasText: 'Die Einleitung beginnt hier.' }).first().waitFor({ timeout: 20000 })
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
+  // wait_for_event aus dem Browser wie ein MCP-Client; Ergebnis und Dauer landen in window.__warten[name].
+  async function wartenStarten(token, name, args = {}) {
+    await page.evaluate(([t, n, a]) => {
+      window.__warten ??= {}
+      const start = Date.now()
+      const eintrag = { ergebnis: null }
+      window.__warten[n] = eintrag
+      fetch('/spur/mcp', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${t}`, Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'wait_for_event', arguments: a } }),
+      })
+        .then(r => r.text())
+        .then(text => {
+          const zeilen = text.split('\n').filter(z => z.startsWith('data:')).map(z => JSON.parse(z.slice(5)))
+          const antwort = (zeilen.length ? zeilen : [JSON.parse(text)]).find(d => d.result || d.error)
+          eintrag.ergebnis = antwort.result ? JSON.parse(antwort.result.content[0].text) : antwort
+          eintrag.dauer = Date.now() - start
+        })
+        .catch(e => (eintrag.ergebnis = { fehler: e.message }))
+    }, [token, name, args])
+  }
+
+  async function gewartet(name, timeout = 20000) {
+    const handle = await page.waitForFunction(n => window.__warten?.[n]?.ergebnis && window.__warten[n], name, { timeout })
+    return await handle.jsonValue()
+  }
+
+  features.p8f9 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    await projektOeffnen('E2E P8 Warten')
+    const pid = page.url().split('/').pop()
+    const auftrag = async text => ok((await seitenPost(`/spur/project/${pid}/claude/auftrag`, { text })).status === 201, `Auftrag ${text}`)
+    // Ältere Aufträge dieses Kontos sind für diesen Schritt gelesen.
+    await werkzeug(token, 'events_since', {})
+    try {
+      await fakeSteuern({ schalter: { SPUR_WARTEN_S: '2' } })
+      const leer = (await werkzeug(token, 'wait_for_event', {})).inhalt
+      ok(leer.ereignis === null && 'cursor' in leer && leer.hinweis === 'Kein Auftrag. Ruf wait_for_event erneut auf.' && !leer.abgeloest, `Ohne Auftrag: ${JSON.stringify(leer)}`)
+
+      // Zwischen zwei Aufrufen bleibt das Panel verbunden (kurze Aufrufe von 2 s, Pausen von 3 s, 45 s lang).
+      await panelOeffnen('Claude')
+      await wartenStarten(token, 'takt0')
+      await claudePanel().getByText('Claude verbunden', { exact: true }).waitFor({ timeout: 10000 })
+      const ende = Date.now() + 45000
+      for (let i = 1; Date.now() < ende; i++) {
+        ok((await claudePanel().getByText('Claude nicht verbunden').count()) === 0, `Flackern nach ${45 - Math.round((ende - Date.now()) / 1000)} s`)
+        if (i % 10 === 0) await wartenStarten(token, `takt${i}`)
+        await page.waitForTimeout(500)
+      }
+      await fakeSteuern({ schalter: {} })
+
+      await wartenStarten(token, 'panel')
+      await page.waitForTimeout(500)
+      const feld = claudePanel().getByLabel('Auftrag an Claude')
+      await feld.fill('Bitte Abschnitt 1 glätten')
+      const gesendet = Date.now()
+      await feld.press('Control+Enter')
+      const panel = await gewartet('panel', 10000)
+      ok(panel.ergebnis.ereignis?.daten?.text === 'Bitte Abschnitt 1 glätten' && panel.ergebnis.cursor === panel.ergebnis.ereignis.id, `Aus dem Panel: ${JSON.stringify(panel.ergebnis)}`)
+      ok(Date.now() - gesendet <= 6000, `Auftrag kam nach ${Date.now() - gesendet} ms`)
+
+      await wartenStarten(token, 'erster')
+      await page.waitForTimeout(1000)
+      await wartenStarten(token, 'zweiter')
+      const erster = await gewartet('erster', 10000)
+      ok(erster.ergebnis.ereignis === null && erster.ergebnis.abgeloest === true && /nicht erneut auf/.test(erster.ergebnis.hinweis), `Abgelöst: ${JSON.stringify(erster.ergebnis)}`)
+      await auftrag('Für den zweiten Aufruf')
+      const zweiter = await gewartet('zweiter', 10000)
+      ok(zweiter.ergebnis.ereignis?.daten?.text === 'Für den zweiten Aufruf', `Zweiter Aufruf: ${JSON.stringify(zweiter.ergebnis)}`)
+      ok(erster.ergebnis.ereignis === null, 'Erster Aufruf bekam den Auftrag')
+
+      const angekommen = []
+      for (let i = 0; i < 10; i++) {
+        await wartenStarten(token, `folge${i}`)
+        await auftrag(`Auftrag ${i}`)
+        angekommen.push((await gewartet(`folge${i}`, 10000)).ergebnis.ereignis?.daten?.text)
+      }
+      ok(JSON.stringify(angekommen) === JSON.stringify(Array.from({ length: 10 }, (_, i) => `Auftrag ${i}`)), `Zehn Aufträge: ${JSON.stringify(angekommen)}`)
+
+      const cursor = zweiter.ergebnis.cursor
+      const neuere = (await werkzeug(token, 'events_since', { cursor })).inhalt
+      ok(JSON.stringify(neuere.ereignisse.map(e => e.daten.text)) === JSON.stringify(angekommen), `events_since mit Cursor: ${JSON.stringify(neuere.ereignisse.map(e => e.daten.text))}`)
+      await auftrag('Nur über events_since')
+      const neueste = (await werkzeug(token, 'events_since', {})).inhalt.ereignisse
+      ok(neueste.at(-1).daten.text === 'Nur über events_since', `events_since ohne Cursor: ${neueste.at(-1)?.daten?.text}`)
+      ok((await werkzeug(token, 'wait_for_event', { max_sekunden: 2 })).inhalt.ereignis === null, 'Über events_since Gelesenes kam erneut')
+
+      const REPO = `${FIXTURES}/../../../../../..`
+      const { daten } = await mcp(token, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } })
+      const beschreibung = (await mcp(token, 'tools/list')).daten.result.tools.find(w => w.name === 'wait_for_event').description
+      const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+      // Der Startbefehl im Panel ist claude … -- "<spur_start_prompt>" (claude-verbinden.tsx, Frontend-Test).
+      const startbefehl = JSON.parse(await repoDatei(`${REPO}/services/web/locales/de.json`)).spur_start_prompt
+      const texte = { anweisungen: daten.result.instructions, beschreibung, skill, startbefehl }
+      for (const [name, text] of Object.entries(texte)) {
+        for (const teil of ['wait_for_event', 'ereignis: null', 'abgeloest']) ok(text.includes(teil), `${name} ohne „${teil}“: ${text}`)
+      }
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
+  features.p8f10 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const SPERRE = 'Ein Proxy oder Filter in deinem Netz blockiert diese Anfrage (Status 403). Das liegt nicht an deinem Dokument. Wende dich an deine IT oder versuch es in einem anderen Netz.'
+    const SPERRE_OHNE = SPERRE.replace(' (Status 403)', '')
+    const pdfBereich = () => page
+    // Der Editor kompiliert beim Öffnen; ein Klick direkt danach meldet „zu kurz nach dem letzten Kompilieren“.
+    const neuKompilieren = async () => {
+      await page.waitForTimeout(3000)
+      await page.getByRole('button', { name: KOMPILIEREN }).first().click()
+    }
+    try {
+      await projektOeffnen('E2E P8 Proxy')
+      await page.locator('.pdf-viewer .page canvas').first().waitFor({ timeout: 120000 })
+
+      await fakeSteuern({ schalter: { SPUR_PROXY_PDF: '403' } })
+      await neuKompilieren()
+      const meldung = pdfBereich().getByText(SPERRE, { exact: true })
+      await meldung.waitFor({ timeout: 60000 })
+      ok((await pdfBereich().getByText('PDF-Wiedergabe-Fehler').count()) === 0, 'Weiter „PDF-Wiedergabe-Fehler“')
+      ok((await meldung.getAttribute('role')) === 'alert', 'Meldung ohne role="alert"')
+      await meldung.focus()
+      ok(await meldung.evaluate(el => el === document.activeElement), 'Meldung nicht per Tastatur erreichbar')
+
+      await fakeSteuern({ schalter: { SPUR_PROXY_PDF: '200' } })
+      await neuKompilieren()
+      await pdfBereich().getByText(SPERRE_OHNE, { exact: true }).waitFor({ timeout: 60000 })
+
+      await fakeSteuern({ schalter: { SPUR_PROXY_PDF: 'kaputt' } })
+      await neuKompilieren()
+      await pdfBereich().getByText('PDF-Wiedergabe-Fehler').first().waitFor({ timeout: 60000 })
+      ok((await pdfBereich().getByText(SPERRE_OHNE).count()) === 0, 'Defektes PDF als Proxy-Sperre gemeldet')
+
+      await fakeSteuern({ schalter: {} })
+      await neuKompilieren()
+      await page.locator('.pdf-viewer .page canvas').first().waitFor({ timeout: 120000 })
+
+      for (const [art, text] of [['403', SPERRE], ['200', SPERRE_OHNE]]) {
+        await fakeSteuern({ schalter: { SPUR_PROXY_API: art } })
+        await page.reload()
+        await page.locator('.cm-content').first().waitFor()
+        await panelOeffnen('Quellen')
+        const quellenMeldung = page.locator('.spur-panel').getByText(text, { exact: true })
+        await quellenMeldung.waitFor({ timeout: 20000 })
+        ok(await quellenMeldung.evaluate(el => Boolean(el.closest('[role="alert"]'))), `Quellen-Meldung (${art}) ohne role="alert"`)
+        ok((await page.locator('.spur-panel').getByText(/^(Forbidden|Noch keine Quellen)$/).count()) === 0, `Quellen-Panel (${art}) zeigt Forbidden oder eine leere Liste`)
+      }
+      await fakeSteuern({ schalter: {} })
+      const nochmal = page.locator('.spur-panel').getByRole('button', { name: 'Erneut versuchen' })
+      await nochmal.focus()
+      await page.keyboard.press('Enter')
+      await page.locator('.spur-panel').getByText('Noch keine Quellen').waitFor({ timeout: 20000 })
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+  }
+
+  // Der Namensabgleich Vertrag ↔ werkzeuge.mjs ist tools/tests/mcp-vertrag.test.mjs (node --test).
+  features.p8f11 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const enthaelt = (text, teile, wo) => {
+      for (const teil of teile) ok(text.includes(teil), `${wo} ohne „${teil}“`)
+    }
+    const vertrag = await repoDatei(`${REPO}/docs/mcp-contract.md`)
+    ok(!vertrag.includes('paper_lookup'), 'Vertrag nennt paper_lookup')
+    enthaelt(vertrag, ['`doc_create`', 'inhalt', 'pfad_ist_datei', 'projekt_zu_viele_dateien', 'dienst_nicht_erreichbar', 'Fehler-ID', 'zaehlung.markiert',
+      'beleg_ohne_wortlaut', 'uebersprungen', 'registrierstelle', '100 MB', '300 MB', '(60)', 'cursor', 'abgeloest'], 'Vertrag')
+    ok((await repoDatei(`${REPO}/tools/tests/mcp-vertrag.test.mjs`)).includes('werkzeuge.mjs'), 'Test des Vertrags fehlt')
+
+    const readme = await repoDatei(`${REPO}/README.md`)
+    const claude = readme.split('## Claude and your data\n')[1]?.split('\n## ')[0] ?? ''
+    enthaelt(claude, ['100 seconds', 'CLAUDE_CODE_MCP_AUTO_BACKGROUND_MS'], 'README, Claude')
+    const betrieb = readme.split('## Installation\n')[1]?.split('\n## Make targets')[0] ?? ''
+    enthaelt(betrieb, ['doi.org', 'api.datacite.org', 'TeX-Pakete', 'Fehler-ID', '/var/log/overleaf/web.log'], 'README, Betrieb')
+    const bericht = readme.split('## The check report\n')[1]?.split('\n## ')[0] ?? ''
+    enthaelt(bericht, ['Zitatmakros', 'Ausgeblendete Makros', 'DataCite', 'Registriert bei'], 'README, Prüfbericht')
+
+    const adr = await repoDatei(`${REPO}/docs/adr/0006-doi-check-across-registration-agencies.md`)
+    enthaelt(adr, ['doi.org', 'DataCite', '## Decision Outcome'], 'ADR 0006')
+    const adr3 = await repoDatei(`${REPO}/docs/adr/0003-own-claude-integration.md`)
+    ok(!adr3.includes('/spur:lauf') && adr3.includes('100 seconds'), 'ADR 0003 nennt /spur:lauf oder nicht den kurzen Poll')
+    enthaelt(await repoDatei(`${REPO}/docs/adr/0001-module-in-web-service.md`), ['pdf-js-viewer.tsx'], 'ADR 0001 (Kern-Patches)')
+
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    enthaelt(skill, ['## Waiting for jobs', 'abgeloest', 'spiegel_nicht_erreichbar', 'paket_abgebrochen', 'dienst_nicht_erreichbar', 'pfad_ist_datei', 'Fehler-ID'], 'SKILL.md')
+    const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
+    enthaelt(backlog, ['MCP tasks', 'error ID'], 'Backlog')
+  }
+
+  // P9: Konsolenfehler (console.error) zählen ab hier mit; die älteren Features prüfen nur Seitenfehler.
+  const konsolenMeldungen = []
+  page.on('console', m => m.type() === 'error' && konsolenMeldungen.push(m.text()))
+  // `erwartet`: Meldungen, die ein Schritt absichtlich auslöst (Ladefehler über einen Dev-Schalter).
+  function ohneKonsolenfehler(wo, erwartet = null) {
+    const meldungen = konsolenMeldungen.splice(0).filter(m => !erwartet?.test(m))
+    ok(meldungen.length === 0, `${wo}: Konsolenfehler ${meldungen.join(' | ').slice(0, 400)}`)
+  }
+
+  const PANELS = ['Quellen', 'Recherche', 'Prüfbericht', 'Vorschläge', 'Claude']
+
+  // Panel öffnen und eine offene Quellen-Vorschau verlassen (ihr Titel ist der Name der Quelle).
+  async function panelMitListe(panel) {
+    const zurueck = page.locator('.spur-panel').getByRole('button', { name: 'Zurück', exact: true })
+    if (panel === 'Quellen' && (await zurueck.isVisible())) await zurueck.click()
+    await panelOeffnen(panel)
+  }
+  const modal = () => page.locator('.modal.show')
+
+  // Seltene Aktionen des Quellen-Panels; gibt den Knopf zurück, der danach den Fokus bekommt.
+  async function quellenAktion(name) {
+    await quellenMenue(name)
+    return page.locator('.spur-panel').getByRole('button', { name: 'Weitere Aktionen' })
+  }
+
+  const SPUR_DIALOGE = [
+    ['Importieren', async () => { await panelOeffnen('Quellen'); return await quellenAktion('Importieren') }],
+    ['Aus anderem Projekt holen', async () => { await panelOeffnen('Quellen'); return await quellenAktion('Aus anderem Projekt holen') }],
+    ['Literaturmatrix', async () => { await panelOeffnen('Quellen'); return await quellenAktion('Literaturmatrix') }],
+    ['KI-Offenlegung', async () => {
+      await panelOeffnen('Claude')
+      const knopf = page.getByRole('button', { name: 'KI-Offenlegung' })
+      await knopf.click()
+      return knopf
+    }],
+    ['Quelle löschen', async () => {
+      await panelOeffnen('Quellen')
+      if (!(await page.getByRole('button', { name: 'Quelle löschen' }).isVisible())) {
+        await page.locator('.spur-panel').getByText('smith2024.pdf').first().click()
+      }
+      const knopf = page.getByRole('button', { name: 'Quelle löschen' })
+      await knopf.click()
+      return knopf
+    }],
+  ]
+
+  async function dialogFarbe() {
+    await modal().locator('.modal-content').waitFor()
+    return await modal().locator('.modal-content').evaluate(el => {
+      const s = getComputedStyle(el)
+      return { hintergrund: s.backgroundColor, text: s.color }
+    })
+  }
+
+  const hell = farbe => {
+    const [r, g, b] = farbe.match(/[\d.]+/g).map(Number)
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  }
+
+  async function dialogeImDesign(thema) {
+    return await mitDesign(thema, async () => {
+      await projektOeffnen('E2E Bericht')
+      await page.getByRole('button', { name: /^(Teilen|Share)$/ }).first().click()
+      const teilen = await dialogFarbe()
+      await page.keyboard.press('Escape')
+      await modal().waitFor({ state: 'detached' })
+      ok(thema ? hell(teilen.hintergrund) > 0.8 : hell(teilen.hintergrund) < 0.2, `Projekt teilen im Design „${thema}“: ${teilen.hintergrund}`)
+      for (const [name, oeffnen] of SPUR_DIALOGE) {
+        const knopf = await oeffnen()
+        const farbe = await dialogFarbe()
+        ok(
+          farbe.hintergrund === teilen.hintergrund && farbe.text === teilen.text,
+          `${name} im Design „${thema || 'dunkel'}“: ${JSON.stringify(farbe)} statt ${JSON.stringify(teilen)}`
+        )
+        await page.keyboard.press('Escape')
+        await modal().waitFor({ state: 'detached' })
+        ok(await knopf.evaluate(el => el === document.activeElement), `${name}: Fokus nach Esc nicht am Auslöser`)
+      }
+    })
+  }
+
+  features.p9f1 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Bericht')
+    await dialogeImDesign('')
+    await dialogeImDesign('light-')
+
+    await projektOeffnen('E2E Bericht')
+    for (const [name, oeffnen] of SPUR_DIALOGE) {
+      const knopf = await oeffnen()
+      await modal().waitFor()
+      const schliessen = modal().locator('.modal-footer').getByRole('button', { name: /^(Schließen|Abbrechen)$/ })
+      ok((await schliessen.count()) === 1, `${name}: kein Knopf „Schließen“ oder „Abbrechen“`)
+      await schliessen.click()
+      await modal().waitFor({ state: 'detached' })
+      ok(await knopf.evaluate(el => el === document.activeElement), `${name}: Fokus nach „Schließen“ nicht am Auslöser`)
+    }
+
+    for (const panel of PANELS) {
+      await panelMitListe(panel)
+      const inhalt = page.getByRole('tabpanel', { name: panel }).locator('.spur-panel').first()
+      await inhalt.waitFor()
+      const masse = await inhalt.evaluate(wurzel => {
+        const titel = wurzel.querySelector('.rail-panel-title').getBoundingClientRect().left
+        const links = [...wurzel.querySelectorAll('button, input, textarea, select, p, h5, h6, li, label, [role=tab], a, pre')]
+          .map(el => el.getBoundingClientRect())
+          .filter(r => r.width > 0 && r.height > 0)
+          .map(r => r.left)
+        const ebenen = [...wurzel.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+          .filter(h => !h.classList.contains('rail-panel-title'))
+          .map(h => Number(h.tagName[1]))
+        return { titel, links: Math.min(...links), ebenen }
+      })
+      ok(Math.abs(masse.links - masse.titel) <= 1, `${panel}: Inhalt beginnt bei ${masse.links}, Titel bei ${masse.titel}`)
+      let vorige = 4
+      for (const ebene of masse.ebenen) {
+        ok(ebene > 4 && ebene <= vorige + 1, `${panel}: Überschriften springen (${masse.ebenen})`)
+        vorige = ebene
+      }
+    }
+
+    // Wie auf dem Handy: bei 360 px laden; ein offenes Panel aus 1280 px klappt beim Verkleinern ein.
+    await breite(360)
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    for (const panel of PANELS) {
+      await panelMitListe(panel)
+      await ohneSeitlichesRollen(`Panel ${panel} bei 360 px`)
+    }
+    for (const [name, oeffnen] of SPUR_DIALOGE) {
+      await oeffnen()
+      await modal().waitFor()
+      await ohneSeitlichesRollen(`${name} bei 360 px`)
+      await page.keyboard.press('Escape')
+      await modal().waitFor({ state: 'detached' })
+    }
+    await breite(1280)
+    ohneKonsolenfehler('p9f1')
+  }
+
+
+  // Gibt dem offenen Seitenpanel eine feste Breite (wie nach dem Ziehen am Rand).
+  async function panelBreite(px) {
+    await page.locator('[id^="ide-redesign-sidebar-panel-"]').first().evaluate((el, breite) => {
+      el.style.flex = `0 0 ${breite}px`
+    }, px)
+    await page.waitForTimeout(100)
+  }
+
+  // Ganz sichtbar heißt: innerhalb des Panels und nicht in sich abgeschnitten.
+  async function imPanelGanz(locator, wo) {
+    const masse = await locator.evaluate(el => {
+      const panel = el.closest('[id^="ide-redesign-sidebar-panel-"]').getBoundingClientRect()
+      const r = el.getBoundingClientRect()
+      return { links: r.left - panel.left, rechts: panel.right - r.right, abgeschnitten: el.scrollWidth > el.clientWidth + 1 }
+    })
+    ok(masse.links >= 0 && masse.rechts >= 0 && !masse.abgeschnitten, `${wo}: nicht ganz sichtbar ${JSON.stringify(masse)}`)
+  }
+
+  features.p9f2 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Bericht')
+    await panelOeffnen('Quellen')
+    const panel = page.locator('.spur-panel')
+    await panel.getByRole('button', { name: 'Quelle hinzufügen' }).waitFor()
+    await panel.getByRole('button', { name: 'Weitere Aktionen' }).click()
+    const eintraege = await page.getByRole('menuitem').allInnerTexts()
+    ok(
+      JSON.stringify(eintraege.map(e => e.trim())) ===
+        JSON.stringify(['Webseite aufnehmen', 'Aus anderem Projekt holen', 'Importieren', 'Quellen exportieren', 'Literaturmatrix']),
+      `Menü: ${eintraege}`
+    )
+    await page.keyboard.press('Escape')
+
+    const smith = panel.locator('.spur-liste li', { hasText: 'Sleep and Memory' })
+    await smith.getByRole('button', { name: /^Sleep and Memory/ }).waitFor()
+    await smith.getByText('A. Smith · 2024', { exact: true }).waitFor()
+    await smith.getByText('8 Seiten · Text erkannt', { exact: true }).waitFor()
+
+    await quellenMenue('Webseite aufnehmen')
+    const adresse = modal().getByLabel('Adresse der Webseite')
+    await adresse.fill('kein link')
+    await modal().getByRole('button', { name: 'Aufnehmen', exact: true }).click()
+    await modal().getByText('Bitte eine vollständige Adresse mit http:// oder https:// eingeben.').waitFor()
+    ok((await adresse.inputValue()) === 'kein link', 'Ungültige Adresse verloren')
+    ok((await adresse.getAttribute('aria-invalid')) === 'true', 'Feld nicht als ungültig markiert')
+    await page.keyboard.press('Escape')
+    await modal().waitFor({ state: 'detached' })
+
+    await panelBreite(240)
+    for (const [element, wo] of [
+      [panel.getByRole('button', { name: 'Quelle hinzufügen' }), 'Quelle hinzufügen'],
+      [panel.getByRole('button', { name: 'Weitere Aktionen' }), 'Weitere Aktionen'],
+      [panel.getByRole('searchbox', { name: 'Quellen durchsuchen' }), 'Suchfeld'],
+    ]) {
+      await imPanelGanz(element, `${wo} bei 240 px`)
+    }
+
+    // Leeres Projekt: Platzhalter beim Laden, Erklärung, Upload über die Hauptaktion.
+    let freigeben
+    const gehalten = new Promise(resolve => (freigeben = resolve))
+    await page.route(/\/spur\/project\/[0-9a-f]+\/quellen$/, async route => {
+      await gehalten
+      // Ein zweiter Abruf derselben Adresse kann schon beantwortet sein.
+      await route.continue().catch(() => {})
+    })
+    await projektOeffnen('E2E Leer')
+    await panelOeffnen('Quellen')
+    await panel.locator('.spur-platzhalter-zeile').first().waitFor()
+    freigeben()
+    await page.unroute(/\/spur\/project\/[0-9a-f]+\/quellen$/)
+    await panel.getByText('Noch keine Quellen. Lade ein PDF hoch oder nimm eine Webseite auf.', { exact: true }).waitFor()
+    ok((await panel.locator('.spur-platzhalter-zeile').count()) === 0, 'Platzhalter nach dem Laden')
+    ok((await panel.getByRole('button', { name: 'Quelle hinzufügen' }).count()) === 2, 'Leerer Zustand ohne „Quelle hinzufügen“')
+    // Der echte Dateidialog bliebe im Playwright-Server hängen: den Klick auf das Dateifeld abfangen.
+    const dateiFeld = panel.locator('input[type=file]')
+    ok((await dateiFeld.getAttribute('accept')).includes('.pdf'), 'Dateiauswahl nimmt keine PDFs')
+    await dateiFeld.evaluate(el => el.addEventListener('click', e => {
+      e.preventDefault()
+      el.dataset.geoeffnet = 'ja'
+    }, { once: true }))
+    await panel.getByRole('button', { name: 'Quelle hinzufügen' }).first().click()
+    ok((await dateiFeld.getAttribute('data-geoeffnet')) === 'ja', '„Quelle hinzufügen“ öffnet keine Dateiauswahl')
+    await dateiFeld.setInputFiles(`${FIXTURES}/smith2024.pdf`)
+    const neu = panel.locator('.spur-liste li').first().getByRole('button', { name: /^Sleep and Memory/ })
+    await neu.waitFor({ timeout: 30000 })
+    await page.waitForFunction(() => document.activeElement?.textContent?.startsWith('Sleep and Memory'), null, { timeout: 5000 })
+
+    // Ladefehler mit „Erneut versuchen“.
+    await fakeSteuern({ schalter: { SPUR_PROXY_API: '403' } })
+    try {
+      await page.reload()
+      await page.locator('.cm-content').first().waitFor()
+      await panelOeffnen('Quellen')
+      await panel.getByRole('button', { name: 'Erneut versuchen' }).waitFor({ timeout: 20000 })
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+    await panel.getByRole('button', { name: 'Erneut versuchen' }).click()
+    await neu.waitFor()
+
+    // Mehr als 100 Quellen: nachladen, ohne Metadaten der Dateiname als Titel, Suchtreffer jenseits der ersten 100.
+    await projektOeffnen('E2E Viele')
+    await panelOeffnen('Quellen')
+    const zeilen = panel.locator('.spur-liste li')
+    await panel.getByText('100 von 300', { exact: true }).waitFor()
+    ok((await zeilen.count()) === 100, `Liste zeigt ${await zeilen.count()} Einträge`)
+    await panel.getByRole('button', { name: 'quelle-000.pdf', exact: true }).waitFor()
+    await suchen('seltene Wortfolge')
+    await panel.locator('.spur-zeile', { hasText: 'quelle-150.pdf' }).getByRole('button').first().click()
+    await page.getByRole('button', { name: 'Groß öffnen' }).waitFor()
+    await sichtbar('quelle-150.pdf')
+    await page.getByRole('button', { name: 'Zurück', exact: true }).first().click()
+    await suchen('')
+    await panel.getByRole('button', { name: 'Weitere Quellen laden' }).click()
+    await panel.getByText('200 von 300', { exact: true }).waitFor()
+    ok((await zeilen.count()) === 200, `Nach dem Nachladen ${await zeilen.count()} Einträge`)
+    // Ladefehler mit Absicht (Dev-Schalter); die Quellen von „E2E Viele“ sind Einträge ohne PDF-Datei.
+    ohneKonsolenfehler('p9f2', /Failed to load resource: the server responded with a status of (403|500)/)
+  }
+
+
+  features.p9f3 = async () => {
+    const SATZ = 'Participants completed the task over two consecutive nights.'
+    const SEITE_346 = 'Seite 346 (PDF-Seite 2 von 8)'
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Bericht')
+    await mitDesign('', async () => {
+      await projektOeffnen('E2E Bericht')
+      await panelOeffnen('Quellen')
+      await page.locator('.spur-panel').getByRole('button', { name: /^Sleep and Memory/ }).click()
+      await page.locator('.spur-panel').getByRole('link', { name: 'Original herunterladen' }).waitFor()
+      const { knopf, dialog } = await grossOeffnen()
+      const bild = dialog.locator('img.spur-seitenbild')
+      await bild.waitFor()
+      const rahmen = await dialog.locator('.modal-content').evaluate(el => getComputedStyle(el).backgroundColor)
+      ok(hell(rahmen) < 0.2, `Großansicht im dunklen Design hell: ${rahmen}`)
+      const leiste = dialog.locator('.spur-gross-leiste')
+      await leiste.getByRole('heading', { name: 'Angaben zur Quelle' }).waitFor()
+      await leiste.getByRole('heading', { name: 'Gespeicherte Zitate' }).waitFor()
+      await leiste.getByLabel('Notiz zur Quelle').waitFor()
+      ok((await dialog.locator('pre.spur-seitentext').count()) === 0, 'Seitentext steht als zweite Kopie da')
+
+      // Zoom: scharf, rollbar, nichts unter der Seitenleiste.
+      const flaeche = dialog.locator('.spur-gross-bild')
+      const groesser = dialog.getByRole('button', { name: 'Vergrößern' })
+      for (const stufe of ['125 %', '150 %', '200 %']) {
+        await groesser.click()
+        await dialog.getByText(stufe, { exact: true }).waitFor()
+      }
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.spur-gross-bild')
+        const img = el.querySelector('img')
+        return el.scrollWidth > el.clientWidth && el.scrollHeight > el.clientHeight && img.complete &&
+          img.naturalWidth >= img.getBoundingClientRect().width * devicePixelRatio
+      }, null, { timeout: 20000 })
+      const [bereichBox, leisteBox] = await Promise.all([flaeche.boundingBox(), leiste.boundingBox()])
+      ok(bereichBox.x + bereichBox.width <= leisteBox.x + 1, `Seite unter der Seitenleiste: ${JSON.stringify([bereichBox, leisteBox])}`)
+      await dialog.getByRole('button', { name: 'An Breite anpassen' }).click()
+      await dialog.getByText('100 %', { exact: true }).waitFor()
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.spur-gross-bild')
+        return el.scrollWidth <= el.clientWidth
+      })
+
+      // Tasten, feste Werkzeugleiste, alte Seite bis die neue da ist, neue Seite oben.
+      const knoepfe = ['Vorherige Seite', 'Nächste Seite', 'Verkleinern', 'Vergrößern'].map(name => dialog.getByRole('button', { name }))
+      const lage = async () => Promise.all(knoepfe.map(async k => JSON.stringify(await k.boundingBox())))
+      const vorher = await lage()
+      const mitten = vorher.map(b => JSON.parse(b)).map(b => Math.round(b.y + b.height / 2))
+      ok(Math.max(...mitten) - Math.min(...mitten) <= 2, `Blättern und Zoom nicht auf einer Linie: ${mitten}`)
+      await flaeche.evaluate(el => el.scrollTo(0, 300))
+      let freigeben
+      const gehalten = new Promise(resolve => (freigeben = resolve))
+      await page.route(/\/seiten\/2\/bild/, async route => {
+        await gehalten
+        await route.continue().catch(() => {})
+      })
+      await page.keyboard.press('ArrowRight')
+      await dialog.getByText(SEITE_346, { exact: true }).waitFor()
+      ok(await bild.isVisible(), 'Alte Seite verschwindet beim Blättern')
+      ok((await bild.getAttribute('src')).includes('/seiten/1/'), 'Neue Seite vor dem Laden gezeigt')
+      freigeben()
+      await page.waitForFunction(() => document.querySelector('.spur-gross-bild img')?.getAttribute('src').includes('/seiten/2/'))
+      await page.unroute(/\/seiten\/2\/bild/)
+      ok((await flaeche.evaluate(el => el.scrollTop)) === 0, 'Neue Seite beginnt nicht oben')
+      ok(JSON.stringify(await lage()) === JSON.stringify(vorher), 'Werkzeugleiste springt beim Blättern')
+      await page.keyboard.press('ArrowLeft')
+      await dialog.getByText(/^Seite 345 \(PDF-Seite 1 von 8\)$/).waitFor()
+      await page.keyboard.press('+')
+      await dialog.getByText('125 %', { exact: true }).waitFor()
+      await page.keyboard.press('-')
+      await dialog.getByText('100 %', { exact: true }).waitFor()
+
+      // Markieren auf der Seite, als Zitat speichern, einfügen.
+      await dialog.locator('.spur-textebene', { hasText: 'Participants' }).waitFor()
+      await textMarkieren(SATZ, dialog)
+      await leiste.getByRole('button', { name: 'Zitat speichern' }).click()
+      const zitat = leiste.locator('.spur-zitate li', { hasText: SATZ })
+      await zitat.getByText(/^S\. 345 · /).waitFor()
+      ok((await dialog.getByText('Keine Schreibrechte').count()) === 0, '„Keine Schreibrechte“ für Schreibende')
+      const einfuegen = zitat.getByRole('button', { name: 'Einfügen' })
+      ok(await einfuegen.isEnabled(), '„Einfügen“ für Schreibende gesperrt')
+      await einfuegen.click()
+      await page.waitForFunction(
+        satz => document.querySelector('.cm-content').innerText.includes(`\\enquote{${satz}} \\autocite[345]{smith2024}`),
+        SATZ,
+        { timeout: 10000 }
+      )
+
+      // Seitenleiste einklappen, bleibt eingeklappt.
+      await dialog.getByRole('button', { name: 'Seitenleiste ausblenden' }).click()
+      await leiste.waitFor({ state: 'hidden' })
+      const ohneLeiste = await flaeche.boundingBox()
+      const dialogBox = await dialog.locator('.modal-content').boundingBox()
+      ok(ohneLeiste.width >= dialogBox.width - 2, `Seite nutzt ohne Seitenleiste nicht die ganze Breite: ${ohneLeiste.width} von ${dialogBox.width}`)
+
+      // Original herunterladen.
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        dialog.getByRole('link', { name: 'Original herunterladen' }).click(),
+      ])
+      ok(download.suggestedFilename() === 'smith2024.pdf', `Download heißt ${download.suggestedFilename()}`)
+
+      // Auf Seite 346 schließen: Vorschau folgt, Fokus auf „Groß öffnen“.
+      await page.keyboard.press('ArrowRight')
+      await dialog.getByText(SEITE_346, { exact: true }).waitFor()
+      await page.keyboard.press('Escape')
+      await dialog.waitFor({ state: 'detached' })
+      await page.locator('.spur-panel').getByText(SEITE_346, { exact: true }).waitFor()
+      ok(await knopf.evaluate(el => el === document.activeElement), 'Fokus nach dem Schließen nicht auf „Groß öffnen“')
+      const wieder = await grossOeffnen()
+      await wieder.dialog.getByRole('button', { name: 'Seitenleiste einblenden' }).click()
+      await wieder.dialog.locator('.spur-gross-leiste').waitFor()
+
+      // Seitenbild scheitert: Meldung, Text bleibt lesbar; beim Laden ein Platzhalter.
+      await fakeSteuern({ schalter: { SPUR_SEITENBILD_FEHLER: '403' } })
+      try {
+        await page.keyboard.press('ArrowRight')
+        await wieder.dialog.getByText('Die Seite ließ sich nicht laden.').waitFor({ timeout: 20000 })
+        await wieder.dialog.locator('.spur-seitentext-ersatz').waitFor()
+      } finally {
+        await fakeSteuern({ schalter: {} })
+      }
+      let weiter
+      const halten = new Promise(resolve => (weiter = resolve))
+      await page.route(/\/bild\?/, async route => {
+        await halten
+        await route.continue().catch(() => {})
+      })
+      await wieder.dialog.getByRole('button', { name: 'Erneut versuchen' }).click()
+      await wieder.dialog.locator('.spur-seite-platzhalter').waitFor()
+      weiter()
+      await wieder.dialog.locator('img.spur-seitenbild').waitFor()
+      await page.unroute(/\/bild\?/)
+
+      // Schmal: einspaltig, Seitenleiste unter der Seite, kein Rollen der ganzen Ansicht.
+      for (const px of [768, 360]) {
+        await breite(px)
+        await page.waitForTimeout(300)
+        const [seite, unten, inhalt] = await Promise.all([
+          wieder.dialog.locator('.spur-gross-bild').boundingBox(),
+          wieder.dialog.locator('.spur-gross-leiste').boundingBox(),
+          wieder.dialog.locator('.modal-content').boundingBox(),
+        ])
+        ok(unten.y >= seite.y + seite.height - 1, `${px} px: Seitenleiste nicht unter der Seite`)
+        ok(inhalt.height <= (await page.evaluate(() => window.innerHeight)) + 1, `${px} px: höher als das Fenster`)
+        await ohneSeitlichesRollen(`Großansicht bei ${px} px`)
+      }
+      await breite(1280)
+      await page.keyboard.press('Escape')
+      await wieder.dialog.waitFor({ state: 'detached' })
+    })
+
+    // Scan: Hinweis auf unsicheren Text und Seitenzahl bestätigen; Webseite einspaltig ohne Werkzeugleiste.
+    await projektOeffnen('E2E Scan')
+    await panelOeffnen('Quellen')
+    await page.locator('.spur-panel').getByRole('button', { name: /scan\.pdf/ }).click()
+    await page.locator('.spur-panel img.spur-seitenbild').waitFor()
+    // Wie die Vorschau: Hinweis und „Seitenzahl bestätigen“ nur bei erkanntem Text.
+    const vorschauHinweis = await page.locator('.spur-panel .spur-ocr-hinweis').count()
+    const vorschauBestaetigen = await page.locator('.spur-panel').getByRole('button', { name: 'Seitenzahl bestätigen' }).count()
+    const scan = await grossOeffnen()
+    await scan.dialog.locator('img.spur-seitenbild').waitFor()
+    ok((await scan.dialog.locator('.spur-ocr-hinweis').count()) === vorschauHinweis, 'OCR-Hinweis anders als in der Vorschau')
+    ok((await scan.dialog.getByRole('button', { name: 'Seitenzahl bestätigen' }).count()) === vorschauBestaetigen, '„Seitenzahl bestätigen“ anders als in der Vorschau')
+    await page.keyboard.press('Escape')
+    await scan.dialog.waitFor({ state: 'detached' })
+    await projektOeffnen('E2E Web')
+    await panelOeffnen('Quellen')
+    const webQuelle = page.locator('.spur-panel').getByRole('button', { name: /^Schlafhygiene im Schichtdienst/ })
+    if (!(await webQuelle.isVisible())) {
+      await quellenMenue('Webseite aufnehmen')
+      await page.getByLabel('Adresse der Webseite').fill('http://127.0.0.1/spur/dev/web/testseite')
+      await page.getByRole('button', { name: 'Aufnehmen', exact: true }).click()
+    }
+    await webQuelle.click()
+    const web = await grossOeffnen()
+    await web.dialog.getByText(/^Schnappschuss von http/).waitFor()
+    ok((await web.dialog.locator('.spur-gross-werkzeuge').count()) === 0, 'Webseite mit Werkzeugleiste')
+    const [text, koerper] = await Promise.all([
+      web.dialog.locator('pre.spur-seitentext').boundingBox(),
+      web.dialog.locator('.modal-body').boundingBox(),
+    ])
+    ok(text.width >= koerper.width * 0.9, `Webseite nicht in voller Breite: ${text.width} von ${koerper.width}`)
+    await page.keyboard.press('Escape')
+
+    // Ohne Schreibrecht: „Keine Schreibrechte“ und „Einfügen“ gesperrt.
+    await anmelden('e2e-leser@example.org')
+    await projektOeffnen('E2E Bericht')
+    await panelOeffnen('Quellen')
+    await page.locator('.spur-panel').getByRole('button', { name: /^Sleep and Memory/ }).click()
+    const lesen = await grossOeffnen()
+    const fremd = lesen.dialog.locator('.spur-zitate li', { hasText: SATZ })
+    await fremd.waitFor()
+    await lesen.dialog.getByText('Keine Schreibrechte').waitFor()
+    ok(await fremd.getByRole('button', { name: 'Einfügen' }).isDisabled(), '„Einfügen“ ohne Schreibrecht aktiv')
+    await page.keyboard.press('Escape')
+    // Der 403 des Seitenbilds ist gewollt (Testschalter).
+    ohneKonsolenfehler('p9f3', /Failed to load resource: the server responded with a status of 403/)
+  }
+
+
+  features.p9f4 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Bericht')
+    await panelOeffnen('Prüfbericht')
+    const bericht = page.getByRole('tabpanel', { name: 'Prüfbericht' })
+    const gruppe = datei => bericht.getByRole('button', { name: new RegExp(`^${datei.replace('.', '\\.')}\\s*\\d+ Stellen?, \\d+ markiert$`) })
+    await gruppe('main.tex').waitFor({ timeout: 30000 })
+    await gruppe('kapitel.tex').waitFor()
+    const kapitelZeile = bericht.locator('.spur-zeile', { hasText: 'kapitel.tex:' })
+    await kapitelZeile.first().waitFor()
+    await gruppe('kapitel.tex').click()
+    ok((await gruppe('kapitel.tex').getAttribute('aria-expanded')) === 'false', 'Gruppe lässt sich nicht einklappen')
+    ok((await kapitelZeile.count()) === 0, 'Eingeklappte Gruppe zeigt Stellen')
+    await gruppe('kapitel.tex').click()
+    await kapitelZeile.first().waitFor()
+
+    // Filter mit Zahlen; „Markiert“ zeigt nur Stellen mit Problem; ein leerer Filter erklärt sich.
+    const zahlen = {}
+    for (const name of ['Alle', 'Markiert', 'Ohne Quelle', 'Nicht prüfbar']) {
+      const label = bericht.locator('.spur-filter label', { hasText: new RegExp(`^${name} \\d+$`) })
+      zahlen[name] = Number((await label.innerText()).match(/\d+$/)[0])
+    }
+    ok(zahlen.Alle === (await bericht.locator('.spur-zeile').count()), `„Alle“ zählt ${zahlen.Alle}`)
+    await berichtFilter('Markiert')
+    ok((await bericht.locator('.spur-zeile').count()) === zahlen.Markiert, `„Markiert“ zeigt ${await bericht.locator('.spur-zeile').count()} statt ${zahlen.Markiert}`)
+    const ohneProblem = await bericht.locator('.spur-zeile').evaluateAll(zeilen =>
+      zeilen.filter(z => !z.querySelector('.badge.bg-danger, .badge[class*="bg-warning"]')).length
+    )
+    ok(ohneProblem === 0, `„Markiert“ zeigt ${ohneProblem} Stellen ohne Problem`)
+    await berichtFilter('Alle')
+
+    // Erneut prüfen: alter Bericht bleibt, „Prüfung läuft …“, danach der Zeitpunkt.
+    let freigeben
+    const gehalten = new Promise(resolve => (freigeben = resolve))
+    await page.route(/\/pruefbericht$/, async route => {
+      await gehalten
+      await route.continue().catch(() => {})
+    })
+    await bericht.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await bericht.getByText('Prüfung läuft …', { exact: true }).waitFor()
+    ok((await bericht.locator('.spur-zeile').count()) === zahlen.Alle, 'Alter Bericht verschwindet während der Prüfung')
+    freigeben()
+    await bericht.getByText('Prüfung läuft …', { exact: true }).waitFor({ state: 'detached' })
+    await page.unroute(/\/pruefbericht$/)
+    const uhr = await page.evaluate(() => new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' }))
+    const zeitpunkt = await bericht.getByText(/^Zuletzt geprüft: heute, \d{2}:\d{2}$/).innerText()
+    ok(zeitpunkt.endsWith(uhr) || Math.abs(Number(zeitpunkt.slice(-2)) - Number(uhr.slice(-2))) <= 1, `${zeitpunkt} statt ${uhr}`)
+
+    // Abzeichen nebeneinander, nicht breiter als ihr Text, lesbar in beiden Designs.
+    const abzeichen = await bericht.locator('.spur-badges').evaluateAll(gruppen => gruppen.map(g => {
+      const b = [...g.querySelectorAll('.badge')].map(x => {
+        const r = x.getBoundingClientRect()
+        const inhalt = x.querySelector('.badge-content') ?? x
+        const text = document.createRange()
+        text.selectNodeContents(inhalt)
+        return { top: Math.round(r.top), breite: r.width, text: text.getBoundingClientRect().width }
+      })
+      return b
+    }))
+    const zuBreit = abzeichen.flat().filter(b => b.breite > b.text + 24)
+    ok(zuBreit.length === 0, `Abzeichen breiter als ihr Text: ${JSON.stringify(zuBreit)}`)
+    ok(abzeichen.some(g => g.length > 1 && g[0].top === g[1].top), 'Keine zwei Abzeichen nebeneinander')
+    for (const thema of ['', 'light-']) {
+      await mitDesign(thema, async () => {
+        await page.reload()
+        await page.locator('.cm-content').first().waitFor()
+        await panelOeffnen('Prüfbericht')
+        await bericht.locator('.spur-badges .badge').first().waitFor({ timeout: 30000 })
+        const schlecht = await unlesbar(bericht.locator('.spur-liste').first())
+        ok(schlecht.length === 0, `Abzeichen im Design „${thema || 'dunkel'}“: ${schlecht}`)
+      })
+    }
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Prüfbericht')
+
+    // Tooltip an der roten Markierung: Maus und Tastatur.
+    const marke = page.locator('.cm-content .spur-marke-rot', { hasText: 'Sleep strongly supports' })
+    await marke.waitFor({ timeout: 30000 })
+    // Beim Überfahren legt CodeMirror den Tooltip in eine Hülle, am Cursor trägt die Hülle selbst die Klasse.
+    const tooltip = page.locator('.cm-tooltip.spur-befund-tooltip, .cm-tooltip .spur-befund-tooltip')
+    // Cursor weg von der Markierung, sonst zeigt schon der Tooltip am Cursor den Befund.
+    await page.locator('.cm-lineNumbers .cm-gutterElement', { hasText: /^1$/ }).click()
+    await page.keyboard.press('Home')
+    // Die Markierung kann umbrechen: über die erste Zeile fahren, nicht über die Mitte des ganzen Kastens.
+    const box = await marke.evaluate(el => {
+      const r = el.getClientRects()[0]
+      return { x: r.left, y: r.top, height: r.height }
+    })
+    for (let i = 0; i < 10 && !(await tooltip.filter({ hasText: 'Wortlaut: abweichend' }).isVisible()); i++) {
+      await page.mouse.move(box.x + 10 + i * 5, box.y + box.height / 2)
+      await page.waitForTimeout(700)
+    }
+    await tooltip.filter({ hasText: 'Wortlaut: abweichend' }).waitFor({ timeout: 5000 })
+    await page.mouse.move(5, 5)
+    await page.locator('.cm-lineNumbers .cm-gutterElement', { hasText: /^8$/ }).click()
+    await page.keyboard.press('ArrowLeft')
+    for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowRight')
+    await tooltip.filter({ hasText: 'Wortlaut: abweichend' }).waitFor()
+    await page.keyboard.press('Home')
+
+    // Sprung aus dem Bericht.
+    await page.locator('.cm-content').evaluate(el => el.blur())
+    await bericht.getByRole('button', { name: 'main.tex:8', exact: true }).click()
+    await page.locator('.cm-activeLineGutter', { hasText: /^8$/ }).waitFor()
+
+    await bericht.getByRole('button', { name: 'Einstellungen der Prüfung' }).waitFor()
+    await bericht.getByText(/davon \d+ markiert/).waitFor()
+
+    // Ein Filter ohne Treffer erklärt sich (im Projekt mit nur grünen Stellen).
+    await projektOeffnen('E2E Bericht Grün')
+    await panelOeffnen('Prüfbericht')
+    await bericht.locator('.spur-filter label', { hasText: /^Markiert 0$/ }).waitFor({ timeout: 30000 })
+    await berichtFilter('Markiert')
+    await bericht.getByText('Keine Stellen mit diesem Befund.', { exact: true }).waitFor()
+    ohneKonsolenfehler('p9f4')
+  }
+
+
+  features.p9f5 = async () => {
+    const SATZ = 'Von 240 Befragten antworteten 90.'
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Automatik')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    const panel = claudePanel()
+    const schalter = panel.getByRole('switch', AUTOMATIK)
+    await schalter.waitFor()
+    await panel.getByText('Rote Zitate bleiben offen.', { exact: true }).waitFor()
+    ok((await panel.locator('.spur-lauf-karte').count()) === 0, 'Lauf-Karte vor dem ersten Lauf')
+    ok(await schalter.isChecked(), 'Altes Häkchen nicht als Schalter übernommen')
+    ok((await page.getByText('Automatisch annehmen, wenn ein Lauf ohne Probleme endet').count()) === 0, 'Altes Häkchen noch da')
+
+    const token = await neuesToken()
+    let nr = 0
+    const schreiben = async (alt, neu, pfad = 'main.tex', mitToken = token) => {
+      const r = await werkzeug(mitToken, 'doc_edit', { project_id: pid, pfad, alt, neu, idempotenz_schluessel: `p9f5-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit ${neu}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+
+    // Schalter an: sofort angenommen, ohne run_finish; Hinweis auf Zahlen ohne Beleg.
+    await schreiben('Alpha Satz.', `Alpha Satz. ${SATZ}`)
+    await page.waitForFunction(
+      satz => {
+        const inhalt = document.querySelector('.cm-content')
+        return inhalt.innerText.includes(satz) && ![...inhalt.querySelectorAll('[class*="ol-cm-change"]')].some(e => e.textContent.includes('Befragten'))
+      },
+      SATZ,
+      { timeout: 5000 }
+    )
+    const karte = panel.locator('.spur-lauf-karte').first()
+    await karte.locator('.spur-lauf-automatisch', { hasText: SATZ }).getByText('Automatisch angenommen').waitFor({ timeout: 10000 })
+    await karte.getByText('Zahl ohne Beleg: 240, 90', { exact: true }).waitFor()
+
+    // Rotes Zitat bleibt offen und steht oben unter „Bitte prüfen“; der Rest desselben Laufs ist angenommen.
+    const rot = await schreiben('Gamma Satz.', 'Gamma Satz. \\footfullcite{smith2024}')
+    ok(rot.rot.length === 1, `Zitat nicht rot: ${JSON.stringify(rot)}`)
+    await schreiben('Delta Satz.', 'Delta Satz ergänzt.')
+    const zuPruefen = karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' })
+    await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'footfullcite' }).waitFor({ timeout: 10000 })
+    const reihenfolge = await karte.locator('.spur-lauf-aenderung .spur-nachricht-text').allInnerTexts()
+    ok(reihenfolge[0].includes('footfullcite'), `Rotes Zitat nicht oben: ${reihenfolge}`)
+    await karte.locator('.spur-lauf-automatisch', { hasText: 'ergänzt' }).waitFor()
+
+    // Schalter aus: Neue Änderungen bleiben offen. Per Tastatur, ohne Sprung, mit Zustand.
+    const vorher = JSON.stringify(await panel.locator('.spur-automatik').boundingBox())
+    await schalter.focus()
+    await Promise.all([page.waitForResponse(r => r.url().endsWith('/claude/automatik')), page.keyboard.press('Space')])
+    ok(!(await schalter.isChecked()) && (await schalter.getAttribute('role')) === 'switch', 'Schalter nicht per Tastatur aus')
+    ok(JSON.stringify(await panel.locator('.spur-automatik').boundingBox()) === vorher, 'Schalter springt beim Speichern')
+    // Während und nach dem Speichern bleibt der Fokus auf dem Schalter, nicht auf der Seite.
+    await page.waitForFunction(() => !document.querySelector('#spur-automatik[aria-busy]'))
+    await fokusAuf(schalter, 'nach dem Speichern')
+    const zwoelf = [['Beta Satz.', 'Beta Satz. Nachtrag']]
+    for (const wort of ['Eins.', 'Zwei.', 'Drei.', 'Vier.', 'Fünf.']) zwoelf.push([wort, `${wort} neu`])
+    for (const [alt, neu] of zwoelf) await schreiben(alt, neu)
+    for (const wort of ['Sechs.', 'Sieben.', 'Acht.', 'Neun.', 'Zehn.', 'Elf.']) await schreiben(wort, `${wort} neu`, 'extra.tex')
+    await karte.locator('.spur-lauf-aenderung', { hasText: 'Nachtrag' }).getByRole('button', { name: 'Annehmen' }).waitFor({ timeout: 10000 })
+
+    // Alles Offene jetzt annehmen: Rückfrage, Abbrechen ändert nichts, Annehmen lässt nur Rotes offen.
+    const sammel = panel.getByRole('button', { name: 'Alles Offene jetzt annehmen' })
+    await sammel.click()
+    await modal().getByText('12 Änderungen in 2 Dateien annehmen? Rote Zitate bleiben offen.', { exact: true }).waitFor()
+    await modal().getByRole('button', { name: 'Abbrechen' }).click()
+    await modal().waitFor({ state: 'detached' })
+    ok((await karte.locator('.spur-lauf-aenderung', { hasText: 'Nachtrag' }).count()) === 1, 'Abbrechen hat angenommen')
+    await fokusAuf(sammel, 'nach „Abbrechen“')
+    // Per Tastatur: Enter öffnet, Enter auf „Annehmen“ nimmt an; danach liegt der Fokus auf „Nichts offen“.
+    await sammel.focus()
+    await page.keyboard.press('Enter')
+    await modal().getByRole('button', { name: 'Annehmen', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    await modal().waitFor({ state: 'detached', timeout: 20000 })
+    const nichts = panel.getByRole('button', { name: 'Nichts offen' })
+    await nichts.waitFor({ timeout: 10000 })
+    ok(await nichts.isDisabled(), '„Nichts offen“ nicht gesperrt')
+    await fokusAuf(nichts, 'nach dem Annehmen')
+    await page.keyboard.press('Enter')
+    ok((await modal().count()) === 0, '„Nichts offen“ öffnet den Dialog')
+    await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'footfullcite' }).waitFor()
+    ok((await karte.locator('.spur-lauf-aenderung', { hasText: 'Nachtrag' }).count()) === 0, 'Offenes nicht angenommen')
+
+    // Lauf rückgängig nimmt auch automatisch Angenommenes zurück.
+    await karte.getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte.getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const zurueck = await page.evaluate(async p => (await (await fetch(`/spur/project/${p}/claude`)).json()).laeufe[0], pid)
+    ok(zurueck.lauf.status === 'zurueckgenommen', `Status ${zurueck.lauf.status}`)
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('.cm-content [class*="ol-cm-change-d"], .cm-content .ol-cm-change')].length > 0 ||
+        !document.querySelector('.cm-content').innerText.includes('Befragten'),
+      null,
+      { timeout: 10000 }
+    )
+
+    // Fehler beim Speichern: Schalter springt zurück, die Meldung nennt den Grund.
+    await fakeSteuern({ schalter: { SPUR_AUTOMATIK_FEHLER: '1' } })
+    try {
+      await schalter.check({ force: true }).catch(() => {})
+      await panel.getByText('Speichern ist gerade nicht möglich. Bitte versuch es gleich noch einmal.').waitFor({ timeout: 10000 })
+      await page.waitForFunction(() => !document.querySelector('#spur-automatik').checked)
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+
+    // Gilt nur in diesem Projekt.
+    await projektOeffnen('E2E Schreiben')
+    await panelOeffnen('Claude')
+    await claudePanel().getByRole('switch', AUTOMATIK).waitFor()
+    ok(!(await claudePanel().getByRole('switch', AUTOMATIK).isChecked()), 'Schalter in „E2E Schreiben“ an')
+
+    // Reviewer und Lesende: weder Schalter noch Knopf, die Routen antworten 403.
+    for (const email of ['e2e-review@example.org', 'e2e-leser@example.org']) {
+      await anmelden(email)
+      await page.goto(`${BASE}/project/${pid}`)
+      await page.locator('.cm-content').first().waitFor()
+      await panelOeffnen('Claude')
+      await claudePanel().getByText(/^Claude (nicht )?verbunden$/).first().waitFor()
+      ok((await claudePanel().getByRole('switch').count()) === 0, `${email} sieht den Schalter`)
+      ok((await claudePanel().getByRole('button', { name: /Alles Offene|Nichts offen/ }).count()) === 0, `${email} sieht die Sammelannahme`)
+      for (const [methode, pfad, body] of [['PUT', `/spur/project/${pid}/claude/automatik`, { an: true }], ['POST', `/spur/project/${pid}/claude/alles-annehmen`, {}]]) {
+        const antwort = await seitenAnfrage(methode, pfad, body)
+        ok(antwort.status === 403, `${email} ${methode} ${pfad}: ${antwort.status}`)
+      }
+    }
+
+    // Ohne Schreibrecht bleibt die nächste Änderung des eigenen Claude offen, auch mit eingeschaltetem Schalter.
+    await anmelden('e2e-schreib@example.org')
+    const schreibId = await page.evaluate(() => document.querySelector('meta[name="ol-user_id"]').content)
+    const schreibToken = await neuesToken()
+    await anmelden('e2e-a@example.org')
+    await page.goto(`${BASE}/project/${pid}`)
+    await page.locator('.cm-content').first().waitFor()
+    const herab = await seitenAnfrage('PUT', `/project/${pid}/users/${schreibId}`, { privilegeLevel: 'review' })
+    ok(herab.status === 204, `Herabstufen: ${herab.status}`)
+    await schreiben('Neun.', 'Neun. als Reviewer', 'extra.tex', schreibToken)
+    await anmelden('e2e-schreib@example.org')
+    await page.goto(`${BASE}/project/${pid}`)
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Claude')
+    await claudePanel().locator('.spur-lauf-aenderung', { hasText: 'als Reviewer' }).waitFor({ timeout: 15000 })
+    ohneKonsolenfehler('p9f5', /Failed to load resource: the server responded with a status of (403|503)/)
+  }
+
+
+  features.p9f6 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+
+    // Nicht verbunden, ohne Aufträge: Status, Startbefehl, Weg zu den Tokens, gesperrtes Eingabefeld.
+    await projektOeffnen('E2E Viele Läufe')
+    await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('spur-startbefehl')).forEach(k => localStorage.removeItem(k)))
+    await page.reload()
+    await page.locator('.cm-content').first().waitFor()
+    await panelOeffnen('Claude')
+    const panel = claudePanel()
+    await panel.getByText('Claude nicht verbunden').waitFor()
+    const link = panel.getByRole('link', { name: 'Token verwalten' })
+    ok((await link.getAttribute('href')) === '/user/settings#language-feedback', `Token verwalten führt nach ${await link.getAttribute('href')}`)
+    await panel.getByText(/claude --allowedTools/).waitFor()
+    await panel.locator('.spur-befehl-kasten').getByRole('button', { name: 'Kopieren' }).click()
+    await panel.locator('.spur-befehl-kasten').getByRole('button', { name: 'Kopiert' }).waitFor()
+    ok(await panel.getByLabel('Auftrag an Claude').isDisabled(), 'Eingabefeld ohne Verbindung bedienbar')
+    await panel.getByText('Verbinde zuerst Claude').waitFor()
+
+    // Mehr als 20 Läufe: „Ältere laden“.
+    ok((await panel.locator('.spur-lauf-karte').count()) === 20, `Läufe: ${await panel.locator('.spur-lauf-karte').count()}`)
+    await panel.getByRole('button', { name: 'Ältere laden' }).click()
+    await page.waitForFunction(() => document.querySelectorAll('.spur-lauf-karte').length === 22)
+    ok((await panel.getByRole('button', { name: 'Ältere laden' }).count()) === 0, '„Ältere laden“ nach dem letzten Lauf')
+
+    // Ohne Aufträge: der Hinweis steht direkt über dem Eingabefeld.
+    await projektOeffnen('E2E Leer')
+    await panelOeffnen('Claude')
+    const leer = panel.getByText('Noch keine Aufträge. Schreib unten, was Claude tun soll.', { exact: true })
+    await leer.waitFor()
+    const [hinweisBox, eingabeBox] = await Promise.all([leer.boundingBox(), panel.locator('.spur-chat-eingabe').boundingBox()])
+    ok(eingabeBox.y - (hinweisBox.y + hinweisBox.height) < 40, `Hinweis nicht direkt über dem Eingabefeld: ${hinweisBox.y}, ${eingabeBox.y}`)
+
+    // Verbunden: Startbefehl eingeklappt, Lauf-Karte direkt unter der Statuszeile und ganz sichtbar.
+    await projektOeffnen('E2E Läufe')
+    const pid = page.url().split('/').pop()
+    await panelOeffnen('Claude')
+    const token = await neuesToken()
+    let nr = 0
+    const schreiben = async (alt, neu) => {
+      const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: `p9f6-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit: ${JSON.stringify(r.inhalt)}`)
+    }
+    await schreiben('Eins.', 'Eins. a')
+    await schreiben('Zwei.', 'Zwei. b')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Erster Lauf' })
+    await schreiben('Drei.', 'Drei. c')
+    await schreiben('Vier.', 'Vier. d')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zweiter Lauf' })
+    await schreiben('Fünf.', 'Fünf. e')
+    await verbinden(token)
+    await panel.getByRole('button', { name: 'Startbefehl anzeigen' }).waitFor()
+    ok((await panel.getByText(/claude --allowedTools/).count()) === 0, 'Startbefehl trotz Verbindung offen')
+    const koepfe = panel.locator('.spur-lauf-kopf button')
+    await page.waitForFunction(() => document.querySelectorAll('.spur-lauf-kopf button').length === 3, null, { timeout: 15000 })
+    ok(JSON.stringify(await koepfe.evaluateAll(k => k.map(b => b.getAttribute('aria-expanded')))) === '["true","false","false"]', 'Neuester Lauf nicht allein offen')
+    for (const i of [1, 2]) {
+      const text = await koepfe.nth(i).innerText()
+      ok(/Fertig/.test(text) && /2 offen/.test(text), `Älterer Lauf: ${text}`)
+    }
+    const [status, ersteKarte, inhalt] = await Promise.all([
+      panel.locator('.spur-claude-status').boundingBox(),
+      panel.locator('.spur-lauf-karte').first().boundingBox(),
+      panel.locator('.spur-claude-inhalt').boundingBox(),
+    ])
+    ok(ersteKarte.y - (status.y + status.height) < 24, `Lauf-Karte nicht unter der Statuszeile: ${status.y + status.height}, ${ersteKarte.y}`)
+    ok(ersteKarte.y >= inhalt.y && ersteKarte.y + ersteKarte.height <= inhalt.y + inhalt.height, 'Lauf-Karte abgeschnitten')
+
+    // Einen älteren Lauf aufklappen und einzeln entscheiden.
+    await koepfe.nth(2).click()
+    const aelter = panel.locator('.spur-lauf-karte').nth(2)
+    await aelter.locator('.spur-lauf-aenderung').first().getByRole('button', { name: 'Annehmen', exact: true }).click()
+    await page.waitForFunction(() => /1 offen/.test(document.querySelectorAll('.spur-lauf-kopf button')[2]?.innerText ?? ''), null, { timeout: 10000 })
+    await panel.locator('.spur-lauf-karte').nth(2).getByRole('button', { name: 'Ablehnen' }).first().click()
+    await page.waitForFunction(() => !/offen/.test(document.querySelectorAll('.spur-lauf-kopf button')[2]?.innerText ?? 'offen'), null, { timeout: 10000 })
+
+    // Ein Fehler der Abfrage verschwindet, sobald sie wieder klappt.
+    await fakeSteuern({ schalter: { SPUR_CLAUDE_FEHLER: '403' } })
+    try {
+      await panel.locator('.notification-type-error').first().waitFor({ timeout: 15000 })
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+    await panel.locator('.notification-type-error').first().waitFor({ state: 'detached', timeout: 15000 })
+
+    // Token erzeugen: Doppelklick gibt ein Token; Widerrufen fragt nach.
+    await page.goto(`${BASE}/user/settings`)
+    const zeilen = page.locator('.spur-token')
+    await page.getByRole('button', { name: 'Token erzeugen' }).waitFor()
+    const vorher = await zeilen.count()
+    await page.getByRole('button', { name: 'Token erzeugen' }).dblclick()
+    await page.getByText('So verbindest du Claude Code').waitFor()
+    await page.waitForTimeout(1000)
+    ok((await zeilen.count()) === vorher + 1, `Doppelklick: ${(await zeilen.count()) - vorher} Tokens`)
+    await zeilen.first().getByRole('button', { name: 'Widerrufen' }).click()
+    await page.locator('.modal').getByText('Danach kann sich Claude mit diesem Token nicht mehr verbinden.').waitFor()
+    await page.locator('.modal').getByRole('button', { name: 'Abbrechen' }).click()
+    ok((await zeilen.count()) === vorher + 1, 'Abbrechen hat widerrufen')
+    ohneKonsolenfehler('p9f6', /Failed to load resource: the server responded with a status of 403/)
+  }
+
+
+  features.p9f7 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const recherche = () => page.getByRole('tabpanel', { name: 'Recherche' })
+    await projektOeffnen('E2E Recherche')
+
+    // „Nicht frei“ lesbar in beiden Designs.
+    for (const thema of ['', 'light-']) {
+      await mitDesign(thema, async () => {
+        await projektOeffnen('E2E Recherche')
+        await panelOeffnen('Recherche')
+        await paperSuchen('sleep memory')
+        const nichtFrei = recherche().locator('.spur-paper', { hasText: 'Nicht frei' }).first()
+        await nichtFrei.waitFor()
+        const schlecht = await unlesbar(nichtFrei)
+        ok(schlecht.length === 0, `Treffer im Design „${thema || 'dunkel'}“: ${schlecht}`)
+      })
+    }
+    await projektOeffnen('E2E Recherche')
+    await panelOeffnen('Recherche')
+    await paperSuchen('sleep memory')
+
+    // Je Treffer eine Hauptaktion, der Rest im Menü; die DOI ist ein Link.
+    const treffer = recherche().locator('.spur-paper').filter({ has: page.locator('.spur-paper-doi') })
+    const anzahl = await treffer.count()
+    ok(anzahl > 0, 'Keine Treffer mit DOI')
+    for (let i = 0; i < anzahl; i++) {
+      const eintrag = treffer.nth(i)
+      const haupt = await eintrag.locator('.spur-paper-aktionen > .btn').allInnerTexts()
+      const frei = (await eintrag.getByText('Open Access', { exact: true }).count()) > 0
+      ok(JSON.stringify(haupt) === JSON.stringify([frei ? 'Aufnehmen' : 'Auf die Beschaffungsliste']), `Hauptaktion: ${haupt}`)
+      const doi = await eintrag.locator('.spur-paper-doi a').innerText()
+      ok((await eintrag.locator('.spur-paper-doi a').getAttribute('href')) === `https://doi.org/${doi}`, `DOI-Link für ${doi}`)
+    }
+    await treffer.first().getByRole('button', { name: 'Weitere Aktionen' }).click()
+    const menue = await page.getByRole('menuitem').allInnerTexts()
+    ok(JSON.stringify(menue.map(m => m.trim())) === '["Zitiert von","Zitiert"]', `Menü: ${menue}`)
+    await page.keyboard.press('Escape')
+
+    // Reiter mit Pfeiltasten.
+    const reiter = name => recherche().getByRole('tab', { name, exact: true })
+    await reiter('Treffer').focus()
+    await page.keyboard.press('ArrowRight')
+    ok((await reiter('Suchprotokoll').getAttribute('aria-selected')) === 'true', 'Pfeil rechts wählt „Suchprotokoll“ nicht')
+    ok(await reiter('Suchprotokoll').evaluate(el => el === document.activeElement), 'Fokus nicht auf „Suchprotokoll“')
+    await page.keyboard.press('ArrowRight')
+    ok((await reiter('Beschaffung').getAttribute('aria-selected')) === 'true', 'Pfeil rechts wählt „Beschaffung“ nicht')
+    await page.keyboard.press('ArrowLeft')
+    await page.keyboard.press('ArrowLeft')
+    ok((await reiter('Treffer').getAttribute('aria-selected')) === 'true', 'Pfeil links wählt „Treffer“ nicht')
+
+    // Schmal: Reiter in einer Zeile oder rollend, Suchfeld und „Suchen“ ganz sichtbar.
+    await panelBreite(240)
+    const oben = await recherche().getByRole('tab').evaluateAll(t => t.map(e => Math.round(e.getBoundingClientRect().top)))
+    ok(new Set(oben).size === 1, `Reiter stapeln: ${oben}`)
+    await imPanelGanz(recherche().getByRole('searchbox', { name: 'Paper suchen' }), 'Suchfeld bei 240 px')
+    await imPanelGanz(recherche().getByRole('button', { name: 'Suchen', exact: true }), '„Suchen“ bei 240 px')
+
+    // Platzhalter während der Suche, Text ohne Treffer.
+    let freigeben
+    const gehalten = new Promise(resolve => (freigeben = resolve))
+    await page.route(/\/recherche\?/, async route => {
+      await gehalten
+      await route.continue().catch(() => {})
+    })
+    await recherche().getByRole('searchbox', { name: 'Paper suchen' }).fill('sleep')
+    await recherche().getByRole('button', { name: 'Suchen', exact: true }).click()
+    await recherche().locator('.spur-platzhalter-zeile').first().waitFor()
+    freigeben()
+    await page.unroute(/\/recherche\?/)
+    await paperSuchen('xyzxyz')
+    await recherche().getByText('Keine Treffer für „xyzxyz“. Prüf die Schreibweise oder such nach der DOI.', { exact: true }).waitFor()
+
+    // Beschaffung: „PDF hochladen“ als Hauptaktion, Exporte im Menü, leere Liste erklärt sich.
+    await reiter('Beschaffung').click()
+    await recherche().locator('.btn-primary', { hasText: 'PDF hochladen' }).waitFor()
+    await recherche().getByRole('button', { name: 'Liste exportieren' }).click()
+    const exporte = await page.getByRole('menuitem').evaluateAll(m => m.map(e => e.getAttribute('aria-label')))
+    ok(JSON.stringify(exporte) === '["Als .bib exportieren","Als .ris exportieren","Als CSV exportieren"]', `Exporte: ${exporte}`)
+    await page.keyboard.press('Escape')
+    await projektOeffnen('E2E Leer')
+    await panelOeffnen('Recherche')
+    await reiter('Beschaffung').click()
+    await recherche().getByText('Die Beschaffungsliste ist leer. Nicht freie Treffer setzt du mit „Auf die Beschaffungsliste“ hierher.').waitFor()
+    ohneKonsolenfehler('p9f7')
+  }
+
+
+  features.p9f8 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Bericht')
+
+    // Vorschläge: „Für mich“ und „Standard für alle im Projekt“, je Auslöser eine Zeile; Tageslimit am Feld.
+    let freigeben
+    let gehalten = new Promise(resolve => (freigeben = resolve))
+    await page.route(/\/vorschlaege$/, async route => {
+      await gehalten
+      await route.continue().catch(() => {})
+    })
+    await panelOeffnen('Vorschläge')
+    const vorschlaege = page.getByRole('tabpanel', { name: 'Vorschläge' })
+    await vorschlaege.locator('.spur-platzhalter-zeile').first().waitFor()
+    freigeben()
+    await page.unroute(/\/vorschlaege$/)
+    await vorschlaege.getByRole('heading', { name: 'Für mich', exact: true }).waitFor()
+    await vorschlaege.getByRole('heading', { name: 'Standard für alle im Projekt', exact: true }).waitFor()
+    for (const zeile of await vorschlaege.locator('.spur-vorschlag-zeile').all()) {
+      const [name, auswahl] = await Promise.all([zeile.locator('label').boundingBox(), zeile.locator('select').boundingBox()])
+      ok(Math.abs(name.y + name.height / 2 - (auswahl.y + auswahl.height / 2)) < 6, 'Auslöser nicht als Zeile mit Namen und Auswahl')
+    }
+    const limit = vorschlaege.getByLabel('Tageslimit, für alle Projekte')
+    const stand = vorschlaege.getByText(/^Heute \d+ von \d+ Auslösern$/)
+    const [feldBox, standBox] = await Promise.all([limit.boundingBox(), stand.boundingBox()])
+    ok(Math.abs(feldBox.y - standBox.y) < feldBox.height, 'Stand steht nicht neben dem Feld')
+    for (const wert of ['0', 'abc']) {
+      await limit.fill(wert)
+      await vorschlaege.locator('.spur-vorschlag-limit').getByRole('button', { name: 'Speichern' }).click()
+      await vorschlaege.getByText('Bitte eine ganze Zahl von 1 bis 1000 eingeben.').waitFor()
+      ok((await limit.getAttribute('aria-invalid')) === 'true', `Feld bei „${wert}“ nicht als ungültig markiert`)
+    }
+
+    // Literaturmatrix: Platzhalter ganz lesbar, „Gespeichert“ an der Zelle, Fehler mit erhaltenem Text.
+    await panelOeffnen('Quellen')
+    await quellenMenue('Literaturmatrix')
+    const matrix = modal()
+    const neueSpalte = matrix.getByPlaceholder('Neue Spalte, etwa „Methode“')
+    const passt = await neueSpalte.evaluate(el => {
+      const stil = getComputedStyle(el)
+      const ctx = document.createElement('canvas').getContext('2d')
+      ctx.font = `${stil.fontSize} ${stil.fontFamily}`
+      const frei = el.clientWidth - parseFloat(stil.paddingLeft) - parseFloat(stil.paddingRight)
+      return ctx.measureText(el.placeholder).width <= frei
+    })
+    ok(passt, 'Platzhalter der neuen Spalte abgeschnitten')
+    if ((await matrix.getByRole('columnheader', { name: 'P9 Methode' }).count()) === 0) {
+      await neueSpalte.fill('P9 Methode')
+      await matrix.getByRole('button', { name: 'Spalte hinzufügen' }).click()
+      await matrix.getByRole('columnheader', { name: 'P9 Methode' }).waitFor()
+    }
+    const zelle = matrix.getByLabel(/^P9 Methode: smith2024\.pdf$/)
+    await zelle.fill('Experiment')
+    await zelle.press('Tab')
+    const zellStatus = zelle.locator('xpath=ancestor::td').getByRole('status')
+    await zellStatus.getByText('Gespeichert', { exact: true }).waitFor()
+    await fakeSteuern({ schalter: { SPUR_MATRIX_FEHLER: '1' } })
+    try {
+      await zelle.fill('Experiment mit Kontrollgruppe')
+      await zelle.press('Tab')
+      await zellStatus.getByText('Speichern ist gerade nicht möglich. Bitte versuch es gleich noch einmal.').waitFor()
+      ok((await zelle.inputValue()) === 'Experiment mit Kontrollgruppe', 'Text nach Fehler verloren')
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+    await page.keyboard.press('Escape')
+    await matrix.waitFor({ state: 'detached' })
+
+    // Quelle löschen: Zahl lädt sichtbar; scheitert sie, bleibt Löschen möglich.
+    gehalten = new Promise(resolve => (freigeben = resolve))
+    await page.route(/\/pruefbericht$/, async route => {
+      await gehalten
+      await route.continue().catch(() => {})
+    })
+    await page.locator('.spur-panel').getByRole('button', { name: /^Sleep and Memory/ }).click()
+    await page.getByRole('button', { name: 'Quelle löschen' }).click()
+    await modal().getByText('Betroffene Zitate werden gezählt …').waitFor()
+    freigeben()
+    await page.unroute(/\/pruefbericht$/)
+    await modal().getByText(/Zitate? nutz/).waitFor()
+    await modal().getByRole('button', { name: 'Abbrechen' }).click()
+    await fakeSteuern({ schalter: { SPUR_PRUEFBERICHT_FEHLER: '403' } })
+    try {
+      await page.getByRole('button', { name: 'Quelle löschen' }).click()
+      await modal().getByText('Die betroffenen Zitate ließen sich nicht ermitteln.').waitFor({ timeout: 20000 })
+      ok(await modal().getByRole('button', { name: 'Endgültig löschen' }).isEnabled(), 'Löschen ohne Zahl gesperrt')
+      await modal().getByRole('button', { name: 'Abbrechen' }).click()
+    } finally {
+      await fakeSteuern({ schalter: {} })
+    }
+
+    // Import: Ladehinweis der Sammlungen, gleiche Namen als zwei Zeilen, Schließen während des Uploads fragt nach.
+    const pdf = await repoBytes(`${FIXTURES}/keller2014.pdf`)
+    await projektOeffnen('E2E Leer')
+    await panelOeffnen('Quellen')
+    gehalten = new Promise(resolve => (freigeben = resolve))
+    await page.route(/\/import\/zotero$/, async route => {
+      if (route.request().method() === 'GET') await gehalten
+      await route.continue().catch(() => {})
+    })
+    await quellenMenue('Importieren')
+    await modal().getByText('Zotero-Sammlungen werden geladen').waitFor()
+    freigeben()
+    await page.unroute(/\/import\/zotero$/)
+    let hochladen
+    const upload = new Promise(resolve => (hochladen = resolve))
+    await page.route(/\/quellen$/, async route => {
+      if (route.request().method() === 'POST') await upload
+      await route.continue().catch(() => {})
+    })
+    await modal().getByLabel('PDFs wählen').setInputFiles([
+      { name: 'gleich.pdf', mimeType: 'application/pdf', buffer: pdf },
+      { name: 'gleich.pdf', mimeType: 'application/pdf', buffer: pdf },
+    ])
+    ok((await modal().locator('.spur-import-liste li', { hasText: 'gleich.pdf' }).count()) === 2, 'Gleiche Namen nicht als zwei Zeilen')
+    await modal().getByRole('button', { name: 'Schließen' }).click()
+    await modal().getByText('Der Upload läuft noch. Beim Schließen kommen die übrigen Dateien nicht an.').waitFor()
+    await modal().getByRole('button', { name: 'Weiter hochladen' }).click()
+    hochladen()
+    await page.waitForFunction(() => [...document.querySelectorAll('.spur-import-liste li')].every(li => !li.textContent.includes('wird aufgenommen')), null, { timeout: 30000 }).catch(() => {})
+    await page.unroute(/\/quellen$/)
+    await modal().getByRole('button', { name: 'Schließen' }).click()
+    await modal().waitFor({ state: 'detached' })
+
+    // Einladungslink: „Kopiert“ nur, wenn das Kopieren gelungen ist.
+    await mailFake(false)
+    await anmelden('e2e-admin@example.org')
+    const dialog = await kontoAnlegen(`p9f8-${Date.now()}@example.org`)
+    await dialog.getByLabel('Einladungslink').last().waitFor()
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = () => Promise.reject(new Error('verweigert'))
+      document.execCommand = () => false
+    })
+    await dialog.getByRole('button', { name: 'Kopieren' }).last().click()
+    await dialog.getByText('Kopieren nicht möglich. Markier den Link und kopier ihn von Hand.').waitFor()
+    ok((await dialog.getByRole('button', { name: 'Kopiert' }).count()) === 0, '„Kopiert“ trotz Fehler')
+    await dialog.getByRole('button', { name: 'Schließen' }).click()
+    ohneKonsolenfehler('p9f8', /Failed to load resource: the server responded with a status of (403|409|503)/)
+  }
+
+
+  features.p9f10 = async () => {
+    await breite(1280)
+    const de = JSON.parse(await repoDatei(`${FIXTURES}/../../../../locales/de.json`))
+    const en = JSON.parse(await repoDatei(`${FIXTURES}/../../../../locales/en.json`))
+    // Englische Texte, die im Deutschen anders lauten: Taucht einer in der Oberfläche auf, fehlt eine Übersetzung.
+    const englisch = new Set(Object.keys(en).filter(k => de[k] && de[k] !== en[k] && /[a-z]{3}/.test(en[k])).map(k => en[k]))
+    const nurDeutsch = (texte, wo) => {
+      const fremd = texte.map(t => t.trim()).filter(t => englisch.has(t))
+      ok(fremd.length === 0, `${wo}: englisch ${fremd.join(' | ')}`)
+    }
+    await anmelden('e2e-a@example.org')
+
+    // Projektliste: relative Zeit deutsch, Papierkorb, Stichwörter nicht abgeschnitten.
+    await page.goto(`${BASE}/project`)
+    await page.getByPlaceholder(/^Suche in allen Projekten…$/).filter({ visible: true }).first().fill('E2E Alt')
+    const zeile = page.getByRole('row', { name: /E2E Alt/ }).first()
+    await zeile.getByText(/^vor 2 Tagen von dir$/).filter({ visible: true }).first().waitFor()
+    await page.getByText('Papierkorb', { exact: true }).first().waitFor()
+    const abgeschnitten = await page.locator('.project-list-sidebar-wrapper-react, .project-list-sidebar').first().evaluate(seite =>
+      [...seite.querySelectorAll('*')].filter(el => el.children.length === 0 && el.textContent.trim() && el.scrollWidth > el.clientWidth + 1).map(el => el.textContent.trim())
+    ).catch(() => [])
+    ok(abgeschnitten.length === 0, `Abgeschnitten in der Seitenleiste: ${abgeschnitten}`)
+    nurDeutsch(await page.locator('main, nav, aside').allInnerTexts().then(t => t.join('\n').split('\n')), 'Projektliste')
+    await page.getByRole('button', { name: /^(Konto|Account)/ }).first().click().catch(() => {})
+    nurDeutsch(await page.locator('.dropdown-menu.show').allInnerTexts().then(t => t.join('\n').split('\n')), 'Kontomenü')
+    await page.keyboard.press('Escape')
+
+    // Editor: Menüleiste und jedes Menü deutsch.
+    await projektOeffnen('E2E Bericht')
+    const leiste = page.getByRole('menubar').first()
+    const menues = (await leiste.locator('.menu-bar-toggle').allInnerTexts()).map(t => t.trim())
+    ok(JSON.stringify(menues) === JSON.stringify(['Datei', 'Bearbeiten', 'Einfügen', 'Ansicht', 'Format', 'Hilfe']), `Menüleiste: ${menues}`)
+    for (const name of menues) {
+      await leiste.getByRole('button', { name, exact: true }).first().click()
+      await page.locator('.dropdown-menu.show').first().waitFor()
+      nurDeutsch(await page.locator('.dropdown-menu.show').allInnerTexts().then(t => t.join('\n').split('\n')), `Menü ${name}`)
+      await page.keyboard.press('Escape')
+    }
+
+    // Leiste links: zugängliche Namen und Tooltips.
+    for (const name of ['Dateibaum', 'Projektsuche', 'Überprüfung', 'Chat']) {
+      const tab = railTab(name)
+      await tab.waitFor()
+      await tab.hover()
+      await page.getByRole('tooltip').filter({ hasText: name }).first().waitFor({ timeout: 5000 })
+      await page.mouse.move(600, 400)
+    }
+
+    // Review-Panel: deutsche Knöpfe zum Annehmen und Ablehnen.
+    await projektOeffnen('E2E Schreiben')
+    await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name: 'voll.tex' }))
+    await page.locator('.file-tree').getByRole('treeitem', { name: 'voll.tex' }).click()
+    await panelSichern('Überprüfung', page.locator('.review-panel-entry').first(), 60000)
+    const knoepfe = await page.locator('.review-panel-entry button').evaluateAll(b => b.map(e => e.getAttribute('aria-label') || e.textContent.trim()))
+    ok(knoepfe.some(k => /annehmen/i.test(k)) && knoepfe.some(k => /ablehnen/i.test(k)), `Review-Knöpfe: ${knoepfe.slice(0, 6)}`)
+    nurDeutsch(knoepfe, 'Review-Panel')
+    ohneKonsolenfehler('p9f10')
+  }
+
+
+  // Grund und Füllung des Schriftzugs liegen übereinander; gemessen bei 0, 50 und 100 % Fortschritt.
+  async function schriftzugDeckt(wo) {
+    await page.locator('.loading-screen-brand-fuellung').waitFor({ timeout: 20000 })
+    for (const stand of [0, 50, 100]) {
+      const abweichung = await page.evaluate(p => {
+        const grund = document.querySelector('.loading-screen-brand-grund')
+        const fuellung = document.querySelector('.loading-screen-brand-fuellung')
+        fuellung.style.clipPath = `inset(${100 - p}% 0 0 0)`
+        const a = grund.getBoundingClientRect()
+        const b = fuellung.getBoundingClientRect()
+        const text = document.querySelector('.loading-screen-label')?.getBoundingClientRect()
+        const mitte = r => r.left + r.width / 2
+        return {
+          rahmen: Math.max(Math.abs(a.left - b.left), Math.abs(a.top - b.top), Math.abs(a.height - b.height), Math.abs(a.bottom - b.bottom)),
+          text: text ? Math.abs(mitte(text) - mitte(a)) : 0,
+          unter: text ? text.top >= a.bottom : true,
+        }
+      }, stand)
+      ok(abweichung.rahmen <= 1, `${wo} bei ${stand} %: Füllung versetzt um ${abweichung.rahmen} px`)
+      ok(abweichung.unter && abweichung.text <= 2, `${wo}: Text nicht mittig darunter (${JSON.stringify(abweichung)})`)
+    }
+  }
+
+  // Hält Anfragen an `muster` an, bis `schritte` fertig sind; so bleibt der Ladebildschirm stehen.
+  async function mitGehaltenemNetz(muster, schritte) {
+    let freigeben
+    const gehalten = new Promise(resolve => (freigeben = resolve))
+    await page.route(muster, async route => {
+      await gehalten
+      await route.continue().catch(() => {})
+    })
+    try {
+      await schritte()
+    } finally {
+      freigeben()
+      await page.unroute(muster)
+    }
+  }
+
+  features.p9f11 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    await projektOeffnen('E2E Quellen')
+    const pid = page.url().split('/').pop()
+    // Die Tokens entstehen erst, wenn der Linkzugriff eingeschaltet wird.
+    await seitenAnfrage('POST', `/project/${pid}/settings/admin`, { publicAccessLevel: 'tokenBased' })
+    const { readAndWrite } = await (await page.request.get(`${BASE}/project/${pid}/tokens`)).json()
+    ok(readAndWrite, 'Kein Freigabelink')
+
+    for (const [px, thema] of [[1280, 'light-'], [1280, ''], [360, '']]) {
+      await breite(px)
+      await mitDesign(thema, async () => {
+        await mitGehaltenemNetz(/\/socket\.io\//, async () => {
+          await page.goto(`${BASE}/project/${pid}`, { waitUntil: 'commit' })
+          await schriftzugDeckt(`Editor ${px} px ${thema || 'dunkel'}`)
+        })
+        await page.locator('.cm-content').first().waitFor({ timeout: 60000 })
+      })
+    }
+    await breite(1280)
+
+    await anmelden('e2e-review@example.org')
+    await mitGehaltenemNetz(/\/grant$/, async () => {
+      await page.goto(`${BASE}/${readAndWrite}`, { waitUntil: 'commit' })
+      // Overleaf fragt vor dem Beitreten nach; der Ladebildschirm steht, solange der Zugriff angefragt wird.
+      const beitreten = page.getByRole('button', { name: /beitreten|join/i }).first()
+      await beitreten.waitFor({ timeout: 15000 }).then(() => beitreten.click(), () => {})
+      await schriftzugDeckt('Freigabelink')
+    })
+    ohneKonsolenfehler('p9f11', /Failed to load resource|WebSocket|socket\.io/)
+  }
+
+
+  features.p9f9 = async () => {
+    await breite(1280)
+    await anmelden('e2e-admin@example.org')
+    const seite = page.locator('main.spur-admin-seite')
+
+    // Admin-Menü auf Deutsch, beide Einträge führen zur Seite.
+    const breiten = {}
+    for (const [eintrag, pfad] of [['Grenzen', '/spur/admin/grenzen'], ['Workflows', '/spur/admin/workflows']]) {
+      await page.goto(`${BASE}/project`)
+      await page.getByRole('menuitem', { name: 'Admin', exact: true }).first().click()
+      await page.getByRole('menuitem', { name: eintrag, exact: true }).click()
+      await page.waitForURL(new RegExp(`${pfad}$`))
+      await seite.getByRole('heading', { level: 1, name: eintrag }).waitFor()
+      await seite.locator('section.spur-admin-abschnitt h2').first().waitFor()
+      ok((await seite.locator(':scope > p').count()) >= 1, `${eintrag}: kein einleitender Satz`)
+      ok((await seite.locator('section.spur-admin-abschnitt h2').count()) >= 1, `${eintrag}: keine Abschnitte`)
+      breiten[eintrag] = (await seite.boundingBox()).width
+    }
+    ok(breiten.Grenzen === breiten.Workflows, `Inhaltsbreiten: ${JSON.stringify(breiten)}`)
+
+    // Workflows: „Gespeichert“ am Knopf; über 20 000 Zeichen eine Meldung am Feld, die Eingabe bleibt.
+    const abschnitt = seite.locator('section.spur-admin-abschnitt').first()
+    const feld = abschnitt.locator('textarea')
+    const text = await feld.inputValue()
+    // Per Tastatur gespeichert, bleibt der Fokus auf dem Knopf (er ist beim Laden kurz gesperrt).
+    const speichern = abschnitt.getByRole('button', { name: 'Speichern', exact: true })
+    await speichern.focus()
+    await page.keyboard.press('Enter')
+    await abschnitt.locator('.spur-vorschlag-aktionen').getByText(/^Gespeichert/).waitFor()
+    await fokusAuf(speichern, 'nach „Speichern“')
+    const lang = 'x'.repeat(20001)
+    await feld.fill(lang)
+    await abschnitt.getByRole('button', { name: 'Speichern', exact: true }).click()
+    await abschnitt.getByText(/^Der Text hat 20.001 Zeichen; erlaubt sind höchstens 20.000\./).waitFor()
+    ok((await feld.inputValue()).length === 20001, 'Zu langer Text verloren')
+    ok((await feld.getAttribute('aria-invalid')) === 'true', 'Feld nicht als ungültig markiert')
+    await feld.fill(text)
+
+    // Grenzen: Suche nach Name oder Adresse, Blättern ab 50 Zeilen, leere Tabellen erklären sich.
+    await page.goto(`${BASE}/spur/admin/grenzen`)
+    const nutzer = seite.locator('section', { has: page.getByRole('heading', { name: 'Nutzer' }) }).first()
+    await nutzer.getByLabel('Nach Name oder Adresse suchen').fill('e2e-leser@')
+    await page.waitForFunction(() => document.querySelectorAll('tr[data-email]').length === 1)
+    ok((await page.locator('tr[data-email]').getAttribute('data-email')) === 'e2e-leser@example.org', 'Suche findet die Adresse nicht')
+    const echt = await (await page.request.get(`${BASE}/spur/admin/grenzen.json`)).json()
+    const viele = Array.from({ length: 60 }, (_, i) => ({ ...echt.nutzer[0], id: `p9-${i}`, email: `p9-${i}@example.org`, name: `P9 ${i}` }))
+    for (const [nutzerListe, projekte, pruefen] of [
+      [viele, echt.projekte, async () => {
+        ok((await page.locator('tr[data-email]').count()) === 50, `Erste Seite: ${await page.locator('tr[data-email]').count()} Zeilen`)
+        await seite.getByRole('button', { name: 'Nächste Seite' }).click()
+        ok((await page.locator('tr[data-email]').count()) === 10, `Zweite Seite: ${await page.locator('tr[data-email]').count()} Zeilen`)
+      }],
+      [[], [], async () => {
+        await seite.getByText('Noch keine Nutzer', { exact: true }).waitFor()
+        await seite.getByText('Noch keine Projekte', { exact: true }).waitFor()
+      }],
+    ]) {
+      await page.route(/\/spur\/admin\/grenzen\.json$/, route => route.fulfill({ json: { ...echt, nutzer: nutzerListe, projekte } }))
+      await page.reload()
+      await seite.getByRole('heading', { level: 1, name: 'Grenzen' }).waitFor()
+      await page.locator('table').first().waitFor()
+      await pruefen()
+      await page.unroute(/\/spur\/admin\/grenzen\.json$/)
+    }
+
+    // 360 px: Die Seite rollt nicht seitlich, breite Tabellen rollen in ihrem Bereich.
+    await breite(360)
+    for (const pfad of ['/spur/admin/grenzen', '/spur/admin/workflows']) {
+      await page.goto(`${BASE}${pfad}`)
+      await seite.locator('h1').waitFor()
+      await page.waitForTimeout(500)
+      await ohneSeitlichesRollen(`${pfad} bei 360 px`)
+    }
+    await breite(1280)
+    ohneKonsolenfehler('p9f9')
+  }
+
+
+  features.p9f12 = async () => {
+    const wurzel = `${FIXTURES}/../../../../../..`
+    const readme = await repoDatei(`${wurzel}/README.md`)
+    const adr2 = await repoDatei(`${wurzel}/docs/adr/0002-single-write-path.md`)
+    const vertrag = await repoDatei(`${wurzel}/docs/mcp-contract.md`)
+    const kern = await repoDatei(`${wurzel}/docs/adr/0001-module-in-web-service.md`)
+    const backlog = await repoDatei(`${wurzel}/docs/backlog.md`)
+    const enthaelt = (text, teile, wo) => {
+      const fehlt = teile.filter(t => !text.includes(t))
+      ok(fehlt.length === 0, `${wo}: fehlt ${fehlt.join(' | ')}`)
+    }
+    enthaelt(readme, ['Alles von Claude automatisch annehmen', 'Rote Zitate bleiben offen.', 'Alles Offene jetzt annehmen', 'Lauf rückgängig', 'Original herunterladen', 'Markiert', 'Ohne Quelle', 'tooltip'], 'README')
+    enthaelt(adr2, ['Addendum 2026-11-13', 'red', 'no tool'], 'ADR 0002')
+    ok(/switch "Alles von Claude automatisch annehmen"/.test(vertrag) && /no tool to accept/.test(vertrag), 'MCP-Vertrag nennt die Regel nicht')
+    enthaelt(kern, ['loading-branded.tsx', 'locales/de.json', 'admin-menu.tsx'], 'Kern-Patches')
+    ok(!/Nicht frei|Menüsprach|mixed menu|narrow research/i.test(backlog.split('## ').find(t => t.startsWith('Interface')) ?? ''), 'Erledigtes steht noch im Backlog')
+    ok(/lacks \d+ keys/.test(backlog), 'Backlog nennt die Zahl fehlender deutscher Schlüssel nicht')
+    for (const [name, text] of [['README', readme], ['ADR 0002', adr2], ['Vertrag', vertrag], ['Kern-Patches', kern], ['Backlog', backlog]]) {
+      ok(!text.includes('Automatisch annehmen, wenn ein Lauf ohne Probleme endet'), `${name} nennt das alte Häkchen`)
+      ok(!/\bLimits\b/.test(text), `${name} nennt „Limits“`)
+    }
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`
@@ -4227,12 +6250,17 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
   for (const [id, lauf] of Object.entries(features)) {
     if (nur.length && !nur.includes(id)) continue
     konsolenFehler.length = 0
+    konsolenMeldungen.length = 0
+    // Ein abgebrochener Schritt kann eine angehaltene Route hinterlassen; sie hielte jede spätere Anfrage fest.
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
     try {
       await lauf()
       ok(konsolenFehler.length === 0, `Fehler: ${konsolenFehler.join(' | ')}`)
       ergebnis.push(`${id} ok`)
     } catch (error) {
-      ergebnis.push(`${id} FEHLER: ${error.message}`)
+      // Die Zeile im Stapel hilft beim Finden des Schritts (run-code liefert keine Dateinamen).
+      const stelle = (error.stack ?? '').split('\n').filter(z => /<anonymous>:\d+/.test(z)).slice(0, 6).map(z => z.match(/:(\d+):\d+\)?$/)?.[1]).join(' < ')
+      ergebnis.push(`${id} FEHLER: ${error.message}${stelle ? ` (Zeilen ${stelle})` : ''}`)
     }
   }
   page.off('pageerror', beiFehler)
