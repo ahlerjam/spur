@@ -19,3 +19,20 @@
 - Nachtrag Sichtprüfung: Beim Ansehen des Teilen-Dialogs fiel „Link sharing is off“ auf, das meine Attributsuche nicht fand (sie prüft nur Attribute und kurze Texte mit Stichwörtern). Eine Prüfung aller `t()`-Schlüssel der Flächen zeigt: Dateibaum (10 Schlüssel, die Seitenleiste gehört zu f4) ist jetzt übersetzt und in `tools/tests/sprache.test.mjs` als Fläche aufgenommen. Nicht übersetzt, weil außerhalb der in f4 genannten Flächen: Teilen-Dialog (60 fehlende Schlüssel, z. B. `link_sharing_is_off_short`) und Verlauf (18 fehlende Schlüssel); sie zählen zu den im Backlog genannten fehlenden Schlüsseln.
 - Nachtrag 2: Teilen-Dialog (60 Schlüssel) und Verlauf (18 Schlüssel) sind jetzt ebenfalls übersetzt (mit den Plural-Formen) und im Sprachtest als Flächen geführt; die Aussage „nicht übersetzt“ im Nachtrag davor gilt damit nicht mehr.
 - Endabnahme (Stand `953c447fab`): voller E2E-Lauf 97 von 97 ok (`p6f10`, `p10f1` bis `p10f7` eingeschlossen), Frontend-Tests der geänderten Dateien 65 von 65, Overleafs Frontend-Suite 1789 bestanden, 14 bekannte, 0 neue. Bilder bei 1280 und 360 px angesehen: Teilen-Dialog (bei 360 px 344 px breit im 360-px-Fenster, kein Seiten-Überlauf; die Abdunklung dahinter ist der Modal-Hintergrund) und Verlauf (kein Seiten-Überlauf; die drei Spalten Dateien, Diff und Änderungsliste sind Overleafs eigenes, verstellbares Layout und bei 360 px eng, wie zuvor; P10 hat dort nur Texte, Datumsformate und das Datei-Badge übersetzt). Offen im Verlauf: Uhrzeiten mit „pm“ (Format `h:mm a` aus Overleaf) und der Tab „Labels“ (so steht er in Overleafs deutscher Fassung).
+
+## Endabnahme auf dem Stand 1c01ef005f (Code unverändert seit diesem Commit)
+Gesamtlauf E2E: 97 von 97 Features ok (`p6f10`, `p10f1` bis `p10f7` eingeschlossen). `spur-dev test`: 531 Tests, 92,33 % Zeilen. Overleafs Frontend-Suite: 1789 bestanden, 14 bekannt, 0 neu. `/code-review medium` und `/security-review` (Skill, Schritt 1 als Subagent, wie vom Skill vorgeschrieben): keine Funde ≥ 8.
+
+Ansichten, je am laufenden Build mit Playwright aufgenommen und angesehen (Screenshots nicht im Repo, laut `CLAUDE.md`); Seitenbreite = `document.documentElement.scrollWidth`:
+
+| Ansicht | 1280 px | 360 px |
+|---|---|---|
+| Projektliste | „Deine Projekte – spur“, Breite 1280 | Breite 360 |
+| Editor | „E2E P8 DOI – spur“, 3 Resizer „Größe ändern“, Breite 1280 | wie links, Breite 360 |
+| Prüfbericht | Filter in einer Zeile, Kopfzeile „9 Stellen, 7 markiert: 4 mit Befund, 2 ohne Quelle, 1 nicht prüfbar“ | 2×2-Raster, nichts abgeschnitten |
+| Admin-Projekttabelle | Hinweis zum Speicher, Suche, Breite 1280 | „E2E Web“ „0,53 KB / 1 GB“, Breite 360 |
+| Log-Bereich | „Rohprotokoll“ sichtbar | „Rohprotokoll“ sichtbar |
+| Claude-Dialog | „1 rotes Zitat mit annehmen?“, „Nur die anderen“ mit Fokus | lesbar, beide Knöpfe sichtbar |
+| Lauf-Karte nach „Alle annehmen“ | keine leere Überschrift „Bitte prüfen“ | wie links |
+| Teilen-Dialog | „Linkfreigabe ist aus“, alles deutsch | 344 px breit im 360-px-Fenster |
+| Verlauf | „Ansicht vom 13. November“, 24-Stunden-Zeit, Tab „Marken“ | wie links, Breite 360 |
