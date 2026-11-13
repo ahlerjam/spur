@@ -38,11 +38,11 @@ function dateien(pfad) {
 }
 
 export function schluesselIn(quelltext) {
-  return [...quelltext.matchAll(/\bt\(\s*['"]([a-z0-9_]+)['"]/g)].map(treffer => treffer[1])
+  return [...quelltext.matchAll(/(?:\bt\(\s*|i18nKey=)['"]([a-z0-9_]+)['"]/g)].map(treffer => treffer[1])
 }
 
 test('schluesselIn findet t()-Aufrufe mit einfachen und doppelten Anführungszeichen', () => {
-  assert.deepEqual(schluesselIn(`t('file') + t("insert", { x }) + translate('view') + t(variable)`), ['file', 'insert'])
+  assert.deepEqual(schluesselIn(`t('file') + t("insert", { x }) + translate('view') + t(variable) + <Trans i18nKey="viewing_x" />`), ['file', 'insert', 'viewing_x'])
 })
 
 test('jeder Schlüssel der täglichen Flächen steht in de.json', () => {
