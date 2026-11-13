@@ -69,7 +69,12 @@
 - /code-review (medium, `74da65505c..HEAD`, nur E2E-Schritte): behoben: p6f3 wartet auf den Fokus ohne Annahme über den
   Shadow-Host, löst das Feld bei jeder Abfrage neu auf und meldet Fokus und Feldinhalt; p5f6 rundet nicht mehr, sondern
   misst erst nach dem Ende der Einblend-Animationen (abgebrochene Animationen zählen als fertig).
-- Letzter voller E2E-Lauf nach der letzten Änderung (`ed6acb4777`): alle Features grün, f1 bis p9f12.
+- /simplify (`74da65505c..HEAD`, E2E-Schritte): übernommen: `fokusAuf` prüft über einen Locator mit `:focus`, der bei
+  jeder Abfrage neu aufgelöst wird und Shadow-DOMs sieht; p6f3 nutzt ihn statt einer eigenen Warteschleife; Meldungen
+  werden nur im Fehlerfall gebaut. Übersprungen: ein gemeinsamer Helfer fürs Warten auf Animationen (nur eine Stelle).
+- Security (Subagent, `b252f41fcb..HEAD`): keine sicherheitsrelevanten Befunde. `alles-annehmen` und `automatik`
+  verlangen auf dem Server Schreibrecht (`schreiben`-Kette, `darfSchreiben`); `aria-disabled` statt `disabled`
+  schwächt nichts, der Knopf öffnet nur den Rückfragedialog. Keine neuen Dev-Routen, kein `innerHTML`.
 - Screenshots aller Ansichten bei 360 und 1280 px nach der letzten Änderung an der Oberfläche neu aufgenommen
   (Projektliste, Quellen, Prüfbericht, Claude, Recherche, Vorschläge, Import, große Ansicht, Grenzen, Workflows).
 - Screenshots nach dem Fokus-Fix: Claude-Panel mit „Nichts offen“ bei 360 und 1280 px; der Fokusring ist per Tastatur

@@ -2615,11 +2615,11 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await page.setViewportSize({ width: px, height: px < 400 ? 740 : 690 })
   }
 
-  // Der Fokus liegt (spätestens nach 5 s) auf dem Element; sonst nennt die Meldung, wo er gelandet ist.
-  async function fokusAuf(element, wann) {
-    const handle = await element.elementHandle()
-    const da = await page.waitForFunction(el => el === document.activeElement, handle, { timeout: 5000 }).then(() => true, () => false)
-    ok(da, `Fokus ${wann} auf ${await page.evaluate(() => document.activeElement?.tagName)}`)
+  // Der Fokus liegt (spätestens nach `timeout`) auf dem Element; sonst nennt die Meldung, wo er gelandet ist. Der Locator
+  // wird bei jeder Abfrage neu aufgelöst und sieht auch in Shadow-DOMs (Kommentarfelder des Review-Panels).
+  async function fokusAuf(element, wann, timeout = 5000) {
+    const da = await element.and(page.locator(':focus')).waitFor({ timeout }).then(() => true, () => false)
+    if (!da) ok(false, `Fokus ${wann} auf ${await page.evaluate(() => document.activeElement?.tagName)}`)
   }
 
   async function ohneSeitlichesRollen(wo) {
@@ -3315,17 +3315,10 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await feld.waitFor()
     // Overleaf setzt den neuen Kommentar erst an seine Stelle und fokussiert dann selbst das Feld (im Shadow-DOM);
     // vorher Getipptes kann mit dem ersten Eintrag verschwinden. Wie ein Mensch: erst tippen, wenn der Cursor dort steht.
-    // Der Locator wird bei jeder Abfrage neu aufgelöst: Overleaf ersetzt das Feld beim ersten Platzieren.
-    const feldHatFokus = () => feld.evaluate(el => el.getRootNode().activeElement === el).catch(() => false)
-    let fokussiert = false
-    for (let i = 0; i < 50 && !fokussiert; i++) {
-      fokussiert = await feldHatFokus()
-      if (!fokussiert) await page.waitForTimeout(200)
-    }
-    ok(fokussiert, 'Overleaf hat das Kommentarfeld nicht fokussiert')
+    await fokusAuf(feld, 'im neuen Kommentar', 10000)
     await page.keyboard.type('@claude bitte ansehen')
     const angekommen = await feld.filter({ hasText: '@claude bitte ansehen' }).waitFor({ timeout: 5000 }).then(() => true, () => false)
-    ok(angekommen, `Getipptes nicht im Kommentarfeld: „${await feld.textContent()}“, Fokus im Feld: ${await feldHatFokus()}`)
+    if (!angekommen) ok(false, `Getipptes nicht im Kommentarfeld: „${await feld.textContent()}“`)
     await hinweis.waitFor({ timeout: 5000 })
     const hinweisKasten = formular.locator('.spur-claude-hinweis')
     ok(!(await unlesbar(hinweisKasten)).length, `Hinweis schlecht lesbar: ${await unlesbar(hinweisKasten)}`)
