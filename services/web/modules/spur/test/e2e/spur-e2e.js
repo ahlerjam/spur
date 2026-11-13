@@ -3016,7 +3016,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     const box = await klein.dialog.locator('.modal-content').boundingBox()
     ok(box.width >= 355 && box.x <= 1, `Große Ansicht bei 360 px: ${JSON.stringify(box)}`)
     const zuKlein = await klein.dialog.getByRole('button').evaluateAll(knoepfe =>
-      knoepfe.filter(k => k.offsetParent).map(k => [k.textContent.trim() || k.getAttribute('aria-label'), k.getBoundingClientRect()]).filter(([, r]) => r.width < 24 || r.height < 24).map(([n]) => n)
+      knoepfe.filter(k => k.offsetParent).map(k => [k.textContent.trim() || k.getAttribute('aria-label'), k.getBoundingClientRect()]).filter(([, r]) => Math.round(r.width) < 24 || Math.round(r.height) < 24).map(([n, r]) => `${n} ${r.width}×${r.height}`)
     )
     ok(zuKlein.length === 0, `Knöpfe unter 24 px: ${zuKlein}`)
     await ohneSeitlichesRollen('Große Ansicht 360 px')
