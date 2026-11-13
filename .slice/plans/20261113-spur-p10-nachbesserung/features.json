@@ -11,7 +11,7 @@
     "Der Satz „Von 240 Befragten antworteten 37,5 Prozent; der Mittelwert lag bei 3.14 und 12,5 von 1.250 Fällen fehlten.“ meldet genau `240`, `37,5`, `3.14`, `12,5`, `1.250`",
     "Unit-Tests decken ab: `9 Uhr`, `9.30 Uhr`, `9:30 Uhr`, `Python 3.12`, `R 4.3.1`, `SPSS 29`, `LaTeX2e`, `Node 20` werden nicht gemeldet; `3.14`, `12,5`, `1.250`, `240`, `Gruppe 2 hatte 17 Teilnehmende` (17 gemeldet) werden gemeldet"
   ]},
-  {"id": "f3", "title": "Claude-Panel sagt, was offen ist, und nimmt rote Zitate nie stillschweigend an", "ui": true, "passes": false, "steps": [
+  {"id": "f3", "title": "Claude-Panel sagt, was offen ist, und nimmt rote Zitate nie stillschweigend an", "ui": true, "passes": true, "steps": [
     "Projekt „E2E Automatik“ mit Schalter „Alles von Claude automatisch annehmen“ an: Claude schreibt über MCP eine normale Änderung und `\\parencite{unbekannt}` (DOI unbekannt). Oben im Panel steht der ausgegraute Knopf „Nur rote Zitate offen (1)“ mit dem Hinweis, dass rote Zitate einzeln geprüft werden; „Nichts offen“ steht dort nicht",
     "Ohne offene Änderungen heißt der Knopf „Nichts offen“; mit offenen nicht roten Änderungen (Schalter aus, zwei Änderungen) heißt er „Alles Offene jetzt annehmen (2)“",
     "Mit Schalter aus, einer normalen und einer roten Änderung klickt die Nutzerin in der Lauf-Karte „Alle annehmen“: Ein Dialog „1 rotes Zitat mit annehmen?“ erscheint mit „Nur die anderen“ (hat den Fokus) und „Alle annehmen“",
