@@ -1,0 +1,52 @@
+{"features": [
+  {"id": "f1", "title": "Prüfbericht zählt „markiert“ einheitlich", "ui": true, "passes": false, "steps": [
+    "Projekt „E2E Bericht“: Die Nutzerin öffnet den Prüfbericht und klickt „Erneut prüfen“. Die Zahl hinter „Markiert“ im Filter, die Zahl „markiert“ in der Kopfzeile und die Summe der „markiert“-Angaben in den Dateizeilen sind gleich (der Builder zählt am Testprojekt nach und schreibt die Zahl in den E2E-Schritt)",
+    "Die Kopfzeile beginnt mit der Gesamtzahl der Stellen und der markierten und schlüsselt danach auf, z. B. „9 Stellen, 6 markiert: 3 mit Befund, 2 ohne Quelle, 1 nicht prüfbar“; „Beleg ohne Wortlaut“ und „übersprungen“ stehen weiter wie bisher",
+    "Mit dem Filter „Markiert“ ist die Zahl der sichtbaren Zeilen genau die Zahl aus Kopfzeile und Filter",
+    "`check_report` über MCP liefert `zaehlung.markiert` mit derselben Zahl; die Werkzeugbeschreibung und `docs/mcp-contract.md` erklären die Bedeutung in einem Satz",
+    "Projekt „E2E P8 Zählung“ (keine Markierung): Kopfzeile nennt „keine markiert“, Filter „Markiert 0“"
+  ]},
+  {"id": "f2", "title": "Uhrzeiten und Softwareversionen sind keine Zahl ohne Beleg", "passes": false, "steps": [
+    "Über MCP schreibt `doc_edit` im Projekt „E2E P8 Zahlen“ den Satz „Die Sitzung begann um 9 Uhr und endete um 9.30 Uhr, ausgewertet mit Python 3.12, R 4.3.1 und SPSS 29, gesetzt mit LaTeX2e.“: Die Antwort enthält `zahlen_ohne_beleg: []`",
+    "Der Satz „Von 240 Befragten antworteten 37,5 Prozent; der Mittelwert lag bei 3.14 und 12,5 von 1.250 Fällen fehlten.“ meldet genau `240`, `37,5`, `3.14`, `12,5`, `1.250`",
+    "Unit-Tests decken ab: `9 Uhr`, `9.30 Uhr`, `9:30 Uhr`, `Python 3.12`, `R 4.3.1`, `SPSS 29`, `LaTeX2e`, `Node 20` werden nicht gemeldet; `3.14`, `12,5`, `1.250`, `240`, `Gruppe 2 hatte 17 Teilnehmende` (17 gemeldet) werden gemeldet"
+  ]},
+  {"id": "f3", "title": "Claude-Panel sagt, was offen ist, und nimmt rote Zitate nie stillschweigend an", "ui": true, "passes": false, "steps": [
+    "Projekt „E2E Automatik“ mit Schalter „Alles von Claude automatisch annehmen“ an: Claude schreibt über MCP eine normale Änderung und `\\parencite{unbekannt}` (DOI unbekannt). Oben im Panel steht der ausgegraute Knopf „Nur rote Zitate offen (1)“ mit dem Hinweis, dass rote Zitate einzeln geprüft werden; „Nichts offen“ steht dort nicht",
+    "Ohne offene Änderungen heißt der Knopf „Nichts offen“; mit offenen nicht roten Änderungen (Schalter aus, zwei Änderungen) heißt er „Alles Offene jetzt annehmen (2)“",
+    "Mit Schalter aus, einer normalen und einer roten Änderung klickt die Nutzerin in der Lauf-Karte „Alle annehmen“: Ein Dialog „1 rotes Zitat mit annehmen?“ erscheint mit „Nur die anderen“ (hat den Fokus) und „Alle annehmen“",
+    "„Nur die anderen“: Die normale Änderung ist angenommen, das rote Zitat bleibt als Track Change offen und steht unter „Bitte prüfen“",
+    "Erneut „Alle annehmen“ und im Dialog „Alle annehmen“: auch das rote Zitat ist angenommen; Esc im Dialog schließt ohne etwas anzunehmen und der Fokus liegt wieder auf „Alle annehmen“",
+    "Ein Lauf ohne rote Zitate: „Alle annehmen“ nimmt ohne Dialog alles an"
+  ]},
+  {"id": "f4", "title": "Keine englischen Reste in Editor, Log-Bereich und Projektliste", "ui": true, "passes": false, "steps": [
+    "Der Tab-Titel im Editor lautet „E2E P8 DOI – spur“ (Muster „<Projektname> – spur“); der Titel der Projektliste folgt demselben Muster",
+    "Nach einem Kompilierfehler zeigt der Log-Bereich „Rohprotokoll“ statt „Raw Logs“ und die Beschreibung auf Deutsch",
+    "Die Seitenleiste nennt den Knopf zum Einklappen des Dateibaums „Dateibaum ausblenden“ (aria-label und Tooltip)",
+    "Der Builder sucht mit Playwright in Editor (Menüs, Seitenleiste, Log-Bereich, PDF-Werkzeugleiste, Einstellungen) und Projektliste weitere englische sichtbare Texte und aria-labels; jeder Fund ist übersetzt oder in `progress.md` begründet; `tools/tests/sprache.test.mjs` prüft die neuen Schlüssel"
+  ]},
+  {"id": "f5", "title": "Admin-Projekttabelle mit Suche, Blättern und lesbarem Speicher", "ui": true, "passes": false, "steps": [
+    "Admin öffnet „Grenzen“: Über der Projekttabelle steht ein Suchfeld „Nach Projekt oder Eigentümer suchen“; die Tabelle zeigt höchstens 50 Zeilen und darunter eine Blätterleiste wie die Nutzertabelle",
+    "Eingabe „P8 Pakete“ zeigt nur Projekte mit diesem Namensteil; Eingabe „e2e-pakete@“ nur Projekte dieses Eigentümers; eine Eingabe ohne Treffer zeigt „Keine Projekte gefunden“",
+    "Die Spalte Speicher zeigt kleine Projekte in KB oder MB mit deutscher Zahl (z. B. „3,4 MB“), keines steht auf „0 GB“, wenn es Dateien hat; ein leeres Projekt zeigt „0 KB“",
+    "„Speicher neu berechnen“ in Zeile 51 (zweite Seite) wirkt auf das richtige Projekt"
+  ]},
+  {"id": "f6", "title": "Filterknöpfe im Prüfbericht sauber bei schmalem und breitem Panel", "ui": true, "passes": false, "steps": [
+    "Seitenleiste in Standardbreite (~210 px bei 1440 px Fenster), Projekt „E2E Bericht“: Die vier Filter stehen ohne einzelnes Umbrechen eines Knopfes, z. B. als 2×2-Raster gleich breiter Knöpfe oder in einer Zeile mit gekürzten Beschriftungen, und keine Zahl wird abgeschnitten (Screenshot)",
+    "Seitenleiste breit gezogen (~400 px): Die vier Filter stehen in einer Zeile (Screenshot)",
+    "Hell und dunkel: Der aktive Filter ist klar erkennbar, Kontrast mindestens 4,5:1",
+    "Tastatur: Pfeiltasten wechseln den Filter wie bisher"
+  ]},
+  {"id": "f7", "title": "D9: Test für gleichzeitige Paketinstallation ist stabil", "passes": false, "steps": [
+    "Der Builder reproduziert das Wackeln: `texPaketeHinzufuegen.test.mjs` 20-mal einzeln ausgeführt, die Zahl der roten Läufe steht in `progress.md`",
+    "Die Ursache steht in `progress.md` (Sperre in `hinzufuegen` oder Test); bei einem Fehler in der Sperre ist der Code behoben und ein Test zeigt zwei gleichzeitige `tex_package_add carlito`, die genau eine Installation mit fünf Dateien ergeben, der zweite meldet „schon im Projekt“",
+    "Danach ist der Test 20 Läufe in Folge grün und `spur-dev test` 3 Läufe in Folge grün",
+    "Über MCP: zwei gleichzeitige `tex_package_add carlito` im Projekt „E2E P8 Pakete B“ ergeben genau einen Ordner `tex-pakete/carlito` mit fünf Dateien",
+    "D9 in `.slice/decisions.md` ist als erledigt mit Ursache vermerkt"
+  ]},
+  {"id": "f8", "title": "Doku beschreibt die Nachbesserungen", "passes": false, "steps": [
+    "README-Abschnitt zum Prüfbericht erklärt „markiert“ in einem Satz; zum Claude-Panel die Rückfrage bei roten Zitaten",
+    "`docs/mcp-contract.md` nennt die neue Bedeutung von `zaehlung.markiert` und welche Uhrzeiten und Versionen `zahlen_ohne_beleg` nicht meldet",
+    "`docs/backlog.md` ist aktuell"
+  ]}
+]}
