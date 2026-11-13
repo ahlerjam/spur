@@ -131,6 +131,14 @@ describe('Datum, Uhrzeit und Versionsnummern', () => {
     expect(zahlenOhneBeleg('Um 9 Uhr waren es 240 mit Python 3.12 und 3.14 Punkten.')).toEqual(['240', '3.14'])
   })
 
+  it('meldet ganze Zahlen hinter mehrdeutigen Namen und über Zeilenumbrüche hinweg', () => {
+    expect(zahlenOhneBeleg('Excel 5 Tabellen lagen vor.')).toEqual(['5'])
+    expect(zahlenOhneBeleg('Julia 3 Probanden kamen.')).toEqual(['3'])
+    expect(zahlenOhneBeleg('Linux 12 Server liefen.')).toEqual(['12'])
+    expect(zahlenOhneBeleg('Gruppe SAS\n\n40 Fälle lagen vor.')).toEqual(['40'])
+    expect(zahlenOhneBeleg('Excel 16.0 und Julia 1.10 liefen.')).toEqual([])
+  })
+
   it('meldet im Satz aus der Spec nur die Messwerte', () => {
     expect(
       zahlenOhneBeleg('Die Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.')

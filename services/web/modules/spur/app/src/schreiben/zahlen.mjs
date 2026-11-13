@@ -42,8 +42,12 @@ const UHRZEIT = /(?<![\d.,:])(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?![\d:])/g
 const VERSION = [/\b(?:Version|Vers\.|v|V)\s*\d+(?:\.\d+)*/g, /(?<![\d.,])\d+(?:\.\d+){2,}(?![\d.,]\d)/g]
 // „9 Uhr“, „9.30 Uhr“; ohne „Uhr“ bleibt 9.30 eine Dezimalzahl.
 const UHR = /(?<![\d.,])\d{1,2}(?:[.:]\d{2})?\s*Uhr\b/g
-// Nur bekannte Namen: „Gruppe 2“ ist keine Version.
-const SOFTWARE = /\b(?:Python|SPSS|SAS|Stata|MATLAB|Matlab|Julia|Node|Java|Excel|Windows|macOS|Ubuntu|Linux|TeX Live|LaTeX|NVivo|MAXQDA|JASP|jamovi|Zotero)\s+\d+(?:\.\d+)*/g
+// Namen, hinter denen eine ganze Zahl eine Version ist, und Namen, die auch Vornamen oder Alltagswörter sind (Julia,
+// Excel, Linux): dort zählt nur eine Version mit Punkt. Nur Leerzeichen, kein Zeilenumbruch dazwischen.
+const SOFTWARE = [
+  /\b(?:Python|SPSS|SAS|Stata|MATLAB|Matlab|Node|Java|Windows|macOS|Ubuntu|TeX Live|LaTeX|NVivo|MAXQDA|JASP|jamovi|Zotero)[ \t]+\d+(?:\.\d+)*/g,
+  /\b(?:Julia|Excel|Linux)[ \t]+\d+(?:\.\d+)+/g,
+]
 const ZAHL = /(?<![\p{L}\d\\\-.,])\d+(?:[.,]\d+)*(?![\p{L}\d])/gu
 
 const dezimalzeichen = text => text.replace(/\{,\}/g, ',')
@@ -69,7 +73,7 @@ export function zahlenOhneBeleg(text, belegt = []) {
   // Formeln an Ort und Stelle durch ihre meldenswerten Zahlen ersetzen, damit die Reihenfolge bleibt.
   for (const muster of MATHE) rest = rest.replace(muster, formel => ` ${unbelegt(formelZahlen(formel))} `)
   rest = rest.replace(BEFEHL_ARGUMENTE, ' ').replace(SEITE, ' ')
-  for (const muster of [...DATUM, UHRZEIT, UHR, ...VERSION, SOFTWARE]) rest = rest.replace(muster, ' ')
+  for (const muster of [...DATUM, UHRZEIT, UHR, ...VERSION, ...SOFTWARE]) rest = rest.replace(muster, ' ')
   rest = rest.replace(JAHR, ' ')
   return [...new Set(rest.match(ZAHL) ?? [])]
 }
