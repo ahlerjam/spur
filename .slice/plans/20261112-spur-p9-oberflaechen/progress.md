@@ -64,6 +64,11 @@
 - E2E p6f3 (wackelte schon vor P9): Der Schritt tippte, bevor Overleaf den neuen Kommentar platziert und selbst
   fokussiert hatte; der Text ging mit dem ersten Eintrag verloren. Er wartet jetzt auf diesen Fokus (Feld im
   Shadow-DOM) und prüft, dass der Text im Feld steht.
+- E2E p5f6: Die Blätterknöpfe sind genau 24 × 24 px; der Schritt vergleicht jetzt ganze Pixel (Bruchteile beim
+  Öffnen des Dialogs) und nennt bei einem Fehler die Maße.
+- Letzter voller E2E-Lauf nach der letzten Änderung (`6507441bad`): alle Features grün, f1 bis p9f12.
+- Screenshots nach dem Fokus-Fix: Claude-Panel mit „Nichts offen“ bei 360 und 1280 px; der Fokusring ist per Tastatur
+  sichtbar (2 px blau), auch auf dem gesperrt aussehenden Knopf.
 - Security: Der Fix ändert nur Fokus und ARIA im Browser, keine Route, keine Rechte, keine Eingaben an den Server;
   keine eigene Sicherheitsprüfung nötig.
 
