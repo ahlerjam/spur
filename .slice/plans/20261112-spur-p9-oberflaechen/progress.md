@@ -72,6 +72,9 @@
 - /simplify (`74da65505c..HEAD`, E2E-Schritte): übernommen: `fokusAuf` prüft über einen Locator mit `:focus`, der bei
   jeder Abfrage neu aufgelöst wird und Shadow-DOMs sieht; p6f3 nutzt ihn statt einer eigenen Warteschleife; Meldungen
   werden nur im Fehlerfall gebaut. Übersprungen: ein gemeinsamer Helfer fürs Warten auf Animationen (nur eine Stelle).
+- /code-review (medium, `6454eca7f6..HEAD`): behoben: `fokusAuf` nimmt den ersten Treffer, wartet auf „attached“ statt
+  „sichtbar“ und nennt das tiefste fokussierte Element hinter Shadow-Hosts; die Meldung in p6f3 wartet nicht 30 s auf ein
+  verschwundenes Feld. Kein Handlungsbedarf: `ok()` wirft nur und zählt nichts.
 - Security (Subagent, `b252f41fcb..HEAD`): keine sicherheitsrelevanten Befunde. `alles-annehmen` und `automatik`
   verlangen auf dem Server Schreibrecht (`schreiben`-Kette, `darfSchreiben`); `aria-disabled` statt `disabled`
   schwächt nichts, der Knopf öffnet nur den Rückfragedialog. Keine neuen Dev-Routen, kein `innerHTML`.

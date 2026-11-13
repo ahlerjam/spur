@@ -2618,8 +2618,15 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   // Der Fokus liegt (spätestens nach `timeout`) auf dem Element; sonst nennt die Meldung, wo er gelandet ist. Der Locator
   // wird bei jeder Abfrage neu aufgelöst und sieht auch in Shadow-DOMs (Kommentarfelder des Review-Panels).
   async function fokusAuf(element, wann, timeout = 5000) {
-    const da = await element.and(page.locator(':focus')).waitFor({ timeout }).then(() => true, () => false)
-    if (!da) ok(false, `Fokus ${wann} auf ${await page.evaluate(() => document.activeElement?.tagName)}`)
+    const da = await element.and(page.locator(':focus')).first().waitFor({ state: 'attached', timeout }).then(() => true, () => false)
+    if (da) return
+    // Das tiefste fokussierte Element, auch hinter Shadow-Hosts.
+    const wo = await page.evaluate(() => {
+      let a = document.activeElement
+      while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement
+      return a ? `${a.tagName}.${a.className}` : 'nichts'
+    })
+    ok(false, `Fokus ${wann} auf ${wo}`)
   }
 
   async function ohneSeitlichesRollen(wo) {
@@ -3318,7 +3325,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await fokusAuf(feld, 'im neuen Kommentar', 10000)
     await page.keyboard.type('@claude bitte ansehen')
     const angekommen = await feld.filter({ hasText: '@claude bitte ansehen' }).waitFor({ timeout: 5000 }).then(() => true, () => false)
-    if (!angekommen) ok(false, `Getipptes nicht im Kommentarfeld: „${await feld.textContent()}“`)
+    if (!angekommen) ok(false, `Getipptes nicht im Kommentarfeld: „${await feld.textContent({ timeout: 1000 }).catch(() => '(Feld nicht gefunden)')}“`)
     await hinweis.waitFor({ timeout: 5000 })
     const hinweisKasten = formular.locator('.spur-claude-hinweis')
     ok(!(await unlesbar(hinweisKasten)).length, `Hinweis schlecht lesbar: ${await unlesbar(hinweisKasten)}`)
