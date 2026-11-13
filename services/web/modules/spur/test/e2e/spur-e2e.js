@@ -2615,6 +2615,13 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     await page.setViewportSize({ width: px, height: px < 400 ? 740 : 690 })
   }
 
+  // Der Fokus liegt (spätestens nach 5 s) auf dem Element; sonst nennt die Meldung, wo er gelandet ist.
+  async function fokusAuf(element, wann) {
+    const handle = await element.elementHandle()
+    const da = await page.waitForFunction(el => el === document.activeElement, handle, { timeout: 5000 }).then(() => true, () => false)
+    ok(da, `Fokus ${wann} auf ${await page.evaluate(() => document.activeElement?.tagName)}`)
+  }
+
   async function ohneSeitlichesRollen(wo) {
     const masse = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth])
     ok(masse[0] <= masse[1], `${wo}: Seite rollt seitlich (${masse})`)
@@ -5563,8 +5570,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(JSON.stringify(await panel.locator('.spur-automatik').boundingBox()) === vorher, 'Schalter springt beim Speichern')
     // Während und nach dem Speichern bleibt der Fokus auf dem Schalter, nicht auf der Seite.
     await page.waitForFunction(() => !document.querySelector('#spur-automatik[aria-busy]'))
-    const fokusAufSchalter = await schalter.evaluate(el => el === document.activeElement)
-    ok(fokusAufSchalter, `Fokus nach dem Speichern auf ${await page.evaluate(() => document.activeElement?.tagName)}`)
+    await fokusAuf(schalter, 'nach dem Speichern')
     const zwoelf = [['Beta Satz.', 'Beta Satz. Nachtrag']]
     for (const wort of ['Eins.', 'Zwei.', 'Drei.', 'Vier.', 'Fünf.']) zwoelf.push([wort, `${wort} neu`])
     for (const [alt, neu] of zwoelf) await schreiben(alt, neu)
@@ -5588,8 +5594,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const nichts = panel.getByRole('button', { name: 'Nichts offen' })
     await nichts.waitFor({ timeout: 10000 })
     ok(await nichts.isDisabled(), '„Nichts offen“ nicht gesperrt')
-    await page.waitForFunction(() => document.activeElement?.textContent === 'Nichts offen', null, { timeout: 5000 }).catch(() => {})
-    ok(await nichts.evaluate(el => el === document.activeElement), `Fokus nach dem Annehmen auf ${await page.evaluate(() => document.activeElement?.tagName)}`)
+    await fokusAuf(nichts, 'nach dem Annehmen')
     await page.keyboard.press('Enter')
     ok((await modal().count()) === 0, '„Nichts offen“ öffnet den Dialog')
     await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'footfullcite' }).waitFor()
@@ -6153,8 +6158,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await speichern.focus()
     await page.keyboard.press('Enter')
     await abschnitt.locator('.spur-vorschlag-aktionen').getByText(/^Gespeichert/).waitFor()
-    await page.waitForFunction(() => document.activeElement !== document.body, null, { timeout: 3000 }).catch(() => {})
-    ok(await speichern.evaluate(el => el === document.activeElement), `Fokus nach „Speichern“ auf ${await page.evaluate(() => document.activeElement?.tagName)}`)
+    await fokusAuf(speichern, 'nach „Speichern“')
     const lang = 'x'.repeat(20001)
     await feld.fill(lang)
     await abschnitt.getByRole('button', { name: 'Speichern', exact: true }).click()

@@ -50,6 +50,11 @@
   Dialog den Fokus. Dasselbe Muster steckte in jedem Knopf mit `isLoading` (Overleafs `OLButton` setzt dabei
   `disabled`): Der neue Baustein `lade-knopf.tsx` gibt einem Knopf, der beim Start des Ladens den Fokus hatte, ihn
   danach zurück, sofern niemand ihn woanders hingesetzt hat; alle 22 ladenden Knöpfe in spur nutzen ihn.
+  `tools/tests/oberflaeche.test.mjs` weist einen ladenden `OLButton` in spur ab.
+- /simplify (Fokus-Fix): übernommen: ein Ref weniger in `LadeKnopf`, `useImperativeHandle` statt Callback-Ref, Fokus
+  nach dem Dialog per Effekt statt `requestAnimationFrame`, E2E-Helfer `fokusAuf`, Repo-Prüfung gegen ladende
+  `OLButton`. Übersprungen (Vorschlag): Overleafs `OLButton` selbst beim Laden mit `aria-disabled` statt `disabled`
+  bauen (Kern-Patch, ändert alle ladenden Knöpfe von Overleaf und deren Upstream-Tests).
 
 ## Needs decision
 

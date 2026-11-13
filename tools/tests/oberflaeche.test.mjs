@@ -103,3 +103,20 @@ test('Schließen, Speichern und Kopieren kommen je aus einem Sprachschlüssel', 
     .filter(datei => DOPPELTE_SCHLUESSEL.some(s => readFileSync(datei, 'utf8').includes(`'${s}'`)))
   assert.deepEqual(code, [])
 })
+
+// Ein ladender OLButton ist `disabled` und verliert den Fokus; spur baut ladende Knöpfe darum über LadeKnopf.
+export function ladendeOLButtons(quelltext) {
+  return [...quelltext.matchAll(/<OLButton\b[^>]*?\bisLoading=/gs)].length
+}
+
+test('ladendeOLButtons findet isLoading auch über mehrere Zeilen und lässt andere Knöpfe stehen', () => {
+  assert.equal(ladendeOLButtons('<OLButton\n  variant="primary"\n  isLoading={x}\n>'), 1)
+  assert.equal(ladendeOLButtons('<OLButton onClick={f}>a</OLButton><LadeKnopf isLoading={x} />'), 0)
+})
+
+test('spur nutzt für ladende Knöpfe LadeKnopf statt OLButton', () => {
+  const treffer = dateien(join(WEB, 'modules/spur/frontend/js'))
+    .filter(datei => /\.tsx$/.test(datei) && !datei.endsWith('/lade-knopf.tsx'))
+    .filter(datei => ladendeOLButtons(readFileSync(datei, 'utf8')) > 0)
+  assert.deepEqual(treffer, [])
+})

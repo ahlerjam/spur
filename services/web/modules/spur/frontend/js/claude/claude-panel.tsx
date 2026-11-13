@@ -111,6 +111,12 @@ function Automatik({
   const [fragen, setFragen] = useState(false)
   const [nimmtAn, setNimmtAn] = useState(false)
   const knopf = useRef<HTMLButtonElement>(null)
+  // Nach dem Dialog kehrt der Fokus auf den Knopf zurück, auch wenn er inzwischen „Nichts offen“ zeigt.
+  const warOffen = useRef(false)
+  useEffect(() => {
+    if (warOffen.current && !fragen) knopf.current?.focus()
+    warOffen.current = fragen
+  }, [fragen])
   // Die Abfrage alle paar Sekunden überschreibt keine laufende Änderung.
   useEffect(() => {
     if (!speichert) setWert(an)
@@ -142,15 +148,9 @@ function Automatik({
     } catch (error) {
       setFehler((error as Error).message)
     } finally {
-      dialogSchliessen()
+      setFragen(false)
       setNimmtAn(false)
     }
-  }
-
-  // Nach dem Dialog kehrt der Fokus auf den Knopf zurück, auch wenn er inzwischen „Nichts offen“ zeigt.
-  const dialogSchliessen = () => {
-    setFragen(false)
-    window.requestAnimationFrame(() => knopf.current?.focus())
   }
 
   const nichtsOffen = offen.aenderungen === 0
@@ -186,7 +186,7 @@ function Automatik({
         {nichtsOffen ? t('spur_nichts_offen') : t('spur_alles_offene_annehmen')}
       </OLButton>
       {fragen && (
-        <OLModal themed show onHide={dialogSchliessen}>
+        <OLModal themed show onHide={() => setFragen(false)}>
           <OLModalHeader>
             <OLModalTitle>{t('spur_alles_offene_annehmen')}</OLModalTitle>
           </OLModalHeader>
@@ -200,7 +200,7 @@ function Automatik({
             </p>
           </OLModalBody>
           <OLModalFooter>
-            <OLButton variant="secondary" onClick={dialogSchliessen}>
+            <OLButton variant="secondary" onClick={() => setFragen(false)}>
               {t('cancel')}
             </OLButton>
             <LadeKnopf variant="primary" isLoading={nimmtAn} onClick={allesAnnehmen}>
