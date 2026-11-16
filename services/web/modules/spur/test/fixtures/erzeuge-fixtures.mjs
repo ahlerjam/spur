@@ -125,6 +125,8 @@ einfach('oa003.pdf', 'Rate limits on scholarly infrastructure', 'I. Probst', ['A
 einfach('oa004.pdf', 'Sleep and memory consolidation in adolescents', 'T. Novak', ['Adolescents retained more word pairs after a full night of sleep.'])
 einfach('bot001.pdf', 'Publisher walls around open articles', 'R. Stein', ['The article is open, the server still refuses automated requests.'])
 einfach('soil.pdf', 'Soil microbes in alpine meadows', 'B. Jones', ['Microbial communities differ with altitude.'])
+einfach('p12a.pdf', 'Slow-wave sleep and declarative recall in adults', 'A. Rivers', ['Recall of word pairs rose with the share of slow-wave sleep.'])
+einfach('p12b.pdf', 'Sleep deprivation and working memory in nurses', 'B. Lindqvist', ['After night shifts the nurses made more errors in the n-back task.'])
 einfach('report.pdf', 'AI at Work', 'J. Meyer, C. Okafor', ['Firms adopt generative tools unevenly across occupations.'])
 writeFileSync(
   join(here, 'deckblatt.pdf'),

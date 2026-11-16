@@ -1,15 +1,11 @@
 import logger from '@overleaf/logger'
-import { csv } from '../csv.mjs'
 import { doiNormal } from '../pruefung/bib.mjs'
 import { Problem } from '../probleme.mjs'
 import { meldung } from '../meldungen.mjs'
-import { suchprotokoll } from '../sammlungen.mjs'
-import { jetzt } from '../schalter.mjs'
 import { DienstFehler, gezaehlt } from './abruf.mjs'
 import { PRO_SEITE, SUCHDIENSTE, ZITATIONSDIENSTE } from './dienste.mjs'
+import * as Suchprotokoll from './Suchprotokoll.mjs'
 
-const PROTOKOLL_SEITE = 50
-const CSV_MAX = 10000
 const DOI_MUSTER = /^10\.\d{4,9}\/\S+$/
 const RICHTUNGEN = ['zitiert_von', 'zitiert']
 const ANZEIGE = Object.fromEntries(SUCHDIENSTE.map(d => [d.name, d.anzeige]))
@@ -61,7 +57,7 @@ export function auswerten(dienste, ergebnisse, versuche = []) {
       return
     }
     const { treffer, gesamt: anzahl } = ergebnis.value
-    gesamt.push({ dienst, anzahl })
+    gesamt.push({ dienst, anzahl, geliefert: treffer.length })
     for (const t of treffer) zusammenfuehren(sammlung, t)
   })
   // Ohne Abstract bleibt das Feld leer statt null. Gekürzt, damit eine Seite paper_search unter 10.000 Tokens bleibt.
@@ -83,19 +79,17 @@ export async function suchen({ projectId, userId, anfrage, seite = 0 }) {
   const begriff = anfrage?.trim()
   if (!begriff) throw new Problem(400, 'anfrage_fehlt', 'spur_fehler_suchbegriff_fehlt')
   const { treffer, fehler, gesamt, dienste, hinweis } = await fragen(SUCHDIENSTE, d => d.suchen(begriff, seite))
-  if (seite === 0 && gesamt.length) {
-    const datum = jetzt()
-    await (await suchprotokoll()).insertMany(
-      gesamt.map(({ dienst, anzahl }) => ({
-        projectId,
-        userId,
-        datum,
-        dienst: dienst.anzeige,
-        anfrage: begriff,
-        treffer: anzahl,
-      }))
-    )
-  }
+  await Suchprotokoll.festhalten({
+    projectId,
+    userId,
+    anfrage: begriff,
+    seite,
+    dienste: dienste.map((d, i) => {
+      const antwort = gesamt.find(g => g.dienst === SUCHDIENSTE[i])
+      return { ...d, treffer: antwort?.geliefert ?? 0, gesamt: antwort?.anzahl ?? null }
+    }),
+    treffer,
+  })
   return {
     anfrage: begriff,
     seite,
@@ -105,20 +99,6 @@ export async function suchen({ projectId, userId, anfrage, seite = 0 }) {
     dienste,
     hinweis,
   }
-}
-
-export async function protokoll(projectId, { seite = 0 } = {}) {
-  const sammlung = await suchprotokoll()
-  const [eintraege, anzahl] = await Promise.all([
-    sammlung
-      .find({ projectId }, { projection: { _id: 0, datum: 1, dienst: 1, anfrage: 1, treffer: 1 } })
-      .sort({ datum: -1, _id: -1 })
-      .skip(seite * PROTOKOLL_SEITE)
-      .limit(PROTOKOLL_SEITE)
-      .toArray(),
-    sammlung.countDocuments({ projectId }),
-  ])
-  return { eintraege, gesamt: anzahl, weiter: (seite + 1) * PROTOKOLL_SEITE < anzahl }
 }
 
 export function doiPruefen(doi) {
@@ -137,16 +117,4 @@ export async function zitationen(doi, richtung) {
   const wert = doiPruefen(doi)
   const { treffer, fehler, dienste, hinweis } = await fragen(ZITATIONSDIENSTE, d => d.zitationen(wert, richtung))
   return { doi: wert, richtung, treffer, fehler, dienste, hinweis }
-}
-
-export async function protokollCsv(projectId) {
-  const eintraege = await (await suchprotokoll())
-    .find({ projectId })
-    .sort({ datum: -1, _id: -1 })
-    .limit(CSV_MAX)
-    .toArray()
-  return csv(
-    ['Datum', 'Datenbank', 'Anfrage', 'Trefferzahl'],
-    eintraege.map(e => [e.datum.toISOString(), e.dienst, e.anfrage, e.treffer])
-  )
 }

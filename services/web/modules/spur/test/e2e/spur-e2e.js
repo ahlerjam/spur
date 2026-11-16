@@ -1467,7 +1467,7 @@ async page => {
     await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
     const eintrag = page.locator('.spur-protokoll .spur-zeile', { hasText: 'sleep memory consolidation' }).filter({ hasText: 'OpenAlex' }).first()
     await eintrag.waitFor()
-    ok(/OpenAlex · \d+ Treffer · \d/.test(await eintrag.textContent()), `Protokolleintrag: ${await eintrag.textContent()}`)
+    ok(/Seite 1 · \d+ Treffer · .*OpenAlex: \d+ Treffer/.test(await eintrag.textContent()), `Protokolleintrag: ${await eintrag.textContent()}`)
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
@@ -1476,8 +1476,8 @@ async page => {
     ok(download.suggestedFilename() === 'suchprotokoll.csv', `Datei: ${download.suggestedFilename()}`)
     const csv = await (await page.request.get(download.url())).text()
     const zeilen = csv.trim().split('\n')
-    ok(zeilen[0] === 'Datum,Datenbank,Anfrage,Trefferzahl', `Kopf: ${zeilen[0]}`)
-    ok(zeilen.some(z => /^\d{4}-\d\d-\d\dT[^,]+,OpenAlex,sleep memory consolidation,\d+$/.test(z)), `CSV:\n${csv}`)
+    ok(zeilen[0].startsWith('Datum,Anfrage,Seite,Filter,arXiv: Status,arXiv: Treffer,OpenAlex: Status,OpenAlex: Treffer,'), `Kopf: ${zeilen[0]}`)
+    ok(zeilen.some(z => /^\d{4}-\d\d-\d\dT[^,]+,sleep memory consolidation,0,,geantwortet,\d+,geantwortet,\d+,/.test(z)), `CSV:\n${csv}`)
   }
 
   features.p2f3 = async () => {
@@ -7052,6 +7052,136 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const stelle = page.locator('.spur-panel .spur-zeile', { hasText: 'Employees used the assistant' }).first()
     await stelle.getByText('Wortlaut: exakt', { exact: true }).waitFor({ timeout: 30000 })
     ok((await stelle.locator('.badge.bg-danger, .text-danger').count()) === 0, 'Die Stelle ohne DOI ist rot markiert')
+  }
+
+  features.p12f5 = async () => {
+    const D = k => `10.5555/spur.p12.${k}`
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Protokoll')
+    const leer = await projektId(token, 'E2E P12 Quellen')
+    // „sleep memory“: OpenAlex liefert 3 Treffer, Semantic Scholar 2 (einer mit derselben DOI), auf Seite 2 folgen 2;
+    // „slow-wave sleep“: 2 Treffer, einer davon schon bekannt.
+    await fakeSteuern({
+      cachesLeeren: true,
+      suchen: {
+        'sleep memory': { openalex: [[D('a'), D('b'), D('c')], [D('e'), D('f')]], s2: [[D('c'), D('d')]] },
+        'slow-wave sleep': { openalex: [[D('g'), D('a')]] },
+      },
+    })
+    const tool = async (name, args) => {
+      const r = await werkzeug(token, name, { project_id: pid, ...args })
+      ok(!r.fehler, `${name} ${JSON.stringify(args)}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+    const gleich = (ist, soll, was) => ok(JSON.stringify(ist) === JSON.stringify(soll), `${was}: ${JSON.stringify(ist)} statt ${JSON.stringify(soll)}`)
+    try {
+      const erste = await tool('paper_search', { anfrage: 'sleep memory' })
+      gleich(erste.treffer.map(t => t.doi).sort(), [D('a'), D('b'), D('c'), D('d')], 'Erste Seite')
+      ok(erste.naechster_cursor === '1', `Kein cursor für die zweite Seite: ${JSON.stringify(erste.naechster_cursor)}`)
+      const zweite = await tool('paper_search', { anfrage: 'sleep memory', cursor: erste.naechster_cursor })
+      gleich(zweite.treffer.map(t => t.doi).sort(), [D('e'), D('f')], 'Zweite Seite')
+      const andere = await tool('paper_search', { anfrage: 'slow-wave sleep' })
+      gleich(andere.treffer.map(t => t.doi).sort(), [D('a'), D('g')], 'Zweite Suche')
+
+      let log = await tool('search_log', {})
+      gleich(log.eintraege.map(e => [e.anfrage, e.seite, e.treffer]), [['sleep memory', 0, 5], ['sleep memory', 1, 2], ['slow-wave sleep', 0, 2]], 'Anfragen')
+      ok(log.eintraege.every((e, i) => i === 0 || new Date(e.zeit) >= new Date(log.eintraege[i - 1].zeit)), 'Anfragen nicht in zeitlicher Folge')
+      const dienste = e => Object.fromEntries(e.dienste.map(d => [d.dienst, [d.status, d.treffer]]))
+      gleich(dienste(log.eintraege[0]), { arXiv: ['geantwortet', 0], OpenAlex: ['geantwortet', 3], Crossref: ['geantwortet', 0], 'Semantic Scholar': ['geantwortet', 2] }, 'Dienste der ersten Anfrage')
+      gleich([log.prisma.identifiziert, log.prisma.dubletten, log.prisma.gesichtet], [9, 2, 7], 'identifiziert, dubletten, gesichtet')
+      gleich(log.prisma.identifiziert_nach_dienst, { OpenAlex: 7, 'Semantic Scholar': 2 }, 'identifiziert_nach_dienst')
+      ok(log.prisma.identifiziert - log.prisma.dubletten === log.prisma.gesichtet && log.prisma.offen === 7, `Gleichung: ${JSON.stringify(log.prisma)}`)
+      ok(log.naechster_cursor === null, `naechster_cursor: ${log.naechster_cursor}`)
+
+      // Zwei aufnehmen, drei ausschließen, eines ist nicht frei.
+      for (const k of ['a', 'b']) await tool('source_add', { doi: D(k) })
+      await tool('paper_exclude', { doi: D('c'), grund: 'falsche Population' })
+      await tool('paper_exclude', { doi: D('d'), grund: 'falsche Population' })
+      await tool('paper_exclude', { doi: D('e'), grund: 'falsche Population' })
+      const nichtFrei = await werkzeug(token, 'source_add', { project_id: pid, doi: D('f') })
+      ok(nichtFrei.fehler && nichtFrei.inhalt.fehler === 'nicht_frei', `p12.f: ${JSON.stringify(nichtFrei.inhalt)}`)
+      // Ein zweites paper_exclude ersetzt den Grund, statt doppelt zu zählen.
+      const ersetzt = await tool('paper_exclude', { doi: D('e'), grund: 'kein empirischer Beitrag' })
+      gleich(ersetzt, { doi: D('e'), titel: 'A commentary on sleep research methods', grund: 'kein empirischer Beitrag' }, 'paper_exclude')
+      const fremd = await werkzeug(token, 'paper_exclude', { project_id: pid, doi: '10.5555/spur.oa.001', grund: 'nie gesucht' })
+      ok(fremd.fehler && fremd.inhalt.fehler === 'treffer_nicht_gefunden', `Unbekannte DOI: ${JSON.stringify(fremd.inhalt)}`)
+
+      log = await tool('search_log', {})
+      gleich(
+        [log.prisma.aufgenommen, log.prisma.ausgeschlossen, log.prisma.nicht_beschaffbar, log.prisma.offen],
+        [2, { gesamt: 3, nach_grund: { 'falsche Population': 2, 'kein empirischer Beitrag': 1 } }, { nicht_frei: 1 }, 1],
+        'Entscheidungen'
+      )
+      gleich([log.prisma.identifiziert, log.prisma.dubletten, log.prisma.gesichtet], [9, 2, 7], 'Summen nach den Entscheidungen')
+    } finally {
+      await fakeSteuern({})
+    }
+
+    // Ohne Zugriff auf das Projekt: weder lesen noch ausschließen.
+    for (const [name, args] of [['search_log', {}], ['paper_exclude', { doi: D('g'), grund: 'x' }]]) {
+      const ohne = await werkzeug('spur_e2e_p3a', name, { project_id: pid, ...args })
+      ok(ohne.fehler && ohne.inhalt.fehler === 'keine_rechte', `${name} ohne Zugriff: ${JSON.stringify(ohne.inhalt)}`)
+    }
+    const webOhne = await page.request.get(`${BASE}/spur/project/${'0'.repeat(24)}/recherche/protokoll`)
+    ok(webOhne.status() === 403 || webOhne.status() === 404, `Web-Protokoll eines fremden Projekts: ${webOhne.status()}`)
+
+    // Beschreibungen und Vertrag erklären Felder und Gleichung.
+    const { daten } = await mcp(token, 'tools/list')
+    const beschreibung = name => daten.result.tools.find(w => w.name === name)?.description ?? ''
+    ok(/identifiziert − dubletten = gesichtet/.test(beschreibung('search_log')) && /nicht_beschaffbar/.test(beschreibung('search_log')), `search_log: ${beschreibung('search_log')}`)
+    ok(/grund/.test(beschreibung('paper_exclude')) && /treffer_nicht_gefunden/.test(beschreibung('paper_exclude')), `paper_exclude: ${beschreibung('paper_exclude')}`)
+    const vertrag = await repoDatei(`${FIXTURES}/../../../../../../docs/mcp-contract.md`)
+    for (const text of ['`search_log`', '`paper_exclude`', 'identifiziert − dubletten = gesichtet', '`prisma.nicht_beschaffbar`', '`treffer_nicht_gefunden`', '`bot_schutz`', '`titelabgleich`', '`versuche`']) {
+      ok(vertrag.includes(text), `docs/mcp-contract.md ohne ${text}`)
+    }
+
+    await projektOeffnen('E2E P12 Protokoll')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    const protokoll = page.locator('.spur-panel')
+    await protokoll.getByText('9 identifiziert, 2 Dubletten, 7 gesichtet, 2 aufgenommen, 3 ausgeschlossen, 1 nicht beschaffbar, 1 offen', { exact: true }).waitFor({ timeout: 20000 })
+    await protokoll.getByText('Ausgeschlossen nach Grund: falsche Population (2), kein empirischer Beitrag (1)', { exact: true }).waitFor()
+    const zeilen = await protokoll.locator('.spur-protokoll > li').allInnerTexts()
+    ok(zeilen.length === 3, `Anfragen im Browser: ${zeilen.length}`)
+    // Im Browser stehen die neuesten zuerst.
+    ok(/^slow-wave sleep\s+Seite 1 · 2 Treffer · 1 Dublette ·/.test(zeilen[0]) && /OpenAlex: 2 Treffer/.test(zeilen[0]), `Dritte Anfrage: ${zeilen[0]}`)
+    ok(/^sleep memory\s+Seite 2 · 2 Treffer · 0 Dubletten ·/.test(zeilen[1]), `Zweite Anfrage: ${zeilen[1]}`)
+    ok(/^sleep memory\s+Seite 1 · 5 Treffer · 1 Dublette ·/.test(zeilen[2]) && /OpenAlex: 3 Treffer/.test(zeilen[2]) && /Semantic Scholar: 2 Treffer/.test(zeilen[2]), `Erste Anfrage: ${zeilen[2]}`)
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: 'Protokoll exportieren' }).click(),
+    ])
+    const csv = (await (await page.request.get(download.url())).text()).trim().split('\n')
+    ok(csv[0] === 'Datum,Anfrage,Seite,Filter,arXiv: Status,arXiv: Treffer,OpenAlex: Status,OpenAlex: Treffer,Crossref: Status,Crossref: Treffer,Semantic Scholar: Status,Semantic Scholar: Treffer,Treffer,Dubletten', `CSV-Kopf: ${csv[0]}`)
+    ok(/^\d{4}-\d\d-\d\dT[^,]+,sleep memory,0,,geantwortet,0,geantwortet,3,geantwortet,0,geantwortet,2,5,1$/.test(csv[3]), `CSV, erste Anfrage: ${csv[3]}`)
+    ok(/,sleep memory,1,,geantwortet,0,geantwortet,2,geantwortet,0,geantwortet,0,2,0$/.test(csv[2]), `CSV, zweite Anfrage: ${csv[2]}`)
+    gleich(
+      csv.slice(4),
+      [
+        'Summe: identifiziert,9',
+        'Summe: Dubletten,2',
+        'Summe: gesichtet,7',
+        'Summe: aufgenommen,2',
+        'Summe: ausgeschlossen,3',
+        'Summe: ausgeschlossen (falsche Population),2',
+        'Summe: ausgeschlossen (kein empirischer Beitrag),1',
+        'Summe: nicht beschaffbar,1',
+        'Summe: nicht beschaffbar (nicht frei verfügbar),1',
+        'Summe: offen,1',
+      ],
+      'CSV-Summen'
+    )
+
+    // Ein Projekt ohne Suche.
+    const ohneSuche = await werkzeug(token, 'search_log', { project_id: leer })
+    gleich([ohneSuche.inhalt.eintraege, ohneSuche.inhalt.prisma.identifiziert], [[], 0], 'Leeres Protokoll')
+    await projektOeffnen('E2E P12 Quellen')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    await page.locator('.spur-panel').getByText(/^Noch keine Suche/).waitFor({ timeout: 20000 })
+    ok((await page.locator('.spur-prisma').count()) === 0, 'Summenzeile in einem Projekt ohne Suche')
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

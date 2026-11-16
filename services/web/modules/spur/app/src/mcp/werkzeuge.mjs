@@ -14,6 +14,8 @@ import { bibLesen } from '../pruefung/bib.mjs'
 import { referenzStatus } from '../pruefung/bewertung.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
+import * as Suchprotokoll from '../recherche/Suchprotokoll.mjs'
+import { eingabeUngueltig } from '../recherche/ohneDoi.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
@@ -394,11 +396,61 @@ Object.assign(WERKZEUGE, {
       'Sucht Paper über arXiv, OpenAlex, Crossref und Semantic Scholar. Treffer mit DOI, Titel, Autoren, Jahr, Abstract, ' +
       'Diensten und Open-Access-Status. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar und nennt die ' +
       'versuche (bei 429, 503 und Netzfehlern fragt spur bis zu dreimal; 0 heißt: Antwort aus dem Cache). fehler nennt den ' +
-      'Grund; hinweis ist gesetzt, wenn keiner geantwortet hat. Die Suche landet im Suchprotokoll des Projekts.',
-    inputSchema: z.object({ project_id: id, anfrage: z.string().min(1).max(300), seite: z.number().int().min(0).max(50).optional() }),
-    async ausfuehren({ project_id: pid, anfrage, seite = 0 }, { menschId }) {
+      'Grund; hinweis ist gesetzt, wenn keiner geantwortet hat. Weitere Seiten: cursor aus naechster_cursor (oder seite). ' +
+      'Jede Anfrage landet im Suchprotokoll des Projekts (search_log).',
+    inputSchema: z.object({
+      project_id: id,
+      anfrage: z.string().min(1).max(300),
+      seite: z.number().int().min(0).max(50).optional(),
+      cursor: z.string().regex(/^\d{1,2}$/).optional(),
+    }),
+    async ausfuehren({ project_id: pid, anfrage, seite = 0, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
-      return await Recherche.suchen({ projectId, userId: menschId, anfrage, seite })
+      const ergebnis = await Recherche.suchen({ projectId, userId: menschId, anfrage, seite: cursor ? Math.min(50, Number(cursor)) : seite })
+      return { ...ergebnis, naechster_cursor: ergebnis.weiter ? String(ergebnis.seite + 1) : null }
+    },
+  },
+
+  search_log: {
+    description:
+      'Suchprotokoll des Projekts für ein PRISMA-Flussdiagramm, nur lesend. eintraege: jede Anfrage von paper_search in ' +
+      'zeitlicher Folge, auch Folgeseiten, mit zeit, anfrage, filter (derzeit immer null), seite, je Dienst status ' +
+      '(geantwortet, gedrosselt, nicht_erreichbar), treffer und versuche, dazu treffer (Summe) und dubletten der Anfrage. ' +
+      'prisma: identifiziert (alle gelieferten Treffer; identifiziert_nach_dienst je Dienst), dubletten (gleiche DOI, ohne ' +
+      'DOI gleicher Titel und gleiches Jahr), gesichtet, aufgenommen (Quelle mit dieser DOI), ausgeschlossen (gesamt und ' +
+      'nach_grund, über paper_exclude), nicht_beschaffbar (offene Einträge der Beschaffungsliste nach nicht_frei, bot_schutz, ' +
+      'pdf_fehlt) und offen. Es gilt identifiziert − dubletten = gesichtet und gesichtet = aufgenommen + ausgeschlossen.gesamt + ' +
+      'nicht_beschaffbar + offen. Einträge von vor dieser Fassung kennen ihre Treffer nicht einzeln: Sie zählen als ' +
+      'identifiziert, gesichtet und offen.',
+    inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
+    async ausfuehren({ project_id: pid, cursor }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      const ab = seiteAus(cursor)
+      const [{ eintraege, weiter }, prisma] = await Promise.all([
+        Suchprotokoll.liste(projectId, { ab, aufsteigend: true }),
+        Suchprotokoll.prisma(projectId),
+      ])
+      return { eintraege, naechster_cursor: weiter ? String(ab + Suchprotokoll.SEITE) : null, prisma }
+    },
+  },
+
+  paper_exclude: {
+    description:
+      'Schließt einen Treffer aus dem Suchprotokoll aus, per doi oder (ohne DOI) per titel, mit grund als freiem Text bis ' +
+      '200 Zeichen, etwa „falsche Population“. In search_log zählt er danach unter ausgeschlossen.nach_grund; ein zweiter ' +
+      'Aufruf für denselben Treffer ersetzt den Grund. Kam der Treffer in keiner Suche des Projekts vor: treffer_nicht_gefunden. ' +
+      'Ein Treffer ohne Entscheidung zählt als offen; eine aufgenommene Quelle zählt als aufgenommen, auch wenn sie vorher ' +
+      'ausgeschlossen war.',
+    inputSchema: z.object({
+      project_id: id,
+      doi: z.string().min(4).max(300).optional(),
+      titel: z.string().min(1).max(500).optional(),
+      grund: z.string().trim().min(1).max(200),
+    }),
+    async ausfuehren({ project_id: pid, doi, titel, grund }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      if (!doi && !titel) throw eingabeUngueltig('doi')
+      return await Suchprotokoll.ausschliessen({ projectId, userId: menschId, doi: doi && Recherche.doiPruefen(doi), titel, grund })
     },
   },
 

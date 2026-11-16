@@ -75,7 +75,7 @@
         "Ein Konto ohne Zugriff auf das Projekt bekommt von `search_log` 403",
         "Die Werkzeugbeschreibungen von `search_log` und `paper_exclude` und `docs/mcp-contract.md` erklären die Felder und die Gleichung"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     }
   ]

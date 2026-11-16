@@ -16,6 +16,7 @@ import * as LaufManager from './schreiben/LaufManager.mjs'
 import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
 import * as Recherche from './recherche/Recherche.mjs'
+import * as Suchprotokoll from './recherche/Suchprotokoll.mjs'
 import * as Aufnahme from './recherche/Aufnahme.mjs'
 import * as Beschaffung from './recherche/Beschaffung.mjs'
 import * as Import from './recherche/Import.mjs'
@@ -517,12 +518,16 @@ export const rechercheZitationen = mitProblemen(async (req, res) => {
 })
 
 export const suchprotokoll = mitProblemen(async (req, res) => {
-  res.json(await Recherche.protokoll(projektId(req), { seite: seiteAus(req.query.seite) }))
+  const [seite, prisma] = await Promise.all([
+    Suchprotokoll.liste(projektId(req), { ab: seiteAus(req.query.seite) * Suchprotokoll.SEITE }),
+    Suchprotokoll.prisma(projektId(req)),
+  ])
+  res.json({ ...seite, prisma })
 })
 
 export const suchprotokollExport = mitProblemen(async (req, res) => {
   res.attachment('suchprotokoll.csv').type('text/csv; charset=utf-8')
-  res.send(await Recherche.protokollCsv(projektId(req)))
+  res.send(await Suchprotokoll.alsCsv(projektId(req)))
 })
 
 export const perDoiAufnehmen = mitProblemen(async (req, res) => {

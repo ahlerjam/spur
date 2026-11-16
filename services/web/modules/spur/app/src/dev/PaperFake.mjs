@@ -32,7 +32,9 @@ const beiCrossref = w => Boolean(w) && (w.dienste.includes('crossref') || w.nurD
 
 // stoerungen: je Dienst oder je `crossref:<doi>` eine Antwort statt der echten, z. B. { status: 429, retryAfter: 1,
 // mal: 2 } (zweimal, dann normal), { status: 503 } (dauerhaft) oder { trennen: true } (Verbindung bricht ab).
-const zustand = { ausfall: new Set(), stoerungen: {}, protokoll: [] }
+// suchen: feste Treffer je Anfrage, Dienst und Seite, z. B. { 'sleep memory': { openalex: [[doi, doi], [doi]], s2: [[doi]] } };
+// Dienste ohne Eintrag liefern für diese Anfrage nichts.
+const zustand = { ausfall: new Set(), stoerungen: {}, suchen: {}, protokoll: [] }
 
 function begriffe(anfrage) {
   return (anfrage ?? '')
@@ -135,11 +137,26 @@ ${eintraege}
 
 const seite = (liste, ab, anzahl) => liste.slice(ab, ab + anzahl)
 
+// Treffer einer Seite und die Gesamtzahl, aus dem Katalog oder aus den festen Ergebnissen der Steuerung.
+function gefunden(dienst, anfrage, ab, anzahl) {
+  const fest = zustand.suchen[begriffe(anfrage).join(' ')]
+  if (!fest) {
+    const alle = suche(dienst, anfrage)
+    return { treffer: seite(alle, ab, anzahl), gesamt: alle.length }
+  }
+  const seiten = fest[dienst] ?? []
+  return {
+    treffer: (seiten[Math.floor(ab / anzahl)] ?? []).map(nachDoi).filter(Boolean),
+    gesamt: seiten.length ? (seiten.length - 1) * anzahl + seiten.at(-1).length : 0,
+  }
+}
+
 export const paperFake = express.Router()
 
 paperFake.post('/_steuerung', express.json(), async (req, res) => {
   zustand.ausfall = new Set(req.body?.ausfall ?? [])
   zustand.stoerungen = req.body?.stoerungen ?? {}
+  zustand.suchen = Object.fromEntries(Object.entries(req.body?.suchen ?? {}).map(([anfrage, fest]) => [begriffe(anfrage).join(' '), fest]))
   // Antworten cacht spur einen Tag; ein Test, der Dienste umschaltet, muss danach wirklich abrufen.
   if (req.body?.cachesLeeren) {
     await Promise.all([crossrefCache, paperCache].map(async sammlung => await (await sammlung()).deleteMany({})))
@@ -240,27 +257,27 @@ paperFake.get('/europepmc/articles/:pmcid', (req, res) => {
 
 paperFake.get('/arxiv/api/query', (req, res) => {
   const start = Number(req.query.start ?? 0)
-  const treffer = req.query.id_list
-    ? WERKE.filter(w => w.arxiv && req.query.id_list.split(',').includes(w.arxiv))
-    : suche('arxiv', req.query.search_query)
-  res.type('application/atom+xml').send(atom(req, seite(treffer, start, Number(req.query.max_results ?? 10)), treffer.length))
+  const anzahl = Number(req.query.max_results ?? 10)
+  const nachId = req.query.id_list && WERKE.filter(w => w.arxiv && req.query.id_list.split(',').includes(w.arxiv))
+  const { treffer, gesamt } = nachId ? { treffer: seite(nachId, start, anzahl), gesamt: nachId.length } : gefunden('arxiv', req.query.search_query, start, anzahl)
+  res.type('application/atom+xml').send(atom(req, treffer, gesamt))
 })
 
 paperFake.get('/openalex/works', (req, res) => {
   const proSeite = Number(req.query['per-page'] ?? 25)
   const filter = /^(cites|cited_by):(W\d+)$/.exec(req.query.filter ?? '')
-  let treffer
+  const ab = (Number(req.query.page ?? 1) - 1) * proSeite
+  let ergebnis
   if (filter) {
     const ziel = WERKE.find(w => w.openalex === filter[2])
-    const liste = filter[1] === 'cites' ? ziel?.zitiertVon : ziel?.zitiert
-    treffer = (liste ?? []).map(nachDoi).filter(Boolean)
+    const liste = ((filter[1] === 'cites' ? ziel?.zitiertVon : ziel?.zitiert) ?? []).map(nachDoi).filter(Boolean)
+    ergebnis = { treffer: seite(liste, ab, proSeite), gesamt: liste.length }
   } else {
-    treffer = suche('openalex', req.query.search)
+    ergebnis = gefunden('openalex', req.query.search, ab, proSeite)
   }
-  const ab = (Number(req.query.page ?? 1) - 1) * proSeite
   res.json({
-    meta: { count: treffer.length },
-    results: seite(treffer, ab, proSeite).map(w => openalexWerk(req, w)),
+    meta: { count: ergebnis.gesamt },
+    results: ergebnis.treffer.map(w => openalexWerk(req, w)),
   })
 })
 
@@ -271,9 +288,9 @@ paperFake.get(/^\/openalex\/works\/doi:(.+)$/, (req, res) => {
 })
 
 paperFake.get('/s2/graph/v1/paper/search', (req, res) => {
-  const treffer = suche('s2', req.query.query)
   const ab = Number(req.query.offset ?? 0)
-  res.json({ total: treffer.length, offset: ab, data: seite(treffer, ab, Number(req.query.limit ?? 10)).map(w => s2Paper(req, w)) })
+  const { treffer, gesamt } = gefunden('s2', req.query.query, ab, Number(req.query.limit ?? 10))
+  res.json({ total: gesamt, offset: ab, data: treffer.map(w => s2Paper(req, w)) })
 })
 
 paperFake.get(/^\/s2\/graph\/v1\/paper\/DOI:(.+)\/(citations|references)$/, (req, res) => {
@@ -297,12 +314,11 @@ paperFake.get(/^\/unpaywall\/v2\/(.+)$/, (req, res) => {
 })
 
 paperFake.get('/works', (req, res) => {
-  const treffer = suche('crossref', req.query.query)
-  const ab = Number(req.query.offset ?? 0)
+  const { treffer, gesamt } = gefunden('crossref', req.query.query, Number(req.query.offset ?? 0), Number(req.query.rows ?? 20))
   res.json({
     status: 'ok',
     'message-type': 'work-list',
-    message: { 'total-results': treffer.length, items: seite(treffer, ab, Number(req.query.rows ?? 20)).map(crossrefWerk) },
+    message: { 'total-results': gesamt, items: treffer.map(crossrefWerk) },
   })
 })
 

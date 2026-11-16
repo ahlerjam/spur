@@ -11,6 +11,7 @@ import { jetzt } from '../schalter.mjs'
 import * as Aufnahme from './Aufnahme.mjs'
 import { doiPfad } from './dienste.mjs'
 import { freierKey, keyVorschlag } from './keys.mjs'
+import * as Suchprotokoll from './Suchprotokoll.mjs'
 
 const SEITE = 50
 const STANDARD_VORLAGE = 'https://doi.org/{doi}'
@@ -57,6 +58,7 @@ export async function aufnehmenOderVormerken({ projectId, userId, doi }) {
   try {
     return await Aufnahme.perDoi({ projectId, userId, doi })
   } catch (error) {
+    if (error.typ === 'pdf_fehlt') await Suchprotokoll.aufnahmeFehlerMerken(projectId, Aufnahme.doiNormal(doi), 'pdf_fehlt')
     if (!['nicht_frei', 'bot_schutz'].includes(error.typ)) throw error
     try {
       await vormerken({ projectId, userId, doi: Aufnahme.doiNormal(doi), grund: error.typ, adresse: error.zusatz?.adresse ?? null })

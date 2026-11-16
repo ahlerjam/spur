@@ -253,17 +253,32 @@ describe('suchen', () => {
     expect(ergebnis.hinweis).toBeNull()
   })
 
-  it('schreibt je Dienst Datum, Datenbank, Anfrage und Trefferzahl ins Protokoll', async () => {
+  it('hält jede Anfrage im Protokoll fest, auch Folgeseiten, mit Status, gelieferten Treffern und Versuchen je Dienst', async () => {
     ausfall.add('s2')
     await suchen('sleep memory consolidation')
     await suchen('sleep memory consolidation', 1)
-    const { eintraege } = await Recherche.protokoll(projectId)
-    expect(eintraege.map(e => [e.dienst, e.anfrage, e.treffer]).sort()).toEqual([
-      ['Crossref', 'sleep memory consolidation', 1],
-      ['OpenAlex', 'sleep memory consolidation', 25],
-      ['arXiv', 'sleep memory consolidation', 1],
+    const eintraege = await datenbank.db.collection('spurSearchLog').find({ projectId }).sort({ _id: 1 }).toArray()
+    expect(eintraege.map(e => [e.anfrage, e.seite, e.geliefert])).toEqual([
+      ['sleep memory consolidation', 0, 3],
+      ['sleep memory consolidation', 1, 3],
     ])
-    expect(eintraege[0].datum).toBeInstanceOf(Date)
+    expect(eintraege[0]).toMatchObject({ userId, neu: 2, datum: expect.any(Date) })
+    expect(eintraege[0].dienste).toEqual([
+      { dienst: 'arXiv', antwort: 'geantwortet', versuche: 1, treffer: 1, gesamt: 1 },
+      { dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1, treffer: 1, gesamt: 25 },
+      { dienst: 'Crossref', antwort: 'geantwortet', versuche: 1, treffer: 1, gesamt: 1 },
+      { dienst: 'Semantic Scholar', antwort: 'nicht_erreichbar', versuche: 1, treffer: 0, gesamt: null },
+    ])
+    // Dieselben Treffer noch einmal: nichts Neues.
+    expect(eintraege[1].neu).toBe(0)
+  })
+
+  it('hält auch eine Anfrage fest, auf die kein Dienst geantwortet hat', async () => {
+    for (const dienst of ['arxiv', 'openalex', 'crossref', 's2']) ausfall.add(dienst)
+    await suchen('sleep')
+    const [eintrag] = await datenbank.db.collection('spurSearchLog').find({ projectId }).toArray()
+    expect(eintrag).toMatchObject({ anfrage: 'sleep', geliefert: 0, neu: 0 })
+    expect(eintrag.dienste.map(d => d.antwort)).toEqual(Array(4).fill('nicht_erreichbar'))
   })
 
   it('lehnt eine leere Anfrage ab', async () => {
@@ -381,17 +396,6 @@ describe('zitationen', () => {
   it('lehnt eine ungültige Richtung oder DOI ab', async () => {
     expect(await fehlerVon(Recherche.zitationen('10.1/a', 'quer'))).toMatchObject({ status: 400 })
     expect(await fehlerVon(Recherche.zitationen('keine-doi', 'zitiert'))).toMatchObject({ status: 400 })
-  })
-})
-
-describe('protokollCsv', () => {
-  it('schreibt Datum, Datenbank, Anfrage und Trefferzahl als CSV', async () => {
-    await suchen('sleep, "memory"')
-    const csv = await Recherche.protokollCsv(projectId)
-    const zeilen = csv.trim().split('\n')
-    expect(zeilen[0]).toBe('Datum,Datenbank,Anfrage,Trefferzahl')
-    expect(zeilen).toContain('2026-11-07T10:00:00.000Z,OpenAlex,"sleep, ""memory""",25')
-    expect(zeilen).toHaveLength(5)
   })
 })
 

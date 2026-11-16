@@ -7,7 +7,7 @@ import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
-import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, vorschlaege } from './sammlungen.mjs'
+import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, suchtreffer, vorschlaege } from './sammlungen.mjs'
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, titelFeld, versatzAusLabels, vttSeiten } from './pdf.mjs'
@@ -526,6 +526,7 @@ export async function projektAufraeumen(projectId) {
     (await bearbeitungen()).deleteMany({ projectId: id }),
     (await einstellungen()).deleteMany({ projectId: id }),
     (await suchprotokoll()).deleteMany({ projectId: id }),
+    (await suchtreffer()).deleteMany({ projectId: id }),
     (await beschaffungen()).deleteMany({ projectId: id }),
     (await notizen()).deleteMany({ projectId: id }),
     (await matrixSpalten()).deleteOne({ _id: id }),

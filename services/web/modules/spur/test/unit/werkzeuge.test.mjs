@@ -61,11 +61,18 @@ beforeEach(async () => {
     Erwaehnung: { imThreadAntworten: vi.fn(async () => ({ nachricht_id: 'm1' })) },
     Vorschlaege: { ARTEN: ['compile_fehler', 'belegloses_argument'], vorschlagen: vi.fn(async () => ({ vorschlag_id: 'v1' })) },
     Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
+    Suchprotokoll: {
+      SEITE: 50,
+      liste: vi.fn(async () => ({ eintraege: [{ anfrage: 'sleep', seite: 0 }], gesamt: 1, weiter: false })),
+      prisma: vi.fn(async () => ({ identifiziert: 9, dubletten: 2, gesichtet: 7 })),
+      ausschliessen: vi.fn(async ({ doi, grund }) => ({ doi, titel: 'T', grund })),
+    },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   recht.anmelden(vi)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.PruefManager)
+  vi.doMock('../../app/src/recherche/Suchprotokoll.mjs', () => m.Suchprotokoll)
   vi.doMock('../../app/src/QuellenManager.mjs', () => m.QuellenManager)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.ZitatManager)
   vi.doMock('../../app/src/schreiben/SchreibManager.mjs', () => m.SchreibManager)
@@ -101,6 +108,7 @@ describe('Rechte der Werkzeuge', () => {
     ['suggest', { art: 'compile_fehler', titel: 'Fehler in Zeile 4', text: 'x' }],
     ['run_status', {}],
     ['paper_search', { anfrage: 'sleep' }],
+    ['search_log', {}],
     ['compile', {}],
     ['compile_log', {}],
     ['page_image', { seite: 1 }],
@@ -444,6 +452,40 @@ describe('Recherche', () => {
       anfrage: 'sleep',
       seite: 0,
     })
+  })
+
+  it('paper_search nimmt den cursor der nächsten Seite und nennt den folgenden', async () => {
+    m.Recherche.suchen.mockImplementation(async ({ seite }) => ({ seite, treffer: [], fehler: [], weiter: seite === 0 }))
+    const erste = await aufruf('paper_search', { project_id: projekt, anfrage: 'sleep' })
+    expect(erste.naechster_cursor).toBe('1')
+    const zweite = await aufruf('paper_search', { project_id: projekt, anfrage: 'sleep', cursor: erste.naechster_cursor })
+    expect(m.Recherche.suchen).toHaveBeenLastCalledWith(expect.objectContaining({ seite: 1 }))
+    expect(zweite.naechster_cursor).toBeNull()
+  })
+
+  it('search_log liefert die Anfragen in zeitlicher Folge, die PRISMA-Summen und blättert mit cursor', async () => {
+    mitStufe('readOnly')
+    expect(await aufruf('search_log', { project_id: projekt })).toEqual({
+      eintraege: [{ anfrage: 'sleep', seite: 0 }],
+      naechster_cursor: null,
+      prisma: { identifiziert: 9, dubletten: 2, gesichtet: 7 },
+    })
+    expect(m.Suchprotokoll.liste).toHaveBeenCalledWith(new ObjectId(projekt), { ab: 0, aufsteigend: true })
+    m.Suchprotokoll.liste.mockResolvedValue({ eintraege: [], gesamt: 120, weiter: true })
+    expect((await aufruf('search_log', { project_id: projekt, cursor: '50' })).naechster_cursor).toBe('100')
+    expect(m.Suchprotokoll.liste).toHaveBeenLastCalledWith(new ObjectId(projekt), { ab: 50, aufsteigend: true })
+  })
+
+  it('paper_exclude verlangt Schreibrechte und schließt per DOI oder Titel mit Grund aus', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('paper_exclude', { project_id: projekt, doi: '10.1/X', grund: 'falsche Population' }))).toMatchObject({ code: 'keine_rechte' })
+    expect(m.Suchprotokoll.ausschliessen).not.toHaveBeenCalled()
+    mitStufe('owner')
+    expect(await aufruf('paper_exclude', { project_id: projekt, doi: '10.1/X', grund: 'falsche Population' })).toEqual({ doi: '10.1/x', titel: 'T', grund: 'falsche Population' })
+    expect(m.Suchprotokoll.ausschliessen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x', titel: undefined, grund: 'falsche Population' })
+    await aufruf('paper_exclude', { project_id: projekt, titel: 'Ohne DOI', grund: 'Abschlussarbeit' })
+    expect(m.Suchprotokoll.ausschliessen).toHaveBeenLastCalledWith(expect.objectContaining({ doi: undefined, titel: 'Ohne DOI' }))
+    expect(await fehlerVon(aufruf('paper_exclude', { project_id: projekt, grund: 'x' }))).toMatchObject({ typ: 'eingabe_ungueltig', zusatz: { feld: 'doi' } })
   })
 
   it('paper_citations reicht DOI und Richtung weiter', async () => {

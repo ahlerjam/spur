@@ -981,6 +981,23 @@ $spur-sm: 575.98px;
   }
 }
 
+.spur-prisma {
+  padding: var(--spacing-03) 0;
+  border-bottom: 1px solid var(--border-divider-themed);
+}
+
+.spur-prisma-zeile {
+  margin: 0 0 var(--spacing-02);
+  font-weight: 600;
+}
+
+.spur-protokoll-dienste {
+  margin: var(--spacing-01) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-02);
+}
+
 .spur-bibliothek-link {
   display: inline-block;
   margin-top: var(--spacing-02);
