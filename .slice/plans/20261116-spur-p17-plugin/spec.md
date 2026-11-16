@@ -1,0 +1,83 @@
+Type: cli, api
+
+# spur P17: Plugin mit Prüfkette, Abbildungsregeln und Browser-Download
+
+## Zweck
+Das Plugin besteht bisher aus einem Skill und zwei Skripten. In einer echten Arbeit fragte der Owner nach, ob die Paper richtig gedeutet sind, ob es die Treffer wirklich gibt und ob wichtige Stellen übersehen wurden; erst darauf setzte Claude eine Gegenprüfung an, und sie fand Fehler (falsche Seite bei Oldemeyer, „alle“ statt „95 %“ bei Hirtranusi). Die Abbildungen waren zu groß und bunt, ein gestrichelter Pfeil lief durch eine Beschriftung, eine Tabelle war schwer lesbar. Zehn freie Paper blieben am Bot-Schutz hängen. Dieser Plan macht daraus feste Bestandteile des Plugins: Auswertung, unabhängige Gegenprüfung, Endprüfung und Humanizer als Kette, die Claude nicht überspringen kann, dazu Regeln für Abbildungen und einen Browser-Weg für freie PDFs.
+
+## Nutzer
+Forschende, die mit Claude Code und dem spur-Plugin schreiben; der Owner als einziger Maintainer, der sich auf gründliche Arbeit verlassen will, ohne jedes Mal nachzufragen.
+
+## Was Nutzer danach können
+- Das Plugin installieren und `humanizer`, `humanizer-de` und `playwright` automatisch mitbekommen.
+- Sich darauf verlassen, dass jede Quelle samt Abstract gelesen und jede Stelle im Zusammenhang gedeutet wurde.
+- Sich darauf verlassen, dass frische Prüfer jede Aussage gegen die Quelle gegenlesen, bevor ein Lauf als fertig gilt.
+- Texte bekommen, die am Ende sprachlich überarbeitet und danach noch einmal geprüft sind.
+- Abbildungen und Tabellen bekommen, die zurückhaltend, lesbar und frei von Überlappungen sind.
+- Freie PDFs, die den Server abweisen, von Claude im Browser holen lassen.
+
+## Context
+- Plugin unter `plugins/spur/`: `.claude-plugin/plugin.json` (Version 0.1.0, `userConfig` mit `server_url` und `token`), `.mcp.json` (HTTP-Server `spur`), `skills/spur/SKILL.md`, `bin/spur-pdf-holen`, `bin/spur-hochladen`. Keine Agenten, keine Hooks. Marketplace: `.claude-plugin/marketplace.json` im Repo-Wurzelverzeichnis (Name `spur`).
+- Workflows liegen auf dem Server als MCP-Prompts in `services/web/modules/spur/app/src/workflows/standardtexte.mjs`: `literaturueberblick`, `methodenteil`, `folien`, `quellen_sammeln`. Keiner nennt Gegenprüfung, Endprüfung oder Humanizer.
+- Claude-Code-Doku, nachgelesen am 2026-11-16 (code.claude.com/docs/en: `plugins/components`, `plugins/dependencies`, `sub-agents`, `skills`, `hooks`, `hooks-guide`):
+  - Anweisungen gehören in Skills, eigene Kontexte in Agenten (`agents/*.md`), Regeln, die immer gelten müssen, in Hooks.
+  - Plugin-Agenten kennen `name`, `description`, `model`, `effort`, `maxTurns`, `tools`, `disallowedTools`, `skills`; `hooks`, `mcpServers` und `permissionMode` werden ignoriert. Sie erben die MCP-Werkzeuge der Hauptsession, eingeschränkt durch `tools`/`disallowedTools`. Ob ein `tools`-Eintrag mit dem Plugin-MCP-Namen greift, sagt die Doku nicht ausdrücklich.
+  - MCP-Werkzeuge des Plugins heißen `mcp__plugin_spur_spur__<werkzeug>`.
+  - `dependencies` in `plugin.json`: Einträge als Name, `name@marketplace` oder Objekt mit `name`, `marketplace`, `version`. Abhängigkeiten aus einem anderen Marketplace werden nur installiert, wenn der Marketplace des Plugins ihn unter `allowCrossMarketplaceDependenciesOn` nennt oder die Abhängigkeit schon aktiv ist.
+  - Hooks eines Plugins stehen in `hooks/hooks.json`. Ereignisse unter anderem `SessionStart`, `PreToolUse`, `PostToolUse`, `SubagentStop`, `Stop`. Ein `PreToolUse`-Hook verweigert mit `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"…"}}`; `additionalContext` fügt bei `SessionStart` Kontext ein. Eingaben: `session_id`, `transcript_path`, `tool_name`, `tool_input`; bei `SubagentStop` `agent_type`. `${CLAUDE_PLUGIN_DATA}` ist ein dauerhafter Datenordner des Plugins, `${CLAUDE_PLUGIN_ROOT}` der Plugin-Ordner. Hooks können keine Agenten starten (außer Typ `agent`, experimentell); sie können blockieren und Claude anweisen.
+  - `claude plugin validate <pfad>` prüft Manifest, Pfade und `.mcp.json`, nicht das Verhalten.
+- `humanizer` und `humanizer-de` sind eigene Plugins im öffentlichen Marketplace `cflow` (GitHub `ahlerjam/cflow`), Skills `humanizer:humanizer` und `humanizer-de:humanizer-de`. `playwright` kommt aus `claude-plugins-official`, Werkzeuge `mcp__plugin_playwright_playwright__browser_*`.
+- In Builder-Läufen ist das Playwright-Plugin abgeschaltet, und ein echter Claude-Durchlauf mit dem Plugin ist nicht möglich.
+- Die Pläne P12 bis P16 liefern die Werkzeuge, auf die sich die Skills beziehen: `search_log`, `paper_exclude`, Status `bot_schutz`, `source_read` mit `ab_zeichen`, `source_page_image`, `source_figure_add`, `file_upload_link`, `doc_edit` mit `alle_vorkommen`, `aenderungen` in `run_status`, `tex_file_read`, `fehlende_pakete`, `abweichungen` in `bib_list`.
+
+## Decisions
+Owner-Entscheidungen (2026-11-16):
+- Auswertung, Gegenprüfung und Endprüfung als Agenten im Plugin, mit Skills für das Wie; die Aufteilung folgt der Claude-Code-Doku.
+- Paraphrasen prüft allein der Gegenprüf-Agent; der Server urteilt nicht (ADR 0004 bleibt).
+- Am Ende der Endprüfung läuft ein Humanizer-Durchgang; `humanizer` und `humanizer-de` sind Abhängigkeiten des spur-Plugins.
+- `playwright` ist ebenfalls Abhängigkeit; ein Skill lässt Claude freie PDFs selbst im Headless-Browser holen.
+- Abbildungsregeln als eigener Skill; sie gelten allgemein für jede Arbeit.
+- Hooks wirken nur in Claude Code, im Browser ist nichts davon sichtbar. Sie erinnern an die Kette, und `run_finish` wird nach Textarbeit aufgehalten, bis Gegenprüfung, Endprüfung und Humanizer gelaufen sind. Läufe ohne Textänderung gehen ohne Kette durch.
+Annahmen (ohne Rückfrage getroffen):
+- Plugin-Version 0.2.0. `plugin.json` bekommt `dependencies`: `{"name": "humanizer", "marketplace": "cflow"}`, `{"name": "humanizer-de", "marketplace": "cflow"}`, `{"name": "playwright", "marketplace": "claude-plugins-official"}`; `marketplace.json` bekommt `allowCrossMarketplaceDependenciesOn: ["cflow", "claude-plugins-official"]`. Die README nennt die zwei Befehle zum Hinzufügen der Marketplaces vor der Installation und was passiert, wenn einer fehlt.
+- Agenten (`plugins/spur/agents/`), alle deutsch-englisch arbeitend je nach Sprache der Arbeit, ohne Werkzeug zum Starten weiterer Agenten:
+  - `auswertung`: liest je Quelle zuerst Abstract und Einleitung, dann die Fundstellen aus `source_search` mit `source_read` (mit `ab_zeichen`), bei Bedarf `source_page_image` für Tabellen und Abbildungen. Liefert je Quelle: Fragestellung, Methode, Stichprobe, Kernbefunde, Grenzen laut Abstract, und je verwertbarer Stelle Wortlaut, PDF-Seite, gedruckte Seite und einen Satz, wie die Stelle im Zusammenhang des Abstracts zu verstehen ist. Kennzeichnet Stellen, die nur Stand der Forschung referieren, statt eigener Befund zu sein. Schreibt nichts ins Dokument.
+  - `gegenpruefung`: bekommt nur die Projekt-ID und den Bereich, nicht die Auswertung und nicht die Begründungen des Schreibers. Nur lesende Werkzeuge. Geht jede Zitierstelle aus `check_report` durch (auch `beleg_ohne_wortlaut`), liest die angegebene Seite und das Abstract und urteilt je Aussage: `gedeckt`, `abweichend` (mit dem, was die Quelle wirklich sagt), `nicht_gefunden` oder `nicht_pruefbar`. Jedes Urteil nennt Fundstelle (Quelle, PDF-Seite, Wortlaut bis 300 Zeichen); ein Urteil ohne Fundstelle ist nicht erlaubt. Achtet eigens auf Zahlen, Quantoren („alle“, „die meisten“ gegen Prozentwerte), Richtung von Effekten, Stichprobe und darauf, ob die Quelle die Aussage selbst trifft oder nur zitiert. Prüft je Quelle, ob DOI, Titel, Autoren und Jahr im Eintrag zu den Metadaten passen (`bib_list`). Sucht am Ende je Quelle mit zwei bis drei eigenen Suchen nach wichtigen Stellen, die der Text nicht nutzt oder die ihm widersprechen, und meldet sie als `uebersehen`.
+  - `endpruefung`: läuft nach den Korrekturen. Prüft `check_report` (keine markierten Stellen ohne Begründung), kompiliert, sieht sich jede Seite mit Abbildung oder Tabelle über `page_image` an und misst sie an den Abbildungsregeln, prüft `bib_list` auf `abweichungen`, `run_status` auf offene und rote Änderungen, und dass jede Aussage der Zusammenfassung an den Owner belegt ist. Liefert eine Liste aus Befund, Ort und Vorschlag, oder „keine Befunde“.
+- Für Arbeiten mit mehr als 15 Quellen startet die Hauptsession zwei Gegenprüfer mit geteilter Quellenliste; darunter einen.
+- Der Humanizer-Schritt läuft in der Hauptsession, nicht in einem Agenten: Sie ruft für deutschen Text den Skill `humanizer-de:humanizer-de`, für englischen `humanizer:humanizer` auf, jeweils nur für die im Lauf geschriebenen Abschnitte. Unverändert bleiben: alles in `\enquote`, „…“, `quote`-Umgebungen und anderen Zitatformen, jeder Zitierbefehl samt Seite, jede Zahl, Eigennamen, Fachbegriffe, Formeln, Tabellen, Grafiken, Labels. Änderungen gehen als `doc_edit` in denselben Lauf. Danach läuft `check_report` noch einmal; kippt eine Stelle, wird die Änderung zurückgenommen.
+- Reihenfolge der Kette: schreiben → `gegenpruefung` → Korrekturen → `endpruefung` → Korrekturen → Humanizer → `check_report` → `run_finish`. Die Zusammenfassung an den Owner nennt je Stufe, was sie fand und was daraufhin geändert wurde, und alles, was offen blieb.
+- Skills (`plugins/spur/skills/`): `spur` (Hauptskill, bekommt die Kette, die neuen Werkzeuge und die Zustände eines Laufs), `spur-auswertung`, `spur-gegenpruefung`, `spur-endpruefung` (je das Vorgehen und das Ausgabeformat; die Agenten laden sie über `skills:` vor), `spur-abbildungen`, `spur-pdf-holen`. Jeder Skill unter 500 Zeilen, Beschreibung mit klaren Auslösern.
+- `spur-abbildungen`, Regeln: Graustufen oder eine einzige Akzentfarbe, keine bunten Füllungen; Unterscheidung über Linienart, Schraffur und Beschriftung, nicht über Farbe; Schrift in der Abbildung nicht kleiner als die Fußnotengröße und nicht größer als der Fließtext; Breite höchstens die Textbreite, einfache Schemata höchstens 0,7 davon, keine Abbildung höher als die halbe Seite, wenn sie nicht ausdrücklich ganzseitig sein soll; Pfeile und Linien kreuzen weder Beschriftungen noch andere Pfeile und liegen nicht auf gleicher Höhe wie ein parallel laufender Pfeil mit anderer Bedeutung (Abstand oder Versatz); gestrichelte Linien haben eine Legende oder Beschriftung; Tabellen im `booktabs`-Stil ohne senkrechte Linien; Matrix-Tabellen (Merkmal × Quelle) mit „x“ bzw. `\checkmark` statt langer Texte in den Zellen, breite Tabellen mit `tabularx` oder quer; jede Abbildung und Tabelle hat Titel, Quelle oder „Eigene Darstellung“ und wird im Text genannt. Vorgehen: nach jeder Änderung kompilieren, die Seite mit `page_image` ansehen und die Regeln einzeln abhaken; erst dann weiter. Abbildungen aus Quellen nur über `source_figure_add`; bei `lizenz_fehlt` nachzeichnen mit „in Anlehnung an“.
+- `spur-pdf-holen`: Für Einträge der Beschaffungsliste mit `bot_schutz`. Zuerst `bin/spur-pdf-holen` (Unpaywall, arXiv). Scheitert das, öffnet Claude die freie Adresse mit den Browser-Werkzeugen des Playwright-Plugins, lädt das PDF in einen Ordner, prüft den Dateianfang `%PDF-` und lädt mit `source_upload_link` und `bin/spur-hochladen --doi` hoch. Grenzen: nur Adressen, die Unpaywall oder Europe PMC als frei nennen; keine Bezahlschranken, keine fremden Zugangsdaten, keine Schattenbibliotheken, keine Tarn-Techniken gegen Bot-Erkennung, kein Lösen von Captchas. Erscheint eine Abfrage oder ein Login, hält Claude an und bittet die Person, die Seite selbst zu öffnen. Höchstens ein Abruf alle 5 Sekunden je Verlag. Der Skill erklärt, wie der Browser des Playwright-Plugins headless gestellt wird; der Builder schlägt das in der Doku des Playwright-MCP-Servers nach (Context7).
+- Hooks (`plugins/spur/hooks/hooks.json`, Skripte in `plugins/spur/hooks/`), Zustand je `session_id` in `${CLAUDE_PLUGIN_DATA}`:
+  - `SessionStart`: fügt eine sachliche Erinnerung an die Kette ein (drei Sätze, kein Befehlston).
+  - `PostToolUse` auf `mcp__plugin_spur_spur__doc_edit` und `…__doc_create`: merkt „Textarbeit“ und den Zeitpunkt der letzten Änderung, wenn der Pfad auf `.tex` endet.
+  - `SubagentStop`: merkt für die Agenten `gegenpruefung` und `endpruefung`, dass sie gelaufen sind, mit Zeitpunkt.
+  - `PostToolUse` auf das Skill-Werkzeug: merkt den Humanizer, wenn der Skill `humanizer:humanizer` oder `humanizer-de:humanizer-de` war; `PostToolUse` auf `…__check_report`: merkt den Zeitpunkt.
+  - `PreToolUse` auf `mcp__plugin_spur_spur__run_finish`: ohne Textarbeit durchlassen. Mit Textarbeit verweigern, solange eines fehlt: Gegenprüfung nach der ersten Textänderung, Endprüfung nach der Gegenprüfung, Humanizer nach der Endprüfung, `check_report` nach der letzten Textänderung. Die Begründung nennt genau die fehlenden Stufen und den nächsten Schritt. Nach erfolgreichem `run_finish` wird der Zustand der Session geleert.
+  - Ausnahme: `bin/spur-pruefkette aus "<grund>"` schaltet die Sperre für die laufende Session ab. Der Skill erlaubt das nur, wenn die Person es in dieser Session ausdrücklich verlangt; der Grund gehört in die Zusammenfassung. `spur-pruefkette stand` zeigt den Zustand.
+  - Fehler im Hook-Skript (kaputte Zustandsdatei, fehlender Ordner) blockieren nie: Der Hook lässt durch und schreibt eine Zeile nach stderr.
+  - Die Skripte nutzen nur, was die vorhandenen `bin`-Skripte schon voraussetzen; der Builder prüft, welche Namen `agent_type` und `tool_input` für Plugin-Agenten und das Skill-Werkzeug wirklich tragen (Doku `hooks`, sonst an einer echten Hook-Eingabe), und hält das im Test fest.
+- Server: Die vier Workflow-Prompts in `standardtexte.mjs` bekommen am Ende denselben kurzen Absatz zur Kette (für Clients ohne Plugin als Empfehlung formuliert), `quellen_sammeln` zusätzlich den Hinweis auf `search_log`, `paper_exclude` und den Umgang mit `bot_schutz`. Neue ADR 0007 „Prüfkette im Plugin“ hält fest, warum die Kette im Client liegt und der Server nicht urteilt.
+- Tests: `tools/tests/plugin-skripte.test.mjs` wird erweitert bzw. bekommt Geschwister: Manifest und Marketplace (Abhängigkeiten, Allowlist, Versionen gleich), Frontmatter jedes Agenten und Skills (Pflichtfelder, keine ignorierten Felder, `tools` ohne Schreib-Werkzeuge bei `gegenpruefung`), jede Werkzeugnennung in Skills und Agenten existiert in `mcp/werkzeuge.mjs`, und die Hook-Skripte gegen feste JSON-Eingaben. `claude plugin validate plugins/spur --strict` läuft im Lauf, wenn `claude` verfügbar ist, und in der CI als eigener Schritt.
+- Der echte Durchlauf (Installation mit Abhängigkeiten, Kette an einer Arbeit, Browser-Download) ist Handprüfung des Owners nach dem Merge; die README bekommt dafür eine Checkliste mit sieben Schritten.
+- Alle Skill- und Agententexte englisch wie der bestehende Skill, mit humanizer geprüft; README-Abschnitte ebenso.
+
+## Access
+Keine Schlüssel. Zur Handprüfung nach dem Merge: eine spur-Installation mit Token, die Marketplaces `cflow` und `claude-plugins-official`.
+
+## Quality bar
+- MCP und API: bestehende Fehlercodes und Felder bleiben unverändert; neue Zustände, Felder und Hinweise haben feste Schlüssel und stehen in `docs/mcp-contract.md`. Listen sind paginiert (50 je Seite, `cursor`).
+- Zugriff wird bei jedem Aufruf für das angesprochene Projekt geprüft; ein Konto ohne Schreibrecht kann nichts ändern.
+- Fehlermeldungen sagen, was passiert ist und was zu tun ist. Ein Ausfall eines fremden Dienstes wird nie als Befund über die Arbeit ausgegeben.
+- Fremder Text (Metadaten, Quellen, Dateinamen, Logs) wird als Daten behandelt; SSRF-Schutz (`netz.mjs`) gilt für jede neue ausgehende Anfrage.
+- Web: per Tastatur bedienbar mit sichtbarem Fokus, Kontrast mindestens 4,5:1 (hell und dunkel), kein horizontales Rollen bei 360 px, keine Konsolenfehler, keine nativen `alert`/`confirm`/`prompt`.
+- Texte: deutsch geduzt und englisch in beiden Sprachdateien; deutsche Texte mit humanizer-de, englische mit humanizer geprüft.
+
+### Tests (TDD)
+- Jede Änderung an Server- oder Frontend-Logik beginnt mit einem roten Test unter `services/web/modules/spur/test/unit` bzw. `test/frontend`; die echten Fälle aus `## Context` sind als Testfälle enthalten.
+- Externe Dienste laufen über die vorhandenen Fakes (`PaperFake`, `TexLiveFake`); neue Störungen bekommen Schalter im Fake.
+- Die E2E-Suite bekommt je Feature Schritte (`p17f1` …) und läuft nach dem Zurücksetzen der Testdaten vollständig grün, auch alle älteren Features.
+- `spur-dev test` bleibt über 80 % Zeilenabdeckung; `node --test tools/tests/*.test.mjs` ist grün (auch der Vertragstest `mcp-vertrag.test.mjs`).
+- Overleafs eigene Suiten bleiben grün bis auf die bekannte Upstream-Liste.
