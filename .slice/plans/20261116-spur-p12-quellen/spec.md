@@ -42,6 +42,12 @@ Annahmen (ohne Rückfrage getroffen):
 - Dubletten werden über die normalisierte DOI erkannt, ohne DOI über Titel (klein, ohne Satzzeichen) und Jahr.
 - Bestehende Protokolleinträge bleiben lesbar; ihnen fehlen die neuen Felder, sie zählen in `prisma` mit dem, was sie haben.
 - Europe PMC bekommt einen Fake im `PaperFake`; die echte Adresse ist per Schalter einstellbar wie bei den anderen Diensten.
+Nachtrag (2026-11-16, Owner: Brauchbares aus dem Altprojekt `academic-research` aufnehmen; die Einzelheiten sind Annahmen des Planers):
+- Titelabgleich gegen falsche PDFs: Ein Ausweichweg kann das PDF eines anderen Werks liefern. Nach jedem geladenen PDF vergleicht spur den Titel aus den Metadaten mit dem Text der ersten drei Seiten und dem Titelfeld des PDFs (klein geschrieben, ohne Satzzeichen und Akzente). Es passt, wenn mindestens die Hälfte der Titelwörter mit vier oder mehr Zeichen vorkommt, mindestens aber drei (bei weniger als drei solchen Wörtern alle). Drei Seiten statt nur des Anfangs, weil Repositorien oft ein Deckblatt voranstellen.
+- Ergebnis im Feld `titelabgleich` der Quelle: `passt`, `abweichend` oder `nicht_pruefbar` (die ersten drei Seiten haben keine Textebene, oder der Titel hat kein Wort mit vier Zeichen). `nicht_pruefbar` ist kein Fehltreffer; die Quelle wird aufgenommen wie bisher.
+- Beim Download durch den Server weist `abweichend` den Fundort ab: Er steht in `versucht` mit dem Ergebnis `falsches_pdf`, der nächste Fundort wird versucht. `falsches_pdf` zählt nicht als Bot-Schutz; liefert kein Fundort ein passendes PDF und gab es sonst keine HTML- oder 401/403/429/503-Antwort, lautet der Status `pdf_fehlt`.
+- Beim Upload (Einmal-Link, auch aus dem Browser-Weg des Plugins) und bei `pdf_url` mit `metadaten` wird nicht abgewiesen, weil die Person das PDF selbst gewählt hat: Die Quelle entsteht mit `titelabgleich: "abweichend"`, die Antwort und `sources_list` tragen den Hinweis „Titel im PDF passt nicht zu den Metadaten“, das Quellen-Panel zeigt ihn an der Quelle. Übersetzte Titel können so einen Hinweis auslösen; er ist deshalb eine Warnung und kein Fehler.
+- Bereits aufgenommene Quellen werden nicht nachträglich abgeglichen; ihnen fehlt das Feld.
 
 ## Access
 Alle optional, Tests nutzen Fakes: `UNPAYWALL_EMAIL`, `CROSSREF_MAILTO`, `OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`.

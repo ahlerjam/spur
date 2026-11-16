@@ -8,7 +8,11 @@
         "`source_add` über MCP mit dieser DOI liefert eine Quelle; `sources_list` zeigt sie mit Seitenzahl, und das Protokoll des Fakes zeigt, dass die Repositoriums-Adresse vor der Verlagsadresse abgerufen wurde",
         "Für `10.5555/spur.oa.002` liefert Unpaywall nur die Verlagsadresse (HTML), der Europe-PMC-Fake kennt die DOI mit einem PDF: `source_add` liefert die Quelle aus Europe PMC",
         "Für `10.5555/spur.oa.003` antwortet der einzige Fundort zweimal mit 503 und `Retry-After: 1`, beim dritten Mal mit dem PDF: `source_add` liefert die Quelle; der Aufruf dauert höchstens 15 s",
-        "Im Browser zeigt das Quellen-Panel die drei Quellen; bei der ersten steht die Lizenz „CC BY“"
+        "Im Browser zeigt das Quellen-Panel die drei Quellen; bei der ersten steht die Lizenz „CC BY“",
+        "Für `10.5555/spur.oa.004` (Titel „Sleep and memory consolidation in adolescents“) liefert der Repositoriums-Fundort ein echtes PDF eines anderen Werks („Soil microbes in alpine meadows“), der Verlags-Fundort das richtige: `source_add` liefert die Quelle, ihre erste Seite enthält den richtigen Titel, `sources_list` zeigt `titelabgleich: \"passt\"`, und das Protokoll des Fakes zeigt beide Abrufe",
+        "Für `10.5555/spur.oa.005` liefert der einzige Fundort das PDF des anderen Werks: `source_add` antwortet mit `pdf_fehlt`, `versucht` nennt den Fundort mit `falsches_pdf`, und `sources_list` enthält keine Quelle mit dieser DOI",
+        "Dasselbe falsche PDF per Einmal-Link mit `--doi 10.5555/spur.oa.005` hochgeladen: Die Quelle entsteht mit `titelabgleich: \"abweichend\"`; die Antwort und das Quellen-Panel zeigen „Titel im PDF passt nicht zu den Metadaten“",
+        "Ein PDF ohne Textebene (reiner Scan) mit richtiger DOI hochgeladen: `titelabgleich: \"nicht_pruefbar\"`, kein Hinweis; ein richtiges PDF mit vorangestelltem Deckblatt des Repositoriums (Titel erst auf Seite 2) ergibt `passt`"
       ],
       "passes": false,
       "ui": true
