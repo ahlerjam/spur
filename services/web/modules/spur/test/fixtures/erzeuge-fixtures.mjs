@@ -116,6 +116,41 @@ writeFileSync(
   join(here, 'retracted.pdf'),
   buildPdf({ pages: retracted, title: 'Retracted Findings on Sleep' })
 )
+// P12: Volltexte für Ausweichwege, falsche PDFs, Deckblätter und Quellen ohne DOI.
+const einfach = (datei, titel, autor, saetze) =>
+  writeFileSync(join(here, datei), buildPdf({ pages: [[titel, autor], saetze], title: titel }))
+einfach('oa001.pdf', 'Green open access in institutional repositories', 'N. Lind', ['Repositories keep accepted manuscripts available.'])
+einfach('oa002.pdf', 'Full text mirrors for biomedical literature', 'O. Haddad', ['Mirrors serve the same article from a second host.'])
+einfach('oa003.pdf', 'Rate limits on scholarly infrastructure', 'I. Probst', ['A second request after a short pause usually succeeds.'])
+einfach('oa004.pdf', 'Sleep and memory consolidation in adolescents', 'T. Novak', ['Adolescents retained more word pairs after a full night of sleep.'])
+einfach('bot001.pdf', 'Publisher walls around open articles', 'R. Stein', ['The article is open, the server still refuses automated requests.'])
+einfach('soil.pdf', 'Soil microbes in alpine meadows', 'B. Jones', ['Microbial communities differ with altitude.'])
+einfach('report.pdf', 'AI at Work', 'J. Meyer, C. Okafor', ['Firms adopt generative tools unevenly across occupations.'])
+writeFileSync(
+  join(here, 'deckblatt.pdf'),
+  buildPdf({
+    pages: [
+      ['University Repository', 'This version is made available under the terms of the archive.', 'Downloaded on 3 March 2025'],
+      ['Napping and attention in shift workers', 'L. Brandt'],
+      ['Short naps restored attention for about two hours.'],
+    ],
+    title: 'Repository cover sheet',
+  })
+)
+writeFileSync(
+  join(here, 'tampere.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 14 }, (_, i) =>
+      i === 0
+        ? ['Generative AI adoption in a large enterprise', 'Aino Virtanen', "Master's thesis", 'Tampere University, 2024']
+        : i === 11
+          ? ['Employees used the assistant mainly for drafting and summarising.', `Thesis page ${i + 1}.`]
+          : [`Thesis page ${i + 1}.`, 'Interviews were coded in two rounds.']
+    ),
+    title: 'Generative AI adoption in a large enterprise',
+  })
+)
+
 // Ein Scan: Seite 1 ist nur ein Bild mit dem bekannten Satz (keine Textebene), Seite 2 ist leer.
 // Das Bild entsteht, indem pdftocairo eine Textseite in Graustufen rastert; die IDAT-Daten der PNG
 // gehen mit PNG-Prädiktor unverändert als FlateDecode-Bild ins PDF.

@@ -6,8 +6,10 @@ import { mitProblemen, Problem, problemSenden } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import { quellen } from '../sammlungen.mjs'
 import { rolleFuerClaude } from '../rechte.mjs'
+import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import { doiPruefen } from '../recherche/Recherche.mjs'
+import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as UploadLink from './UploadLink.mjs'
 
@@ -38,9 +40,22 @@ async function istPdf(pfad) {
   }
 }
 
+// Metadaten der angegebenen DOI, damit Titel und .bib nicht von einer DOI im PDF-Text abhängen. Ohne Antwort des
+// Registers entsteht die Quelle trotzdem.
+async function doiMetadaten(doi) {
+  try {
+    const { meta } = await Aufnahme.metadaten(doi)
+    return meta.gefunden ? meta : undefined
+  } catch (error) {
+    if (error instanceof Problem) return undefined
+    throw error
+  }
+}
+
 async function aufnehmen(link, req, dateiname) {
   const doi = req.body?.doi ? doiPruefen(String(req.body.doi)) : undefined
   const titel = req.body?.titel ? String(req.body.titel).slice(0, 500) : undefined
+  const meta = titel ? { titel } : doi ? await doiMetadaten(doi) : undefined
   try {
     return await QuellenManager.aufnehmen({
       projectId: link.projectId,
@@ -49,7 +64,7 @@ async function aufnehmen(link, req, dateiname) {
       tempPfad: req.file.path,
       groesse: req.file.size,
       doi,
-      meta: titel ? { titel } : undefined,
+      meta,
     })
   } catch (error) {
     if (error instanceof Problem && error.typ === 'quelle_vorhanden') {
@@ -89,6 +104,7 @@ export const hochladen = mitProblemen(async (req, res) => {
       datei: dateiname,
       status: 'angelegt',
       quelle_id: String(ergebnis._id),
+      ...titelBefund(ergebnis),
       ...(eintrag && { beschaffung_id: String(eintrag._id) }),
     })
   } finally {

@@ -42,7 +42,10 @@ beforeEach(async () => {
       antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })),
     },
     Crossref: { pruefen: vi.fn() },
-    Beschaffung: { hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })) },
+    Beschaffung: {
+      hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })),
+      aufnehmenOderVormerken: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })),
+    },
     Literatur: { vorschlagen: vi.fn(async () => ({ quelle_id: 'q', spalte: 'Methode' })) },
     Kompilieren: {
       starten: vi.fn(async () => ({ job_id: 'j1', status: 'laeuft' })),
@@ -242,6 +245,17 @@ describe('Lesen im Projekt', () => {
       eintraege: [{ id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', seiten: 8, status: 'text', fassung: '' }],
       naechster_cursor: null,
     })
+  })
+
+  it('sources_list nennt den Titelabgleich und warnt bei einem abweichenden PDF', async () => {
+    const quelle = (id, titelabgleich) => ({ _id: id, dateiname: `${id}.pdf`, key: id, doi: null, seitenzahl: 2, status: 'text', fassung: '', titelabgleich })
+    m.QuellenManager.alle.mockResolvedValue([quelle('a', 'passt'), quelle('b', 'abweichend'), quelle('c', 'nicht_pruefbar')])
+    const { eintraege } = await aufruf('sources_list', { project_id: projekt })
+    expect(eintraege.map(e => [e.titelabgleich, e.hinweis])).toEqual([
+      ['passt', undefined],
+      ['abweichend', meldung('spur_hinweis_titel_abweichend')],
+      ['nicht_pruefbar', undefined],
+    ])
   })
 
   it('source_search nennt gedruckte Seite, PDF-Seite und Position, keinen Absatz', async () => {
@@ -444,7 +458,13 @@ describe('Recherche', () => {
       dateiname: 'keller2014.pdf',
       doi: '10.1/x',
     })
-    expect(m.Aufnahme.perDoi).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
+    expect(m.Beschaffung.aufnehmenOderVormerken).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
+  })
+
+  it('source_add nennt nach einer Aufnahme das Ergebnis des Titelabgleichs', async () => {
+    mitStufe('owner')
+    m.Beschaffung.aufnehmenOderVormerken.mockResolvedValue({ _id: 'q1', key: 'k', dateiname: 'k.pdf', doi: '10.1/x', titelabgleich: 'passt' })
+    expect(await aufruf('source_add', { project_id: projekt, doi: '10.1/X' })).toMatchObject({ titelabgleich: 'passt' })
   })
 
   it('acquisition_add verlangt Schreibrechte und setzt die DOI auf die Liste', async () => {

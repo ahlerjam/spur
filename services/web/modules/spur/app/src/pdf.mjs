@@ -140,6 +140,12 @@ export function vttSeiten(text) {
   return abschnitte
 }
 
+// Titel aus den Dokumenteigenschaften des PDFs, sonst null.
+export async function titelFeld(pfad) {
+  const { stdout } = await ausfuehren('pdfinfo', ['-enc', 'UTF-8', pfad], GRENZEN)
+  return /^Title:[ \t]+(.+)$/m.exec(stdout)?.[1].trim() ?? null
+}
+
 export async function seitenzahl(pfad) {
   const { stdout } = await ausfuehren('pdfinfo', [pfad], GRENZEN)
   return Number(/^Pages:\s+(\d+)/m.exec(stdout)?.[1] ?? 0)

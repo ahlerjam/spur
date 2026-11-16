@@ -164,6 +164,24 @@ describe('Quellen-Panel', function () {
     screen.getByText('ohne.pdf')
   })
 
+  it('zeigt die Lizenz und warnt, wenn der Titel im PDF nicht zu den Metadaten passt', async function () {
+    fetchMock.get(QUELLEN, {
+      quellen: [
+        quelle('lind2021', { titel: 'Green open access', lizenz: 'cc-by', titelabgleich: 'passt' }),
+        quelle('abel2018', { titel: 'Dream recall', lizenz: 'cc by-nc', titelabgleich: 'abweichend' }),
+        quelle('scan', { titelabgleich: 'nicht_pruefbar' }),
+      ],
+      gesamt: 3,
+    })
+    zeigen()
+    const zeile = async (name: string) => (await screen.findByRole('button', { name: new RegExp(name) })).closest('li')!
+    expect((await zeile('Green open access')).textContent).to.contain('Lizenz: CC BY')
+    expect((await zeile('Green open access')).textContent).not.to.contain('Titel im PDF')
+    expect((await zeile('Dream recall')).textContent).to.contain('Lizenz: CC BY NC')
+    expect((await zeile('Dream recall')).textContent).to.contain('Titel im PDF passt nicht zu den Metadaten')
+    expect((await zeile('scan.pdf')).textContent).not.to.match(/Titel im PDF|Lizenz/)
+  })
+
   it('lädt weitere Quellen nach und nennt den Stand', async function () {
     fetchMock.get(QUELLEN, { quellen: [quelle('a')], gesamt: 3 })
     fetchMock.get(QUELLEN_SEITE_2, { quellen: [quelle('b')], gesamt: 3 })

@@ -817,6 +817,15 @@ $spur-sm: 575.98px;
   }
 }
 
+.spur-zeile-warnung {
+  color: var(--content-warning-themed);
+
+  .material-symbols {
+    font-size: 1.1em;
+    vertical-align: text-bottom;
+  }
+}
+
 .spur-lauf-hinweis {
   margin: var(--spacing-03) 0 0;
   color: var(--content-warning-themed);
@@ -976,6 +985,10 @@ $spur-sm: 575.98px;
   display: inline-block;
   margin-top: var(--spacing-02);
   font-size: var(--font-size-02);
+}
+
+.spur-bibliothek-link + .spur-bibliothek-link {
+  margin-left: var(--spacing-05);
 }
 
 .spur-import-teil + .spur-import-teil {

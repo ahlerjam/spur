@@ -1,3 +1,4 @@
+import logger from '@overleaf/logger'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
 import { csv } from '../csv.mjs'
 import { Problem } from '../probleme.mjs'
@@ -34,6 +35,39 @@ export async function hinzufuegen({ projectId, userId, doi }) {
     throw error
   }
   return eintrag
+}
+
+// Legt die DOI mit dem Grund auf die Liste; steht sie schon dort, bekommt der Eintrag nur Grund und Adresse.
+async function vormerken({ projectId, userId, doi, grund, adresse }) {
+  const sammlung = await beschaffungen()
+  const { matchedCount } = await sammlung.updateOne({ projectId, doi }, { $set: { grund, adresse } })
+  if (matchedCount) return
+  const { meta } = await Aufnahme.metadaten(doi)
+  try {
+    await sammlung.insertOne({ _id: new ObjectId(), projectId, doi, meta, status: 'offen', grund, adresse, angelegtVon: userId, angelegtAm: jetzt() })
+  } catch (error) {
+    // Ein gleichzeitiger Aufruf hat den Eintrag schon angelegt.
+    if (error.code !== 11000) throw error
+  }
+}
+
+// Aufnahme per DOI. Scheitert sie an der Bezahlschranke (nicht_frei) oder am Bot-Schutz der Server (bot_schutz),
+// steht die DOI danach mit diesem Grund auf der Beschaffungsliste; der Fehler geht trotzdem an den Aufrufer.
+export async function aufnehmenOderVormerken({ projectId, userId, doi }) {
+  try {
+    return await Aufnahme.perDoi({ projectId, userId, doi })
+  } catch (error) {
+    if (!['nicht_frei', 'bot_schutz'].includes(error.typ)) throw error
+    try {
+      await vormerken({ projectId, userId, doi: Aufnahme.doiNormal(doi), grund: error.typ, adresse: error.zusatz?.adresse ?? null })
+    } catch (vormerkFehler) {
+      logger.warn({ err: vormerkFehler, doi }, 'spur: DOI nicht auf die Beschaffungsliste gesetzt')
+      throw error
+    }
+    throw error.typ === 'bot_schutz'
+      ? new Problem(502, 'bot_schutz', 'spur_fehler_bot_schutz_vorgemerkt', undefined, error.zusatz)
+      : new Problem(409, 'nicht_frei', 'spur_fehler_nicht_frei_vorgemerkt')
+  }
 }
 
 export async function liste(projectId, { seite = 0 } = {}) {

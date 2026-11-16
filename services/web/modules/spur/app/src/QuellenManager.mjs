@@ -10,7 +10,8 @@ import { Problem } from './probleme.mjs'
 import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, vorschlaege } from './sammlungen.mjs'
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
-import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, titelFeld, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { titelabgleich } from './recherche/titelabgleich.mjs'
 import { abrufen } from './WebSchnappschuss.mjs'
 import { quelleGeaendert } from './live.mjs'
 import * as Speicher from './Speicher.mjs'
@@ -127,7 +128,8 @@ async function speichern(quelle, seitenListe, schreibeDatei) {
   return quelle
 }
 
-// key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF.
+// key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF. Mit vorgegebenem Titel
+// wird das PDF dagegen abgeglichen; titelStreng weist ein abweichendes PDF mit falsches_pdf ab.
 export async function aufnehmen(angaben) {
   pruefeDateityp(angaben.dateiname)
   // Vor dem Auslesen: eine zu große Datei wird abgewiesen, ehe Text und OCR Zeit kosten.
@@ -139,21 +141,29 @@ export async function aufnehmen(angaben) {
   }
 }
 
-async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, nurProjekt = false }) {
+async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, lizenz = null, titelStreng = false, nurProjekt = false }) {
   const key = vorgabe ?? schluesselAus(dateiname)
   if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
-  const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
+  const endung = Path.extname(dateiname).toLowerCase()
+  const inhalt = await AUSLESER[endung](tempPfad)
+  const abgleich =
+    endung === '.pdf' && meta?.titel
+      ? titelabgleich(meta.titel, inhalt.seiten.map(s => s.text), await titelFeld(tempPfad).catch(() => null))
+      : null
+  if (titelStreng && abgleich === 'abweichend') throw new Problem(422, 'falsches_pdf', 'spur_fehler_falsches_pdf')
   const quelle = {
     _id: new ObjectId(),
     projectId,
     dateiname,
     key,
     groesse,
-    art: Path.extname(dateiname).slice(1).toLowerCase(),
+    art: endung.slice(1),
     seitenzahl: inhalt.seiten.length,
     status: inhalt.hatText ? 'text' : 'kein_text',
     doi: doi ?? inhalt.doi,
     meta: meta ?? inhalt.meta,
+    ...(abgleich && { titelabgleich: abgleich }),
+    lizenz,
     nurProjekt,
     versatz: inhalt.versatz,
     versatzQuelle: inhalt.versatzQuelle,

@@ -62,7 +62,17 @@
       "dienste": ["openalex", "crossref"],
       "zitiertVon": [],
       "zitiert": ["10.1038/nrn2762"]
-    }
+    },
+    {"doi": "10.5555/spur.oa.001", "titel": "Green open access in institutional repositories", "autoren": [["Nora", "Lind"]], "jahr": 2021, "journal": "Learned Publishing", "seiten": "1-9", "frei": true, "fundorte": [{"art": "publisher", "liefert": "html", "lizenz": "cc-by"}, {"art": "repository", "liefert": "oa001.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.002", "titel": "Full text mirrors for biomedical literature", "autoren": [["Omar", "Haddad"]], "jahr": 2020, "journal": "Journal of Biomedical Informatics", "seiten": "10-19", "frei": true, "fundorte": [{"art": "publisher", "liefert": "html", "lizenz": null}], "europepmc": {"pmcid": "PMC9000002", "pdf": "oa002.pdf", "lizenz": "cc by"}, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.003", "titel": "Rate limits on scholarly infrastructure", "autoren": [["Ines", "Probst"]], "jahr": 2022, "journal": "Quantitative Science Studies", "seiten": "20-31", "frei": true, "fundorte": [{"art": "repository", "liefert": "oa003.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.004", "titel": "Sleep and memory consolidation in adolescents", "autoren": [["Tara", "Novak"]], "jahr": 2019, "journal": "Journal of Adolescence", "seiten": "40-52", "frei": true, "fundorte": [{"art": "repository", "liefert": "soil.pdf", "lizenz": "cc-by"}, {"art": "publisher", "liefert": "oa004.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.005", "titel": "Dream recall across the lifespan", "autoren": [["Jon", "Abel"]], "jahr": 2018, "journal": "Dreaming", "seiten": "5-17", "frei": true, "fundorte": [{"art": "repository", "liefert": "soil.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.006", "titel": "Napping and attention in shift workers", "autoren": [["Lea", "Brandt"]], "jahr": 2017, "journal": "Chronobiology International", "seiten": "60-71", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.007", "titel": "Scanned field notes on night shifts", "autoren": [["Kim", "Arnold"]], "jahr": 2016, "journal": "Field Methods", "seiten": "3-8", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.bot.001", "titel": "Publisher walls around open articles", "autoren": [["Rosa", "Stein"]], "jahr": 2023, "journal": "Insights", "seiten": "1-8", "frei": true, "fundorte": [{"art": "publisher", "liefert": 403, "lizenz": "cc-by", "seite": "https://publisher.example/articles/spur.bot.001"}, {"art": "repository", "liefert": "html", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.zu.001", "titel": "Subscription journals and their readers", "autoren": [["Paul", "Winter"]], "jahr": 2015, "journal": "Serials Review", "seiten": "12-20", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.weg.001", "titel": "Link rot in open archives", "autoren": [["Mia", "Kranz"]], "jahr": 2014, "journal": "D-Lib Magazine", "seiten": "1-6", "frei": true, "fundorte": [{"art": "repository", "liefert": 404, "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []}
   ],
   "serie": {
     "anzahl": 24,

@@ -14,7 +14,7 @@
         "Dasselbe falsche PDF per Einmal-Link mit `--doi 10.5555/spur.oa.005` hochgeladen: Die Quelle entsteht mit `titelabgleich: \"abweichend\"`; die Antwort und das Quellen-Panel zeigen „Titel im PDF passt nicht zu den Metadaten“",
         "Ein PDF ohne Textebene (reiner Scan) mit richtiger DOI hochgeladen: `titelabgleich: \"nicht_pruefbar\"`, kein Hinweis; ein richtiges PDF mit vorangestelltem Deckblatt des Repositoriums (Titel erst auf Seite 2) ergibt `passt`"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {

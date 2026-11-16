@@ -26,6 +26,8 @@ type Eintrag = {
   autoren: string[]
   jahr: number | null
   status: 'offen' | 'beschafft'
+  grund?: 'bot_schutz' | 'nicht_frei' | null
+  adresse?: string | null
   link: string
 }
 type Liste = { eintraege: Eintrag[]; offen: number; beschafft: number; weiter: boolean; vorlage: string }
@@ -240,6 +242,18 @@ export default function Beschaffung() {
                       </OLBadge>
                     </p>
                     <p className="spur-zeile-meta spur-paper-doi">{e.doi}</p>
+                    {e.status === 'offen' && e.grund && (
+                      <p className="spur-zeile-meta">
+                        <OLBadge bg="light" className="spur-grund-badge">
+                          {t(e.grund === 'bot_schutz' ? 'spur_grund_bot_schutz' : 'spur_grund_nicht_frei')}
+                        </OLBadge>
+                      </p>
+                    )}
+                    {e.status === 'offen' && e.grund === 'bot_schutz' && e.adresse && (
+                      <a href={e.adresse} target="_blank" rel="noopener noreferrer" className="spur-bibliothek-link">
+                        {t('spur_im_browser_laden')}
+                      </a>
+                    )}
                     {e.status === 'offen' && (
                       <a href={e.link} target="_blank" rel="noopener noreferrer" className="spur-bibliothek-link">
                         {t('spur_in_bibliothek')}

@@ -57,6 +57,8 @@ function quelleFuerClient(q) {
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
     nurProjekt: q.nurProjekt === true,
+    lizenz: q.lizenz ?? null,
+    titelabgleich: q.titelabgleich ?? null,
     ocr: QuellenManager.ocrZustand(q),
     web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }
@@ -523,7 +525,7 @@ export const suchprotokollExport = mitProblemen(async (req, res) => {
 
 export const perDoiAufnehmen = mitProblemen(async (req, res) => {
   const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
-  const quelle = await Aufnahme.perDoi({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
+  const quelle = await Beschaffung.aufnehmenOderVormerken({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
   res.status(201).json(quelleFuerClient(quelle))
 })
 
@@ -536,6 +538,9 @@ function beschaffungFuerClient(eintrag, vorlage) {
     jahr: eintrag.meta.jahr,
     status: eintrag.status,
     quelleId: eintrag.quelleId ?? null,
+    grund: eintrag.grund ?? null,
+    // Die Adresse stammt von Unpaywall: als Link nur mit http(s).
+    adresse: /^https?:\/\//i.test(eintrag.adresse ?? '') ? eintrag.adresse : null,
     link: Beschaffung.link(vorlage, eintrag.doi),
   }
 }

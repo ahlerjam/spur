@@ -14,6 +14,7 @@ import { referenzStatus } from '../pruefung/bewertung.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
+import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
@@ -134,7 +135,9 @@ export const WERKZEUGE = {
   },
 
   sources_list: {
-    description: 'Quellen eines Projekts mit Status, ohne Text.',
+    description:
+      'Quellen eines Projekts mit Status, ohne Text. titelabgleich (passt, abweichend, nicht_pruefbar) vergleicht den Titel ' +
+      'aus den Metadaten mit dem Anfang des PDFs; bei abweichend sagt hinweis, dass das PDF ein anderes Werk sein kann.',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
@@ -148,6 +151,7 @@ export const WERKZEUGE = {
           seiten: q.seitenzahl,
           status: q.status,
           fassung: q.fassung,
+          ...titelBefund(q),
         })),
         cursor
       )
@@ -410,19 +414,23 @@ Object.assign(WERKZEUGE, {
   source_add: {
     description:
       'Nimmt ein Paper per DOI auf: lädt den freien Volltext, legt die Quelle an und ergänzt die .bib mit den ' +
-      'DOI-Metadaten. Ohne freien Volltext: acquisition_add.',
+      'DOI-Metadaten. spur versucht alle freien Fundorte (Repositorien vor Verlagsseiten, dann Europe PMC). ' +
+      'Fehler: nicht_frei (kein freier Fundort), bot_schutz (frei, aber die Server haben spur abgewiesen; im Browser unter ' +
+      'adresse ladbar) und pdf_fehlt; versucht nennt je Adresse host, art und ergebnis. Bei nicht_frei und bot_schutz ' +
+      'setzt spur die DOI selbst auf die Beschaffungsliste; ein Upload mit dieser DOI erledigt den Eintrag.',
     inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
     async ausfuehren({ project_id: pid, doi }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
-      const quelle = await Aufnahme.perDoi({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
-      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi }
+      const quelle = await Beschaffung.aufnehmenOderVormerken({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi, ...titelBefund(quelle) }
     },
   },
 
   acquisition_add: {
     description:
-      'Setzt ein nicht freies Paper per DOI auf die Beschaffungsliste des Projekts. Die Person holt es in der Bibliothek ' +
-      'und lädt das PDF hoch; spur ordnet es per DOI zu.',
+      'Setzt ein Paper per DOI auf die Beschaffungsliste des Projekts. Die Person holt es in der Bibliothek ' +
+      'und lädt das PDF hoch; spur ordnet es per DOI zu. Nach nicht_frei oder bot_schutz von source_add steht die DOI ' +
+      'schon dort (beschaffung_vorhanden).',
     inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
     async ausfuehren({ project_id: pid, doi }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)

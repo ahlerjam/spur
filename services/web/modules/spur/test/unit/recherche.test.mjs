@@ -420,3 +420,89 @@ describe('Unpaywall-Adresse', () => {
     expect(abrufe).toHaveLength(0)
   })
 })
+
+describe('Unpaywall-Fundorte', () => {
+  let dienste
+  beforeEach(async () => {
+    vi.stubEnv('UNPAYWALL_EMAIL', 'unpaywall@example.org')
+    dienste = await import('../../app/src/recherche/dienste.mjs')
+  })
+
+  it('liefert alle freien PDF-Adressen, Repositorien vor Verlagsseiten', async () => {
+    sonder = () => ({
+      doi: '10.1/x',
+      is_oa: true,
+      best_oa_location: { host_type: 'publisher', url_for_pdf: 'https://verlag.example/a.pdf', license: 'cc-by' },
+      oa_locations: [
+        { host_type: 'publisher', url_for_pdf: 'https://verlag.example/a.pdf', url_for_landing_page: 'https://verlag.example/a', license: 'cc-by' },
+        { host_type: 'repository', url_for_pdf: null, url_for_landing_page: 'https://repo.example/nur-seite' },
+        { host_type: 'repository', url_for_pdf: 'https://repo.example/a.pdf', url_for_landing_page: 'https://repo.example/a', license: null },
+        { host_type: 'repository', url_for_pdf: 'https://repo.example/a.pdf', license: null },
+      ],
+    })
+    expect(await dienste.unpaywall.status('10.1/x')).toEqual({
+      frei: true,
+      fundorte: [
+        { url: 'https://repo.example/a.pdf', art: 'repository', lizenz: null, seite: 'https://repo.example/a' },
+        { url: 'https://verlag.example/a.pdf', art: 'publisher', lizenz: 'cc-by', seite: 'https://verlag.example/a' },
+      ],
+    })
+  })
+
+  it('nimmt best_oa_location, wenn die Liste der Fundorte fehlt', async () => {
+    sonder = () => ({ doi: '10.1/x', is_oa: true, best_oa_location: { url_for_pdf: 'https://x.example/a.pdf', license: 'cc-by' } })
+    expect((await dienste.unpaywall.status('10.1/x')).fundorte).toEqual([
+      { url: 'https://x.example/a.pdf', art: 'publisher', lizenz: 'cc-by', seite: null },
+    ])
+  })
+
+  it('kennt ohne freien Zugang keinen Fundort', async () => {
+    sonder = () => ({ doi: '10.1/x', is_oa: false, best_oa_location: null, oa_locations: [] })
+    expect(await dienste.unpaywall.status('10.1/x')).toEqual({ frei: false, fundorte: [] })
+  })
+})
+
+describe('Europe PMC', () => {
+  let dienste
+  // Gekürzte echte Antwort (2026-11-16) für eine DOI mit freiem PDF.
+  const TREFFER = {
+    doi: '10.1371/JOURNAL.PMED.0040040',
+    pmcid: 'PMC1817752',
+    isOpenAccess: 'Y',
+    hasPDF: 'Y',
+    license: 'cc by',
+    fullTextUrlList: {
+      fullTextUrl: [
+        { availabilityCode: 'S', documentStyle: 'doi', site: 'DOI', url: 'https://doi.org/10.1371/journal.pmed.0040040' },
+        { availabilityCode: 'OA', documentStyle: 'html', site: 'Europe_PMC', url: 'https://europepmc.org/articles/PMC1817752' },
+        { availabilityCode: 'OA', documentStyle: 'pdf', site: 'Europe_PMC', url: 'https://europepmc.org/articles/PMC1817752?pdf=render' },
+      ],
+    },
+  }
+  beforeEach(async () => {
+    dienste = await import('../../app/src/recherche/dienste.mjs')
+  })
+
+  it('fragt nach der DOI und liefert das freie PDF als Fundort', async () => {
+    sonder = () => ({ resultList: { result: [TREFFER] } })
+    expect(await dienste.europepmc.fundort('10.1371/journal.pmed.0040040')).toEqual({
+      url: 'https://europepmc.org/articles/PMC1817752?pdf=render',
+      art: 'europepmc',
+      lizenz: 'cc by',
+      seite: null,
+    })
+    const url = new URL(abrufe.at(-1).url)
+    expect(url.pathname).toBe('/fake/europepmc/webservices/rest/search')
+    expect(Object.fromEntries(url.searchParams)).toEqual({ query: 'DOI:10.1371/journal.pmed.0040040', format: 'json', resultType: 'core' })
+  })
+
+  it('liefert null ohne Treffer, ohne freies PDF und für den Treffer einer anderen DOI', async () => {
+    sonder = () => ({ resultList: { result: [] } })
+    expect(await dienste.europepmc.fundort('10.1/a')).toBeNull()
+    const nurAbo = { ...TREFFER, doi: '10.1/b', fullTextUrlList: { fullTextUrl: [{ availabilityCode: 'S', documentStyle: 'pdf', url: 'https://verlag.example/b.pdf' }] } }
+    sonder = () => ({ resultList: { result: [nurAbo] } })
+    expect(await dienste.europepmc.fundort('10.1/b')).toBeNull()
+    sonder = () => ({ resultList: { result: [TREFFER] } })
+    expect(await dienste.europepmc.fundort('10.1/c')).toBeNull()
+  })
+})

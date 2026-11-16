@@ -101,10 +101,19 @@ function QuellenZeile({
           {t('spur_text_erkennen')}
         </OLButton>
       )}
+      {quelle.lizenz && <p className="spur-zeile-meta">{t('spur_lizenz', { lizenz: lizenzText(quelle.lizenz) })}</p>}
+      {quelle.titelabgleich === 'abweichend' && (
+        <p className="spur-zeile-meta spur-zeile-warnung">
+          <MaterialIcon type="warning" /> {t('spur_hinweis_titel_abweichend')}
+        </p>
+      )}
       {quelle.nurProjekt && <p className="spur-zeile-meta">{t('spur_nur_projekt')}</p>}
     </li>
   )
 }
+
+// Unpaywall schreibt „cc-by“, Europe PMC „cc by“.
+const lizenzText = (lizenz: string) => lizenz.replace(/[-_\s]+/g, ' ').trim().toUpperCase()
 
 function autorenKurz(autoren: string[], t: (k: string, o?: object) => string) {
   if (autoren.length >= 3) return t('spur_autoren_mehr', { erster: autoren[0] })

@@ -3238,8 +3238,8 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
     const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
-    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei.
-    ok(eintraege === 41, `Backlog hat ${eintraege} Einträge statt 41`)
+    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei; vier Ideen aus dem Altprojekt.
+    ok(eintraege === 45, `Backlog hat ${eintraege} Einträge statt 45`)
     ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /lacks \d+ keys/.test(backlog), 'Backlog ohne Transformers, Tesseract oder fehlende Übersetzungen')
   }
 
@@ -6532,6 +6532,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     for (let versuch = 1; ; versuch++) {
       await page.getByRole('button', { name: KOMPILIEREN }).first().click()
       await hinweis.or(uebersprungen).waitFor({ state: 'attached', timeout: 120000 })
+      // Der Lauf beim Laden der Seite und der angestoßene können sich überholen; ein übersprungener Lauf ersetzt
+      // das Log dann gleich wieder. Der Hinweis zählt erst, wenn er stehen bleibt.
+      await page.waitForTimeout(3000)
       if (await hinweis.count()) break
       ok(versuch < 5, 'Kompilieren wurde fünfmal übersprungen')
       await page.waitForTimeout(10000)
@@ -6749,6 +6752,86 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const nachher = await roteLage(pid)
     ok(nachher.rot.length === anzahl && nachher.normal.length === 0, `Danach rot ${nachher.rot.length}, normal ${nachher.normal.length}`)
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Geteilt.' })
+  }
+
+  // P12: Quellen beschaffen und Suche nachvollziehen.
+  const fakeAbrufe = async dienste =>
+    (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe
+      .filter(a => dienste.includes(a.dienst))
+      .map(a => a.pfad.split('/spur/dev/crossref')[1])
+  const quellenZeile = titel => page.locator('.spur-panel li.spur-zeile', { has: page.getByRole('button', { name: new RegExp(`^${titel}`) }) }).first()
+
+  features.p12f1 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Quellen')
+    await fakeSteuern({ cachesLeeren: true, protokollLeeren: true })
+    const aufnehmen = doi => werkzeug(token, 'source_add', { project_id: pid, doi })
+    const quellen = async () => (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    const fundort = (art, doi) => `/fundort/${art}/${doi}`
+
+    // Die Verlagsseite liefert „Just a moment…“ statt des PDFs: Das Repositorium kommt zuerst und reicht.
+    const eins = await aufnehmen('10.5555/spur.oa.001')
+    ok(!eins.fehler && eins.inhalt.key === 'lind2021', `oa.001: ${JSON.stringify(eins.inhalt)}`)
+    const erste = (await quellen()).find(q => q.doi === '10.5555/spur.oa.001')
+    ok(erste?.seiten === 2, `oa.001 in sources_list: ${JSON.stringify(erste)}`)
+    let abrufe = await fakeAbrufe(['fundort'])
+    const repo = abrufe.indexOf(fundort('repository', '10.5555/spur.oa.001'))
+    const verlag = abrufe.indexOf(fundort('publisher', '10.5555/spur.oa.001'))
+    ok(repo >= 0 && (verlag < 0 || verlag > repo), `Repositorium nicht vor dem Verlag: ${JSON.stringify(abrufe)}`)
+
+    // Unpaywall kennt nur die Verlagsseite (HTML), Europe PMC hat das PDF.
+    const zwei = await aufnehmen('10.5555/spur.oa.002')
+    ok(!zwei.fehler && zwei.inhalt.key === 'haddad2020', `oa.002: ${JSON.stringify(zwei.inhalt)}`)
+    abrufe = await fakeAbrufe(['fundort', 'europepmc'])
+    ok(abrufe.at(-1) === '/europepmc/articles/PMC9000002?pdf=render', `oa.002 nicht aus Europe PMC: ${JSON.stringify(abrufe)}`)
+
+    // Zweimal 503 mit Retry-After: 1, beim dritten Mal das PDF.
+    await fakeSteuern({ stoerungen: { fundort: { status: 503, retryAfter: 1, mal: 2 } }, protokollLeeren: true })
+    const start = Date.now()
+    const drei = await aufnehmen('10.5555/spur.oa.003')
+    const dauer = Date.now() - start
+    await fakeSteuern({})
+    ok(!drei.fehler && drei.inhalt.key === 'probst2022', `oa.003: ${JSON.stringify(drei.inhalt)}`)
+    ok((await fakeAbrufe(['fundort'])).length === 3 && dauer >= 2000 && dauer <= 15000, `oa.003: ${dauer} ms, Abrufe ${JSON.stringify(await fakeAbrufe(['fundort']))}`)
+
+    // Das Repositorium liefert ein anderes Werk, der Verlag das richtige.
+    await fakeSteuern({ protokollLeeren: true })
+    const vier = await aufnehmen('10.5555/spur.oa.004')
+    ok(!vier.fehler && vier.inhalt.titelabgleich === 'passt', `oa.004: ${JSON.stringify(vier.inhalt)}`)
+    const seite = await werkzeug(token, 'source_read', { project_id: pid, source_id: vier.inhalt.quelle_id, pdf_seite: 1 })
+    ok(seite.inhalt.text.includes('Sleep and memory consolidation in adolescents'), `oa.004 Seite 1: ${seite.inhalt.text}`)
+    ok((await quellen()).find(q => q.doi === '10.5555/spur.oa.004')?.titelabgleich === 'passt', 'oa.004: sources_list ohne titelabgleich „passt“')
+    abrufe = await fakeAbrufe(['fundort'])
+    ok(JSON.stringify(abrufe) === JSON.stringify([fundort('repository', '10.5555/spur.oa.004'), fundort('publisher', '10.5555/spur.oa.004')]), `oa.004 Abrufe: ${JSON.stringify(abrufe)}`)
+
+    // Der einzige Fundort liefert ein anderes Werk.
+    const fuenf = await aufnehmen('10.5555/spur.oa.005')
+    ok(fuenf.fehler && fuenf.inhalt.fehler === 'pdf_fehlt', `oa.005: ${JSON.stringify(fuenf.inhalt)}`)
+    ok(fuenf.inhalt.versucht?.length === 1 && fuenf.inhalt.versucht[0].ergebnis === 'falsches_pdf' && fuenf.inhalt.versucht[0].art === 'repository', `oa.005 versucht: ${JSON.stringify(fuenf.inhalt.versucht)}`)
+    ok(!(await quellen()).some(q => q.doi === '10.5555/spur.oa.005'), 'oa.005 wurde trotz falschem PDF aufgenommen')
+
+    // Per Einmal-Link entscheidet die Person: Das abweichende PDF wird aufgenommen, mit Hinweis.
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const falsch = await perLink(link.link, 'soil.pdf', { doi: '10.5555/spur.oa.005' })
+    ok(falsch.daten?.status === 'angelegt' && falsch.daten.titelabgleich === 'abweichend', `Upload soil.pdf: ${JSON.stringify(falsch)}`)
+    ok(falsch.daten.hinweis?.startsWith('Titel im PDF passt nicht zu den Metadaten'), `Hinweis: ${falsch.daten.hinweis}`)
+    const gelistet = (await quellen()).find(q => q.doi === '10.5555/spur.oa.005')
+    ok(gelistet?.titelabgleich === 'abweichend' && gelistet.hinweis?.startsWith('Titel im PDF passt nicht'), `sources_list: ${JSON.stringify(gelistet)}`)
+    const scan = await perLink(link.link, 'scan.pdf', { doi: '10.5555/spur.oa.007' })
+    ok(scan.daten?.status === 'angelegt' && scan.daten.titelabgleich === 'nicht_pruefbar' && !('hinweis' in scan.daten), `Upload scan.pdf: ${JSON.stringify(scan)}`)
+    const deckblatt = await perLink(link.link, 'deckblatt.pdf', { doi: '10.5555/spur.oa.006' })
+    ok(deckblatt.daten?.status === 'angelegt' && deckblatt.daten.titelabgleich === 'passt' && !('hinweis' in deckblatt.daten), `Upload deckblatt.pdf: ${JSON.stringify(deckblatt)}`)
+
+    await projektOeffnen('E2E P12 Quellen')
+    await panelOeffnen('Quellen')
+    for (const titel of ['Green open access in institutional repositories', 'Full text mirrors for biomedical literature', 'Rate limits on scholarly infrastructure']) {
+      await quellenZeile(titel).waitFor({ timeout: 20000 })
+    }
+    await quellenZeile('Green open access').getByText('Lizenz: CC BY', { exact: true }).waitFor()
+    await quellenZeile('Dream recall across the lifespan').getByText(/Titel im PDF passt nicht zu den Metadaten/).waitFor()
+    ok((await quellenZeile('Scanned field notes').getByText(/Titel im PDF/).count()) === 0, 'Hinweis am Scan, obwohl nicht prüfbar')
+    ok((await quellenZeile('Sleep and memory consolidation').getByText(/Titel im PDF/).count()) === 0, 'Hinweis an oa.004, obwohl der Titel passt')
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

@@ -27,6 +27,8 @@ const WERKE = [
   })),
 ]
 const nachDoi = doi => WERKE.find(w => w.doi === doi?.toLowerCase())
+// nurDoi: bei Crossref per DOI bekannt, aber in keiner Suche.
+const beiCrossref = w => Boolean(w) && (w.dienste.includes('crossref') || w.nurDoi === true)
 
 // stoerungen: je Dienst oder je `crossref:<doi>` eine Antwort statt der echten, z. B. { status: 429, retryAfter: 1,
 // mal: 2 } (zweimal, dann normal), { status: 503 } (dauerhaft) oder { trennen: true } (Verbindung bricht ab).
@@ -54,7 +56,21 @@ function invertiert(text) {
   return index
 }
 
-const pdfUrl = (req, w) => (w.pdf ? `${req.protocol}://${req.get('host')}${req.baseUrl}/pdf/${w.pdf}` : null)
+const wurzel = req => `${req.protocol}://${req.get('host')}${req.baseUrl}`
+const pdfUrl = (req, w) => (w.pdf ? `${wurzel(req)}/pdf/${w.pdf}` : null)
+
+// Freie Fundorte wie bei Unpaywall. Ein Werk mit `fundorte` im Katalog hat je Art (publisher, repository) eine Adresse
+// unter /fundort/<art>/<doi>, die ein PDF, eine HTML-Seite („liefert": "html") oder einen Status liefert.
+function oaFundorte(req, w) {
+  if (!w.frei) return []
+  if (!w.fundorte) return [{ host_type: 'publisher', url_for_pdf: pdfUrl(req, w), url_for_landing_page: `https://doi.org/${w.doi}`, license: w.lizenz }]
+  return w.fundorte.map(ort => ({
+    host_type: ort.art,
+    url_for_pdf: `${wurzel(req)}/fundort/${ort.art}/${w.doi}`,
+    url_for_landing_page: ort.seite ?? `https://doi.org/${w.doi}`,
+    license: ort.lizenz ?? null,
+  }))
+}
 
 function openalexWerk(req, w) {
   return {
@@ -146,7 +162,7 @@ paperFake.get('/_semantik', (req, res) => res.json({ modellVorhanden: existsSync
 paperFake.get('/_protokoll', (req, res) => res.json({ abrufe: zustand.protokoll }))
 
 paperFake.use((req, res, next) => {
-  const dienst = /^\/(arxiv|openalex|s2|unpaywall|pdf|doiorg|datacite|texlive|texlive-b)\//.exec(req.path)?.[1] ?? 'crossref'
+  const dienst = /^\/(arxiv|openalex|s2|unpaywall|europepmc|fundort|pdf|doiorg|datacite|texlive|texlive-b)\//.exec(req.path)?.[1] ?? 'crossref'
   zustand.protokoll.push({ dienst, pfad: req.originalUrl, zeit: Date.now() })
   zustand.protokoll = zustand.protokoll.slice(-500)
   if (zustand.ausfall.has(dienst)) return res.status(503).send('Service unavailable')
@@ -163,9 +179,60 @@ paperFake.use((req, res, next) => {
 // Zwei TeX-Live-Spiegel, damit Tests Störungen je Spiegel setzen können (stoerungen.texlive, stoerungen['texlive-b']).
 paperFake.get(['/texlive/archive/:datei', '/texlive-b/archive/:datei'], texLiveFake)
 
+const pdfSenden = (res, datei) => res.type('application/pdf').sendFile(fileURLToPath(new URL(datei, FIXTURES)))
+
 paperFake.get('/pdf/:datei', (req, res) => {
   if (!WERKE.some(w => w.pdf === req.params.datei)) return res.sendStatus(404)
-  res.type('application/pdf').sendFile(fileURLToPath(new URL(req.params.datei, FIXTURES)))
+  pdfSenden(res, req.params.datei)
+})
+
+// So sieht die Seite aus, mit der Verlage Server abweisen: Status 200, aber kein PDF.
+const BOT_SEITE = '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>Checking your browser before accessing the article.</body></html>'
+
+paperFake.get(/^\/fundort\/(publisher|repository)\/(.+)$/, (req, res) => {
+  const ort = nachDoi(req.params[1])?.fundorte?.find(f => f.art === req.params[0])
+  if (!ort) return res.sendStatus(404)
+  if (ort.liefert === 'html') return res.type('html').send(BOT_SEITE)
+  if (typeof ort.liefert === 'number') return res.sendStatus(ort.liefert)
+  pdfSenden(res, ort.liefert)
+})
+
+// Europe PMC: Suche nach DOI im Format der echten Antwort (resultType=core) und das PDF unter /articles/<pmcid>?pdf=render.
+paperFake.get('/europepmc/webservices/rest/search', (req, res) => {
+  const w = nachDoi(/^DOI:(.+)$/.exec(req.query.query ?? '')?.[1])
+  if (!w?.europepmc) return res.json({ version: '6.9', hitCount: 0, resultList: { result: [] } })
+  const artikel = `${wurzel(req)}/europepmc/articles/${w.europepmc.pmcid}`
+  res.json({
+    version: '6.9',
+    hitCount: 1,
+    resultList: {
+      result: [
+        {
+          id: w.europepmc.pmcid.slice(3),
+          source: 'MED',
+          pmcid: w.europepmc.pmcid,
+          doi: w.doi,
+          title: w.titel,
+          isOpenAccess: 'Y',
+          hasPDF: 'Y',
+          license: w.europepmc.lizenz,
+          fullTextUrlList: {
+            fullTextUrl: [
+              { availability: 'Subscription required', availabilityCode: 'S', documentStyle: 'doi', site: 'DOI', url: `https://doi.org/${w.doi}` },
+              { availability: 'Open access', availabilityCode: 'OA', documentStyle: 'html', site: 'Europe_PMC', url: artikel },
+              { availability: 'Open access', availabilityCode: 'OA', documentStyle: 'pdf', site: 'Europe_PMC', url: `${artikel}?pdf=render` },
+            ],
+          },
+        },
+      ],
+    },
+  })
+})
+
+paperFake.get('/europepmc/articles/:pmcid', (req, res) => {
+  const w = WERKE.find(w => w.europepmc?.pmcid === req.params.pmcid)
+  if (!w || req.query.pdf !== 'render') return res.sendStatus(404)
+  pdfSenden(res, w.europepmc.pdf)
 })
 
 paperFake.get('/arxiv/api/query', (req, res) => {
@@ -221,7 +288,8 @@ paperFake.get(/^\/unpaywall\/v2\/(.+)$/, (req, res) => {
     doi: w.doi,
     is_oa: w.frei,
     oa_status: w.frei ? 'gold' : 'closed',
-    best_oa_location: w.frei ? { url_for_pdf: pdfUrl(req, w), license: w.lizenz } : null,
+    best_oa_location: oaFundorte(req, w)[0] ?? null,
+    oa_locations: oaFundorte(req, w),
   })
 })
 
@@ -239,7 +307,7 @@ paperFake.get('/works/:doi', (req, res) => {
   const doi = req.params.doi.toLowerCase()
   const w = nachDoi(doi)
   // arXiv-DOIs stehen wie in Wirklichkeit nicht bei Crossref, sondern bei DataCite.
-  const message = CROSSREF[doi] ?? (w?.dienste.includes('crossref') ? crossrefWerk(w) : null)
+  const message = CROSSREF[doi] ?? (beiCrossref(w) ? crossrefWerk(w) : null)
   if (!message) return res.status(404).send('Resource not found.')
   res.json({ status: 'ok', 'message-type': 'work', message })
 })
@@ -247,7 +315,7 @@ paperFake.get('/works/:doi', (req, res) => {
 // doi.org nennt die Registrierstelle; ohne Eintrag „DOI does not exist“. 10.3333/ steht für eine dritte Stelle.
 function registrierstelle(doi) {
   if (doi.startsWith('10.3333/')) return 'mEDRA'
-  if (CROSSREF[doi] || nachDoi(doi)?.dienste.includes('crossref')) return 'Crossref'
+  if (CROSSREF[doi] || beiCrossref(nachDoi(doi))) return 'Crossref'
   if (nachDoi(doi)?.arxiv) return 'DataCite'
   return null
 }
