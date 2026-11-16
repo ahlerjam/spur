@@ -27,6 +27,10 @@ Deferred, not discarded. Check here before new plans.
 - Audio and video transcription
 - Literature alerts, systematic review
 - Script execution on the server
+- arXiv LaTeX source as a second text layer for sources with an arXiv ID: PDF extraction often breaks formulas, the e-print endpoint delivers them exactly. Read the archive in memory only and cap member count and size (idea from the old `academic-research` plugin, `scripts/arxiv_latex.py`)
+- PRISMA flow diagram rendered from the numbers of `search_log` (P12), as TikZ in the project, so the figures in the diagram cannot drift from the log
+- Duplicates beyond P12 (normalized DOI, or exact title and year): fuzzy title match (about 0.85 similarity) to pair a preprint with its published version under different DOIs, shown as a suggestion and never merged silently
+- Layout checks on the server as part of `check_report` instead of the plugin skill `spur-endpruefung` (P17): doubly escaped citation commands, `cleveref` before `hyperref`, `biblatex` with `natbib`, float labels without a reference, float order against first mention
 
 ## Tests
 - Overleaf's Cypress tests (`server-ce/test`) in the dev stack and in CI
