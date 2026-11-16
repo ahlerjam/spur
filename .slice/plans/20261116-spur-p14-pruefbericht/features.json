@@ -1,0 +1,61 @@
+{
+  "features": [
+    {
+      "id": "f1",
+      "title": "Zitate mit vorangestelltem `\\textcite` werden geprüft",
+      "steps": [
+        "Für alle, die den Autor in den Satz nehmen. Ausgangslage: Projekt „E2E P14 Textcite“ mit der Quelle `smith2024` (Seite 347 enthält „Sleep supports the consolidation of declarative memory.“). In `main.tex` steht `\\textcite[S.~347]{smith2024} schreiben: \\enquote{Sleep supports the consolidation of declarative memory.}`",
+        "Der Prüfbericht zeigt genau eine Zeile zu dieser Stelle, mit „Wortlaut: exakt“ und „Seite stimmt“; `check_report` zählt sie unter `geprueft`, `beleg_ohne_wortlaut` ist 0",
+        "Dieselbe Stelle mit „…“ in deutschen Anführungszeichen statt `\\enquote` und mit `\\Textcite` am Satzanfang wird genauso geprüft",
+        "`\\textcite{smith2024} schreiben: \\enquote{Sleep supports the consolidation of declarative memory.} \\parencite[S.~347]{smith2024}`: eine Zeile, Seite aus dem nachfolgenden Beleg, „Seite stimmt“",
+        "`\\textcite[S.~347]{smith2024} schreiben: \\enquote{Sleep invented the consolidation.}` zeigt „Wortlaut: abweichend“, rot markiert; `doc_edit` lehnt denselben Text über MCP mit dem Fehlercode ab, der schon für erfundenen Wortlaut nach `\\enquote{…} \\parencite` gilt",
+        "Steht zwischen `\\textcite[S.~347]{smith2024}` und dem Zitat ein Satzende („… zeigt das. \\enquote{…}“), wird nicht verknüpft: Die `\\textcite`-Stelle bleibt „Beleg ohne Wortlaut“",
+        "Folgt dem Zitat ein Beleg mit anderem Key, gilt dieser, nicht der vorangestellte"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f2",
+      "title": "Mehrfachzitate und Zitiervarianten werden vollständig geprüft",
+      "steps": [
+        "Für alle, die mehrere Quellen in einer Klammer nennen. Ausgangslage: Projekt „E2E P14 Varianten“; `.bib` mit `smith2024` (DOI bekannt, Quelle aufgenommen), `jones2023` (DOI bekannt, keine Quelle) und `fake2020` (DOI `10.9999/nirgends.1`, bei doi.org unbekannt). In `main.tex` steht `Mehrere Studien stützen das \\parencite{smith2024,jones2023,fake2020}.`",
+        "Der Prüfbericht zeigt drei Zeilen zu dieser Stelle, je Key eine; die Zeile zu `fake2020` zeigt rot „DOI nicht registriert“, die zu `jones2023` „ohne Quelle“",
+        "`check_report` zählt die drei Stellen einzeln; vor der Änderung wäre `fake2020` nicht aufgefallen (Unit-Test hält das fest)",
+        "`\\Parencite{smith2024}`, `\\citeauthor{smith2024}`, `\\citeyear{smith2024}`, `\\citealp{smith2024}` und `\\parencites[12]{smith2024}[34]{jones2023}` erscheinen als Belege mit Key und, wo angegeben, Seite; keine dieser Stellen hat den Grund `zitierform_unbekannt`",
+        "`\\enquote{Sleep supports the consolidation of declarative memory.} \\parencite[347]{jones2023,smith2024}`: eine Zeile mit „Wortlaut: exakt“ und dem Key `smith2024`, dazu eine Zeile für `jones2023` ohne Wortlaut",
+        "`\\meincite{smith2024}` (unbekannter Befehl) bleibt „nicht prüfbar“ mit dem Grund `zitierform_unbekannt`",
+        "Die Kopfzeile des Berichts im Browser nennt Zahlen, die zur Summe der Zeilen passen"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f3",
+      "title": "Seitenangaben in Preprints sind prüfbar",
+      "steps": [
+        "Für alle, die arXiv-Fassungen zitieren. Ausgangslage: Quelle `gandhi2024` ohne erkannte gedruckte Seitenzahlen (`versatz` leer); der Satz „Replay strengthens memory traces.“ steht auf PDF-Seite 6",
+        "`\\enquote{Replay strengthens memory traces.} \\parencite[S.~6]{gandhi2024}` zeigt im Bericht „Wortlaut: exakt“ und „PDF-Seite stimmt“; `check_report` liefert `seite: \"stimmt\"` und `seitenbasis: \"pdf\"`, die Stelle ist kein Problem",
+        "Mit `[S.~9]` zeigt der Bericht „Wortlaut auf PDF-Seite 6 gefunden“, markiert; `check_report` liefert `seite: \"gefunden\"`, `gefundenAuf: \"6\"`",
+        "Eine Quelle mit gedruckten Seitenzahlen (`smith2024`, PDF-Seite 3 ist gedruckte Seite 347) prüft weiter gegen die gedruckte Seite: `[347]` stimmt, `[3]` nicht; `seitenbasis: \"gedruckt\"`",
+        "Die Werkzeugbeschreibung von `check_report` und `docs/mcp-contract.md` erklären `seitenbasis` in einem Satz"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f4",
+      "title": "Grafiken und Einstellungen lösen keine Zahlenmeldungen aus",
+      "steps": [
+        "Für Claude, das Abbildungen überarbeitet. Ausgangslage: `main.tex` enthält ein `tikzpicture` mit `\\node[draw] (a) at (0,0) {Start};` und `\\draw[->] (a) -- (4.4,0);`, in der Präambel `\\tikzset{box/.style={draw, minimum width=2.5cm, line width=0.4pt}}`",
+        "`doc_edit` ersetzt mitten in der Grafik `(4.4,0)` durch `(5.2,0.4)`: Die Antwort enthält kein `zahlen_ohne_beleg` (vorher: „5.2,0.4“)",
+        "`doc_edit` ersetzt in der Präambel `line width=0.4pt` durch `line width=0.6pt` und fügt `\\geometry{margin=2.5cm}` und `\\captionsetup{font=small, skip=6pt}` ein: keine Meldung",
+        "`doc_edit` schreibt im Fließtext `\\begin{tabularx}{\\textwidth}{p{0.3\\textwidth}X}` und `\\includegraphics[width=0.8\\textwidth]{abb}` und `\\vspace{0.5cm}`: keine Meldung",
+        "`doc_edit` schreibt im Fließtext „Die Genauigkeit stieg um 12,5 Prozent auf 0,89.“: Die Antwort meldet weiter `12,5` und `0,89`",
+        "`doc_edit` schreibt in einer Tabellenzelle `Gruppe A & 75,7 \\\\`: `75,7` wird weiter gemeldet",
+        "Die echten Fälle aus dem Kontext („0.4“, „4.4,0“ in einem Stück ohne `\\begin{tikzpicture}`) sind als Unit-Tests enthalten und melden nichts; alle bisherigen Tests der Zahlenprüfung bleiben grün"
+      ],
+      "passes": false
+    }
+  ]
+}
