@@ -9,7 +9,7 @@ import { rolleFuerClaude } from '../rechte.mjs'
 import { jetzt } from '../schalter.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
-import { autorenAusText, metadatenOhneDoi } from '../recherche/ohneDoi.mjs'
+import { autorenAusText, metadatenOhneDoi, WERKFELDER } from '../recherche/ohneDoi.mjs'
 import { doiPruefen } from '../recherche/Recherche.mjs'
 import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
@@ -54,8 +54,6 @@ async function doiMetadaten(doi) {
   }
 }
 
-const OHNE_DOI_FELDER = ['autoren', 'jahr', 'art', 'institution', 'abschluss', 'url']
-
 // Ohne DOI, aber mit Angaben zum Werk (Autoren, Jahr, Art, Institution): Die Quelle bekommt wie bei source_add mit
 // pdf_url einen Key aus Nachname und Jahr und einen .bib-Eintrag passend zur Art.
 async function ohneDoiAufnehmen(link, req, dateiname) {
@@ -80,7 +78,7 @@ async function ohneDoiAufnehmen(link, req, dateiname) {
 
 async function aufnehmen(link, req, dateiname) {
   const doi = req.body?.doi ? doiPruefen(String(req.body.doi)) : undefined
-  if (!doi && OHNE_DOI_FELDER.some(feld => req.body?.[feld])) return await ohneDoiAufnehmen(link, req, dateiname)
+  if (!doi && WERKFELDER.some(feld => req.body?.[feld])) return await ohneDoiAufnehmen(link, req, dateiname)
   const titel = req.body?.titel ? String(req.body.titel).slice(0, 500) : undefined
   const meta = titel ? { titel } : doi ? await doiMetadaten(doi) : undefined
   try {

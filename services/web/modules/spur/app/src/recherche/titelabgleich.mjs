@@ -2,7 +2,8 @@ import { meldung } from '../meldungen.mjs'
 
 const SEITEN = 3
 
-const normal = text =>
+// Klein, ohne Satzzeichen und Akzente; auch der Schlüssel für Dubletten ohne DOI im Suchprotokoll.
+export const normal = text =>
   String(text ?? '')
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')

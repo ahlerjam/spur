@@ -6,7 +6,7 @@ import dns from 'node:dns'
 import { isIP } from 'node:net'
 import logger from '@overleaf/logger'
 import * as Crossref from '../Crossref.mjs'
-import { adresseGesperrt, geschuetztHolen } from '../netz.mjs'
+import { adresseGesperrt, geschuetztHolen, gesperrtFehler } from '../netz.mjs'
 import { Problem } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
@@ -34,7 +34,7 @@ function imFake(adresse) {
 }
 
 // Echte Volltexte kommen nur von öffentlichen https-Adressen. Die Auflösung des Namens prüft erst die Anfrage
-// selbst, an der Stelle, an der sie verbindet. Ergebnis: die Adresse oder null.
+// selbst, an der Stelle, an der sie verbindet. Ergebnis: { adresse, lokal } oder null; lokal heißt Paper-Fake.
 function erlaubteAdresse(url) {
   let adresse
   try {
@@ -42,22 +42,20 @@ function erlaubteAdresse(url) {
   } catch {
     return null
   }
-  if (imFake(adresse)) return adresse
+  if (imFake(adresse)) return { adresse, lokal: true }
   const host = adresse.hostname.replace(/^\[|\]$/g, '')
   const oeffentlich = adresse.protocol === 'https:' && !isIP(host) && host !== 'localhost' && !host.endsWith('.localhost')
-  return oeffentlich ? adresse : null
+  return oeffentlich ? { adresse, lokal: false } : null
 }
-
-const GESPERRT = Symbol('gesperrt')
 
 // Redirects selbst folgen, damit jede Station dieselbe Prüfung durchläuft.
 async function holenMitPruefung(url, signal) {
   let ziel = url
   for (let i = 0; i < 5; i++) {
-    const adresse = erlaubteAdresse(ziel)
-    if (!adresse) throw GESPERRT
-    const antwort = await netz.holen(adresse, {
-      gesperrt: imFake(adresse) ? () => false : adresseGesperrt,
+    const erlaubt = erlaubteAdresse(ziel)
+    if (!erlaubt) throw gesperrtFehler()
+    const antwort = await netz.holen(erlaubt.adresse, {
+      gesperrt: erlaubt.lokal ? () => false : adresseGesperrt,
       signal,
       lookup: netz.lookup,
       headers: { 'User-Agent': 'spur (Volltext)', Accept: 'application/pdf' },
@@ -82,7 +80,7 @@ async function einmalLaden(url, ziel, signal) {
     antwort = await holenMitPruefung(url, signal)
   } catch (error) {
     // Auch ein gesperrtes Ziel meldet der Nutzer nur als nicht ladbar.
-    if (error === GESPERRT || (error instanceof Problem && error.typ === 'adresse_gesperrt')) return { ergebnis: 'gesperrt' }
+    if (error instanceof Problem && error.typ === 'adresse_gesperrt') return { ergebnis: 'gesperrt' }
     logger.warn({ err: error, url }, 'Volltext nicht erreichbar')
     return { ergebnis: 'netzfehler' }
   }
@@ -95,9 +93,11 @@ async function einmalLaden(url, ziel, signal) {
     return { ergebnis: 'zu_gross' }
   }
   const teile = []
+  const pruefsumme = createHash('sha256')
   let groesse = 0
   try {
     for await (const teil of antwort) {
+      pruefsumme.update(teil)
       groesse += teil.length
       if (groesse > QuellenManager.MAX_BYTES) {
         antwort.destroy()
@@ -114,7 +114,7 @@ async function einmalLaden(url, ziel, signal) {
     return { ergebnis: istHtml(inhalt, antwort.headers['content-type']) ? 'html' : 'kein_pdf' }
   }
   await fs.writeFile(ziel, inhalt)
-  return { ergebnis: 'pdf', groesse }
+  return { ergebnis: 'pdf', groesse, hash: pruefsumme.digest('hex') }
 }
 
 const FRIST_MS = 60000
@@ -269,14 +269,13 @@ export async function perUrl({ projectId, userId, pdfUrl, metadaten }) {
   const ordner = await fs.mkdtemp(Path.join(os.tmpdir(), 'spur-url-'))
   try {
     const tempPfad = Path.join(ordner, 'volltext.pdf')
-    const { ergebnis, groesse } = await fundortLaden(url, tempPfad, Date.now() + FRIST_MS)
+    const { ergebnis, groesse, hash } = await fundortLaden(url, tempPfad, Date.now() + FRIST_MS)
     if (ergebnis === 'zu_gross') throw zuGross()
     if (ergebnis !== 'pdf') {
       throw new Problem(502, 'pdf_fehlt', 'spur_fehler_pdf_url_laden', undefined, {
         versucht: [{ url, host: hostVon(url), art: 'pdf_url', ergebnis }],
       })
     }
-    const hash = createHash('sha256').update(await fs.readFile(tempPfad)).digest('hex')
     if (quellen.some(q => q.hash === hash)) throw vorhanden()
     const quelle = await QuellenManager.aufnehmen({
       projectId,
@@ -288,7 +287,8 @@ export async function perUrl({ projectId, userId, pdfUrl, metadaten }) {
       meta,
       // Ohne Lizenzangabe bleibt der Volltext wie bei der Aufnahme per DOI in diesem Projekt.
       nurProjekt: true,
-      felder: { pdfUrl: url, hash },
+      pdfUrl: url,
+      hash,
     })
     return await mitBibEintrag(projectId, docs, quelle, userId)
   } finally {

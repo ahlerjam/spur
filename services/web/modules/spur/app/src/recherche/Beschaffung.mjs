@@ -58,10 +58,11 @@ export async function aufnehmenOderVormerken({ projectId, userId, doi }) {
   try {
     return await Aufnahme.perDoi({ projectId, userId, doi })
   } catch (error) {
-    if (error.typ === 'pdf_fehlt') await Suchprotokoll.aufnahmeFehlerMerken(projectId, Aufnahme.doiNormal(doi), 'pdf_fehlt')
+    const wert = Aufnahme.doiNormal(doi)
+    if (error.typ === 'pdf_fehlt') await Suchprotokoll.aufnahmeFehlerMerken(projectId, wert, 'pdf_fehlt')
     if (!['nicht_frei', 'bot_schutz'].includes(error.typ)) throw error
     try {
-      await vormerken({ projectId, userId, doi: Aufnahme.doiNormal(doi), grund: error.typ, adresse: error.zusatz?.adresse ?? null })
+      await vormerken({ projectId, userId, doi: wert, grund: error.typ, adresse: error.zusatz?.adresse ?? null })
     } catch (vormerkFehler) {
       logger.warn({ err: vormerkFehler, doi }, 'spur: DOI nicht auf die Beschaffungsliste gesetzt')
       throw error

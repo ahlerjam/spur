@@ -1,7 +1,10 @@
 // Metadaten für Quellen ohne DOI (Abschlussarbeiten, Reports, Working Papers), wie sie source_add und der Upload annehmen.
 import { Problem } from '../probleme.mjs'
 
-export const ARTEN = ['thesis', 'report', 'working_paper', 'book', 'misc']
+const ARTEN = ['thesis', 'report', 'working_paper', 'book', 'misc']
+
+// Formularfelder des Uploads, an denen eine Quelle ohne DOI zu erkennen ist (der Titel allein reicht dafür nicht).
+export const WERKFELDER = ['autoren', 'jahr', 'art', 'institution', 'abschluss', 'url']
 
 export const eingabeUngueltig = feld => new Problem(422, 'eingabe_ungueltig', 'spur_fehler_eingabe_feld', { feld }, { feld })
 

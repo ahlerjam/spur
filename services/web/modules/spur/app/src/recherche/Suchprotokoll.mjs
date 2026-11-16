@@ -6,13 +6,14 @@ import { Problem } from '../probleme.mjs'
 import { beschaffungen, quellen, suchprotokoll, suchtreffer } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { SUCHDIENSTE } from './dienste.mjs'
+import { normal } from './titelabgleich.mjs'
 
 export const SEITE = 50
 const CSV_MAX = 10000
 
-const titelNormal = titel => titel?.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() || null
+const titelNormal = titel => normal(titel) || null
 
-// Dubletten erkennt spur über die normalisierte DOI, ohne DOI über Titel (klein, ohne Satzzeichen) und Jahr.
+// Dubletten erkennt spur über die normalisierte DOI, ohne DOI über Titel (klein, ohne Satzzeichen und Akzente) und Jahr.
 function schluesselVon(treffer) {
   if (treffer.doi) return `doi:${treffer.doi.toLowerCase()}`
   const titel = titelNormal(treffer.titel)

@@ -37,3 +37,14 @@
 
 ## Vorschläge (nicht gebaut)
 - `spur-hochladen --abschluss`: Die Spec nennt die Option nicht; der Server nimmt das Feld `abschluss` beim Upload schon an. Ohne sie fehlt bei hochgeladenen Abschlussarbeiten `type` in der `.bib`.
+
+## /simplify (661a28817e..HEAD)
+- Umgesetzt: Die Adressprüfung wertet `imFake` einmal aus und nutzt den vorhandenen `gesperrtFehler` aus `netz.mjs` statt eines eigenen Symbols. Die Prüfsumme bei `pdf_url` entsteht beim Laden statt durch erneutes Lesen der Datei (spart bis 50 MB Lesen und Puffer). `QuellenManager.aufnehmen` nimmt benannte `pdfUrl` und `hash` statt beliebiger `felder`. `pdfinfo` für das Titelfeld läuft nur noch, wenn der Text der ersten Seiten allein nicht passt. Suchprotokoll und Titelabgleich teilen die Titelnormalisierung (Dubletten ohne DOI sind jetzt auch ohne Akzente gleich). Die Feldliste für Uploads ohne DOI steht in `ohneDoi.mjs`. Für `paper_exclude` per Titel gibt es den Index `projectId_1_titelSchluessel_1_erstmals_-1` in derselben Migration.
+- Nicht umgesetzt, Vorschläge für später:
+  - Eine gemeinsame Wiederholungsschleife für Suchdienste, Volltexte und Crossref (`Crossref.mjs` hat eigene Regeln: 4 Versuche, höchstens 5 s Retry-After). Das Angleichen ändert das Verhalten von Crossref und gehört nicht in diesen Plan.
+  - `prisma` per Mongo-Aggregation statt Zählen in Node: lohnt erst bei Zehntausenden Treffern je Projekt.
+  - `versuche` als Rückgabewert statt über `AsyncLocalStorage`: berührt jede Dienstmethode.
+  - Titelabgleich als eigene Prüfung vor `aufnehmen` statt `titelStreng` plus Auswertung von `error.typ`.
+  - Ein Merkmal `meta.herkunft` statt der zwei Metadatenformen (`gefunden` bei DOI, `art` ohne DOI).
+  - Alte Protokolleinträge per Migration ins neue Format bringen; heute liest `istAlt` beide Formen.
+

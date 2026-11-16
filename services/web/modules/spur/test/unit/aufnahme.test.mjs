@@ -436,7 +436,8 @@ describe('perUrl', () => {
       groesse: PDF.length,
       nurProjekt: true,
       meta: { ...TAMPERE, url: URL_PDF, abgerufenAm: expect.any(Date) },
-      felder: { pdfUrl: URL_PDF, hash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+      pdfUrl: URL_PDF,
+      hash: expect.stringMatching(/^[0-9a-f]{64}$/),
     })
     expect(geladen[0]).not.toHaveProperty('doi')
     // Die Person hat die Adresse selbst gewählt: Ein abweichender Titel weist das PDF nicht ab.
@@ -448,7 +449,7 @@ describe('perUrl', () => {
   it('nimmt die url aus den Metadaten für die .bib, wenn sie angegeben ist', async () => {
     await perUrl(URL_PDF, { ...TAMPERE, url: 'https://trepo.example/handle/1' })
     expect(geladen[0].meta.url).toBe('https://trepo.example/handle/1')
-    expect(geladen[0].felder.pdfUrl).toBe(URL_PDF)
+    expect(geladen[0].pdfUrl).toBe(URL_PDF)
   })
 
   it('verlangt einen Titel, bevor etwas geladen wird', async () => {
@@ -488,7 +489,7 @@ describe('perUrl', () => {
 
   it('meldet quelle_vorhanden für dieselbe Datei unter einer anderen Adresse', async () => {
     await perUrl()
-    vorhandene = [{ key: 'virtanen2024', pdfUrl: URL_PDF, hash: geladen[0].felder.hash }]
+    vorhandene = [{ key: 'virtanen2024', pdfUrl: URL_PDF, hash: geladen[0].hash }]
     expect(await fehlerVon(perUrl('https://spiegel.example/thesis.pdf'))).toMatchObject({ status: 409, typ: 'quelle_vorhanden' })
     expect(geladen).toHaveLength(1)
   })
