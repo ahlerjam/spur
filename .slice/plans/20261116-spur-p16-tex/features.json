@@ -8,7 +8,7 @@
         "`node --test tools/tests/tex-pakete.test.mjs` ist grün: Jedes Paket, das dieses Dokument direkt oder über `apa7.cls` und `biblatex-apa` lädt, steht in der Paketliste von `server-ce/Dockerfile-base`; entfernt man `booktabs` aus der Liste, wird der Test rot und nennt `booktabs`",
         "Die Paketliste ist alphabetisch, ohne Dubletten; ein Test prüft beides",
         "Der Workflow `Dev image` kompiliert das Dokument im gebauten Image und schlägt fehl, wenn das Log „not found“ enthält; die Workflow-Datei zeigt diesen Schritt, und `tools/tests/ci-pfade.test.mjs` bleibt grün",
-        "Im laufenden Dev-Stack mit dem bisherigen Image meldet `compile` für dieses Dokument die fehlenden Pakete über `fehlende_pakete` (siehe f3); nach `tex_package_add` für jedes davon kompiliert es, und `page_image` der ersten Seite zeigt das Deckblatt im APA-Layout",
+        "Im Dev-Stack kompiliert ein zweites, kleines Dokument, das nur Pakete des bisherigen Images lädt (`article`, `babel` mit ngerman, `csquotes`, `siunitx`), weiterhin ohne Fehler; `page_image` der ersten Seite zeigt den Text. Das APA-Dokument selbst kompiliert erst im neuen Image, also im Workflow",
         "Die README nennt in einem Absatz, welche Pakete das Image mitbringt und dass alles andere mit `tex_package_add` ins Projekt kommt"
       ],
       "passes": false
@@ -18,8 +18,8 @@
       "title": "Code-Listings mit `minted`",
       "steps": [
         "Für alle, die Programmcode in der Arbeit zeigen. Im Repo liegt ein Smoke-Dokument `minted-beispiel.tex` mit einer `minted`-Umgebung für Python (`def mittel(xs): return sum(xs)/len(xs)`) und einer für R",
-        "Die Paketliste enthält `minted` und seine TeX-Abhängigkeiten; die Dockerfile installiert, was die minted-Doku für TeX Live zusätzlich verlangt (Pygments bzw. das Hilfsprogramm), und der Paketlisten-Test deckt das Dokument ab",
-        "Der Kompilierdienst erlaubt nur eingeschränktes Shell-Escape mit dem von minted benötigten Programm; ein Test zeigt, dass ein Dokument mit `\\immediate\\write18{touch /tmp/spur-shell-test}` keine Datei anlegt",
+        "Die Paketliste enthält `minted` und seine TeX-Abhängigkeiten; die Dockerfile prüft nach der Installation mit `latexminted --version` und einer Python-Versionsabfrage, dass das Hilfsprogramm läuft; der Paketlisten-Test deckt das Dokument ab",
+        "`LatexRunner.js` übergibt weiterhin kein `-shell-escape`; ein Unit-Test hält fest, dass der Befehl das Flag nicht enthält. Der Workflow kompiliert zusätzlich ein Dokument mit `\\immediate\\write18{touch /tmp/spur-shell-test}` und prüft, dass die Datei nicht entsteht",
         "Der Workflow `Dev image` kompiliert `minted-beispiel.tex` und prüft, dass das PDF entsteht und das Log keinen Fehler „You must invoke LaTeX with the -shell-escape flag“ enthält",
         "`docs/adr` bekommt einen Eintrag, der den gewählten Weg und die Grenze (kein volles Shell-Escape) festhält, mit der Fundstelle in der minted-Doku",
         "Die README nennt `minted` mit einem Drei-Zeilen-Beispiel"
