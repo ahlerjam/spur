@@ -9,6 +9,7 @@
         "`doc_read` der `.bib` zeigt `@article{oldemeyer2025,` mit `volume = {35}`, `number = {2}`, `pages = {101--118}` und `year = {2025}`",
         "Für `10.5555/spur.heft.002` liefert der Fake nur `issued` 2021 und weder Band noch Heft: Der Eintrag hat `year = {2021}` und keine leeren Felder `volume` oder `number`",
         "Für `10.5555/spur.kap.001` (`type: book-chapter`, `container-title` „Handbook of Sleep“, `publisher` „Springer“) entsteht `@incollection` mit `booktitle = {Handbook of Sleep}` und `publisher = {Springer}`",
+        "Für `10.5555/spur.enr.001` liefert der Fake `article-number: \"e0209899\"`, `volume: \"14\"`, `issue: \"1\"` und keine `page`: Der Eintrag hat `eid = {e0209899}` und kein Feld `pages`",
         "Das Projekt kompiliert mit `biblatex` im Stil `apa`; im PDF (über `page_image` der Seite mit dem Literaturverzeichnis) steht beim ersten Eintrag „35(2), 101–118“ und das Jahr 2025"
       ],
       "passes": false
