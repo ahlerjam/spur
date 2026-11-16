@@ -6834,6 +6834,81 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok((await quellenZeile('Sleep and memory consolidation').getByText(/Titel im PDF/).count()) === 0, 'Hinweis an oa.004, obwohl der Titel passt')
   }
 
+  features.p12f2 = async () => {
+    const BOT = '10.5555/spur.bot.001'
+    const ZU = '10.5555/spur.zu.001'
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Status')
+    // repoBytes ersetzt den Seiteninhalt: die Datei lesen, bevor das Projekt offen ist.
+    const pdf = { name: 'bot001.pdf', mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/bot001.pdf`) }
+    await fakeSteuern({ cachesLeeren: true })
+    const aufnehmen = doi => werkzeug(token, 'source_add', { project_id: pid, doi })
+    const liste = async () => (await jsonVon(`/spur/project/${pid}/beschaffung`)).eintraege
+
+    // Frei, aber beide Fundorte weisen den Server ab (HTML-Seite und 403); Europe PMC kennt die DOI nicht.
+    const bot = await aufnehmen(BOT)
+    ok(bot.fehler && bot.inhalt.fehler === 'bot_schutz', `bot.001: ${JSON.stringify(bot.inhalt)}`)
+    const versucht = bot.inhalt.versucht ?? []
+    ok(
+      versucht.length === 2 &&
+        versucht.every(v => v.host && v.url.includes(BOT)) &&
+        JSON.stringify(versucht.map(v => [v.art, v.ergebnis])) === JSON.stringify([['repository', 'html'], ['publisher', '403']]),
+      `bot.001 versucht: ${JSON.stringify(versucht)}`
+    )
+    ok(/frei verfügbar/.test(bot.inhalt.detail) && /Im Browser lässt es sich laden/.test(bot.inhalt.detail), `bot.001 Text: ${bot.inhalt.detail}`)
+    ok(/^https:\/\//.test(bot.inhalt.adresse), `bot.001 ohne Adresse für den Browser: ${JSON.stringify(bot.inhalt)}`)
+
+    const zu = await aufnehmen(ZU)
+    ok(zu.fehler && zu.inhalt.fehler === 'nicht_frei' && !('versucht' in zu.inhalt), `zu.001: ${JSON.stringify(zu.inhalt)}`)
+    const weg = await aufnehmen('10.5555/spur.weg.001')
+    ok(weg.fehler && weg.inhalt.fehler === 'pdf_fehlt' && weg.inhalt.versucht?.[0]?.ergebnis === '404', `weg.001: ${JSON.stringify(weg.inhalt)}`)
+
+    // Ein zweiter Versuch legt keinen zweiten Eintrag an; pdf_fehlt kommt nicht auf die Liste.
+    ok((await aufnehmen(BOT)).inhalt.fehler === 'bot_schutz', 'bot.001 beim zweiten Mal anders')
+    const eintraege = await liste()
+    ok(
+      JSON.stringify(eintraege.map(e => [e.doi, e.grund, e.status]).sort()) === JSON.stringify([[BOT, 'bot_schutz', 'offen'], [ZU, 'nicht_frei', 'offen']]),
+      `Beschaffungsliste: ${JSON.stringify(eintraege)}`
+    )
+
+    await projektOeffnen('E2E P12 Status')
+    // Dieselben Fehler über die Web-Route, mit den HTTP-Status des Vertrags.
+    const web = async doi => await seitenPost(`/spur/project/${pid}/recherche/aufnehmen`, { doi })
+    const webBot = await web(BOT)
+    ok(webBot.status === 502 && webBot.daten.type === 'urn:spur:problem:bot_schutz' && webBot.daten.versucht.length === 2, `Web bot.001: ${JSON.stringify(webBot)}`)
+    const webZu = await web(ZU)
+    ok(webZu.status === 409 && webZu.daten.type === 'urn:spur:problem:nicht_frei', `Web zu.001: ${JSON.stringify(webZu)}`)
+    const webWeg = await web('10.5555/spur.weg.001')
+    ok(webWeg.status === 502 && webWeg.daten.type === 'urn:spur:problem:pdf_fehlt', `Web weg.001: ${JSON.stringify(webWeg)}`)
+    ok((await liste()).length === 2, 'Die Web-Route hat weitere Einträge angelegt')
+
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Beschaffung' }).click()
+    const zeile = titel => page.locator('.spur-panel li.spur-paper', { hasText: titel })
+    const blockiert = zeile('Publisher walls around open articles')
+    await blockiert.getByText('Frei, Download blockiert', { exact: true }).waitFor({ timeout: 20000 })
+    const link = blockiert.getByRole('link', { name: 'Im Browser herunterladen' })
+    ok((await link.getAttribute('href')) === bot.inhalt.adresse, `Link zur besten Adresse: ${await link.getAttribute('href')}`)
+    const schranke = zeile('Subscription journals and their readers')
+    await schranke.getByText('Nicht frei verfügbar', { exact: true }).waitFor()
+    ok((await schranke.getByRole('link', { name: 'Im Browser herunterladen' }).count()) === 0, 'Browser-Link an einem Paper hinter der Bezahlschranke')
+    ok((await blockiert.getByText('Nicht frei verfügbar').count()) === 0 && (await schranke.getByText('Frei, Download blockiert').count()) === 0, 'Abzeichen vertauscht')
+
+    // Das im Browser geholte PDF kommt per Einmal-Link mit der DOI: Der Eintrag ist erledigt, die Quelle da.
+    const { inhalt: einmal } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const hoch = await perLink(einmal.link, pdf, { doi: BOT })
+    const eintrag = (await liste()).find(e => e.doi === BOT)
+    ok(hoch.daten?.status === 'angelegt' && hoch.daten.beschaffung_id === eintrag.id && hoch.daten.titelabgleich === 'passt', `Upload bot001.pdf: ${JSON.stringify(hoch)}`)
+    ok(eintrag.status === 'beschafft' && eintrag.quelleId === hoch.daten.quelle_id, `Eintrag nach dem Upload: ${JSON.stringify(eintrag)}`)
+    const quellen = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    ok(quellen.some(q => q.doi === BOT && q.id === hoch.daten.quelle_id), `Quelle fehlt: ${JSON.stringify(quellen)}`)
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    await page.getByRole('tab', { name: 'Beschaffung' }).click()
+    await zeile('Publisher walls around open articles').getByText('Beschafft', { exact: true }).waitFor({ timeout: 20000 })
+    ok((await zeile('Publisher walls around open articles').getByText('Frei, Download blockiert').count()) === 0, 'Abzeichen am erledigten Eintrag')
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

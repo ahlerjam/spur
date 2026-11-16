@@ -29,7 +29,7 @@
         "Ein zweites `source_add` mit `10.5555/spur.bot.001` legt keinen zweiten Eintrag auf der Liste an",
         "Nach einem Upload über `spur-hochladen <link> datei.pdf --doi 10.5555/spur.bot.001` ist der Eintrag auf der Liste erledigt und die Quelle vorhanden"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {

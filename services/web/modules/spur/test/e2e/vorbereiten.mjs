@@ -548,7 +548,7 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await grenzenVorbereiten()
   await p8Vorbereiten(a)
   // P12: Ausweichwege, Bot-Schutz, Quellen ohne DOI und das Suchprotokoll.
-  for (const name of ['E2E P12 Quellen']) await neuAnlegen(a, name, { 'main.tex': LEER })
+  for (const name of ['E2E P12 Quellen', 'E2E P12 Status']) await neuAnlegen(a, name, { 'main.tex': LEER })
 }
 
 const CARLITO = String.raw`\documentclass{article}

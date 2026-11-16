@@ -14,6 +14,7 @@ import { bibLesen, doiNormal as bibDoi } from '../pruefung/bib.mjs'
 import { paperApiBasis } from '../schalter.mjs'
 import { arxivMetadaten, europepmc, unpaywall } from './dienste.mjs'
 import { freierKey, keyVorschlag } from './keys.mjs'
+import { pauseMs, VERSUCHE } from './wiederholen.mjs'
 
 const ARXIV_DOI = /^10\.48550\/arxiv\.(.+)$/
 
@@ -105,19 +106,10 @@ async function einmalLaden(url, ziel, signal) {
   return { ergebnis: 'pdf', groesse }
 }
 
-const VERSUCHE = 3
-const PAUSEN_MS = [1000, 2000]
-const RETRY_AFTER_MAX_MS = 10000
 const FRIST_MS = 60000
 // Antworten, mit denen Verlagsseiten Server abweisen, obwohl das Paper frei ist.
 const ABGEWIESEN = ['html', '401', '403', '429', '503']
 const WIEDERHOLBAR = ['netzfehler', '429', '503']
-
-function pauseMs(retryAfter, versuch) {
-  const sekunden = Number(retryAfter)
-  if (retryAfter != null && Number.isFinite(sekunden) && sekunden >= 0) return Math.min(sekunden * 1000, RETRY_AFTER_MAX_MS)
-  return PAUSEN_MS[versuch - 1]
-}
 
 // Wiederholt einen Fundort bei Netzfehlern, 429 und 503, solange die Frist des ganzen Aufrufs reicht.
 async function fundortLaden(url, ziel, frist) {

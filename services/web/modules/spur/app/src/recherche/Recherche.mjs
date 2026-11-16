@@ -5,7 +5,7 @@ import { Problem } from '../probleme.mjs'
 import { meldung } from '../meldungen.mjs'
 import { suchprotokoll } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
-import { DienstFehler } from './abruf.mjs'
+import { DienstFehler, gezaehlt } from './abruf.mjs'
 import { PRO_SEITE, SUCHDIENSTE, ZITATIONSDIENSTE } from './dienste.mjs'
 
 const PROTOKOLL_SEITE = 50
@@ -35,8 +35,15 @@ const kuerzen = text => {
   return zeichen.length > ABSTRACT_MAX ? `${zeichen.slice(0, ABSTRACT_MAX).join('')}…` : text
 }
 
+// Fragt die Dienste parallel und zählt je Dienst die Versuche.
+async function fragen(dienste, aufruf) {
+  const staende = dienste.map(() => ({ versuche: 0 }))
+  const ergebnisse = await Promise.allSettled(dienste.map((d, i) => gezaehlt(staende[i], () => aufruf(d))))
+  return auswerten(dienste, ergebnisse, staende.map(s => s.versuche))
+}
+
 // Fasst die Antworten paralleler Dienstaufrufe zusammen. Ein Ausfall nimmt nur diesen Dienst heraus.
-export function auswerten(dienste, ergebnisse) {
+export function auswerten(dienste, ergebnisse, versuche = []) {
   const sammlung = new Map()
   const fehler = []
   const gesamt = []
@@ -59,9 +66,13 @@ export function auswerten(dienste, ergebnisse) {
   })
   // Ohne Abstract bleibt das Feld leer statt null. Gekürzt, damit eine Seite paper_search unter 10.000 Tokens bleibt.
   const treffer = [...sammlung.values()].map(t => ({ ...t, abstract: kuerzen(t.abstract ?? '') }))
-  const antworten = dienste.map(d => {
+  const antworten = dienste.map((d, i) => {
     const fehlschlag = fehler.find(f => f.dienst === d.name)
-    return { dienst: d.anzeige, antwort: !fehlschlag ? 'geantwortet' : fehlschlag.art === 'limit' ? 'gedrosselt' : 'nicht_erreichbar' }
+    return {
+      dienst: d.anzeige,
+      antwort: !fehlschlag ? 'geantwortet' : fehlschlag.art === 'limit' ? 'gedrosselt' : 'nicht_erreichbar',
+      versuche: versuche[i] ?? 0,
+    }
   })
   // Eine leere Liste heißt sonst „nichts gefunden“, obwohl niemand gefragt werden konnte.
   const hinweis = gesamt.length ? null : meldung('spur_hinweis_kein_dienst')
@@ -71,8 +82,7 @@ export function auswerten(dienste, ergebnisse) {
 export async function suchen({ projectId, userId, anfrage, seite = 0 }) {
   const begriff = anfrage?.trim()
   if (!begriff) throw new Problem(400, 'anfrage_fehlt', 'spur_fehler_suchbegriff_fehlt')
-  const ergebnisse = await Promise.allSettled(SUCHDIENSTE.map(d => d.suchen(begriff, seite)))
-  const { treffer, fehler, gesamt, dienste, hinweis } = auswerten(SUCHDIENSTE, ergebnisse)
+  const { treffer, fehler, gesamt, dienste, hinweis } = await fragen(SUCHDIENSTE, d => d.suchen(begriff, seite))
   if (seite === 0 && gesamt.length) {
     const datum = jetzt()
     await (await suchprotokoll()).insertMany(
@@ -125,8 +135,7 @@ export async function zitationen(doi, richtung) {
     throw new Problem(400, 'richtung_ungueltig', 'spur_fehler_richtung_ungueltig')
   }
   const wert = doiPruefen(doi)
-  const ergebnisse = await Promise.allSettled(ZITATIONSDIENSTE.map(d => d.zitationen(wert, richtung)))
-  const { treffer, fehler, dienste, hinweis } = auswerten(ZITATIONSDIENSTE, ergebnisse)
+  const { treffer, fehler, dienste, hinweis } = await fragen(ZITATIONSDIENSTE, d => d.zitationen(wert, richtung))
   return { doi: wert, richtung, treffer, fehler, dienste, hinweis }
 }
 

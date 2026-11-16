@@ -11,6 +11,7 @@ let abrufe
 let ausfall
 let gedrosselt
 let sonder
+let stoerungen
 
 const ATOM = `<?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -96,6 +97,7 @@ beforeEach(async () => {
   abrufe = []
   ausfall = new Set()
   gedrosselt = new Set()
+  stoerungen = {}
   sonder = () => null
   schalter = schalterAttrappe()
   schalter.paperApiBasis = 'http://paper.test/fake'
@@ -107,8 +109,14 @@ beforeEach(async () => {
     vi.fn(async url => {
       const dienst = dienstAus(url)
       abrufe.push({ dienst, url: String(url), zeit: Date.now() })
-      if (ausfall.has(dienst)) return { ok: false, status: 503 }
-      if (gedrosselt.has(dienst)) return { ok: false, status: 429 }
+      const stoerung = stoerungen[dienst]
+      if (stoerung && stoerung.mal !== 0) {
+        if (stoerung.mal) stoerung.mal--
+        if (stoerung.trennen) throw new Error('ECONNRESET')
+        return { ok: false, status: stoerung.status, headers: new Headers(stoerung.retryAfter == null ? {} : { 'Retry-After': String(stoerung.retryAfter) }) }
+      }
+      if (ausfall.has(dienst)) return { ok: false, status: 500, headers: new Headers() }
+      if (gedrosselt.has(dienst)) return { ok: false, status: 429, headers: new Headers() }
       const extra = sonder(String(url))
       if (extra) return { ok: true, status: 200, json: async () => extra }
       const { text, json } = ANTWORTEN[dienst]()
@@ -117,6 +125,7 @@ beforeEach(async () => {
   )
   Recherche = await import('../../app/src/recherche/Recherche.mjs')
   Abruf = await import('../../app/src/recherche/abruf.mjs')
+  Abruf.zeit.warten = vi.fn(async () => {})
 })
 
 afterEach(() => {
@@ -236,10 +245,10 @@ describe('suchen', () => {
     ausfall.add('s2')
     const ergebnis = await suchen('sleep')
     expect(ergebnis.dienste).toEqual([
-      { dienst: 'arXiv', antwort: 'geantwortet' },
-      { dienst: 'OpenAlex', antwort: 'geantwortet' },
-      { dienst: 'Crossref', antwort: 'geantwortet' },
-      { dienst: 'Semantic Scholar', antwort: 'nicht_erreichbar' },
+      { dienst: 'arXiv', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'Crossref', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'Semantic Scholar', antwort: 'nicht_erreichbar', versuche: 1 },
     ])
     expect(ergebnis.hinweis).toBeNull()
   })
@@ -355,8 +364,8 @@ describe('zitationen', () => {
     const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
     expect(ergebnis.treffer.map(t => t.doi)).toEqual(['10.1/a'])
     expect(ergebnis.dienste).toEqual([
-      { dienst: 'OpenAlex', antwort: 'geantwortet' },
-      { dienst: 'Semantic Scholar', antwort: 'gedrosselt' },
+      { dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'Semantic Scholar', antwort: 'gedrosselt', versuche: 3 },
     ])
   })
 
@@ -506,3 +515,86 @@ describe('Europe PMC', () => {
     expect(await dienste.europepmc.fundort('10.1/c')).toBeNull()
   })
 })
+
+// Echter Fall: Semantic Scholar war bei 16 von 17 Anfragen gedrosselt, OpenAlex bei 7.
+describe('Wiederholung bei gedrosselten Diensten', () => {
+  const von = (ergebnis, dienst) => ergebnis.dienste.find(d => d.dienst === dienst)
+  const anzahl = dienst => abrufe.filter(a => a.dienst === dienst).length
+
+  it('fragt nach zweimal 429 mit Retry-After ein drittes Mal und nennt die Versuche', async () => {
+    stoerungen.s2 = { status: 429, retryAfter: 1, mal: 2 }
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'geantwortet', versuche: 3 })
+    expect(von(ergebnis, 'OpenAlex')).toEqual({ dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1 })
+    expect(ergebnis.treffer.some(t => t.dienste.includes('Semantic Scholar'))).toBe(true)
+    expect(anzahl('s2')).toBe(3)
+    expect(Abruf.zeit.warten.mock.calls).toEqual([[1000], [1000]])
+  })
+
+  it('meldet nach drei Versuchen gedrosselt und liefert die Treffer der anderen', async () => {
+    stoerungen.s2 = { status: 429, retryAfter: 1 }
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'gedrosselt', versuche: 3 })
+    expect(ergebnis.fehler).toMatchObject([{ dienst: 's2', art: 'limit' }])
+    expect(ergebnis.treffer.length).toBeGreaterThan(0)
+    expect(anzahl('s2')).toBe(3)
+  })
+
+  it('fragt nach einem 503 ohne Retry-After nach 1 s erneut', async () => {
+    stoerungen.openalex = { status: 503, mal: 1 }
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'OpenAlex')).toEqual({ dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 2 })
+    expect(Abruf.zeit.warten.mock.calls).toEqual([[1000]])
+  })
+
+  it('wartet ohne Retry-After 1 und 2 Sekunden', async () => {
+    stoerungen.s2 = { status: 429 }
+    await suchen('sleep memory')
+    expect(Abruf.zeit.warten.mock.calls).toEqual([[1000], [2000]])
+  })
+
+  it('wiederholt einen Netzfehler, aber keinen anderen Fehlerstatus', async () => {
+    stoerungen.s2 = { trennen: true, mal: 1 }
+    ausfall.add('openalex')
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'Semantic Scholar')).toMatchObject({ antwort: 'geantwortet', versuche: 2 })
+    expect(von(ergebnis, 'OpenAlex')).toEqual({ dienst: 'OpenAlex', antwort: 'nicht_erreichbar', versuche: 1 })
+  })
+
+  it('hört nach 20 Sekunden auf, auch wenn noch Versuche übrig wären', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      Abruf.zeit.warten.mockImplementation(async ms => vi.advanceTimersByTime(ms))
+      stoerungen.s2 = { status: 429, retryAfter: 30 }
+      const ergebnis = await suchen('sleep memory')
+      // Retry-After zählt höchstens 10 s: nach zwei Pausen sind die 20 s um.
+      expect(von(ergebnis, 'Semantic Scholar')).toMatchObject({ antwort: 'gedrosselt' })
+      const gewartet = Abruf.zeit.warten.mock.calls.reduce((summe, [ms]) => summe + ms, 0)
+      expect(gewartet).toBeLessThanOrEqual(20000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('zählt keine Versuche, wenn die Antwort aus dem Cache kommt', async () => {
+    await suchen('sleep memory')
+    const ergebnis = await suchen('sleep memory')
+    expect(ergebnis.dienste.map(d => d.versuche)).toEqual([0, 0, 0, 0])
+  })
+
+  it('verhält sich bei Zitationen genauso', async () => {
+    sonder = url => (url.includes('/works/doi:') ? { id: 'https://openalex.org/W1' } : null)
+    stoerungen.s2 = { status: 429, retryAfter: 1, mal: 2 }
+    const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
+    expect(von(ergebnis, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'geantwortet', versuche: 3 })
+  })
+
+  it('meldet bei Zitationen nach drei Versuchen gedrosselt', async () => {
+    sonder = url => (url.includes('/works/doi:') ? { id: 'https://openalex.org/W1' } : null)
+    stoerungen.s2 = { status: 429 }
+    const dauerhaft = await Recherche.zitationen('10.1371/journal.pone.0099999', 'zitiert')
+    expect(von(dauerhaft, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'gedrosselt', versuche: 3 })
+    expect(von(dauerhaft, 'OpenAlex').antwort).toBe('geantwortet')
+  })
+})
+
