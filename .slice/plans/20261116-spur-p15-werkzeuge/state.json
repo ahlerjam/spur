@@ -1,7 +1,6 @@
 {
   "state": "parked",
-  "builderModel": "opus",
-  "builderAdvisor": "fable",
+  "builderModel": "fable",
   "dependsOn": [
     "20261116-spur-p14-pruefbericht"
   ]
