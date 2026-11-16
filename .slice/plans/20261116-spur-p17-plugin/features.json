@@ -46,7 +46,9 @@
         "Der Hauptskill `spur` beschreibt den Humanizer-Schritt: nach der Endprüfung, in der Hauptsession, `humanizer-de:humanizer-de` für deutschen und `humanizer:humanizer` für englischen Text, nur für die im Lauf geschriebenen Abschnitte; die Liste dessen, was unverändert bleibt (Zitate, Zitierbefehle mit Seite, Zahlen, Eigennamen, Fachbegriffe, Formeln, Tabellen, Grafiken, Labels), steht wörtlich darin",
         "Der Hauptskill schreibt vor: nach dem Humanizer `check_report`; ist eine Stelle danach schlechter als vorher, wird die Änderung zurückgenommen",
         "Der Hauptskill enthält die Kette als nummerierte Liste in dieser Reihenfolge: schreiben, Gegenprüfung, Korrekturen, Endprüfung, Korrekturen, Humanizer, `check_report`, `run_finish`; und die Vorgabe, dass die Zusammenfassung je Stufe nennt, was gefunden und geändert wurde und was offen blieb",
-        "Die Workflow-Prompts `literaturueberblick`, `methodenteil`, `folien` und `quellen_sammeln` auf dem Server enden mit dem Absatz zur Kette; ein Unit-Test prüft, dass alle vier ihn enthalten, und `prompts/get` über MCP liefert ihn"
+        "Die Workflow-Prompts `literaturueberblick`, `methodenteil`, `folien` und `quellen_sammeln` auf dem Server enden mit dem Absatz zur Kette; ein Unit-Test prüft, dass alle vier ihn enthalten, und `prompts/get` über MCP liefert ihn",
+        "Der Skill `spur-endpruefung` listet die Prüfungen am Quelltext einzeln: doppelt maskierte Zitierbefehle (`\\textbackslash{}cite` und Varianten), `cleveref` vor `hyperref`, `biblatex` zusammen mit `natbib`, `\\label` in `figure` oder `table` ohne Verweis, Reihenfolge der Abbildungen und Tabellen gegen die erste Nennung; je Befund Datei und Zeile, Labels von Abschnitten und Gleichungen ausdrücklich ausgenommen",
+        "Der Hauptskill `spur` nennt die Obergrenze: je Stufe höchstens eine Nachprüfung durch einen frischen Agenten, nur für die korrigierten Stellen; keine dritte Runde; Verbleibendes steht mit Ort und Grund unter „offen“ in der Zusammenfassung. Die nummerierte Kette enthält die beiden Nachprüfungen als eingeklammerte Schritte"
       ],
       "passes": false
     },
@@ -59,7 +61,9 @@
         "Der Skill enthält je ein kurzes TikZ-Beispiel „so nicht“ und „so“ für den Fall gestrichelter Pfeil auf Höhe eines beschrifteten Pfeils, und ein Tabellenbeispiel Merkmal × Quelle mit „x“",
         "Der Skill schreibt das Vorgehen vor: nach jeder Änderung `compile`, die Seite mit `page_image` ansehen, die Regeln als Liste abhaken, erst dann weiter; für Farbumstellungen `doc_edit` mit `alle_vorkommen`",
         "Der Skill regelt Abbildungen aus Quellen: nur über `source_figure_add`, bei `lizenz_fehlt` nachzeichnen mit „in Anlehnung an“ und Quellenangabe",
-        "Der Builder kompiliert im Dev-Stack beide TikZ-Beispiele und das Tabellenbeispiel und sieht sie mit `page_image` an: Das „so“-Beispiel hat keine Überlappung und keine Farbe außer Grau und Schwarz, die Tabelle zeigt „x“ in den Zellen"
+        "Der Builder kompiliert im Dev-Stack beide TikZ-Beispiele und das Tabellenbeispiel und sieht sie mit `page_image` an: Das „so“-Beispiel hat keine Überlappung und keine Farbe außer Grau und Schwarz, die Tabelle zeigt „x“ in den Zellen",
+        "Der Skill enthält die fünf weiteren Regeln einzeln und prüfbar: eine Abbildung, eine Aussage; Bildunterschrift ohne Fließtext verständlich, mit erklärten Abkürzungen und Einheiten; Abbildung, Bildunterschrift und Text stimmen überein; Reihenfolge im Quelltext wie die erste Nennung; Teilabbildungen oben ausgerichtet und gleich hoch (`subcaption`, `[t]`). Er nennt `andrehuang/academic-writing-agents` (MIT) als Quelle dieser Regeln",
+        "Der Builder kompiliert im Dev-Stack ein Beispiel mit zwei Teilabbildungen verschiedener Höhe, einmal mit `[b]` und einmal mit `[t]` und fester Höhe, und sieht beide mit `page_image` an: Im zweiten liegen die Oberkanten auf einer Linie"
       ],
       "passes": false
     },
@@ -88,7 +92,8 @@
         "Zwei Sessions mit verschiedenen `session_id` beeinflussen sich nicht; nach einer `PostToolUse`-Eingabe für ein erfolgreiches `run_finish` ist der Zustand der Session leer",
         "`spur-pruefkette aus \"Owner will nur einen Tippfehler\"` mit gesetzter Session lässt `run_finish` danach durch, `spur-pruefkette stand` zeigt den Grund; ohne Grund endet der Befehl mit Exit-Code 2 und einer Meldung",
         "Mit einer kaputten Zustandsdatei (kein JSON) lässt der `PreToolUse`-Hook durch und schreibt eine Zeile nach stderr",
-        "Der Hauptskill erklärt die Sperre in vier Sätzen: wann sie greift, wie man den Stand sieht, dass `spur-pruefkette aus` nur auf ausdrücklichen Wunsch der Person in dieser Session erlaubt ist und dass der Grund in die Zusammenfassung gehört"
+        "Der Hauptskill erklärt die Sperre in vier Sätzen: wann sie greift, wie man den Stand sieht, dass `spur-pruefkette aus` nur auf ausdrücklichen Wunsch der Person in dieser Session erlaubt ist und dass der Grund in die Zusammenfassung gehört",
+        "Eine Nachprüfung ändert die Sperre nicht: Nach `doc_edit` auf `main.tex`, zweimal `SubagentStop` mit `agent_type: \"spur:gegenpruefung\"`, zweimal mit `spur:endpruefung`, dem Humanizer-Skill und `check_report` lässt der Hook `run_finish` durch; fehlt in dieser Folge die Endprüfung, nennt die Begründung nur Endprüfung, Humanizer und `check_report`"
       ],
       "passes": false
     },
