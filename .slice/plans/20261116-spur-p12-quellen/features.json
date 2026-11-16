@@ -1,0 +1,78 @@
+{
+  "features": [
+    {
+      "id": "f1",
+      "title": "Freie Paper kommen über Repositorien, wenn die Verlagsseite blockiert",
+      "steps": [
+        "Für Forschende, deren freie Paper bisher am Bot-Schutz scheiterten. Ausgangslage: Der Unpaywall-Fake liefert für `10.5555/spur.oa.001` zwei Fundorte: zuerst `host_type: publisher` (der Fake antwortet dort mit 200 und einer HTML-Seite „Just a moment…“), dann `host_type: repository` mit einem echten PDF und `license: cc-by`",
+        "`source_add` über MCP mit dieser DOI liefert eine Quelle; `sources_list` zeigt sie mit Seitenzahl, und das Protokoll des Fakes zeigt, dass die Repositoriums-Adresse vor der Verlagsadresse abgerufen wurde",
+        "Für `10.5555/spur.oa.002` liefert Unpaywall nur die Verlagsadresse (HTML), der Europe-PMC-Fake kennt die DOI mit einem PDF: `source_add` liefert die Quelle aus Europe PMC",
+        "Für `10.5555/spur.oa.003` antwortet der einzige Fundort zweimal mit 503 und `Retry-After: 1`, beim dritten Mal mit dem PDF: `source_add` liefert die Quelle; der Aufruf dauert höchstens 15 s",
+        "Im Browser zeigt das Quellen-Panel die drei Quellen; bei der ersten steht die Lizenz „CC BY“"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f2",
+      "title": "Der Status trennt Bezahlschranke und Bot-Schutz",
+      "steps": [
+        "Für alle, die wissen müssen, ob sich ein Download von Hand lohnt. Ausgangslage: `10.5555/spur.bot.001` hat bei Unpaywall zwei freie Fundorte, beide antworten mit 403 bzw. einer HTML-Seite; Europe PMC kennt die DOI nicht. `10.5555/spur.zu.001` hat bei Unpaywall keinen freien Fundort",
+        "`source_add` mit `10.5555/spur.bot.001` antwortet mit dem Fehlercode `bot_schutz` (502); die Antwort nennt unter `versucht` beide Adressen mit Host, Art und Ergebnis (`html` bzw. `403`) und den Satz, dass das Paper frei ist und im Browser geladen werden kann",
+        "`source_add` mit `10.5555/spur.zu.001` antwortet wie bisher mit `nicht_frei` (409)",
+        "Antwortet der einzige Fundort mit 404, lautet der Code weiter `pdf_fehlt`, mit `versucht`",
+        "Die Nutzerin öffnet die Beschaffungsliste: Beide DOIs stehen dort, die erste mit dem Abzeichen „Frei, Download blockiert“ und einem Link zur besten Adresse, die zweite mit „Nicht frei verfügbar“; beide Abzeichen unterscheiden sich in Text, nicht nur in Farbe",
+        "Ein zweites `source_add` mit `10.5555/spur.bot.001` legt keinen zweiten Eintrag auf der Liste an",
+        "Nach einem Upload über `spur-hochladen <link> datei.pdf --doi 10.5555/spur.bot.001` ist der Eintrag auf der Liste erledigt und die Quelle vorhanden"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f3",
+      "title": "Gedrosselte Suchdienste werden erneut versucht",
+      "steps": [
+        "Für Claude und Forschende, deren Suchen bisher fast immer ohne Semantic Scholar liefen. Ausgangslage: Der Fake antwortet für `semanticscholar` zweimal mit 429 und `Retry-After: 1`, danach normal",
+        "`paper_search` mit „sleep memory consolidation“ liefert Treffer von Semantic Scholar; unter `dienste` steht für Semantic Scholar `geantwortet` und `versuche: 3`",
+        "Antwortet der Fake dauerhaft mit 429, steht dort nach höchstens 20 s `gedrosselt` mit `versuche: 3`, und die Treffer der anderen Dienste kommen trotzdem",
+        "Antwortet OpenAlex einmal mit 503 ohne `Retry-After`, wird nach etwa 1 s erneut gefragt und der Dienst steht als `geantwortet`",
+        "`paper_citations` verhält sich bei denselben Störungen genauso"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f4",
+      "title": "Quellen ohne DOI lassen sich mit Metadaten aufnehmen",
+      "steps": [
+        "Für Forschende, die Abschlussarbeiten und Reports zitieren. Ausgangslage: Der Fake liefert unter `https://<fake>/thesis/tampere.pdf` ein PDF",
+        "`source_add` mit `pdf_url` auf diese Adresse und `metadaten` `{titel: \"Generative AI adoption in a large enterprise\", autoren: [{family: \"Virtanen\", given: \"Aino\"}], jahr: 2024, art: \"thesis\", abschluss: \"Master's thesis\", institution: \"Tampere University\"}` liefert eine Quelle mit dem Key `virtanen2024`",
+        "`doc_read` der `.bib` zeigt einen Eintrag `@thesis{virtanen2024,` mit `author = {Virtanen, Aino}`, `title`, `year = {2024}`, `type = {Master's thesis}`, `institution = {Tampere University}`, `url` und `urldate` mit dem heutigen Datum",
+        "Ein Satz `\\textcite[12]{virtanen2024}` mit einem wörtlichen Zitat von Seite 12 des PDFs steht im Prüfbericht mit „Wortlaut: exakt“; die Referenz zeigt „ohne DOI“ und ist nicht rot",
+        "`source_add` mit `doi` und `pdf_url` zugleich, oder ohne beides, antwortet mit 422 `eingabe_ungueltig` und nennt das Feld; mit `pdf_url` ohne `metadaten.titel` ebenso",
+        "`source_add` mit `pdf_url` `http://…` (ohne TLS) oder einer internen Adresse antwortet mit `pdf_fehlt`, ohne dass der Server die Adresse abruft",
+        "Ein zweites `source_add` mit derselben `pdf_url` antwortet mit `quelle_vorhanden`",
+        "`spur-hochladen <link> report.pdf --titel \"AI at Work\" --autoren \"Meyer, Jana; Okafor, Chidi\" --jahr 2023 --art report --institution \"OECD\"` gibt `Quelle <id>` aus; die `.bib` hat danach einen Eintrag `@report{meyer2023,` mit beiden Autoren in dieser Reihenfolge",
+        "Im Quellen-Panel stehen beide Quellen mit Titel, Autoren und der Art („Abschlussarbeit“, „Report“)"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f5",
+      "title": "Das Suchprotokoll ist vollständig und über MCP abrufbar",
+      "steps": [
+        "Für alle, die ein PRISMA-Diagramm mit exakten Zahlen brauchen. Ausgangslage: leeres Projekt „E2E P12 Protokoll“. Claude ruft über MCP auf: `paper_search` „sleep memory“ (der Fake liefert 3 Treffer von OpenAlex und 2 von Semantic Scholar, davon 1 gleiche DOI), dann dieselbe Suche mit dem `cursor` der zweiten Seite (2 weitere Treffer), dann `paper_search` „slow-wave sleep“ (2 Treffer, 1 davon schon aus der ersten Suche)",
+        "`search_log` liefert drei Anfragen in zeitlicher Folge mit Suchtext, Seite (0, 1, 0), je Dienst Status und Trefferzahl",
+        "`prisma` zeigt `identifiziert: 9`, `dubletten: 2`, `gesichtet: 7`; es gilt `identifiziert − dubletten = gesichtet`",
+        "Claude nimmt 2 Treffer mit `source_add` auf, schließt 3 mit `paper_exclude` aus (`grund` zweimal „falsche Population“, einmal „kein empirischer Beitrag“), und 1 landet mit `nicht_frei` auf der Beschaffungsliste: `prisma` zeigt `aufgenommen: 2`, `ausgeschlossen: {gesamt: 3, nach_grund: {\"falsche Population\": 2, \"kein empirischer Beitrag\": 1}}`, `nicht_beschaffbar: {nicht_frei: 1}` und `offen: 1`",
+        "`paper_exclude` für eine DOI, die in keiner Suche vorkam, antwortet mit 404 `treffer_nicht_gefunden`; ein zweites `paper_exclude` für dieselbe DOI ersetzt den Grund, statt doppelt zu zählen",
+        "Die Nutzerin öffnet im Browser das Suchprotokoll: Dieselben drei Anfragen und über der Tabelle die Zeile „9 identifiziert, 2 Dubletten, 7 gesichtet, 2 aufgenommen, 3 ausgeschlossen, 1 nicht beschaffbar, 1 offen“; ein leeres Projekt zeigt „Noch keine Suche“",
+        "Der CSV-Export enthält je Anfrage eine Zeile mit den neuen Spalten und am Ende die Summenzeilen",
+        "Ein Konto ohne Zugriff auf das Projekt bekommt von `search_log` 403",
+        "Die Werkzeugbeschreibungen von `search_log` und `paper_exclude` und `docs/mcp-contract.md` erklären die Felder und die Gleichung"
+      ],
+      "passes": false,
+      "ui": true
+    }
+  ]
+}
