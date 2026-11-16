@@ -1,0 +1,81 @@
+{
+  "features": [
+    {
+      "id": "f1",
+      "title": "Artikel tragen Band, Heft und das Jahr der Heftausgabe",
+      "steps": [
+        "Für alle, deren Literaturverzeichnis ohne Nacharbeit stimmen soll. Ausgangslage: Der Crossref-Fake liefert für `10.5555/spur.heft.001` `type: journal-article`, `volume: \"35\"`, `issue: \"2\"`, `page: \"101-118\"`, `published-online` 2024-11-03, `published-print` 2025-02-01, `issued` 2024-11-03, Erstautor „Oldemeyer“",
+        "`source_add` mit dieser DOI liefert eine Quelle mit dem Key `oldemeyer2025`",
+        "`doc_read` der `.bib` zeigt `@article{oldemeyer2025,` mit `volume = {35}`, `number = {2}`, `pages = {101--118}` und `year = {2025}`",
+        "Für `10.5555/spur.heft.002` liefert der Fake nur `issued` 2021 und weder Band noch Heft: Der Eintrag hat `year = {2021}` und keine leeren Felder `volume` oder `number`",
+        "Für `10.5555/spur.kap.001` (`type: book-chapter`, `container-title` „Handbook of Sleep“, `publisher` „Springer“) entsteht `@incollection` mit `booktitle = {Handbook of Sleep}` und `publisher = {Springer}`",
+        "Das Projekt kompiliert mit `biblatex` im Stil `apa`; im PDF (über `page_image` der Seite mit dem Literaturverzeichnis) steht beim ersten Eintrag „35(2), 101–118“ und das Jahr 2025"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f2",
+      "title": "Titel und Zeitschriften sind frei von HTML-Resten",
+      "steps": [
+        "Für alle, die bisher `\\&amp;` im Verzeichnis hatten. Ausgangslage: Crossref-Fake liefert für `10.5555/spur.ent.001` den Titel `Artificial intelligence &amp; firm performance: <i>A review</i> of H<sub>2</sub>O &#8211; 50% more` und die Zeitschrift `Information &amp; Management`",
+        "Nach `source_add` steht in der `.bib` `title = {Artificial intelligence \\& firm performance: \\textit{A review} of H2O – 50\\% more}` und `journal = {Information \\& Management}`; nirgends steht `amp;`, `<i>` oder `&#`",
+        "Das Projekt kompiliert ohne Fehler, und `sources_list` zeigt den Titel als Klartext mit „&“",
+        "Ein Titel mit `{`, `}` oder `\\` aus Crossref bricht die `.bib` weiterhin nicht (bestehender Test bleibt grün)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f3",
+      "title": "Preprints werden als Preprint zitiert",
+      "steps": [
+        "Für alle, die arXiv-Arbeiten zitieren. Ausgangslage: arXiv-Fake kennt `2401.01234` mit den Autoren „Kiran Gandhi“, „Mira Joshi“, Titel „Sleep-like replay improves memory consolidation“, Jahr 2024",
+        "`source_add` mit `10.48550/arXiv.2401.01234` legt in der `.bib` `@online{gandhi2024,` an, mit `eprint = {arXiv}`, `doi = {10.48550/arXiv.2401.01234}`, `date = {2024}` und ohne `journal`",
+        "Für `10.5555/spur.pre.001` mit Crossref-`type: posted-content` und `institution`/Archivname „PsyArXiv“ entsteht `@online` mit `eprint = {PsyArXiv}`",
+        "Das Projekt kompiliert mit biblatex-apa ohne Warnung zu diesen Einträgen; im Literaturverzeichnis (über `page_image`) steht beim ersten Eintrag „arXiv“ und kein leerer Zeitschriftenname",
+        "`bib_list` zeigt für beide Einträge keine Abweichung beim Eintragstyp"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f4",
+      "title": "Abweichende Autoren fallen auf",
+      "steps": [
+        "Für alle, deren Autorenreihenfolge bisher aus fremden Metadaten kam. Ausgangslage: Der arXiv-Fake liefert für `2402.05555` die Autoren in der Reihenfolge „Gandhi, Joshi“; auf der ersten Seite des Fake-PDFs steht „Mira Joshi, Kiran Gandhi“",
+        "Nach `source_add` und dem Einlesen des PDFs steht in der `.bib` `author = {Joshi, Mira and Gandhi, Kiran}`; `sources_list` zeigt für die Quelle `autoren: \"aus_pdf\"`",
+        "Für ein PDF, auf dessen erster Seite der Nachname „Joshi“ fehlt, bleibt die Reihenfolge der Metadaten, und `sources_list` zeigt `autoren: \"abweichend\"`",
+        "Im Quellen-Panel steht bei dieser zweiten Quelle der Hinweis „Autoren im PDF nicht gefunden – bitte prüfen“; bei der ersten steht kein Hinweis",
+        "Für eine Quelle, deren Namen mit Diakritika in den Metadaten („Müller“) und ohne im PDF („Muller“) stehen, lautet der Zustand `bestaetigt`",
+        "Eine gescannte Quelle ohne Text bekommt keinen Abgleich und keinen Hinweis"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f5",
+      "title": "Jeder Upload bekommt einen Literatureintrag",
+      "steps": [
+        "Für alle, die blockierte Paper im Browser laden und hochladen. Ausgangslage: leeres Projekt, nichts auf der Beschaffungsliste",
+        "`spur-hochladen <link> mikalef.pdf --doi 10.5555/spur.heft.001` gibt `Quelle <id>` aus; die `.bib` enthält danach den vollständigen `@article`-Eintrag mit Band, Heft und Jahr aus Crossref",
+        "`spur-hochladen <link> notizen.pdf` ohne weitere Angaben legt `@misc` mit dem Titel aus den PDF-Metadaten an (im Test „Field notes 2023“); `sources_list` zeigt `metadaten: \"unvollstaendig\"`, und das Quellen-Panel zeigt dazu „Metadaten unvollständig“",
+        "Ein Upload mit `--doi 10.9999/nirgends.1` (Crossref kennt sie nicht) legt die Quelle an, mit `@misc` und dem Hinweis `unvollstaendig`; die Ausgabe des Skripts nennt, dass die DOI nicht gefunden wurde",
+        "Der Upload derselben Datei ein zweites Mal gibt `schon vorhanden (Quelle <id>)` aus und legt keinen zweiten Eintrag an"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f6",
+      "title": "`bib_list` zeigt, was bestehenden Einträgen fehlt",
+      "steps": [
+        "Für Arbeiten, die vor diesem Update begonnen wurden. Ausgangslage: Die `.bib` enthält von Hand `@article{alt2024, title = {…}, year = {2024}, doi = {10.5555/spur.heft.001}}` (ohne Band und Heft, Jahr der Online-Fassung) und einen arXiv-Eintrag als `@article` ohne `journal`",
+        "`bib_list` liefert für `alt2024` unter `abweichungen` drei Einträge: `volume` (fehlt, Crossref „35“), `number` (fehlt, „2“), `year` („2024“, Crossref „2025“); für den arXiv-Eintrag eine Abweichung `eintragstyp` („article“, erwartet „online“)",
+        "Keiner der beiden Einträge hat deshalb `problem: true`",
+        "Im Prüfbericht trägt die Referenz `alt2024` das neutrale Abzeichen „Literaturdaten unvollständig“; ein Klick klappt die drei Felder mit beiden Werten auf. Mit „Nur Probleme“ ist die Zeile nicht sichtbar",
+        "Claude ergänzt die Felder mit `doc_edit`; danach liefert `bib_list` für `alt2024` `abweichungen: []` und das Abzeichen ist weg",
+        "Ist der Crossref-Fake abgeschaltet, liefert `bib_list` `abweichungen: null` mit dem Grund `crossref_nicht_erreichbar`"
+      ],
+      "passes": false,
+      "ui": true
+    }
+  ]
+}
