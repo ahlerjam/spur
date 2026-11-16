@@ -42,7 +42,7 @@
         "Antwortet OpenAlex einmal mit 503 ohne `Retry-After`, wird nach etwa 1 s erneut gefragt und der Dienst steht als `geantwortet`",
         "`paper_citations` verhält sich bei denselben Störungen genauso"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f4",

@@ -6909,6 +6909,54 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok((await zeile('Publisher walls around open articles').getByText('Frei, Download blockiert').count()) === 0, 'Abzeichen am erledigten Eintrag')
   }
 
+  features.p12f3 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Status')
+    const von = (inhalt, dienst) => inhalt.dienste.find(d => d.dienst === dienst)
+    const zeiten = async dienst => (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.dienst === dienst).map(a => a.zeit)
+    // Jeder Aufruf fragt die Dienste wirklich (kein Cache) und beginnt mit einem leeren Fake-Protokoll.
+    const mitStoerung = async (stoerungen, aufruf) => {
+      await fakeSteuern({ stoerungen, cachesLeeren: true, protokollLeeren: true })
+      const start = Date.now()
+      try {
+        const { fehler, inhalt } = await aufruf()
+        ok(!fehler, `Werkzeugfehler: ${JSON.stringify(inhalt)}`)
+        return { inhalt, dauer: Date.now() - start }
+      } finally {
+        await fakeSteuern({})
+      }
+    }
+    const suche = () => werkzeug(token, 'paper_search', { project_id: pid, anfrage: 'sleep memory consolidation' })
+    const zitationen = () => werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })
+    const ZWEIMAL = { s2: { status: 429, retryAfter: 1, mal: 2 } }
+    const DAUERHAFT = { s2: { status: 429, retryAfter: 1 } }
+    const EINMAL_503 = { openalex: { status: 503, mal: 1 } }
+
+    for (const [name, aufruf] of [['paper_search', suche], ['paper_citations', zitationen]]) {
+      // Zweimal 429 mit Retry-After: 1, danach normal.
+      const erholt = await mitStoerung(ZWEIMAL, aufruf)
+      const s2 = von(erholt.inhalt, 'Semantic Scholar')
+      ok(s2.antwort === 'geantwortet' && s2.versuche === 3, `${name}, zweimal 429: ${JSON.stringify(erholt.inhalt.dienste)}`)
+      ok(erholt.inhalt.treffer.some(t => t.dienste.includes('Semantic Scholar')), `${name}: keine Treffer von Semantic Scholar`)
+      ok((await zeiten('s2')).length === 3, `${name}: Semantic Scholar wurde ${(await zeiten('s2')).length}-mal gefragt`)
+
+      // Dauerhaft 429: nach drei Versuchen gedrosselt, die anderen Dienste liefern.
+      const zu = await mitStoerung(DAUERHAFT, aufruf)
+      const gedrosselt = von(zu.inhalt, 'Semantic Scholar')
+      ok(gedrosselt.antwort === 'gedrosselt' && gedrosselt.versuche === 3 && zu.dauer <= 20000, `${name}, dauerhaft 429 (${zu.dauer} ms): ${JSON.stringify(zu.inhalt.dienste)}`)
+      ok(zu.inhalt.treffer.length > 0 && zu.inhalt.treffer.every(t => !t.dienste.includes('Semantic Scholar')), `${name}: Treffer der anderen Dienste fehlen`)
+      ok(von(zu.inhalt, 'OpenAlex').antwort === 'geantwortet', `${name}: OpenAlex ${JSON.stringify(zu.inhalt.dienste)}`)
+
+      // Ein 503 ohne Retry-After: nach etwa 1 s erneut gefragt.
+      const kurz = await mitStoerung(EINMAL_503, aufruf)
+      const openalex = von(kurz.inhalt, 'OpenAlex')
+      ok(openalex.antwort === 'geantwortet' && openalex.versuche === 2, `${name}, einmal 503: ${JSON.stringify(kurz.inhalt.dienste)}`)
+      const [erster, zweiter] = await zeiten('openalex')
+      ok(zweiter - erster >= 900 && zweiter - erster <= 3000, `${name}: OpenAlex nach ${zweiter - erster} ms erneut gefragt`)
+    }
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

@@ -391,7 +391,8 @@ Object.assign(WERKZEUGE, {
   paper_search: {
     description:
       'Sucht Paper über arXiv, OpenAlex, Crossref und Semantic Scholar. Treffer mit DOI, Titel, Autoren, Jahr, Abstract, ' +
-      'Diensten und Open-Access-Status. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar, fehler nennt den ' +
+      'Diensten und Open-Access-Status. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar und nennt die ' +
+      'versuche (bei 429, 503 und Netzfehlern fragt spur bis zu dreimal; 0 heißt: Antwort aus dem Cache). fehler nennt den ' +
       'Grund; hinweis ist gesetzt, wenn keiner geantwortet hat. Die Suche landet im Suchprotokoll des Projekts.',
     inputSchema: z.object({ project_id: id, anfrage: z.string().min(1).max(300), seite: z.number().int().min(0).max(50).optional() }),
     async ausfuehren({ project_id: pid, anfrage, seite = 0 }, { menschId }) {
@@ -403,7 +404,8 @@ Object.assign(WERKZEUGE, {
   paper_citations: {
     description:
       'Folgt Zitationen einer DOI über OpenAlex und Semantic Scholar: richtung „zitiert_von“ liefert Arbeiten, die sie zitieren, ' +
-      '„zitiert“ ihre Referenzen. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar; hinweis ist gesetzt, ' +
+      '„zitiert“ ihre Referenzen. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar und nennt die versuche ' +
+      '(wie bei paper_search); hinweis ist gesetzt, ' +
       'wenn keiner geantwortet hat (dann heißt die leere Liste nicht, dass es keine Zitationen gibt).',
     inputSchema: z.object({ doi: z.string().min(4).max(300), richtung: z.enum(['zitiert_von', 'zitiert']) }),
     async ausfuehren({ doi, richtung }) {
