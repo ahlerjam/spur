@@ -1,0 +1,45 @@
+{
+  "features": [
+    {
+      "id": "f1",
+      "title": "Eine APA-7-Arbeit kompiliert ohne Nachladen",
+      "steps": [
+        "Für alle, die eine übliche Abschlussarbeit schreiben. Im Repo liegt ein Smoke-Dokument `apa7-arbeit.tex` mit `\\documentclass[man]{apa7}`, `babel` (ngerman), `csquotes`, `biblatex` im Stil `apa`, einer `booktabs`-Tabelle in `threeparttable` mit Anmerkung, einem `pgfplots`-Balkendiagramm, `lineno`, `float` (`[H]`), `caption`, `setspace`, `hyperref` und `cleveref`",
+        "`node --test tools/tests/tex-pakete.test.mjs` ist grün: Jedes Paket, das dieses Dokument direkt oder über `apa7.cls` und `biblatex-apa` lädt, steht in der Paketliste von `server-ce/Dockerfile-base`; entfernt man `booktabs` aus der Liste, wird der Test rot und nennt `booktabs`",
+        "Die Paketliste ist alphabetisch, ohne Dubletten; ein Test prüft beides",
+        "Der Workflow `Dev image` kompiliert das Dokument im gebauten Image und schlägt fehl, wenn das Log „not found“ enthält; die Workflow-Datei zeigt diesen Schritt, und `tools/tests/ci-pfade.test.mjs` bleibt grün",
+        "Im laufenden Dev-Stack mit dem bisherigen Image meldet `compile` für dieses Dokument die fehlenden Pakete über `fehlende_pakete` (siehe f3); nach `tex_package_add` für jedes davon kompiliert es, und `page_image` der ersten Seite zeigt das Deckblatt im APA-Layout",
+        "Die README nennt in einem Absatz, welche Pakete das Image mitbringt und dass alles andere mit `tex_package_add` ins Projekt kommt"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f2",
+      "title": "Code-Listings mit `minted`",
+      "steps": [
+        "Für alle, die Programmcode in der Arbeit zeigen. Im Repo liegt ein Smoke-Dokument `minted-beispiel.tex` mit einer `minted`-Umgebung für Python (`def mittel(xs): return sum(xs)/len(xs)`) und einer für R",
+        "Die Paketliste enthält `minted` und seine TeX-Abhängigkeiten; die Dockerfile installiert, was die minted-Doku für TeX Live zusätzlich verlangt (Pygments bzw. das Hilfsprogramm), und der Paketlisten-Test deckt das Dokument ab",
+        "Der Kompilierdienst erlaubt nur eingeschränktes Shell-Escape mit dem von minted benötigten Programm; ein Test zeigt, dass ein Dokument mit `\\immediate\\write18{touch /tmp/spur-shell-test}` keine Datei anlegt",
+        "Der Workflow `Dev image` kompiliert `minted-beispiel.tex` und prüft, dass das PDF entsteht und das Log keinen Fehler „You must invoke LaTeX with the -shell-escape flag“ enthält",
+        "`docs/adr` bekommt einen Eintrag, der den gewählten Weg und die Grenze (kein volles Shell-Escape) festhält, mit der Fundstelle in der minted-Doku",
+        "Die README nennt `minted` mit einem Drei-Zeilen-Beispiel"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f3",
+      "title": "Fehlende Pakete stehen direkt im Kompilierergebnis",
+      "steps": [
+        "Für Claude und Forschende, die nicht mehr im Log suchen sollen. Ausgangslage: Dokument mit `\\usepackage{spurdemo}` und `\\usetheme{focus}`; der TeX-Live-Fake kennt `spurdemo.sty` im Paket `spurdemo` und `beamerthemefocus.sty` im Paket `beamertheme-focus`",
+        "`compile` scheitert, und die Antwort enthält `fehlende_pakete: [{datei: \"spurdemo.sty\", paket: \"spurdemo\", im_image: false}]` (LaTeX bricht am ersten fehlenden Paket ab); `compile_log` liefert dieselbe Liste",
+        "`tex_package_add` mit `datei: \"spurdemo.sty\"` legt das Paket an; das nächste `compile` meldet `beamerthemefocus.sty` mit `paket: \"beamertheme-focus\"`; nach dem Nachladen kompiliert das Dokument und `fehlende_pakete` ist `[]`",
+        "Für eine Datei, die kein Paket des Fakes enthält (`gibtesnicht.sty`), steht `paket: null`; ist der Spiegel abgeschaltet, zusätzlich `grund: \"spiegel_nicht_erreichbar\"`",
+        "Echte Logauszüge als Unit-Tests: „! LaTeX Error: File `booktabs.sty' not found.“, „! LaTeX Error: File `apa7.cls' not found.“, „! Package biblatex Error: Style 'apa' not found.“ und „! Font T1/lmr/m/n/10=ec-lmr10 at 10.0pt not loadable: Metric (TFM) file not found.“ ergeben `booktabs.sty`, `apa7.cls`, `apa.bbx` und `ec-lmr10.tfm`; ein Log ohne fehlende Datei ergibt `[]`",
+        "Im Browser steht nach dem gescheiterten Kompilieren über dem Log „Fehlendes Paket: spurdemo (für spurdemo.sty)“; bei unbekannter Zuordnung „Fehlende Datei: gibtesnicht.sty“; nach erfolgreichem Kompilieren ist die Zeile weg",
+        "Der Abschnitt „Missing LaTeX packages“ im Plugin-Skill beschreibt den neuen Weg in zwei Sätzen statt der Suche im Log"
+      ],
+      "passes": false,
+      "ui": true
+    }
+  ]
+}
