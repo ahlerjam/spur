@@ -1,9 +1,10 @@
 {
   "state": "halted",
-  "builderModel": "fable",
+  "builderModel": "opus",
   "runBranch": "slice/run-20261116-spur-p12-quellen",
   "sessionId": "6c5e3f0b-2815-4207-abbf-722c1ba6c112",
   "started": "2026-11-16T17:24:23Z",
   "reason": "stopped",
-  "finished": "2026-11-16T18:24:24Z"
+  "finished": "2026-11-16T18:24:24Z",
+  "builderAdvisor": "opus"
 }
