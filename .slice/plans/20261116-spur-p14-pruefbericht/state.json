@@ -1,4 +1,5 @@
 {
   "state": "queued",
-  "builderModel": "fable"
+  "builderModel": "opus",
+  "builderAdvisor": "opus"
 }
