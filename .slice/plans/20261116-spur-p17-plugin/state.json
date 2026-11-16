@@ -1,5 +1,5 @@
 {
-  "state": "parked",
+  "state": "queued",
   "builderModel": "fable",
   "dependsOn": [
     "20261116-spur-p13-bib",
