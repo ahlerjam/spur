@@ -1,0 +1,88 @@
+{
+  "features": [
+    {
+      "id": "f1",
+      "title": "Quellenseiten lassen sich ab jeder Stelle lesen",
+      "steps": [
+        "Für Claude, das einem Treffer aus `source_search` folgt. Ausgangslage: Quelle `lang2024`, deren PDF-Seite 2 9.500 Zeichen hat; der Satz „The effect persisted after twelve weeks.“ beginnt bei Zeichen 6.037",
+        "`source_search` nach „persisted after twelve weeks“ nennt Seite 2 und die Position 6037",
+        "`source_read` mit `pdf_seite: 2`, `ab_zeichen: 6000` liefert einen Text, der diesen Satz enthält, und dazu `ab_zeichen: 6000`, `bis_zeichen: 9500`, `zeichen_gesamt: 9500`, `gekuerzt: false`",
+        "`source_read` ohne `ab_zeichen` liefert wie bisher die ersten 4.000 Zeichen mit `gekuerzt: true` und zusätzlich `zeichen_gesamt: 9500`",
+        "`ab_zeichen: 20000` liefert leeren Text und `zeichen_gesamt: 9500`; `ab_zeichen: -1` liefert 422 `eingabe_ungueltig`",
+        "Die Werkzeugbeschreibung sagt in einem Satz, dass man mit `bis_zeichen` als nächstem `ab_zeichen` weiterliest"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f2",
+      "title": "Claude sieht Abbildungen in Quellen",
+      "steps": [
+        "Für Claude, das eine Abbildung oder Tabelle einer Quelle verstehen muss. Ausgangslage: Quelle `smith2024` mit einem Diagramm auf PDF-Seite 4",
+        "`source_page_image` mit `pdf_seite: 4` liefert ein PNG, dessen längste Kante höchstens 1.600 px misst und auf dem das Diagramm zu sehen ist (der Builder sieht sich das Bild an)",
+        "`pdf_seite: 99` liefert 404 `seite_nicht_gefunden` und nennt die Seitenzahl der Quelle",
+        "Für einen Web-Schnappschuss liefert das Werkzeug 409 `quelle_ohne_seiten`",
+        "Eine Quelle aus einem anderen Projekt, auf das das Konto keinen Zugriff hat, liefert 403"
+      ],
+      "passes": false
+    },
+    {
+      "id": "f3",
+      "title": "Abbildungen kommen als Bilddatei ins Projekt",
+      "steps": [
+        "Für Arbeiten, die eine Abbildung aus einer offenen Quelle zeigen oder ein eigenes Bild brauchen. Ausgangslage: Quelle `offen2023` mit Lizenz CC BY und einer Abbildung auf PDF-Seite 3; Quelle `verlag2022` ohne Lizenzangabe; Quelle `nd2021` mit CC BY-ND",
+        "`source_figure_add` mit `quelle_id` von `offen2023`, `pdf_seite: 3`, `ausschnitt: {x: 0.1, y: 0.2, breite: 0.8, hoehe: 0.4}`, `pfad: \"abbildungen/offen2023-abb2.png\"` legt die Datei an; die Antwort nennt `lizenz: \"cc-by\"` und eine `quellenangabe`, die `\\textcite{offen2023}`, „S. 3“ und „CC BY“ enthält",
+        "Claude bindet sie mit `\\includegraphics[width=0.8\\textwidth]{abbildungen/offen2023-abb2.png}` ein; `compile` läuft durch und `page_image` der Seite zeigt die Abbildung",
+        "Für `verlag2022` und für `nd2021` antwortet das Werkzeug mit 409 `lizenz_fehlt` und dem Hinweis auf Nachzeichnen oder Erlaubnis; es entsteht keine Datei",
+        "Ein `ausschnitt` mit `breite: 0` oder Werten über 1 liefert 422 `eingabe_ungueltig`; ein vorhandener `pfad` liefert `konflikt`; ein `pfad` ohne `.png` liefert 422",
+        "`file_upload_link` liefert einen Link; `spur-hochladen <link> diagramm.pdf --projektdatei abbildungen/diagramm.pdf` gibt `Datei abbildungen/diagramm.pdf` aus, und die Datei steht im Dateibaum",
+        "Eine Textdatei, die in `bild.png` umbenannt wurde, wird mit `dateityp_nicht_erlaubt` abgelehnt; eine Datei über 10 MB mit `zu_gross`",
+        "Die Laufkarte im Browser listet beide Dateien unter den Dateien des Laufs; nach „Lauf rückgängig“ sind sie aus dem Dateibaum verschwunden"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f4",
+      "title": "Ein Muster wird an allen Stellen in einem Schritt ersetzt",
+      "steps": [
+        "Für Claude bei Umstellungen wie einer Farbänderung. Ausgangslage: `main.tex` enthält 12-mal `fill=blue!20` in mehreren Grafiken",
+        "`doc_edit` mit Alttext `fill=blue!20`, neuem Text `fill=gray!20` und `alle_vorkommen: true` antwortet mit `ersetzt: 12`; `doc_read` zeigt kein `blue!20` mehr",
+        "Im Browser stehen die 12 Ersetzungen als Änderungen eines Laufs auf der Laufkarte; „Lauf rückgängig“ stellt alle 12 wieder her",
+        "Derselbe Aufruf ohne `alle_vorkommen` antwortet wie bisher mit `konflikt`; die Meldung nennt jetzt den Parameter `alle_vorkommen`",
+        "`alle_vorkommen: true` mit einem Alttext, der nicht vorkommt, liefert den bisherigen Fehler für nicht gefundenen Alttext",
+        "Ein Ersatz, der an einer der Stellen einen erfundenen Wortlaut in ein Zitat schriebe, wird ganz abgelehnt; `doc_read` zeigt das Dokument unverändert",
+        "Ein Alttext mit mehr als 500 Vorkommen liefert 422 `zu_viele_vorkommen` mit der Zahl"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f5",
+      "title": "Der Lauf sagt, was angenommen ist und was offen steht",
+      "steps": [
+        "Für Claude und Forschende, die wissen müssen, was noch zu prüfen ist. Ausgangslage: Ein Lauf mit drei `doc_edit`: zwei unauffällige (automatisch angenommen) und eines mit einer Zahl ohne Beleg (rot, nicht angenommen)",
+        "`run_status` liefert `aenderungen: {gesamt: 3, automatisch_angenommen: 2, offen: 1, rot: 1}` und einen `hinweis`, der sagt, dass zwei Änderungen bereits im Text stehen, eine als Track Change auf die Entscheidung wartet und „Lauf rückgängig“ alle drei zurücknimmt",
+        "`run_finish` liefert dieselben Zahlen",
+        "Die Laufkarte im Browser zeigt „2 automatisch angenommen, 1 offen“; die offene Änderung ist im Editor als Track Change sichtbar",
+        "Nimmt die Nutzerin die offene Änderung an, zeigt `run_status` `offen: 0` und der Lauf steht auf „angenommen“",
+        "Ein Lauf ohne Textänderung (nur `reply`) liefert `aenderungen.gesamt: 0` und einen Hinweis ohne Zahlenwörter"
+      ],
+      "passes": false,
+      "ui": true
+    },
+    {
+      "id": "f6",
+      "title": "TeX-Dateien lassen sich nachschlagen, Pakete kommen vom zweiten Spiegel",
+      "steps": [
+        "Für Claude, das das Verhalten einer Klasse verstehen muss. `tex_file_read` mit `name: \"article.cls\"` liefert den Pfad in der TeX-Installation, die Zeilenzahl und Text, der `\\ProvidesClass{article}` enthält",
+        "Mit `ab_zeile: 200` beginnt der Text bei Zeile 200",
+        "`name: \"gibtesnicht.sty\"` liefert 404 `tex_datei_nicht_gefunden` mit dem Hinweis auf `tex_package_add`",
+        "`name: \"../../etc/passwd\"`, `name: \"/etc/passwd\"` und `name: \"geheim.env\"` liefern 422 `eingabe_ungueltig`; im Log des Kompilierdienstes steht kein Zugriff außerhalb des TeX-Baums",
+        "Nach `tex_package_add` für ein Paket, das nur im Projekt liegt (TeX-Live-Fake: `spurdemo`), liefert `tex_file_read` mit `name: \"spurdemo.sty\"` die Datei aus `tex-pakete/`",
+        "Der erste Spiegel des TeX-Live-Fakes antwortet für `spurzwei` mit 404, der zweite liefert das Archiv: `tex_package_add` legt das Paket an",
+        "Antworten beide mit 404, lautet der Fehler wie bisher „Paket nicht gefunden“, nicht `spiegel_nicht_erreichbar`"
+      ],
+      "passes": false
+    }
+  ]
+}
