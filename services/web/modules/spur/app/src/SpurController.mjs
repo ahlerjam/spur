@@ -58,6 +58,8 @@ function quelleFuerClient(q) {
     versatzQuelle: q.versatzQuelle,
     nurProjekt: q.nurProjekt === true,
     lizenz: q.lizenz ?? null,
+    // Art des Werks bei Quellen ohne DOI (thesis, report, …); `art` ist der Dateityp.
+    werkart: q.meta?.art ?? null,
     titelabgleich: q.titelabgleich ?? null,
     ocr: QuellenManager.ocrZustand(q),
     web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,

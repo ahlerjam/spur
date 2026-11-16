@@ -6957,6 +6957,103 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
   }
 
+  features.p12f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Ohne DOI')
+    const bericht = { name: 'report.pdf', mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/report.pdf`) }
+    await fakeSteuern({ cachesLeeren: true, protokollLeeren: true })
+    // Der Fake läuft im Stack des Servers; von dort aus ist seine Adresse die aus dev-schalter.json.
+    const THESIS = 'http://127.0.0.1/spur/dev/crossref/thesis/tampere.pdf'
+    const metadaten = {
+      titel: 'Generative AI adoption in a large enterprise',
+      autoren: [{ family: 'Virtanen', given: 'Aino' }],
+      jahr: 2024,
+      art: 'thesis',
+      abschluss: "Master's thesis",
+      institution: 'Tampere University',
+    }
+    const aufnehmen = args => werkzeug(token, 'source_add', { project_id: pid, ...args })
+    const bib = async () => (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
+
+    // Eingaben, die nichts abrufen dürfen.
+    const beide = await aufnehmen({ doi: '10.5555/spur.oa.001', pdf_url: THESIS, metadaten })
+    ok(beide.fehler && beide.inhalt.fehler === 'eingabe_ungueltig' && beide.inhalt.feld === 'pdf_url' && /doi und pdf_url/.test(beide.inhalt.detail), `doi und pdf_url: ${JSON.stringify(beide.inhalt)}`)
+    const keines = await aufnehmen({ metadaten })
+    ok(keines.fehler && keines.inhalt.fehler === 'eingabe_ungueltig' && keines.inhalt.feld === 'doi', `weder doi noch pdf_url: ${JSON.stringify(keines.inhalt)}`)
+    const ohneTitel = await aufnehmen({ pdf_url: THESIS, metadaten: { ...metadaten, titel: undefined } })
+    ok(ohneTitel.fehler && ohneTitel.inhalt.fehler === 'eingabe_ungueltig' && ohneTitel.inhalt.feld === 'metadaten.titel' && ohneTitel.inhalt.detail.includes('metadaten.titel'), `ohne Titel: ${JSON.stringify(ohneTitel.inhalt)}`)
+    for (const adresse of ['http://trepo.example/thesis.pdf', 'http://localhost/spur/dev/crossref/thesis/tampere.pdf', 'https://127.0.0.1/spur/dev/crossref/thesis/tampere.pdf', 'https://10.0.0.5/thesis.pdf']) {
+      const r = await aufnehmen({ pdf_url: adresse, metadaten })
+      ok(r.fehler && r.inhalt.fehler === 'pdf_fehlt' && r.inhalt.versucht?.[0]?.ergebnis === 'gesperrt', `${adresse}: ${JSON.stringify(r.inhalt)}`)
+    }
+    ok((await fakeAbrufe(['thesis'])).length === 0, `Der Server hat trotzdem abgerufen: ${JSON.stringify(await fakeAbrufe(['thesis']))}`)
+
+    const thesis = await aufnehmen({ pdf_url: THESIS, metadaten })
+    ok(!thesis.fehler && thesis.inhalt.key === 'virtanen2024' && thesis.inhalt.titelabgleich === 'passt', `Abschlussarbeit: ${JSON.stringify(thesis.inhalt)}`)
+    const heute = new Date().toISOString().slice(0, 10)
+    const eintrag = (await bib()).split(/\n(?=@)/).find(b => b.startsWith('@thesis{virtanen2024,')) ?? ''
+    for (const zeile of [
+      'author = {Virtanen, Aino}',
+      'title = {Generative AI adoption in a large enterprise}',
+      'year = {2024}',
+      "type = {Master's thesis}",
+      'institution = {Tampere University}',
+      `url = {${THESIS}}`,
+      `urldate = {${heute}}`,
+    ]) {
+      ok(eintrag.includes(`  ${zeile}`), `.bib ohne „${zeile}“: ${eintrag || (await bib())}`)
+    }
+    const nochmal = await aufnehmen({ pdf_url: THESIS, metadaten })
+    ok(nochmal.fehler && nochmal.inhalt.fehler === 'quelle_vorhanden', `Zweites source_add: ${JSON.stringify(nochmal.inhalt)}`)
+    ok((await fakeAbrufe(['thesis'])).length === 1, 'Die Adresse wurde für die Dublette erneut abgerufen')
+
+    // spur-hochladen schickt dieselben Formularfelder (tools/tests/plugin-skripte.test.mjs prüft das Skript).
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const hoch = await perLink(link.link, bericht, { titel: 'AI at Work', autoren: 'Meyer, Jana; Okafor, Chidi', jahr: '2023', art: 'report', institution: 'OECD' })
+    ok(hoch.daten?.status === 'angelegt' && /^[0-9a-f]{24}$/.test(hoch.daten.quelle_id) && hoch.daten.key === 'meyer2023', `Upload report.pdf: ${JSON.stringify(hoch)}`)
+    const report = (await bib()).split(/\n(?=@)/).find(b => b.startsWith('@report{meyer2023,')) ?? ''
+    ok(report.includes('  author = {Meyer, Jana and Okafor, Chidi}') && report.includes('  institution = {OECD}'), `@report: ${report || (await bib())}`)
+    const doppelt = await perLink(link.link, bericht, { titel: 'AI at Work', autoren: 'Meyer, Jana; Okafor, Chidi', jahr: '2023', art: 'report' })
+    ok(doppelt.daten?.status === 'vorhanden' && doppelt.daten.quelle_id === hoch.daten.quelle_id, `report.pdf noch einmal: ${JSON.stringify(doppelt)}`)
+
+    // Ein wörtliches Zitat von Seite 12 der Abschlussarbeit.
+    const edit = await werkzeug(token, 'doc_edit', {
+      project_id: pid,
+      pfad: 'main.tex',
+      alt: 'Hello',
+      neu: String.raw`\enquote{Employees used the assistant mainly for drafting and summarising.} \textcite[12]{virtanen2024}`,
+      idempotenz_schluessel: `p12f4-${Date.now()}`,
+    })
+    ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
+    const stelleImBericht = async () => (await werkzeug(token, 'check_report', { project_id: pid })).inhalt.eintraege.find(z => z.key === 'virtanen2024')
+    const pruefung = await stelleImBericht()
+    ok(pruefung?.wortlaut === 'exakt' && pruefung.referenz === 'ohne_doi' && pruefung.seitenangabe === '12', `check_report: ${JSON.stringify(pruefung)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zitat ergänzt.' })
+
+    await projektOeffnen('E2E P12 Ohne DOI')
+    // Das PDF hat keine gedruckten Seitenzahlen in den PageLabels: Wie bei jeder solchen Quelle bestätigt die Person,
+    // dass PDF-Seite und gedruckte Seite übereinstimmen. Danach ist an der Stelle nichts mehr markiert.
+    const bestaetigt = await page.evaluate(async url => {
+      const r = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': document.querySelector('meta[name="ol-csrfToken"]').content },
+        body: JSON.stringify({ versatz: 0 }),
+      })
+      return r.status
+    }, `${BASE}/spur/project/${pid}/quellen/${thesis.inhalt.quelle_id}`)
+    ok(bestaetigt === 200, `Seitenzahl bestätigen: ${bestaetigt}`)
+    const geprueft = await stelleImBericht()
+    ok(geprueft.wortlaut === 'exakt' && geprueft.referenz === 'ohne_doi' && geprueft.problem !== true, `Nach der Bestätigung: ${JSON.stringify(geprueft)}`)
+    await panelOeffnen('Quellen')
+    await quellenZeile('Generative AI adoption in a large enterprise').getByText('A. Virtanen · 2024 · Abschlussarbeit', { exact: true }).waitFor({ timeout: 20000 })
+    await quellenZeile('AI at Work').getByText('J. Meyer, C. Okafor · 2023 · Report', { exact: true }).waitFor()
+    await panelOeffnen('Prüfbericht')
+    const stelle = page.locator('.spur-panel .spur-zeile', { hasText: 'Employees used the assistant' }).first()
+    await stelle.getByText('Wortlaut: exakt', { exact: true }).waitFor({ timeout: 30000 })
+    ok((await stelle.locator('.badge.bg-danger, .text-danger').count()) === 0, 'Die Stelle ohne DOI ist rot markiert')
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

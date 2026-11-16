@@ -6,6 +6,7 @@ import * as LaufAktionen from '../schreiben/LaufAktionen.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as SchreibManager from '../schreiben/SchreibManager.mjs'
 import { WerkzeugFehler } from './fehler.mjs'
+import { Problem } from '../probleme.mjs'
 import { rolleFuerClaude, rolleImVertrag } from '../rechte.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
@@ -415,15 +416,43 @@ Object.assign(WERKZEUGE, {
 
   source_add: {
     description:
-      'Nimmt ein Paper per DOI auf: lädt den freien Volltext, legt die Quelle an und ergänzt die .bib mit den ' +
+      'Nimmt eine Quelle auf: entweder ein Paper per doi oder eine Quelle ohne DOI (Abschlussarbeit, Report, Working Paper) ' +
+      'per pdf_url mit metadaten. Genau eines von doi und pdf_url; sonst eingabe_ungueltig mit dem Feld. ' +
+      'Per doi lädt spur den freien Volltext, legt die Quelle an und ergänzt die .bib mit den ' +
       'DOI-Metadaten. spur versucht alle freien Fundorte (Repositorien vor Verlagsseiten, dann Europe PMC). ' +
       'Fehler: nicht_frei (kein freier Fundort), bot_schutz (frei, aber die Server haben spur abgewiesen; im Browser unter ' +
       'adresse ladbar) und pdf_fehlt; versucht nennt je Adresse host, art und ergebnis. Bei nicht_frei und bot_schutz ' +
-      'setzt spur die DOI selbst auf die Beschaffungsliste; ein Upload mit dieser DOI erledigt den Eintrag.',
-    inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
-    async ausfuehren({ project_id: pid, doi }, { menschId }) {
+      'setzt spur die DOI selbst auf die Beschaffungsliste; ein Upload mit dieser DOI erledigt den Eintrag. ' +
+      'pdf_url ist eine öffentliche https-Adresse, die direkt das PDF liefert (höchstens 50 MB; Handles und URNs löst spur ' +
+      'nicht auf). metadaten: titel (Pflicht), autoren ([{family, given}]), jahr, art (thesis, report, working_paper, book, ' +
+      'misc), institution, abschluss (etwa „Masterarbeit“) und url. Die .bib bekommt einen Eintrag passend zur Art mit url ' +
+      'und urldate. Dieselbe pdf_url oder dieselbe Datei noch einmal ergibt quelle_vorhanden.',
+    inputSchema: z.object({
+      project_id: id,
+      doi: z.string().max(300).optional(),
+      pdf_url: z.string().max(2000).optional(),
+      // Die Felder prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feldnamen ergibt.
+      metadaten: z
+        .object({
+          titel: z.string().optional(),
+          autoren: z.array(z.object({ family: z.string(), given: z.string().optional() })).optional(),
+          jahr: z.number().optional(),
+          art: z.string().optional(),
+          institution: z.string().optional(),
+          abschluss: z.string().optional(),
+          url: z.string().optional(),
+        })
+        .optional(),
+    }),
+    async ausfuehren({ project_id: pid, doi, pdf_url: pdfUrl, metadaten }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
-      const quelle = await Beschaffung.aufnehmenOderVormerken({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+      if (Boolean(doi) === Boolean(pdfUrl)) {
+        const feld = doi ? 'pdf_url' : 'doi'
+        throw new Problem(422, 'eingabe_ungueltig', 'spur_fehler_eingabe_doi_oder_pdf_url', { feld }, { feld })
+      }
+      const quelle = doi
+        ? await Beschaffung.aufnehmenOderVormerken({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+        : await Aufnahme.perUrl({ projectId, userId: menschId, pdfUrl, metadaten })
       return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi, ...titelBefund(quelle) }
     },
   },

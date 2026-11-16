@@ -58,7 +58,7 @@
         "`spur-hochladen <link> report.pdf --titel \"AI at Work\" --autoren \"Meyer, Jana; Okafor, Chidi\" --jahr 2023 --art report --institution \"OECD\"` gibt `Quelle <id>` aus; die `.bib` hat danach einen Eintrag `@report{meyer2023,` mit beiden Autoren in dieser Reihenfolge",
         "Im Quellen-Panel stehen beide Quellen mit Titel, Autoren und der Art („Abschlussarbeit“, „Report“)"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {

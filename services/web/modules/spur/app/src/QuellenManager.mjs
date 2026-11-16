@@ -129,7 +129,8 @@ async function speichern(quelle, seitenListe, schreibeDatei) {
 }
 
 // key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF. Mit vorgegebenem Titel
-// wird das PDF dagegen abgeglichen; titelStreng weist ein abweichendes PDF mit falsches_pdf ab.
+// wird das PDF dagegen abgeglichen; titelStreng weist ein abweichendes PDF mit falsches_pdf ab. felder sind weitere
+// Angaben zur Herkunft (etwa pdfUrl und hash bei Quellen ohne DOI).
 export async function aufnehmen(angaben) {
   pruefeDateityp(angaben.dateiname)
   // Vor dem Auslesen: eine zu große Datei wird abgewiesen, ehe Text und OCR Zeit kosten.
@@ -141,7 +142,7 @@ export async function aufnehmen(angaben) {
   }
 }
 
-async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, lizenz = null, titelStreng = false, nurProjekt = false }) {
+async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, lizenz = null, titelStreng = false, nurProjekt = false, felder = {} }) {
   const key = vorgabe ?? schluesselAus(dateiname)
   if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
   const endung = Path.extname(dateiname).toLowerCase()
@@ -170,6 +171,7 @@ async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfa
     fassung: '',
     angelegtVon: userId,
     angelegtAm: jetzt(),
+    ...felder,
   }
   return await speichern(quelle, inhalt.seiten, ziel => fs.copyFile(tempPfad, ziel))
 }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import Path from 'node:path'
@@ -11,9 +12,10 @@ import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import { bibLesen, doiNormal as bibDoi } from '../pruefung/bib.mjs'
-import { paperApiBasis } from '../schalter.mjs'
+import { jetzt, paperApiBasis } from '../schalter.mjs'
 import { arxivMetadaten, europepmc, unpaywall } from './dienste.mjs'
 import { freierKey, keyVorschlag } from './keys.mjs'
+import { metadatenOhneDoi } from './ohneDoi.mjs'
 import { pauseMs, VERSUCHE } from './wiederholen.mjs'
 
 const ARXIV_DOI = /^10\.48550\/arxiv\.(.+)$/
@@ -23,30 +25,39 @@ export const doiNormal = doi => bibDoi(doi)?.toLowerCase() ?? ''
 // Austauschbar für Tests ohne Netz.
 export const netz = { holen: geschuetztHolen, lookup: dns.lookup, warten: ms => new Promise(fertig => setTimeout(fertig, ms)) }
 
-// Der Paper-Fake liegt im eigenen Stack; echte Volltexte kommen nur von öffentlichen https-Adressen.
-// Die Auflösung des Namens prüft erst die Anfrage selbst, an der Stelle, an der sie verbindet.
+// Der Paper-Fake liegt im eigenen Stack: Nur Adressen unter seiner Basis dürfen ins lokale Netz.
+function imFake(adresse) {
+  const basis = paperApiBasis()
+  if (!basis) return false
+  const wurzel = new URL(basis)
+  return adresse.origin === wurzel.origin && adresse.pathname.startsWith(`${wurzel.pathname.replace(/\/$/, '')}/`)
+}
+
+// Echte Volltexte kommen nur von öffentlichen https-Adressen. Die Auflösung des Namens prüft erst die Anfrage
+// selbst, an der Stelle, an der sie verbindet. Ergebnis: die Adresse oder null.
 function erlaubteAdresse(url) {
   let adresse
   try {
     adresse = new URL(url)
   } catch {
-    return false
+    return null
   }
-  if (paperApiBasis()) return true
+  if (imFake(adresse)) return adresse
   const host = adresse.hostname.replace(/^\[|\]$/g, '')
-  return adresse.protocol === 'https:' && !isIP(host) && host !== 'localhost' && !host.endsWith('.localhost')
+  const oeffentlich = adresse.protocol === 'https:' && !isIP(host) && host !== 'localhost' && !host.endsWith('.localhost')
+  return oeffentlich ? adresse : null
 }
 
 const GESPERRT = Symbol('gesperrt')
 
 // Redirects selbst folgen, damit jede Station dieselbe Prüfung durchläuft.
 async function holenMitPruefung(url, signal) {
-  const gesperrt = paperApiBasis() ? () => false : adresseGesperrt
   let ziel = url
   for (let i = 0; i < 5; i++) {
-    if (!erlaubteAdresse(ziel)) throw GESPERRT
-    const antwort = await netz.holen(new URL(ziel), {
-      gesperrt,
+    const adresse = erlaubteAdresse(ziel)
+    if (!adresse) throw GESPERRT
+    const antwort = await netz.holen(adresse, {
+      gesperrt: imFake(adresse) ? () => false : adresseGesperrt,
       signal,
       lookup: netz.lookup,
       headers: { 'User-Agent': 'spur (Volltext)', Accept: 'application/pdf' },
@@ -157,6 +168,30 @@ export async function metadaten(doi) {
   return { meta: await arxivMetadaten(arxiv), arxiv }
 }
 
+// Ein freier Key aus erstem Nachnamen und Jahr, dazu die Dokumente des Projekts für den .bib-Eintrag.
+export async function neuerKey(projectId, quellen, meta) {
+  const docs = await PruefManager.dokumente(projectId)
+  const belegt = new Set(quellen.map(q => q.key))
+  for (const d of docs.filter(d => d.pfad.endsWith('.bib'))) {
+    for (const key of bibLesen(d.text).keys()) belegt.add(key)
+  }
+  return { key: freierKey(keyVorschlag(meta), belegt), docs }
+}
+
+// Ergänzt die .bib um die neue Quelle. Ohne .bib-Eintrag keine Quelle: Sonst schlüge jede Wiederholung mit
+// „Bereits vorhanden“ fehl.
+export async function mitBibEintrag(projectId, docs, quelle, userId) {
+  try {
+    await ZitatManager.bibSicherstellen(projectId, docs, quelle, userId)
+  } catch (error) {
+    await QuellenManager.loeschen(quelle).catch(aufraeumFehler =>
+      logger.error({ err: aufraeumFehler, quelleId: quelle._id }, 'spur: Quelle nach gescheiterter Aufnahme nicht gelöscht')
+    )
+    throw error
+  }
+  return quelle
+}
+
 const nichtFrei = () => new Problem(409, 'nicht_frei', 'spur_fehler_nicht_frei')
 
 // Kein Fundort lieferte das PDF. Frei, aber abgewiesen (bot_schutz) heißt: Im Browser lässt es sich laden.
@@ -177,12 +212,7 @@ export async function perDoi({ projectId, userId, doi }) {
   if (!meta.gefunden) throw new Problem(404, 'doi_nicht_gefunden', 'spur_fehler_doi_nicht_gefunden')
   const zugang = arxiv ? { frei: true, nurDiese: true, fundorte: meta.pdf ? [{ url: meta.pdf, art: 'repository', lizenz: null, seite: null }] : [] } : await unpaywall.status(wert)
   if (!zugang?.frei) throw nichtFrei()
-  const docs = await PruefManager.dokumente(projectId)
-  const belegt = new Set(quellen.map(q => q.key))
-  for (const d of docs.filter(d => d.pfad.endsWith('.bib'))) {
-    for (const key of bibLesen(d.text).keys()) belegt.add(key)
-  }
-  const key = freierKey(keyVorschlag(meta), belegt)
+  const { key, docs } = await neuerKey(projectId, quellen, meta)
   const ordner = await fs.mkdtemp(Path.join(os.tmpdir(), 'spur-doi-'))
   try {
     const tempPfad = Path.join(ordner, 'volltext.pdf')
@@ -220,16 +250,47 @@ export async function perDoi({ projectId, userId, doi }) {
       if (ABGEWIESEN.includes(ergebnis)) abgewiesen ??= ort.seite ?? ort.url
     }
     if (!quelle) throw gescheitert(versucht, abgewiesen)
-    try {
-      await ZitatManager.bibSicherstellen(projectId, docs, quelle, userId)
-    } catch (error) {
-      // Ohne .bib-Eintrag keine Quelle: Sonst schlüge jede Wiederholung mit „Bereits vorhanden“ fehl.
-      await QuellenManager.loeschen(quelle).catch(aufraeumFehler =>
-        logger.error({ err: aufraeumFehler, quelleId: quelle._id }, 'spur: Quelle nach gescheiterter Aufnahme nicht gelöscht')
-      )
-      throw error
+    return await mitBibEintrag(projectId, docs, quelle, userId)
+  } finally {
+    await fs.rm(ordner, { recursive: true, force: true })
+  }
+}
+
+// Quelle ohne DOI (Abschlussarbeit, Report, Working Paper): lädt das PDF von einer https-Adresse und legt die Quelle
+// mit den angegebenen Metadaten und einem passenden .bib-Eintrag an.
+export async function perUrl({ projectId, userId, pdfUrl, metadaten }) {
+  const angaben = metadatenOhneDoi(metadaten)
+  const url = String(pdfUrl).trim()
+  const quellen = await QuellenManager.alle(projectId)
+  const vorhanden = () => new Problem(409, 'quelle_vorhanden', 'spur_fehler_quelle_vorhanden')
+  if (quellen.some(q => q.pdfUrl === url)) throw vorhanden()
+  const meta = { ...angaben, url: angaben.url ?? url, abgerufenAm: jetzt() }
+  const { key, docs } = await neuerKey(projectId, quellen, meta)
+  const ordner = await fs.mkdtemp(Path.join(os.tmpdir(), 'spur-url-'))
+  try {
+    const tempPfad = Path.join(ordner, 'volltext.pdf')
+    const { ergebnis, groesse } = await fundortLaden(url, tempPfad, Date.now() + FRIST_MS)
+    if (ergebnis === 'zu_gross') throw zuGross()
+    if (ergebnis !== 'pdf') {
+      throw new Problem(502, 'pdf_fehlt', 'spur_fehler_pdf_url_laden', undefined, {
+        versucht: [{ url, host: hostVon(url), art: 'pdf_url', ergebnis }],
+      })
     }
-    return quelle
+    const hash = createHash('sha256').update(await fs.readFile(tempPfad)).digest('hex')
+    if (quellen.some(q => q.hash === hash)) throw vorhanden()
+    const quelle = await QuellenManager.aufnehmen({
+      projectId,
+      userId,
+      dateiname: `${key}.pdf`,
+      tempPfad,
+      groesse,
+      key,
+      meta,
+      // Ohne Lizenzangabe bleibt der Volltext wie bei der Aufnahme per DOI in diesem Projekt.
+      nurProjekt: true,
+      felder: { pdfUrl: url, hash },
+    })
+    return await mitBibEintrag(projectId, docs, quelle, userId)
   } finally {
     await fs.rm(ordner, { recursive: true, force: true })
   }

@@ -54,7 +54,10 @@ beforeEach(async () => {
       status: vi.fn(),
     },
     TexPakete: { hinzufuegen: vi.fn(async () => ({ paket: 'xfrac', dateien: [], fehlende_abhaengigkeiten: [] })) },
-    Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
+    Aufnahme: {
+      perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })),
+      perUrl: vi.fn(async () => ({ _id: 'q2', key: 'virtanen2024', dateiname: 'virtanen2024.pdf', doi: null, titelabgleich: 'passt' })),
+    },
     Erwaehnung: { imThreadAntworten: vi.fn(async () => ({ nachricht_id: 'm1' })) },
     Vorschlaege: { ARTEN: ['compile_fehler', 'belegloses_argument'], vorschlagen: vi.fn(async () => ({ vorschlag_id: 'v1' })) },
     Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
@@ -459,6 +462,28 @@ describe('Recherche', () => {
       doi: '10.1/x',
     })
     expect(m.Beschaffung.aufnehmenOderVormerken).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
+  })
+
+  it('source_add nimmt eine Quelle ohne DOI per pdf_url mit Metadaten auf', async () => {
+    mitStufe('readOnly')
+    const metadaten = { titel: 'Generative AI adoption in a large enterprise', autoren: [{ family: 'Virtanen', given: 'Aino' }], jahr: 2024, art: 'thesis' }
+    const eingabe = { project_id: projekt, pdf_url: 'https://trepo.example/thesis.pdf', metadaten }
+    expect(await fehlerVon(aufruf('source_add', eingabe))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('owner')
+    expect(await aufruf('source_add', eingabe)).toEqual({ quelle_id: 'q2', key: 'virtanen2024', dateiname: 'virtanen2024.pdf', doi: null, titelabgleich: 'passt' })
+    expect(m.Aufnahme.perUrl).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, pdfUrl: 'https://trepo.example/thesis.pdf', metadaten })
+    expect(m.Beschaffung.aufnehmenOderVormerken).not.toHaveBeenCalled()
+  })
+
+  it('source_add verlangt genau eines von doi und pdf_url und nennt das Feld', async () => {
+    mitStufe('owner')
+    const beide = await fehlerVon(aufruf('source_add', { project_id: projekt, doi: '10.1/x', pdf_url: 'https://trepo.example/thesis.pdf' }))
+    expect(beide).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'pdf_url' } })
+    expect(beide.message).toContain('doi und pdf_url')
+    const keines = await fehlerVon(aufruf('source_add', { project_id: projekt }))
+    expect(keines).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'doi' } })
+    expect(m.Aufnahme.perUrl).not.toHaveBeenCalled()
+    expect(m.Beschaffung.aufnehmenOderVormerken).not.toHaveBeenCalled()
   })
 
   it('source_add nennt nach einer Aufnahme das Ergebnis des Titelabgleichs', async () => {

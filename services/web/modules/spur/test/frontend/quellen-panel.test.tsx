@@ -182,6 +182,21 @@ describe('Quellen-Panel', function () {
     expect((await zeile('scan.pdf')).textContent).not.to.match(/Titel im PDF|Lizenz/)
   })
 
+  it('nennt bei Quellen ohne DOI die Art des Werks neben Autoren und Jahr', async function () {
+    fetchMock.get(QUELLEN, {
+      quellen: [
+        quelle('virtanen2024', { titel: 'Generative AI adoption', autoren: ['A. Virtanen'], jahr: 2024, werkart: 'thesis' }),
+        quelle('meyer2023', { titel: 'AI at Work', autoren: ['J. Meyer', 'C. Okafor'], jahr: 2023, werkart: 'report' }),
+        quelle('notiz', { titel: 'Notiz', autoren: [], jahr: null, werkart: 'misc' }),
+      ],
+      gesamt: 3,
+    })
+    zeigen()
+    await screen.findByText('A. Virtanen · 2024 · Abschlussarbeit')
+    await screen.findByText('J. Meyer, C. Okafor · 2023 · Report')
+    expect(screen.queryByText(/spur_werkart|Sonstiges/)).to.equal(null)
+  })
+
   it('lädt weitere Quellen nach und nennt den Stand', async function () {
     fetchMock.get(QUELLEN, { quellen: [quelle('a')], gesamt: 3 })
     fetchMock.get(QUELLEN_SEITE_2, { quellen: [quelle('b')], gesamt: 3 })

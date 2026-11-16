@@ -412,3 +412,103 @@ describe('Ausweichwege', () => {
   })
 })
 
+// Echter Fall: eine Masterarbeit der Universität Tampere ohne DOI ließ sich nicht aufnehmen.
+describe('perUrl', () => {
+  const URL_PDF = 'https://trepo.example/bitstream/handle/1/thesis.pdf'
+  const TAMPERE = {
+    titel: 'Generative AI adoption in a large enterprise',
+    autoren: [{ family: 'Virtanen', given: 'Aino' }],
+    jahr: 2024,
+    art: 'thesis',
+    abschluss: "Master's thesis",
+    institution: 'Tampere University',
+  }
+  const perUrl = (pdfUrl = URL_PDF, metadaten = TAMPERE) => Aufnahme.perUrl({ projectId, userId, pdfUrl, metadaten })
+
+  it('lädt das PDF und legt die Quelle mit Key aus Nachname und Jahr, Metadaten und .bib-Eintrag an', async () => {
+    const quelle = await perUrl()
+    expect(holen.mock.calls[0][0].href).toBe(URL_PDF)
+    expect(geladen[0]).toMatchObject({
+      projectId,
+      userId,
+      key: 'virtanen2024',
+      dateiname: 'virtanen2024.pdf',
+      groesse: PDF.length,
+      nurProjekt: true,
+      meta: { ...TAMPERE, url: URL_PDF, abgerufenAm: expect.any(Date) },
+      felder: { pdfUrl: URL_PDF, hash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+    })
+    expect(geladen[0]).not.toHaveProperty('doi')
+    // Die Person hat die Adresse selbst gewählt: Ein abweichender Titel weist das PDF nicht ab.
+    expect(geladen[0].titelStreng).toBeUndefined()
+    expect(m.ZitatManager.bibSicherstellen).toHaveBeenCalledWith(projectId, expect.any(Array), expect.objectContaining({ key: 'virtanen2024' }), userId)
+    expect(quelle.key).toBe('virtanen2024')
+  })
+
+  it('nimmt die url aus den Metadaten für die .bib, wenn sie angegeben ist', async () => {
+    await perUrl(URL_PDF, { ...TAMPERE, url: 'https://trepo.example/handle/1' })
+    expect(geladen[0].meta.url).toBe('https://trepo.example/handle/1')
+    expect(geladen[0].felder.pdfUrl).toBe(URL_PDF)
+  })
+
+  it('verlangt einen Titel, bevor etwas geladen wird', async () => {
+    const fehler = await fehlerVon(perUrl(URL_PDF, { ...TAMPERE, titel: undefined }))
+    expect(fehler).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'metadaten.titel' } })
+    expect(await fehlerVon(perUrl(URL_PDF, null))).toMatchObject({ typ: 'eingabe_ungueltig' })
+    expect(holen).not.toHaveBeenCalled()
+  })
+
+  it.each(['http://trepo.example/thesis.pdf', 'https://127.0.0.1/thesis.pdf', 'https://localhost/thesis.pdf', 'https://10.0.0.5/thesis.pdf', 'file:///etc/passwd', 'kein link'])(
+    'ruft %s nicht ab und meldet pdf_fehlt',
+    async adresse => {
+      const fehler = await fehlerVon(perUrl(adresse))
+      expect(fehler).toMatchObject({ status: 502, typ: 'pdf_fehlt', message: meldung('spur_fehler_pdf_url_laden') })
+      expect(fehler.zusatz.versucht).toMatchObject([{ url: adresse, art: 'pdf_url', ergebnis: 'gesperrt' }])
+      expect(holen).not.toHaveBeenCalled()
+      expect(geladen).toEqual([])
+    }
+  )
+
+  it('lässt mit Paper-Fake nur Adressen unter der Basis des Fakes ins lokale Netz', async () => {
+    m.schalter.paperApiBasis = () => 'http://127.0.0.1/spur/dev/crossref'
+    for (const adresse of ['http://localhost/spur/dev/crossref/thesis/tampere.pdf', 'http://127.0.0.1/spur/dev/e2e/x.pdf', 'http://127.0.0.1/spur/dev/crossref-anders/x.pdf']) {
+      expect(await fehlerVon(perUrl(adresse))).toMatchObject({ typ: 'pdf_fehlt' })
+    }
+    expect(holen).not.toHaveBeenCalled()
+    await perUrl('http://127.0.0.1/spur/dev/crossref/thesis/tampere.pdf')
+    expect(holen).toHaveBeenCalledTimes(1)
+    expect(holen.mock.calls[0][1].gesperrt('127.0.0.1')).toBe(false)
+  })
+
+  it('meldet quelle_vorhanden für dieselbe Adresse, ohne sie erneut abzurufen', async () => {
+    vorhandene = [{ key: 'virtanen2024', pdfUrl: URL_PDF }]
+    expect(await fehlerVon(perUrl())).toMatchObject({ status: 409, typ: 'quelle_vorhanden' })
+    expect(holen).not.toHaveBeenCalled()
+  })
+
+  it('meldet quelle_vorhanden für dieselbe Datei unter einer anderen Adresse', async () => {
+    await perUrl()
+    vorhandene = [{ key: 'virtanen2024', pdfUrl: URL_PDF, hash: geladen[0].felder.hash }]
+    expect(await fehlerVon(perUrl('https://spiegel.example/thesis.pdf'))).toMatchObject({ status: 409, typ: 'quelle_vorhanden' })
+    expect(geladen).toHaveLength(1)
+  })
+
+  it('meldet pdf_fehlt mit dem Ergebnis, wenn die Adresse kein PDF liefert, und zu große Dateien mit 413', async () => {
+    holen.mockResolvedValueOnce(antwort('<html><body>Landing page</body></html>'))
+    const fehler = await fehlerVon(perUrl())
+    expect(fehler).toMatchObject({ status: 502, typ: 'pdf_fehlt' })
+    expect(fehler.zusatz.versucht).toEqual([{ url: URL_PDF, host: 'trepo.example', art: 'pdf_url', ergebnis: 'html' }])
+    holen.mockResolvedValueOnce(antwort(Buffer.concat([PDF, Buffer.alloc(2000)])))
+    expect(await fehlerVon(perUrl())).toMatchObject({ status: 413, typ: 'zu_gross' })
+  })
+
+  it('hängt bei belegtem Key einen Buchstaben an und räumt auf, wenn die .bib nicht ergänzt werden kann', async () => {
+    vorhandene = [{ key: 'virtanen2024' }]
+    await perUrl()
+    expect(geladen[0].key).toBe('virtanen2024a')
+    m.ZitatManager.bibSicherstellen.mockRejectedValueOnce(new Error('Editor weg'))
+    await fehlerVon(perUrl('https://trepo.example/zweite.pdf'))
+    expect(m.QuellenManager.loeschen).toHaveBeenCalled()
+  })
+})
+

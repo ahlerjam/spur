@@ -22,3 +22,12 @@
 - f2: „Beste Adresse“ ist die Artikelseite (`url_for_landing_page`) des ersten Fundorts, der den Server abgewiesen hat, sonst dessen PDF-Adresse. Sie steht bei `bot_schutz` auch in der Antwort (`adresse`). Die Liste verlinkt sie nur mit http(s).
 - f2: Ein von Hand angelegter Eintrag (`acquisition_add`) hat keinen Grund und zeigt kein Abzeichen.
 - f3: Suchdienste wiederholen 429, 503 und Netzfehler (höchstens 3 Versuche, 20 s). `versuche` je Dienst ist die höchste Zahl an Versuchen für eine einzelne Anfrage; 0 heißt: Antwort aus dem Cache. Die Pausenregel teilen sich Suche und Volltext-Download (`recherche/wiederholen.mjs`).
+- f4: `source_add` prüft `doi`, `pdf_url` und `metadaten` selbst (lockeres Schema), damit jeder Eingabefehler `eingabe_ungueltig` mit `feld` ergibt statt eines Protokollfehlers von MCP.
+- f4: Adressprüfung im Dev-Stack verschärft: Ins lokale Netz dürfen nur noch Adressen unter `SPUR_PAPER_API_BASE` (vorher mit Fake jede Adresse). Sonst gilt überall die Regel „öffentliche https-Adresse“. Im E2E-Lauf ist die Adresse der Abschlussarbeit deshalb `http://127.0.0.1/spur/dev/crossref/thesis/tampere.pdf` (der Fake hat kein TLS); `http://…`, `localhost` und IP-Adressen außerhalb der Fake-Basis werden nicht abgerufen.
+- f4: Quellen aus `pdf_url` tragen `pdfUrl` und `hash` (SHA-256 der Datei) für die Dublettenprüfung und bleiben ohne Lizenzangabe im Projekt (`nurProjekt`), wie bei der Aufnahme per DOI. `url` in der `.bib` ist `metadaten.url`, sonst die `pdf_url`.
+- f4: `.bib`-Typen: `thesis` → `@thesis`, `report` → `@report`, `working_paper` → `@report` mit `type = {Working paper}` (oder `abschluss`), `book` → `@book` (`publisher`), `misc` → `@misc` (`organization`).
+- f4: Upload ohne `doi`: Sobald eines der Felder `autoren`, `jahr`, `art`, `institution`, `abschluss`, `url` mitkommt, entsteht der Eintrag wie bei `pdf_url` (Key aus Nachname und Jahr, `.bib`). Nur `titel` verhält sich wie bisher (Key aus dem Dateinamen, kein `.bib`-Eintrag), damit bestehende Aufrufe gleich bleiben. Die Antwort nennt zusätzlich `key`.
+- f4: Der Prüfbericht markiert die Stelle aus der Abschlussarbeit, bis die Person die Seitenzahl bestätigt (PDF ohne PageLabels, bestehende Regel für jede Quelle). Die Referenz „ohne DOI“ ist kein Problem. Der E2E-Schritt bestätigt die Seite wie eine Nutzerin.
+
+## Vorschläge (nicht gebaut)
+- `spur-hochladen --abschluss`: Die Spec nennt die Option nicht; der Server nimmt das Feld `abschluss` beim Upload schon an. Ohne sie fehlt bei hochgeladenen Abschlussarbeiten `type` in der `.bib`.

@@ -6,8 +6,10 @@ import { mitProblemen, Problem, problemSenden } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import { quellen } from '../sammlungen.mjs'
 import { rolleFuerClaude } from '../rechte.mjs'
+import { jetzt } from '../schalter.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
+import { autorenAusText, metadatenOhneDoi } from '../recherche/ohneDoi.mjs'
 import { doiPruefen } from '../recherche/Recherche.mjs'
 import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
@@ -52,8 +54,33 @@ async function doiMetadaten(doi) {
   }
 }
 
+const OHNE_DOI_FELDER = ['autoren', 'jahr', 'art', 'institution', 'abschluss', 'url']
+
+// Ohne DOI, aber mit Angaben zum Werk (Autoren, Jahr, Art, Institution): Die Quelle bekommt wie bei source_add mit
+// pdf_url einen Key aus Nachname und Jahr und einen .bib-Eintrag passend zur Art.
+async function ohneDoiAufnehmen(link, req, dateiname) {
+  const { autoren, ...felder } = req.body
+  const angaben = metadatenOhneDoi({ ...felder, autoren: autorenAusText(autoren) })
+  const meta = angaben.url ? { ...angaben, abgerufenAm: jetzt() } : angaben
+  const alle = await QuellenManager.alle(link.projectId)
+  const vorhanden = alle.find(q => q.dateiname === dateiname)
+  if (vorhanden) return { vorhanden }
+  const { key, docs } = await Aufnahme.neuerKey(link.projectId, alle, meta)
+  const quelle = await QuellenManager.aufnehmen({
+    projectId: link.projectId,
+    userId: link.menschId,
+    dateiname,
+    tempPfad: req.file.path,
+    groesse: req.file.size,
+    key,
+    meta,
+  })
+  return await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
+}
+
 async function aufnehmen(link, req, dateiname) {
   const doi = req.body?.doi ? doiPruefen(String(req.body.doi)) : undefined
+  if (!doi && OHNE_DOI_FELDER.some(feld => req.body?.[feld])) return await ohneDoiAufnehmen(link, req, dateiname)
   const titel = req.body?.titel ? String(req.body.titel).slice(0, 500) : undefined
   const meta = titel ? { titel } : doi ? await doiMetadaten(doi) : undefined
   try {
@@ -104,6 +131,7 @@ export const hochladen = mitProblemen(async (req, res) => {
       datei: dateiname,
       status: 'angelegt',
       quelle_id: String(ergebnis._id),
+      key: ergebnis.key,
       ...titelBefund(ergebnis),
       ...(eintrag && { beschaffung_id: String(eintrag._id) }),
     })

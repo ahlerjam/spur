@@ -162,7 +162,7 @@ paperFake.get('/_semantik', (req, res) => res.json({ modellVorhanden: existsSync
 paperFake.get('/_protokoll', (req, res) => res.json({ abrufe: zustand.protokoll }))
 
 paperFake.use((req, res, next) => {
-  const dienst = /^\/(arxiv|openalex|s2|unpaywall|europepmc|fundort|pdf|doiorg|datacite|texlive|texlive-b)\//.exec(req.path)?.[1] ?? 'crossref'
+  const dienst = /^\/(arxiv|openalex|s2|unpaywall|europepmc|fundort|thesis|pdf|doiorg|datacite|texlive|texlive-b)\//.exec(req.path)?.[1] ?? 'crossref'
   zustand.protokoll.push({ dienst, pfad: req.originalUrl, zeit: Date.now() })
   zustand.protokoll = zustand.protokoll.slice(-500)
   if (zustand.ausfall.has(dienst)) return res.status(503).send('Service unavailable')
@@ -185,6 +185,9 @@ paperFake.get('/pdf/:datei', (req, res) => {
   if (!WERKE.some(w => w.pdf === req.params.datei)) return res.sendStatus(404)
   pdfSenden(res, req.params.datei)
 })
+
+// Eine Abschlussarbeit ohne DOI, wie sie ein Hochschul-Repositorium direkt als PDF ausliefert.
+paperFake.get('/thesis/tampere.pdf', (req, res) => pdfSenden(res, 'tampere.pdf'))
 
 // So sieht die Seite aus, mit der Verlage Server abweisen: Status 200, aber kein PDF.
 const BOT_SEITE = '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>Checking your browser before accessing the article.</body></html>'

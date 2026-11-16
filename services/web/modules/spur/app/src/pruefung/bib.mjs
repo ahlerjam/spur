@@ -64,8 +64,31 @@ function webEintrag(key, quelle) {
   ])
 }
 
+// Eintragstyp je Art einer Quelle ohne DOI; `stelle` ist das Feld für die Institution.
+const OHNE_DOI = {
+  thesis: { typ: 'thesis', stelle: 'institution', mitType: true },
+  report: { typ: 'report', stelle: 'institution', mitType: true },
+  working_paper: { typ: 'report', stelle: 'institution', mitType: true, type: 'Working paper' },
+  book: { typ: 'book', stelle: 'publisher' },
+  misc: { typ: 'misc', stelle: 'organization' },
+}
+
+function ohneDoiEintrag(key, { meta }) {
+  const form = OHNE_DOI[meta.art]
+  return alsBib(form.typ, key, [
+    ['author', text(meta.autoren?.map(autorName).join(' and '))],
+    ['title', text(meta.titel)],
+    ['year', ohneKlammern(meta.jahr)],
+    ['type', form.mitType && text(meta.abschluss ?? form.type)],
+    [form.stelle, text(meta.institution)],
+    ['url', ohneKlammern(meta.url)],
+    ['urldate', meta.url && meta.abgerufenAm?.toISOString().slice(0, 10)],
+  ])
+}
+
 export function bibEintrag(key, quelle) {
   if (quelle.art === 'web') return webEintrag(key, quelle)
+  if (!quelle.doi && OHNE_DOI[quelle.meta?.art]) return ohneDoiEintrag(key, quelle)
   const meta = quelle.meta?.gefunden ? quelle.meta : {}
   return alsBib('article', key, [
     ['author', text(meta.autoren?.map(autorName).join(' and '))],

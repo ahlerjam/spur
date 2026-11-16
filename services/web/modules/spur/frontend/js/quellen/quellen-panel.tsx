@@ -67,7 +67,8 @@ function QuellenZeile({
   const ocrMoeglich =
     textErkennen && quelle.art === 'pdf' && quelle.status === 'kein_text' && quelle.ocr?.status !== 'laeuft'
   const titel = quelle.titel ?? quelle.dateiname
-  const herkunft = [autorenKurz(quelle.autoren, t), quelle.jahr].filter(Boolean).join(' · ')
+  const werkart = quelle.werkart && quelle.werkart !== 'misc' ? t(`spur_werkart_${quelle.werkart}`) : null
+  const herkunft = [autorenKurz(quelle.autoren, t), quelle.jahr, werkart].filter(Boolean).join(' · ')
   return (
     <li className="spur-zeile">
       <button type="button" className="spur-quelle-titel" data-quelle-id={quelle.id} onClick={oeffnen}>
