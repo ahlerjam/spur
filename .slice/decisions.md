@@ -69,3 +69,9 @@
 - D15 (plan 20261116-spur-p16-tex) f1: Schritt 5 (eine APA-7-Arbeit kompiliert im Dev-Stack ohne Nachladen) braucht ein Dev-Image mit der neuen Paketliste. Das vorhandene Image ist älter; der E2E-Schritt `p16f1b` überspringt sich deshalb, f1 bleibt offen.
   Interim: Als Teilstand gemergt (f2, f3 bestanden). Ersatzbeleg des Builders: Pakete der Liste in ein temporäres TEXMFHOME entpackt, APA-Arbeit und minted-Beispiel kompilieren zu PDFs.
   Options: A (empfohlen) Workflow „Dev image“ starten, danach `p16f1b` laufen lassen und f1 auf bestanden setzen | B den Smoke-Schritt des Workflows als Beleg annehmen
+- D16 (plan 20261116-spur-p14-pruefbericht) Prüfung des ganzen Diffs: Der Builder fand vier mögliche Fehler in Code aus P12, P13 und P16, die er nicht angefasst hat: `pruefung/bib.mjs:146` (Quelle ohne DOI bekommt einen leeren `@article`, wenn das PDF irgendwo eine DOI nennt); `kompilieren/Kompilieren.mjs:69` (Compile-Job bleibt `laeuft`, bis das Nachschlagen fehlender Pakete fertig ist, bis 30 s je Spiegel); `fehlende-pakete.tsx:26` (ab der 21. fehlenden Datei verschwinden Zeilen); `Suchprotokoll.mjs:47` (`error.writeErrors` als Array angenommen, Treiberverhalten nicht verifiziert).
+  Interim: nicht geändert, nicht nachgeprüft.
+  Options: A (empfohlen) kleiner Nachbesserungsplan nach P17, je Punkt zuerst ein roter Test | B einzeln prüfen und ins Backlog
+- D17 (plan 20261116-spur-p14-pruefbericht) Abnahme: Die Kopfzeile des Prüfberichts nennt „ohne Quelle“ zweimal (markiert und nicht markiert), etwa „1 ohne Quelle, 1 nicht prüfbar, 3 ohne Quelle“.
+  Interim: so gelassen.
+  Options: A (empfohlen) Zusatz „davon nicht markiert“ im Nachbesserungsplan | B so lassen
