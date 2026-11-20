@@ -12,8 +12,8 @@ function zahl(n) {
   return n < ZAHLWOERTER.length ? ZAHLWOERTER[n] : String(n)
 }
 
-function satz(schluessel, n) {
-  const text = n === 1 ? meldung(`${schluessel}_1`) : meldung(`${schluessel}_n`, { anzahl: zahl(n) })
+function satz(n, einer, mehrere) {
+  const text = n === 1 ? einer : mehrere.replace('__anzahl__', zahl(n))
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
@@ -46,10 +46,15 @@ function hinweisFuer(lauf, stand, { angenommenVonHand, offenRot }) {
   if (stand.gesamt === 0) return meldung('spur_lauf_hinweis_leer')
   if (lauf.status === 'zurueckgenommen') return meldung('spur_lauf_hinweis_zurueckgenommen')
   const saetze = []
-  if (stand.automatisch_angenommen) saetze.push(satz('spur_lauf_hinweis_automatisch', stand.automatisch_angenommen))
-  if (angenommenVonHand) saetze.push(satz('spur_lauf_hinweis_von_hand', angenommenVonHand))
-  if (stand.offen) saetze.push(satz('spur_lauf_hinweis_offen', stand.offen))
-  if (offenRot) saetze.push(satz('spur_lauf_hinweis_rot', offenRot))
-  saetze.push(satz('spur_lauf_hinweis_rueckgaengig', stand.gesamt))
+  const { automatisch_angenommen: automatisch, offen, gesamt } = stand
+  if (automatisch) {
+    saetze.push(satz(automatisch, meldung('spur_lauf_hinweis_automatisch_1'), meldung('spur_lauf_hinweis_automatisch_n')))
+  }
+  if (angenommenVonHand) {
+    saetze.push(satz(angenommenVonHand, meldung('spur_lauf_hinweis_von_hand_1'), meldung('spur_lauf_hinweis_von_hand_n')))
+  }
+  if (offen) saetze.push(satz(offen, meldung('spur_lauf_hinweis_offen_1'), meldung('spur_lauf_hinweis_offen_n')))
+  if (offenRot) saetze.push(satz(offenRot, meldung('spur_lauf_hinweis_rot_1'), meldung('spur_lauf_hinweis_rot_n')))
+  saetze.push(satz(gesamt, meldung('spur_lauf_hinweis_rueckgaengig_1'), meldung('spur_lauf_hinweis_rueckgaengig_n')))
   return saetze.join(' ')
 }
