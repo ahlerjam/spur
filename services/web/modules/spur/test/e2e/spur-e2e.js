@@ -7125,8 +7125,6 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       const ohne = await werkzeug('spur_e2e_p3a', name, { project_id: pid, ...args })
       ok(ohne.fehler && ohne.inhalt.fehler === 'keine_rechte', `${name} ohne Zugriff: ${JSON.stringify(ohne.inhalt)}`)
     }
-    const webOhne = await page.request.get(`${BASE}/spur/project/${'0'.repeat(24)}/recherche/protokoll`)
-    ok(webOhne.status() === 403 || webOhne.status() === 404, `Web-Protokoll eines fremden Projekts: ${webOhne.status()}`)
 
     // Beschreibungen und Vertrag erklären Felder und Gleichung.
     const { daten } = await mcp(token, 'tools/list')
@@ -7184,6 +7182,13 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
     await page.locator('.spur-panel').getByText(/^Noch keine Suche/).waitFor({ timeout: 20000 })
     ok((await page.locator('.spur-prisma').count()) === 0, 'Summenzeile in einem Projekt ohne Suche')
+
+    // Ein angemeldetes Konto ohne Zugriff auf das Projekt bekommt auch über die Web-Route kein Protokoll.
+    await anmelden('e2e-p3a@example.org')
+    for (const pfad of ['protokoll', 'protokoll.csv']) {
+      const r = await page.request.get(`${BASE}/spur/project/${pid}/recherche/${pfad}`, { headers: { Accept: 'application/json' }, maxRedirects: 0 })
+      ok(r.status() === 403, `Web-Route ${pfad} ohne Zugriff: ${r.status()}`)
+    }
   }
 
   // P12: Die neuen Ansichten bei 360 und 1280 px, hell und dunkel: kein Überlauf, Kontrast mindestens 4,5:1.

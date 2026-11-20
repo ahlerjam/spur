@@ -42,6 +42,7 @@ beforeEach(async () => {
     },
     ZitatManager: { bibSicherstellen: vi.fn(async () => 'smith2024') },
     PruefManager: { dokumente: vi.fn(async () => []) },
+    Suchprotokoll: { aufnahmeFehlerMerken: vi.fn(async () => {}) },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -50,6 +51,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/QuellenManager.mjs', () => m.QuellenManager)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.ZitatManager)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.PruefManager)
+  vi.doMock('../../app/src/recherche/Suchprotokoll.mjs', () => m.Suchprotokoll)
   Beschaffung = await import('../../app/src/recherche/Beschaffung.mjs')
 })
 
@@ -210,6 +212,14 @@ describe('aufnehmenOderVormerken', () => {
     scheitert(502, 'pdf_fehlt', { versucht: VERSUCHT })
     expect(await fehlerVon(aufnehmen())).toMatchObject({ typ: 'pdf_fehlt', zusatz: { versucht: VERSUCHT } })
     expect(await eintraege()).toEqual([])
+  })
+
+  it('vermerkt pdf_fehlt im Suchprotokoll und meldet den Fehler samt versucht, auch wenn das Vermerken scheitert', async () => {
+    scheitert(502, 'pdf_fehlt', { versucht: VERSUCHT })
+    await fehlerVon(aufnehmen())
+    expect(m.Suchprotokoll.aufnahmeFehlerMerken).toHaveBeenCalledWith(projectId, DOI, 'pdf_fehlt')
+    m.Suchprotokoll.aufnahmeFehlerMerken.mockRejectedValue(new Error('Mongo weg'))
+    expect(await fehlerVon(aufnehmen())).toMatchObject({ status: 502, typ: 'pdf_fehlt', zusatz: { versucht: VERSUCHT } })
   })
 
   it('meldet den ursprünglichen Fehler, wenn der Eintrag nicht angelegt werden kann', async () => {

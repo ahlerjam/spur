@@ -393,6 +393,27 @@ describe('Ausweichwege', () => {
     }
   })
 
+  it('nennt Fundorte, für die nach 60 Sekunden keine Zeit mehr blieb, als zeit_abgelaufen statt als Netzfehler', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      Aufnahme.netz.warten.mockImplementation(async ms => vi.advanceTimersByTime(ms))
+      m.dienste.unpaywall.status.mockResolvedValue(frei(ort(REPO, 'repository'), ort(VERLAG)))
+      // Jeder Abruf dauert 25 s: Nach drei Versuchen am ersten Fundort (dazwischen 1 und 2 s Pause) ist die Frist um.
+      holen.mockImplementation(async () => {
+        vi.advanceTimersByTime(25000)
+        return antwort('', { status: 503 })
+      })
+      const fehler = await fehlerVon(aufnehmen(DOI))
+      expect(fehler.zusatz.versucht.map(v => [v.url, v.ergebnis])).toEqual([
+        [REPO, '503'],
+        [VERLAG, 'zeit_abgelaufen'],
+      ])
+      expect(holen).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('weist ein PDF mit anderem Titel ab und nimmt den nächsten Fundort', async () => {
     m.dienste.unpaywall.status.mockResolvedValue(frei(ort(REPO, 'repository', 'cc-by'), ort(VERLAG, 'publisher', 'cc-by')))
     m.QuellenManager.aufnehmen
