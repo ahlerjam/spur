@@ -63,3 +63,9 @@
 - Dabei gefunden: Der Testdatenbank fehlte der eindeutige Index auf `spurSearchHits`, der Test für parallele Suchen bestand deshalb nur zufällig. Index in `test/unit/hilfen/datenbank.mjs` ergänzt; der Test ist jetzt stabil grün.
 - Ansichten: Neuer E2E-Schritt `p12ansicht` prüft Quellen-Panel, Beschaffungsliste (beide Abzeichen), Suchprotokoll und leeres Suchprotokoll bei 360 und 1280 px, hell und dunkel, auf Überlauf und Kontrast ≥ 4,5:1.
 - `p12ansicht` fand im dunklen Design zu wenig Kontrast: die Abzeichen der Gründe (1,21; `OLBadge bg="light"` ohne `text="dark"`, das bei den Suchtreffern schon gesetzt ist) und die Links der Beschaffungsliste (3,09; betrifft auch das ältere „In der Bibliothek holen“). Behoben: dunkle Schrift auf dem Abzeichen, Links mit `--link-ui-themed` wie `.spur-paper-doi`. Der Schritt misst erst, wenn keine CSS-Übergänge mehr laufen (der Export-Knopf blendet beim Freischalten über).
+
+## Ansichten (Screenshots bei 360 und 1280 px, `.playwright-mcp/p12-*.png`, nicht im Repo)
+- Quellen-Panel: Lizenz als ruhige Zusatzzeile in der Metadatenfarbe, Titelhinweis mit Warnsymbol und Text direkt an der Quelle. Unverändert.
+- Leeres Suchprotokoll: erklärt den Zustand, Export ausgegraut. Unverändert.
+- Suchprotokoll: Die Summenzeile ist das eine fette Element (PRISMA). Geändert: Zahl und Begriff einer Summe brechen nicht mehr auseinander („7 / gesichtet“); die Dienste einer Anfrage stehen als eine fließende Zeile statt vier gleicher Zeilen und brechen nur zwischen Diensten um. Ein erster Versuch ließ die Summenzeile bei 360 px über das Panel hinauslaufen und wurde korrigiert.
+- Beschaffungsliste: Gründe als graue Abzeichen neben dem Status. Geändert: Die beiden Links stehen bündig untereinander (vorher war „In der Bibliothek holen“ nach dem Umbruch eingerückt).

@@ -166,7 +166,9 @@ describe('Recherche-Panel', function () {
     })
     render(<RecherchePanel />, { wrapper: EditorProviders })
     fireEvent.click(screen.getByRole('tab', { name: 'Suchprotokoll' }))
-    await screen.findByText('9 identifiziert, 2 Dubletten, 7 gesichtet, 2 aufgenommen, 3 ausgeschlossen, 1 nicht beschaffbar, 1 offen')
+    // Die Teile der Summenzeile stehen in eigenen Elementen, damit Zahl und Begriff nicht auseinanderbrechen.
+    const summe = await screen.findByText((_, el) => el?.classList.contains('spur-prisma-zeile') ?? false)
+    expect(summe.textContent).to.equal('9 identifiziert, 2 Dubletten, 7 gesichtet, 2 aufgenommen, 3 ausgeschlossen, 1 nicht beschaffbar, 1 offen')
     screen.getByText('Ausgeschlossen nach Grund: falsche Population (2), kein empirischer Beitrag (1)')
     screen.getByText('Nicht beschaffbar: nicht frei verfügbar (1)')
     const neu = screen.getByText('slow-wave sleep').closest('li')!

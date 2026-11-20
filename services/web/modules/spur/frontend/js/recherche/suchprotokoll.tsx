@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import OLButton from '@/shared/components/ol/ol-button'
 import OLSpinner from '@/shared/components/ol/ol-spinner'
@@ -51,7 +51,17 @@ function Summen({ prisma }: { prisma: Prisma }) {
   const hindernisse = Object.entries(prisma.nicht_beschaffbar)
   return (
     <div className="spur-prisma">
-      <p className="spur-prisma-zeile">{teile.join(', ')}</p>
+      <p className="spur-prisma-zeile">
+        {teile.map((teil, i) => (
+          <Fragment key={teil}>
+            <span className="spur-prisma-teil">
+              {teil}
+              {i < teile.length - 1 && ','}
+            </span>
+            {i < teile.length - 1 && ' '}
+          </Fragment>
+        ))}
+      </p>
       {gruende.length > 0 && (
         <p className="spur-zeile-meta">
           {t('spur_prisma_ausgeschlossen_gruende')} {gruende.map(([grund, n]) => `${grund} (${n})`).join(', ')}
