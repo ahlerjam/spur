@@ -130,7 +130,8 @@ export async function log({ projectId, botId }) {
     job_id: job._id,
     compile: job.ergebnis.compile,
     fehler: fehlerAusLog(text),
-    fehlende_pakete: await fehlendePakete(fehlendeDateien(text)),
+    // Jobs von vor P16 haben die Liste noch nicht.
+    fehlende_pakete: job.ergebnis.fehlende_pakete ?? (await fehlendePakete(fehlendeDateien(text))),
     ende: text.slice(-MAX_LOG),
   }
 }

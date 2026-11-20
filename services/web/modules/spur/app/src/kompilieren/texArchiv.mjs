@@ -45,12 +45,17 @@ export function eintraegePruefen(liste) {
   return eintraege
 }
 
+// Pfad relativ zum TEXMF-Baum, wie im Archiv.
+function istLaufzeitDatei(pfad) {
+  const name = Path.posix.basename(pfad)
+  return /^(tex|fonts|bibtex)\//.test(pfad) && ENDUNGEN.has(Path.posix.extname(name)) && SICHERER_DATEINAME.test(name)
+}
+
 export function laufzeitDateien(eintraege) {
   const gesehen = new Set()
   return eintraege
-    .filter(e => /^(tex|fonts|bibtex)\//.test(e.pfad))
+    .filter(e => istLaufzeitDatei(e.pfad))
     .map(e => ({ ...e, name: Path.posix.basename(e.pfad) }))
-    .filter(e => ENDUNGEN.has(Path.posix.extname(e.name)) && SICHERER_DATEINAME.test(e.name))
     .filter(e => !gesehen.has(e.name) && gesehen.add(e.name))
 }
 
@@ -75,9 +80,9 @@ export function dateiIndexSammler() {
       } else if (!zeile.startsWith(' ')) {
         laufzeit = zeile.startsWith('runfiles ')
       } else if (laufzeit && paket) {
-        const pfad = zeile.trim().split(' ')[0]
+        const pfad = zeile.trim().split(' ')[0].replace(/^(RELOC|texmf-dist)\//, '')
         const name = Path.posix.basename(pfad)
-        if (ENDUNGEN.has(Path.posix.extname(name)) && !pfad.includes('/latex-dev/') && !index.has(name)) index.set(name, paket)
+        if (istLaufzeitDatei(pfad) && !pfad.startsWith('tex/latex-dev/') && !index.has(name)) index.set(name, paket)
       }
     },
   }

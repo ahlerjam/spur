@@ -80,10 +80,9 @@ test('die APA-7-Arbeit nutzt, was eine übliche Abschlussarbeit braucht', () => 
   assert.match(apa7, /\\documentclass\[man\]\{apa7\}/)
   assert.match(apa7, /\\usepackage\[ngerman\]\{babel\}/)
   assert.match(apa7, /\\usepackage\[style=apa,backend=biber\]\{biblatex\}/)
-  for (const paket of ['csquotes', 'booktabs', 'threeparttable', 'pgfplots', 'lineno', 'float', 'caption', 'setspace', 'hyperref']) {
+  for (const paket of ['csquotes', 'booktabs', 'threeparttable', 'pgfplots', 'lineno', 'float', 'caption', 'setspace', 'hyperref', 'cleveref']) {
     assert.match(apa7, new RegExp(`\\\\usepackage(\\[[^\\]]*\\])?\\{${paket}\\}`), paket)
   }
-  assert.match(apa7, /\\usepackage(\[[^\]]*\])?\{cleveref\}/)
   assert.match(apa7, /\\begin\{tablenotes\}/)
   assert.match(apa7, /\\begin\{figure\}\[H\]/)
   assert.match(apa7, /\\addplot/)
@@ -118,7 +117,7 @@ test('die Dockerfile prüft latexminted und Python 3.8+ nach der Installation', 
 test('LatexRunner.js übergibt kein Shell-Escape-Flag', () => {
   const runner = lesen('services/clsi/app/js/LatexRunner.js')
   assert.match(runner, /'latexmk',\n\s+'-cd',/)
-  for (const flag of ['-shell-escape', '--shell-escape', '-enable-write18', 'shell-escape']) {
+  for (const flag of ['shell-escape', 'enable-write18']) {
     assert.ok(!runner.includes(flag), flag)
   }
 })

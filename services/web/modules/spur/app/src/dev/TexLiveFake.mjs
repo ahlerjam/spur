@@ -48,19 +48,15 @@ export async function texLiveFake(req, res) {
   archiv(res, ['-C', `${FIXTURES}${paket}`, ...inhalt])
 }
 
-async function dateienUnter(ordner, pfad = '') {
-  const eintraege = await readdir(Path.join(ordner, pfad), { withFileTypes: true })
-  const listen = await Promise.all(
-    eintraege.map(e => (e.isDirectory() ? dateienUnter(ordner, Path.join(pfad, e.name)) : [Path.join(pfad, e.name)]))
-  )
-  return listen.flat()
-}
-
 export async function texLiveDatenbankFake(req, res) {
   const pakete = (await readdir(FIXTURES, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => e.name)
   const bloecke = await Promise.all(
     pakete.map(async paket => {
-      const laufzeit = (await dateienUnter(`${FIXTURES}${paket}`)).filter(p => !p.startsWith('tlpkg/'))
+      const eintraege = await readdir(`${FIXTURES}${paket}`, { recursive: true, withFileTypes: true })
+      const laufzeit = eintraege
+        .filter(e => e.isFile())
+        .map(e => Path.relative(`${FIXTURES}${paket}`, Path.join(e.parentPath, e.name)))
+        .filter(p => !p.startsWith('tlpkg/'))
       return `name ${paket}\nrunfiles size=1\n${laufzeit.map(p => ` RELOC/${p}`).join('\n')}\n`
     })
   )

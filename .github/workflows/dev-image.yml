@@ -72,8 +72,8 @@ jobs:
                 echo "$doc: kein PDF"
                 exit 1
               fi
-              # biblatex meldet optionale Konfigurationsdateien als „Info: … not found“.
-              if grep "not found" "$aus/output.log" | grep -v " Info: "; then
+              # Nur Fehlerzeilen („! … not found“); biblatex meldet optionale Dateien als „Info: … not found“.
+              if grep -E "^! .*not found" "$aus/output.log"; then
                 echo "$doc: Datei fehlt im Image"
                 exit 1
               fi

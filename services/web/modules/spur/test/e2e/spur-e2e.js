@@ -6772,18 +6772,22 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }, inhalt.data)
   }
 
+  // Paketliste des Images (tlmgr install in server-ce/Dockerfile-base) und der Schritt im Workflow `Dev image`.
+  const imageListe = dockerfile => dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0].split(/[\s\\]+/).filter(Boolean)
+  const smokeSchritt = workflow => workflow.split('- name: Smoke-Dokumente kompilieren')[1]?.split('\n      - name:')[0] ?? ''
+
   features.p16f1 = async () => {
     const REPO = `${FIXTURES}/../../../../../..`
     const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
-    const liste = dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0].split(/[\s\\]+/).filter(Boolean)
+    const liste = imageListe(dockerfile)
     ok(JSON.stringify(liste) === JSON.stringify([...new Set(liste)].sort()), 'Paketliste nicht alphabetisch oder mit Dubletten')
     const fehlen = ['apa7', 'booktabs', 'caption', 'float', 'lineno', 'pgfplots', 'threeparttable', 'cleveref', 'setspace', 'minted'].filter(p => !liste.includes(p))
     ok(fehlen.length === 0, `Fehlt im Image: ${fehlen}`)
     const apa7 = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke/apa7-arbeit.tex`)
     ok(apa7.includes('\\documentclass[man]{apa7}') && apa7.includes('\\begin{threeparttable}'), 'apa7-arbeit.tex fehlt oder ist unvollständig')
     const workflow = await repoDatei(`${REPO}/.github/workflows/dev-image.yml`)
-    const schritt = workflow.split('- name: Smoke-Dokumente kompilieren')[1]?.split('\n      - name:')[0] ?? ''
-    for (const teil of ['apa7-arbeit', 'grep "not found"', '-interaction=batchmode']) ok(schritt.includes(teil), `Workflow-Schritt ohne ${teil}`)
+    const schritt = smokeSchritt(workflow)
+    for (const teil of ['apa7-arbeit', 'not found"', '-interaction=batchmode']) ok(schritt.includes(teil), `Workflow-Schritt ohne ${teil}`)
     ok(/- name: Größe vorher/.test(workflow) && /- name: Größe nachher/.test(workflow), 'Workflow meldet die Größe nicht vorher und nachher')
     const readme = (await repoDatei(`${REPO}/README.md`)).split('### TeX packages\n')[1]?.split('\n### ')[0] ?? ''
     for (const teil of ['apa7', 'booktabs', 'pgfplots', 'tex_package_add']) ok(readme.includes(teil), `README ohne ${teil}`)
@@ -6794,14 +6798,14 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const beispiel = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke/minted-beispiel.tex`)
     ok(beispiel.includes('\\begin{minted}{python}\ndef mittel(xs): return sum(xs)/len(xs)\n\\end{minted}') && beispiel.includes('\\begin{minted}{r}'), 'minted-beispiel.tex ohne Python- und R-Beispiel')
     const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
-    const liste = dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0].split(/[\s\\]+/)
+    const liste = imageListe(dockerfile)
     for (const paket of ['minted', 'fvextra', 'latex2pydata', 'newfloat', 'catchfile', 'upquote']) ok(liste.includes(paket), `${paket} nicht in der Paketliste`)
     const nachher = dockerfile.split('tlmgr path add')[1] ?? ''
     ok(nachher.includes('latexminted --version') && /python3 -c .*version_info < \(3, 8\)/.test(nachher), 'Dockerfile prüft latexminted und Python nicht')
     const runner = await repoDatei(`${REPO}/services/clsi/app/js/LatexRunner.js`)
     ok(!/shell-escape|enable-write18/.test(runner), 'LatexRunner.js übergibt Shell-Escape')
     const workflow = await repoDatei(`${REPO}/.github/workflows/dev-image.yml`)
-    const schritt = workflow.split('- name: Smoke-Dokumente kompilieren')[1]?.split('\n      - name:')[0] ?? ''
+    const schritt = smokeSchritt(workflow)
     for (const teil of ['minted-beispiel', 'shell-escape', 'You must invoke LaTeX with the -shell-escape flag', '/tmp/spur-shell-test', 'output.pdf']) ok(schritt.includes(teil), `Workflow-Schritt ohne ${teil}`)
     const schalter = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke/shell-escape.tex`)
     ok(schalter.includes('\\immediate\\write18{touch /tmp/spur-shell-test}'), 'shell-escape.tex fehlt')
