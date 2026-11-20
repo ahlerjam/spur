@@ -40,6 +40,8 @@ Nachgetragen: P14 baut keine neue Ansicht, sondern drei Abzeichen in die bestehe
 
 - Nachgeholt auf der formalen Plan-Basis `64f017e6..HEAD` (enthält die eingemergten Pläne P12, P13, P16): /code-review medium, /simplify mit vier Prüfern und eine Sicherheitsprüfung des ganzen Diffs (keine Befunde mit hoher Konfidenz). P14-Code daraus behoben: Frontend-Typ `versatzQuelle` kennt `seitentext`, `zeilenBewerten` prüft den Wortlaut je Key nicht doppelt, verwaister Kommentar in latex.mjs. Befunde im Code der anderen Pläne stehen unten als Vorschläge, weil Arbeit außerhalb der Plan-Features nicht gebaut wird.
 
+- Letzter Stand nach der Nachprüfung (Code-Commit `98099bd`): `spur-dev test` grün (94,34 % Zeilen), Gesamtlauf E2E 119 ok, `p16f1b` übersprungen (Dev-Image); sechs Screenshots (Prüfbericht Preprint, Quellenansicht weber2018, Prüfbericht Varianten, je 360 und 1280 px) auf diesem Stand neu aufgenommen, ohne Überlauf.
+
 ## Vorschläge
 - Zitat-Beleg-Zuordnung als ein Nachlauf über die fertige Zeilenliste statt Vorwärtssuche je Zitat mit Korrekturen (Befund aus /simplify).
 - Satzende-Erkennung mit Abkürzungen („vgl.“, „Abb.“, „et al.“), damit ein vorangestelltes `\textcite` auch über solche Stellen hinweg verknüpft wird.
