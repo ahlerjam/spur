@@ -44,6 +44,8 @@ Nachgetragen: P14 baut keine neue Ansicht, sondern drei Abzeichen in die bestehe
 
 - Endstand nach dem zweiten Code-Review (letzter Code-Commit `c2089b1`): `spur-dev test` grün (94,34 % Zeilen), Gesamtlauf E2E 119 ok, `p16f1b` übersprungen (Dev-Image, nicht in diesem Lauf baubar); sechs Ansichten um 20:08 UTC auf diesem Stand neu aufgenommen, ohne Überlauf. Taste je Ansicht: Prüfbericht (Abzeichenfarben tragen die Bedeutung, keine Tells), Quellenansicht (nur die erkannte Seitenzahl neu), Varianten (eine Zeile je Key, Rot nur für den echten Befund).
 
+- Endstand (letzter Code-Commit `84ab2f1`, nach /simplify auf der letzten Änderung): `spur-dev test` grün (94,39 % Zeilen), Gesamtlauf E2E 119 ok, `p16f1b` übersprungen; sechs Ansichten um 20:33 UTC neu aufgenommen, ohne Überlauf.
+
 ## Vorschläge
 - Zitat-Beleg-Zuordnung als ein Nachlauf über die fertige Zeilenliste statt Vorwärtssuche je Zitat mit Korrekturen (Befund aus /simplify).
 - Satzende-Erkennung mit Abkürzungen („vgl.“, „Abb.“, „et al.“), damit ein vorangestelltes `\textcite` auch über solche Stellen hinweg verknüpft wird.
