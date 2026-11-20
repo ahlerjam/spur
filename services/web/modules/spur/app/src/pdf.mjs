@@ -56,9 +56,16 @@ export function versatzAusSeitentext(texte) {
   return anzahl >= MIN_SEITEN && anzahl >= MIN_ANTEIL * erkannt ? versatz : null
 }
 
-// Ohne Breite mit 110 dpi; mit Breite genau so viele Pixel breit (die Höhe folgt dem Seitenformat).
-export async function seitenBild(pfad, seite, ziel, breite = null) {
-  const aufloesung = breite ? ['-scale-to-x', String(breite), '-scale-to-y', '-1'] : ['-r', '110']
+// Ohne Angabe mit 110 dpi; mit breite genau so viele Pixel breit, mit kante höchstens so viele Pixel an der längsten
+// Seite (die andere folgt dem Seitenformat). pdftocairo rundet die Pixel auf (-scale-to 1600 ergibt 1601), daher die
+// Auflösung mit einem halben Pixel Abstand zur Grenze.
+export async function seitenBild(pfad, seite, ziel, { breite = null, kante = null } = {}) {
+  let aufloesung = ['-r', '110']
+  if (breite) aufloesung = ['-scale-to-x', String(breite), '-scale-to-y', '-1']
+  else if (kante) {
+    const groesse = await seitenGroesse(pfad, seite)
+    aufloesung = ['-r', String(((kante - 0.5) * 72) / Math.max(groesse.breite, groesse.hoehe))]
+  }
   await ausfuehren(
     'pdftocairo',
     ['-png', '-singlefile', ...aufloesung, '-f', String(seite), '-l', String(seite), pfad, ziel],
@@ -167,6 +174,14 @@ export function vttSeiten(text) {
 export async function titelFeld(pfad) {
   const { stdout } = await ausfuehren('pdfinfo', ['-enc', 'UTF-8', pfad], GRENZEN)
   return /^Title:[ \t]+(.+)$/m.exec(stdout)?.[1].trim() ?? null
+}
+
+// Größe einer Seite in Punkten, gedreht wie angezeigt.
+export async function seitenGroesse(pfad, seite) {
+  const { stdout } = await ausfuehren('pdfinfo', ['-f', String(seite), '-l', String(seite), pfad], GRENZEN)
+  const [, b, h] = /^Page\s+\d+ size:\s+([\d.]+) x ([\d.]+)/m.exec(stdout)
+  const rot = Number(/^Page\s+\d+ rot:\s+(\d+)/m.exec(stdout)?.[1] ?? 0)
+  return rot % 180 ? { breite: Number(h), hoehe: Number(b) } : { breite: Number(b), hoehe: Number(h) }
 }
 
 export async function seitenzahl(pfad) {

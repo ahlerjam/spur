@@ -80,9 +80,17 @@ describe('seitenBild', () => {
 
   it('rendert auf eine vorgegebene Breite in Pixeln', async () => {
     const { readFileSync } = await import('node:fs')
-    const pfad = await seitenBild(fixture('smith2024.pdf'), 1, join(ordner, 'seite-1-breit'), 1400)
+    const pfad = await seitenBild(fixture('smith2024.pdf'), 1, join(ordner, 'seite-1-breit'), { breite: 1400 })
     // PNG: Breite steht ab Byte 16 im IHDR-Block.
     expect(readFileSync(pfad).readUInt32BE(16)).toBe(1400)
+  })
+
+  it('begrenzt die längste Kante, bei Hochformat also die Höhe', async () => {
+    const { readFileSync } = await import('node:fs')
+    const png = readFileSync(await seitenBild(fixture('smith2024.pdf'), 4, join(ordner, 'seite-4-kante'), { kante: 1600 }))
+    const [breite, hoehe] = [png.readUInt32BE(16), png.readUInt32BE(20)]
+    expect(hoehe).toBe(1600)
+    expect(breite).toBeLessThan(1600)
   })
 })
 

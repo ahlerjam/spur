@@ -13,7 +13,7 @@ import Settings from '@overleaf/settings'
 import { fetchNothing } from '@overleaf/fetch-utils'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
-import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
+import { projektAufraeumen, webAufnehmen } from '../../app/src/QuellenManager.mjs'
 import * as TexPakete from '../../app/src/kompilieren/TexPakete.mjs'
 import { grenzen, speicher as speicherSammlung } from '../../app/src/sammlungen.mjs'
 import {
@@ -584,6 +584,11 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
 async function p15Vorbereiten(a) {
   const quellen = await neuAnlegen(a, 'E2E P15 Quellen', { 'main.tex': LEER })
   await quelleAusFixture(quellen._id, a._id, 'lang2024.pdf')
+  await quelleAusFixture(quellen._id, a._id, 'smith2024.pdf')
+  await webAufnehmen({ projectId: quellen._id, userId: a._id, url: 'http://127.0.0.1/spur/dev/web/testseite' })
+  const b = await konto('e2e-p15b@example.org')
+  const fremd = await neuAnlegen(b, 'E2E P15 Fremd', { 'main.tex': LEER })
+  await quelleAusFixture(fremd._id, b._id, 'smith2024.pdf')
 }
 
 const P14_KOPF = String.raw`\documentclass{article}

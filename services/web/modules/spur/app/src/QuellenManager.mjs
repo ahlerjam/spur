@@ -425,14 +425,30 @@ export async function seite(quelle, nummer) {
 }
 
 export async function bild(quelle, nummer, breite = null) {
-  const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}${breite ? `-w${breite}` : ''}`)
+  return await gerendert(quelle, nummer, breite ? `-w${breite}` : '', { breite })
+}
+
+async function gerendert(quelle, nummer, zusatz, groesse) {
+  const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}${zusatz}`)
   const pfad = `${ziel}.png`
   try {
     await fs.access(pfad)
     return pfad
   } catch {
-    return await seitenBild(dateiPfad(quelle), nummer, ziel, breite)
+    return await seitenBild(dateiPfad(quelle), nummer, ziel, groesse)
   }
+}
+
+const KANTE_CLAUDE = 1600
+
+// Seitenbild für source_page_image: groß genug für Abbildungen, klein genug für ein Modell.
+export async function seitenBildFuerClaude(quelle, nummer) {
+  if (quelle.art !== 'pdf') throw new Problem(409, 'quelle_ohne_seiten', 'spur_fehler_quelle_ohne_seiten')
+  if (nummer > quelle.seitenzahl) {
+    const seiten = quelle.seitenzahl
+    throw new Problem(404, 'seite_nicht_gefunden', 'spur_fehler_seite_nicht_gefunden', { seite: nummer, seiten }, { seiten })
+  }
+  return await fs.readFile(await gerendert(quelle, nummer, `-k${KANTE_CLAUDE}`, { kante: KANTE_CLAUDE }))
 }
 
 // Lage der Zeilen über dem Seitenbild; erkannter Text (OCR) hat keine Lage.

@@ -857,7 +857,9 @@ async page => {
       const P7 = ['tex_package_add', 'source_upload_link']
       // P12: Suchprotokoll und Ausschluss für PRISMA.
       const P12 = ['search_log', 'paper_exclude']
-      const erwartet = [...P1, ...P2, ...P3, ...P7, ...P12].sort()
+      // P15: Werkzeuge, die Claude beim Arbeiten gefehlt haben.
+      const P15 = ['source_page_image']
+      const erwartet = [...P1, ...P2, ...P3, ...P7, ...P12, ...P15].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
@@ -7894,6 +7896,60 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const { daten } = await mcp(token, 'tools/list')
     const beschreibung = daten.result.tools.find(w => w.name === 'source_read').description
     ok(/mit bis_zeichen als nächstes ab_zeichen weiter/.test(beschreibung), `Beschreibung: ${beschreibung}`)
+  }
+
+  // Breite und Höhe eines PNG aus dem IHDR-Block.
+  const pngMasse = base64 => {
+    const kopf = atob(base64.slice(0, 44))
+    const zahl = i => ((kopf.charCodeAt(i) << 24) | (kopf.charCodeAt(i + 1) << 16) | (kopf.charCodeAt(i + 2) << 8) | kopf.charCodeAt(i + 3)) >>> 0
+    return { breite: zahl(16), hoehe: zahl(20) }
+  }
+
+  features.p15f2 = async () => {
+    await anmelden('e2e-p15b@example.org')
+    const tokenB = await neuesToken()
+    const fremd = await p15Quellen(tokenB, 'E2E P15 Fremd')
+
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const { pid, quelle } = await p15Quellen(token)
+    const smith = quelle('smith2024')
+    const bild = async (args, t = token) => {
+      const { daten } = await mcp(t, 'tools/call', { name: 'source_page_image', arguments: args })
+      ok(daten?.result, `source_page_image: ${json(daten).slice(0, 200)}`)
+      return daten.result
+    }
+
+    const seite4 = await bild({ project_id: pid, quelle_id: smith.id, pdf_seite: 4 })
+    const [inhalt] = seite4.content
+    ok(!seite4.isError && inhalt.type === 'image' && inhalt.mimeType === 'image/png', `Seite 4: ${json(seite4).slice(0, 200)}`)
+    const masse = pngMasse(inhalt.data)
+    ok(Math.max(masse.breite, masse.hoehe) <= 1600 && masse.hoehe > 1500, `Seite 4 misst ${json(masse)}`)
+    // Das Diagramm (orangefarbener Balken) ist auf dem Bild zu sehen.
+    const orange = await page.evaluate(async daten => {
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${daten}`)).blob())
+      const leinwand = new OffscreenCanvas(bitmap.width, bitmap.height)
+      const ctx = leinwand.getContext('2d')
+      ctx.drawImage(bitmap, 0, 0)
+      const { data } = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+      let n = 0
+      for (let i = 0; i < data.length; i += 4) if (data[i] > 180 && data[i + 1] > 80 && data[i + 1] < 150 && data[i + 2] < 80) n++
+      return n
+    }, inhalt.data)
+    ok(orange > 10000, `Kein Diagramm auf Seite 4 (${orange} orange Pixel)`)
+
+    const fehler = r => JSON.parse(r.content[0].text)
+    const ausserhalb = await bild({ project_id: pid, quelle_id: smith.id, pdf_seite: 99 })
+    ok(ausserhalb.isError && fehler(ausserhalb).fehler === 'seite_nicht_gefunden' && fehler(ausserhalb).seiten === 8 && /8 Seiten/.test(fehler(ausserhalb).detail), `Seite 99: ${json(fehler(ausserhalb))}`)
+
+    const web = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege.find(q => q.dateiname.endsWith('.html'))
+    ok(web, 'Kein Web-Schnappschuss im Projekt')
+    const ohneSeiten = await bild({ project_id: pid, quelle_id: web.id, pdf_seite: 1 })
+    ok(ohneSeiten.isError && fehler(ohneSeiten).fehler === 'quelle_ohne_seiten', `Web-Schnappschuss: ${json(fehler(ohneSeiten))}`)
+
+    const fremdeQuelle = await bild({ project_id: fremd.pid, quelle_id: fremd.quelle('smith2024').id, pdf_seite: 4 })
+    ok(fremdeQuelle.isError && fehler(fremdeQuelle).fehler === 'keine_rechte', `Fremdes Projekt: ${json(fehler(fremdeQuelle))}`)
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

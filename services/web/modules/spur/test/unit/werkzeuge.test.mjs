@@ -24,7 +24,7 @@ beforeEach(async () => {
   recht = berechtigung()
   m = {
     PruefManager: { dokumente: vi.fn(async () => []), bericht: vi.fn() },
-    QuellenManager: { alle: vi.fn(async () => []), suchen: vi.fn(), holen: vi.fn(), seite: vi.fn() },
+    QuellenManager: { alle: vi.fn(async () => []), suchen: vi.fn(), holen: vi.fn(), seite: vi.fn(), seitenBildFuerClaude: vi.fn(async () => Buffer.from('PNG')) },
     ZitatManager: { markieren: vi.fn() },
     SchreibManager: { docEdit: vi.fn(async () => ({ aenderung: true })), docCreate: vi.fn(async () => ({ aenderung: true })) },
     LaufManager: {
@@ -112,6 +112,7 @@ describe('Rechte der Werkzeuge', () => {
     ['compile', {}],
     ['compile_log', {}],
     ['page_image', { seite: 1 }],
+    ['source_page_image', { quelle_id: 'q', pdf_seite: 1 }],
   ]
 
   it.each(alleLesen)('%s verweigert Nutzern ohne Zugriff mit keine_rechte', async (name, args) => {
@@ -610,6 +611,15 @@ describe('Recherche', () => {
     mitStufe('review')
     await aufruf('matrix_suggest', { project_id: projekt, source_id: quelle, spalte: 'Methode', text: 'x' })
     expect(m.Literatur.vorschlagen).toHaveBeenCalledWith(new ObjectId(projekt), { quelleId: quelle, spalte: 'Methode', text: 'x', botId: bot })
+  })
+
+  it('source_page_image liefert die Quellseite als MCP-Bild', async () => {
+    m.QuellenManager.holen.mockResolvedValue({ _id: 'q1' })
+    expect(await aufruf('source_page_image', { project_id: projekt, quelle_id: 'q1', pdf_seite: 4 })).toEqual({
+      content: [{ type: 'image', data: Buffer.from('PNG').toString('base64'), mimeType: 'image/png' }],
+    })
+    expect(m.QuellenManager.holen).toHaveBeenCalledWith(new ObjectId(projekt), 'q1')
+    expect(m.QuellenManager.seitenBildFuerClaude).toHaveBeenCalledWith({ _id: 'q1' }, 4)
   })
 
   it('compile startet als Person und Bot, page_image liefert ein PNG als MCP-Bild', async () => {

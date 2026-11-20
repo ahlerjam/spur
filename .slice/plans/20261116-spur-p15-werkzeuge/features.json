@@ -23,7 +23,7 @@
         "Für einen Web-Schnappschuss liefert das Werkzeug 409 `quelle_ohne_seiten`",
         "Eine Quelle aus einem anderen Projekt, auf das das Konto keinen Zugriff hat, liefert 403"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f3",

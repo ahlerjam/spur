@@ -280,6 +280,23 @@ describe('Abfragen', () => {
     expect(breit).toMatch(/-w1600\.png$/)
   })
 
+  it('seitenBildFuerClaude rendert die Seite mit höchstens 1600 px an der längsten Kante', async () => {
+    const png = await Quellen.seitenBildFuerClaude(smith, 4)
+    expect(Math.max(png.readUInt32BE(16), png.readUInt32BE(20))).toBe(1600)
+  })
+
+  it('seitenBildFuerClaude nennt bei einer Seite außerhalb die Seitenzahl der Quelle', async () => {
+    const fehler = await fehlerVon(Quellen.seitenBildFuerClaude(smith, 99))
+    expect(fehler).toMatchObject({ status: 404, typ: 'seite_nicht_gefunden', zusatz: { seiten: 8 } })
+    expect(fehler.message).toContain('8')
+  })
+
+  it('seitenBildFuerClaude lehnt Quellen ohne Seiten ab', async () => {
+    for (const art of ['web', 'vtt']) {
+      expect(await fehlerVon(Quellen.seitenBildFuerClaude({ ...smith, art }, 1))).toMatchObject({ status: 409, typ: 'quelle_ohne_seiten' })
+    }
+  })
+
   it('textEbene gibt es nur bei erkanntem Text', async () => {
     expect((await Quellen.textEbene(smith, 1)).zeilen.length).toBeGreaterThan(5)
     expect(await Quellen.textEbene({ ...smith, status: 'ocr' }, 1)).toEqual({ breite: null, hoehe: null, zeilen: [] })

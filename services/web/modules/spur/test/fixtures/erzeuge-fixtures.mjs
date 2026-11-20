@@ -20,7 +20,7 @@ function pageContent(lines, size = 12) {
   return `BT /F1 ${size} Tf\n${body}\nET`
 }
 
-function buildPdf({ pages, firstLabel, title, size, images = [] }) {
+function buildPdf({ pages, firstLabel, title, size, images = [], grafiken = [] }) {
   const objects = []
   const add = body => {
     objects.push(body)
@@ -41,7 +41,7 @@ function buildPdf({ pages, firstLabel, title, size, images = [] }) {
           `/DecodeParms << /Predictor 15 /Colors 1 /BitsPerComponent 8 /Columns ${bild.breite} >> ` +
           `/Length ${bild.daten.length} >>\nstream\n${bild.daten.toString('latin1')}\nendstream`
       )
-    const content = bild ? 'q 612 0 0 792 0 0 cm /Im1 Do Q' : pageContent(lines, size)
+    const content = bild ? 'q 612 0 0 792 0 0 cm /Im1 Do Q' : [pageContent(lines, size), grafiken[i]].filter(Boolean).join('\n')
     const contentId = add(
       `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`
     )
@@ -103,6 +103,14 @@ const smith = [
   filler(352),
 ]
 
+// P15: Ein Balkendiagramm auf PDF-Seite 4 (nur Vektorgrafik, der Text der Seite bleibt gleich).
+const BALKEN = [
+  '0 0 0 RG 1.5 w 120 300 m 480 300 l S 120 300 m 120 600 l S',
+  '0.20 0.40 0.75 rg 150 300 70 120 re f',
+  '0.85 0.45 0.15 rg 260 300 70 260 re f',
+  '0.25 0.60 0.30 rg 370 300 70 190 re f',
+].join('\n')
+
 const retracted = [
   ['Retracted Findings on Sleep', 'B. Jones', 'DOI 10.5555/spur.retracted'],
   ['Naps improve every kind of memory equally.', ...filler(2)],
@@ -110,7 +118,7 @@ const retracted = [
 
 writeFileSync(
   join(here, 'smith2024.pdf'),
-  buildPdf({ pages: smith, firstLabel: 345, title: 'Sleep and Memory' })
+  buildPdf({ pages: smith, firstLabel: 345, title: 'Sleep and Memory', grafiken: { 3: BALKEN } })
 )
 writeFileSync(
   join(here, 'retracted.pdf'),
