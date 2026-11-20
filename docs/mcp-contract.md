@@ -141,7 +141,7 @@ Author check: after reading a PDF with a text layer spur compares the family nam
 
 - `aus_pdf`: all names are on the first page in a different order; the `.bib` entry uses the order of the PDF.
 - `bestaetigt`: all names are there in the same order.
-- `abweichend`: at least one name is missing; the order of the metadata stays and `autoren_hinweis` says "Autoren im PDF nicht gefunden – bitte prüfen". The sources panel shows the same text.
+- `abweichend`: at least one name is missing; the order of the metadata stays and `autoren_hinweis` asks to check the authors (text `spur_hinweis_autoren_abweichend`). The sources panel shows the same text.
 
 Scans without text, sources without authors and sources added before P13 have no `autoren`.
 
