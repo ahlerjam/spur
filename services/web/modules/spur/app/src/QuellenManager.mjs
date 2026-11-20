@@ -425,10 +425,11 @@ export async function seite(quelle, nummer) {
 }
 
 export async function bild(quelle, nummer, breite = null) {
-  return await gerendert(quelle, nummer, breite ? `-w${breite}` : '', { breite })
+  return await gerendert(quelle, nummer, { breite })
 }
 
-async function gerendert(quelle, nummer, zusatz, groesse) {
+async function gerendert(quelle, nummer, groesse) {
+  const zusatz = groesse.breite ? `-w${groesse.breite}` : groesse.kante ? `-k${groesse.kante}` : ''
   const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}${zusatz}`)
   const pfad = `${ziel}.png`
   try {
@@ -453,7 +454,7 @@ export function seitePruefen(quelle, nummer) {
 // Seitenbild für source_page_image: groß genug für Abbildungen, klein genug für ein Modell.
 export async function seitenBildFuerClaude(quelle, nummer) {
   seitePruefen(quelle, nummer)
-  return await fs.readFile(await gerendert(quelle, nummer, `-k${KANTE_CLAUDE}`, { kante: KANTE_CLAUDE }))
+  return await fs.readFile(await gerendert(quelle, nummer, { kante: KANTE_CLAUDE }))
 }
 
 // Lage der Zeilen über dem Seitenbild; erkannter Text (OCR) hat keine Lage.

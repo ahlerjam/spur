@@ -35,7 +35,14 @@ async function ausDemProjekt(projectId, name) {
   return { pfad: datei.path.slice(1), herkunft: 'projekt', inhalt: Buffer.concat(teile).toString('utf8') }
 }
 
-async function wurzeln() {
+// Die Wurzeln ändern sich nicht, solange der Prozess läuft.
+let wurzelnLaden = null
+const wurzeln = () => (wurzelnLaden ??= wurzelnErmitteln().catch(error => {
+  wurzelnLaden = null
+  throw error
+}))
+
+async function wurzelnErmitteln() {
   const werte = await Promise.all(
     ['SELFAUTOPARENT', 'TEXMFLOCAL'].map(async name => (await ausfuehren('kpsewhich', ['-var-value', name])).stdout.trim())
   )

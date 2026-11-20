@@ -14,13 +14,12 @@ const MAX = { quelle: MAX_DATEIEN, datei: MAX_PROJEKTDATEIEN }
 
 const hash = token => createHash('sha256').update(token).digest('hex')
 
-// Links von vor P15 tragen keine Art: Sie sind für Quellen.
-const artVon = link => link.art ?? 'quelle'
-
+// Links von vor P15 tragen weder Art noch Höchstzahl: Sie sind für Quellen.
+const maxVon = link => link.max ?? MAX_DATEIEN
 export async function erzeugen({ projectId, menschId, botId, art = 'quelle' }) {
   const token = randomBytes(32).toString('hex')
   const ablauf = new Date(jetzt().getTime() + GUELTIG_MINUTEN * 60 * 1000)
-  await (await links()).insertOne({ hash: hash(token), projectId, menschId, botId, art, ablauf, genutzt: 0 })
+  await (await links()).insertOne({ hash: hash(token), projectId, menschId, botId, art, max: MAX[art], ablauf, genutzt: 0 })
   return {
     link: `${Settings.siteUrl}/spur/hochladen/${token}`,
     gueltig_minuten: GUELTIG_MINUTEN,
@@ -36,7 +35,7 @@ export function ungueltig() {
 function grund(link) {
   return link.ablauf <= jetzt()
     ? new Problem(410, 'link_abgelaufen', 'spur_fehler_link_abgelaufen')
-    : new Problem(410, 'link_verbraucht', 'spur_fehler_link_verbraucht', { max: MAX[artVon(link)] })
+    : new Problem(410, 'link_verbraucht', 'spur_fehler_link_verbraucht', { max: maxVon(link) })
 }
 
 // Prüft ohne zu verbrauchen, damit ein ungültiger Link gar nicht erst eine Datei annimmt.
@@ -44,8 +43,8 @@ export async function pruefen(token) {
   if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) throw ungueltig()
   const link = await (await links()).findOne({ hash: hash(token) })
   if (!link) throw ungueltig()
-  if (link.ablauf <= jetzt() || link.genutzt >= MAX[artVon(link)]) throw grund(link)
-  return { ...link, art: artVon(link) }
+  if (link.ablauf <= jetzt() || link.genutzt >= maxVon(link)) throw grund(link)
+  return { ...link, art: link.art ?? 'quelle' }
 }
 
 export async function verbrauchen(token) {
@@ -54,15 +53,12 @@ export async function verbrauchen(token) {
     {
       hash: hash(token),
       ablauf: { $gt: jetzt() },
-      $or: [
-        { art: 'datei', genutzt: { $lt: MAX_PROJEKTDATEIEN } },
-        { art: { $ne: 'datei' }, genutzt: { $lt: MAX_DATEIEN } },
-      ],
+      $expr: { $lt: ['$genutzt', { $ifNull: ['$max', MAX_DATEIEN] }] },
     },
     { $inc: { genutzt: 1 } },
     { returnDocument: 'after' }
   )
-  if (verbraucht) return { ...verbraucht, art: artVon(verbraucht) }
+  if (verbraucht) return { ...verbraucht, art: verbraucht.art ?? 'quelle' }
   await pruefen(token)
   throw new Error('Upload-Link weder gültig noch ungültig')
 }

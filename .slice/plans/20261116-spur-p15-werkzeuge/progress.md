@@ -34,4 +34,12 @@
 - `pdf.test.mjs`: `seitenBild` nimmt die Breite jetzt als Option (`{ breite }`), weil die längste Kante (`{ kante }`) dazukam.
 - E2E `f9` prüft die genaue Werkzeugliste; sie enthält jetzt die P15-Werkzeuge.
 
+## Abschluss
+- Prüfbereich: Die formale Plan-Basis (`0ad7efe`, Elternteil von `slice: plan …p15`) enthält die schon geprüften Pläne P12–P14 und P16. /simplify, /code-review und die Sicherheitsprüfung laufen deshalb auf dem Diff dieses Laufs, `44fa98d70b..HEAD`.
+- /simplify (vier Prüfer): übernommen: Upload-Link speichert seine Höchstzahl (`max`) und verbraucht mit `$expr` statt `$or` je Art; eine Lizenzliste statt zwei; Cache-Suffix der Seitenbilder aus der Größe abgeleitet; TeX-Wurzeln für `tex_file_read` einmal je Prozess ermittelt; `dateityp` und `pfadPruefen` ohne überflüssige Bedingungen. Nicht übernommen: eine Prüfung über die ganze Spanne statt je Vorkommen bei `alle_vorkommen` (die Spec verlangt die Prüfung jedes Vorkommens; eine Spanne würde unveränderte Zitate dazwischen mitprüfen); Ordner als eigener Eintrag `art: 'ordner'` (würde beim Rückgängigmachen auch Dateien der Person im Ordner löschen); Change-IDs statt Seed (Changes werden beim Tippen geteilt und bekommen neue IDs, der Seed ist der stabile Schlüssel, den spur selbst vergibt); gemeinsamer Helfer für Projektpfade und Temp-Ordner (Umbau über den Diff hinaus, als Vorschlag notiert).
+
+## Vorschläge
+- Ein Helfer `projektPfade(projectId)` neben `projektEintraege.mjs` für die drei Stellen, die `getAllEntities` zu einer Pfadliste machen (TexPakete, Projektdatei, LaufAktionen), und ein `mitTempOrdner(prefix, fn)` für das wiederkehrende mkdtemp/rm.
+- `bereichPruefen` lädt Projekt und Kontext je Aufruf; bei `alle_vorkommen` mit vielen Treffern, die Zitate berühren, wären Dokumente und Kontext einmal zu laden.
+
 ## Replies

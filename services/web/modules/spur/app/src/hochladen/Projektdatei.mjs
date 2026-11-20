@@ -29,17 +29,17 @@ export async function dateityp(pfad) {
   try {
     const { buffer, bytesRead } = await datei.read(Buffer.alloc(8), 0, 8, 0)
     const anfang = buffer.subarray(0, bytesRead)
-    return Object.keys(KOPF).find(typ => anfang.length >= KOPF[typ].length && anfang.subarray(0, KOPF[typ].length).equals(KOPF[typ])) ?? null
+    return Object.keys(KOPF).find(typ => anfang.subarray(0, KOPF[typ].length).equals(KOPF[typ])) ?? null
   } finally {
     await datei.close()
   }
 }
 
 function pfadPruefen(pfad, feld, endungen) {
-  const abschnitte = String(pfad).split('/')
   const gueltig =
-    typeof pfad === 'string' && pfad.length <= MAX_PFAD &&
-    abschnitte.every(a => ABSCHNITT.test(a) && a !== '..') &&
+    typeof pfad === 'string' &&
+    pfad.length <= MAX_PFAD &&
+    pfad.split('/').every(a => ABSCHNITT.test(a) && a !== '..') &&
     endungen.includes(Path.extname(pfad).toLowerCase())
   if (!gueltig) throw eingabeUngueltig(feld)
 }
@@ -94,7 +94,6 @@ export async function anlegen({ projectId, menschId, botId, pfad, datei, groesse
 }
 
 // Offene Lizenzen erlauben Bearbeitungen wie einen Ausschnitt; ND (keine Bearbeitung) gehört nicht dazu.
-const OFFEN = ['cc-by', 'cc-by-sa', 'cc-by-nc', 'cc-by-nc-sa', 'cc0', 'public-domain']
 const LIZENZ_NAME = { 'cc-by': 'CC BY', 'cc-by-sa': 'CC BY-SA', 'cc-by-nc': 'CC BY-NC', 'cc-by-nc-sa': 'CC BY-NC-SA', cc0: 'CC0', 'public-domain': 'Public Domain' }
 
 // Lizenzangaben wie Unpaywall sie liefert („cc-by“, „CC-BY-4.0“, „pd“); null, wenn sie nicht offen ist.
@@ -102,7 +101,7 @@ export function offeneLizenz(lizenz) {
   if (typeof lizenz !== 'string') return null
   const name = lizenz.trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/-\d+(\.\d+)*$/, '')
   const kanonisch = ['pd', 'public-domain', 'publicdomain'].includes(name) ? 'public-domain' : name
-  return OFFEN.includes(kanonisch) ? kanonisch : null
+  return Object.hasOwn(LIZENZ_NAME, kanonisch) ? kanonisch : null
 }
 
 function ausschnittPruefen(a) {
