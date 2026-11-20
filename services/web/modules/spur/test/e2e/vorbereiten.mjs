@@ -596,6 +596,8 @@ async function p15Vorbereiten(a) {
   for (const [datei, lizenz] of [['offen2023.pdf', 'cc-by'], ['verlag2022.pdf', null], ['nd2021.pdf', 'cc-by-nd']]) {
     await quelleAusFixture(abbildungen._id, a._id, datei, { lizenz })
   }
+  const ersetzen = await neuAnlegen(a, 'E2E P15 Ersetzen', { 'main.tex': P15_ERSETZEN, 'references.bib': P14_BIB, 'viele.tex': 'x '.repeat(501) })
+  await quelleAusFixture(ersetzen._id, a._id, 'smith2024.pdf')
   const b = await konto('e2e-p15b@example.org')
   const fremd = await neuAnlegen(b, 'E2E P15 Fremd', { 'main.tex': LEER })
   await quelleAusFixture(fremd._id, b._id, 'smith2024.pdf')
@@ -633,6 +635,15 @@ const P14_BIB = `@article{smith2024,
   title = {Teams and knowledge}
 }
 `
+
+// Zwölfmal fill=blue!20 in drei Grafiken, dazu ein Zitat aus smith2024.
+const P15_KNOTEN = n => Array.from({ length: 4 }, (_, i) => `  \\node[draw, fill=blue!20] (k${n}${i}) at (${i * 2},0) {${n}.${i}};`).join('\n')
+const P15_ERSETZEN = `${P14_KOPF}Sleep and memory are linked.
+
+\\enquote{${P14_SATZ}} \\parencite[347]{smith2024}
+
+${[1, 2, 3].map(n => `\\begin{tikzpicture}\n${P15_KNOTEN(n)}\n\\end{tikzpicture}`).join('\n\n')}
+${P14_FUSS}`
 
 // P14: Prüfbericht ohne blinde Flecken. Jede Stelle steht auf einer eigenen Zeile (Zeilen 6, 8, 10, …).
 async function p14Vorbereiten(a) {

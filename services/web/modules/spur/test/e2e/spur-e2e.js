@@ -8024,6 +8024,48 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await page.locator('.file-tree').getByRole('treeitem', { name: 'abbildungen' }).waitFor({ state: 'detached', timeout: 20000 })
   }
 
+  features.p15f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const pid = await projektId(token, 'E2E P15 Ersetzen')
+    const lesen = async (pfad = 'main.tex') => (await werkzeug(token, 'doc_read', { project_id: pid, pfad })).inhalt.text
+    const ersetzen = async (args, pfad = 'main.tex') =>
+      await werkzeug(token, 'doc_edit', { project_id: pid, pfad, idempotenz_schluessel: schluessel(), ...args })
+    const zaehlen = (text, teil) => text.split(teil).length - 1
+    const vorher = await lesen()
+    ok(zaehlen(vorher, 'fill=blue!20') === 12, `Ausgangslage: ${zaehlen(vorher, 'fill=blue!20')}-mal fill=blue!20`)
+
+    const ohne = await ersetzen({ alt: 'fill=blue!20', neu: 'fill=gray!20' })
+    ok(ohne.fehler && ohne.inhalt.fehler === 'konflikt' && ohne.inhalt.detail.includes('alle_vorkommen'), `Ohne alle_vorkommen: ${json(ohne.inhalt)}`)
+    const fehlt = await ersetzen({ alt: 'fill=red!20', neu: 'fill=gray!20', alle_vorkommen: true })
+    const bisher = await ersetzen({ alt: 'fill=red!20', neu: 'fill=gray!20' })
+    ok(fehlt.fehler && fehlt.inhalt.fehler === bisher.inhalt.fehler && fehlt.inhalt.detail === bisher.inhalt.detail, `Nicht gefunden: ${json(fehlt.inhalt)} statt ${json(bisher.inhalt)}`)
+    // „memory“ steht im Fließtext und im Zitat; im Zitat wäre „recall“ erfundener Wortlaut.
+    const zitat = await ersetzen({ alt: 'memory', neu: 'recall', alle_vorkommen: true })
+    ok(zitat.fehler && zitat.inhalt.fehler === 'zitat_abweichend', `Ersatz im Zitat: ${json(zitat.inhalt)}`)
+    ok((await lesen()) === vorher, 'Nach dem abgelehnten Ersatz hat sich das Dokument geändert')
+    const viele = await ersetzen({ alt: 'x', neu: 'y', alle_vorkommen: true }, 'viele.tex')
+    ok(viele.fehler && viele.inhalt.fehler === 'zu_viele_vorkommen' && viele.inhalt.anzahl === 501 && viele.inhalt.detail.includes('501'), `501 Vorkommen: ${json(viele.inhalt)}`)
+
+    const alle = await ersetzen({ alt: 'fill=blue!20', neu: 'fill=gray!20', alle_vorkommen: true })
+    ok(!alle.fehler && alle.inhalt.ersetzt === 12, `alle_vorkommen: ${json(alle.inhalt)}`)
+    const nachher = await lesen()
+    ok(!nachher.includes('blue!20') && zaehlen(nachher, 'fill=gray!20') === 12, `Nach dem Ersatz: ${zaehlen(nachher, 'blue!20')}-mal blue!20`)
+
+    await projektOeffnen('E2E P15 Ersetzen')
+    await panelOeffnen('Claude')
+    await karte().getByText('Dateien: 1 · Änderungen: 12', { exact: true }).waitFor({ timeout: 20000 })
+    await karte().locator('.spur-lauf-aenderung', { hasText: 'gray' }).first().waitFor()
+    ok((await karte().locator('.spur-lauf-aenderung', { hasText: 'gray' }).count()) === 12, 'Nicht alle 12 Ersetzungen auf der Laufkarte')
+    await karte().getByRole('button', { name: 'Alle annehmen' }).click()
+    await karte().getByText('Angenommen', { exact: true }).waitFor({ timeout: 20000 })
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const zurueck = await lesen()
+    ok(zaehlen(zurueck, 'fill=blue!20') === 12 && !zurueck.includes('gray!20'), `Nach „Lauf rückgängig“: ${zaehlen(zurueck, 'fill=blue!20')}-mal blue!20`)
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

@@ -396,7 +396,10 @@ describe('Schreiben', () => {
       alt: 'x',
       neu: 'y',
       schluessel: 'schluessel-0001',
+      alleVorkommen: false,
     })
+    await aufruf('doc_edit', { project_id: projekt, pfad: 'a.tex', alt: 'x', neu: 'y', alle_vorkommen: true, idempotenz_schluessel: 'schluessel-0002' })
+    expect(m.SchreibManager.docEdit).toHaveBeenLastCalledWith(expect.objectContaining({ alleVorkommen: true }))
   })
 
   it('doc_create reicht Pfad und Inhalt weiter', async () => {

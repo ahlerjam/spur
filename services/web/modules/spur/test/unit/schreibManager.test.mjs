@@ -424,6 +424,83 @@ describe('Zitatprüfung beim Schreiben', () => {
   })
 })
 
+describe('docEdit mit alle_vorkommen (P15)', () => {
+  // Echter Fall: rund 20 Einzel-Edits für eine Farbumstellung.
+  const GRAFIK = Array.from({ length: 12 }, (_, i) => `\\node[fill=blue!20] (n${i}) {${i}};`).join('\n')
+  const alle = (felder = {}) => bearbeiten({ alt: 'fill=blue!20', neu: 'fill=gray!20', alleVorkommen: true, ...felder })
+
+  it('ersetzt alle Vorkommen in einem Update, von hinten nach vorn, und meldet die Anzahl', async () => {
+    docSetzen(KAPITEL, GRAFIK)
+    const ergebnis = await alle()
+    expect(ergebnis).toMatchObject({ aenderung: true, ersetzt: 12 })
+    const [, , ops] = spurUpdate.mock.calls[0]
+    expect(ops).toHaveLength(24)
+    const positionen = ops.filter(o => o.d).map(o => o.p)
+    expect(positionen).toEqual([...positionen].sort((a, b) => b - a))
+    let text = GRAFIK
+    for (const op of ops) text = op.d ? text.slice(0, op.p) + text.slice(op.p + op.d.length) : text.slice(0, op.p) + op.i + text.slice(op.p)
+    expect(text).toBe(GRAFIK.replaceAll('blue!20', 'gray!20'))
+    expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, { docId: String(KAPITEL), rot: [], zahlen: [], anzahl: 12 })
+  })
+
+  it('zählt überlappende Treffer nicht doppelt', async () => {
+    docSetzen(KAPITEL, 'aaaa')
+    expect(await bearbeiten({ alt: 'aa', neu: 'b', alleVorkommen: true })).toMatchObject({ ersetzt: 2 })
+  })
+
+  it('meldet ohne alle_vorkommen wie bisher konflikt und nennt den Parameter', async () => {
+    docSetzen(KAPITEL, GRAFIK)
+    const fehler = await fehlerVon(bearbeiten({ alt: 'fill=blue!20', neu: 'fill=gray!20' }))
+    expect(fehler).toMatchObject({ code: 'konflikt' })
+    expect(fehler.message).toContain('alle_vorkommen')
+    expect(spurUpdate).not.toHaveBeenCalled()
+  })
+
+  it('meldet einen Alttext, der nicht vorkommt, wie bisher', async () => {
+    const fehler = await fehlerVon(alle({ alt: 'fill=red!20' }))
+    expect(fehler).toMatchObject({ code: 'konflikt', message: meldung('spur_fehler_alttext_fehlt') })
+  })
+
+  it('prüft jedes Vorkommen auf erfundenen Wortlaut und schreibt bei einem Befund nichts', async () => {
+    docSetzen(KAPITEL, '\\enquote{Sleep A.} \\autocite[3]{s}\n\\enquote{Sleep B.} \\autocite[3]{s}')
+    bereichPruefen
+      .mockResolvedValueOnce([{ wortlaut: 'exakt', key: 's', auszug: 'Schlaf A.', form: 'enquote' }])
+      .mockResolvedValueOnce([{ wortlaut: 'abweichend', key: 's', auszug: 'Schlaf B.', form: 'enquote' }])
+    const fehler = await fehlerVon(bearbeiten({ alt: 'Sleep', neu: 'Schlaf', alleVorkommen: true }))
+    expect(fehler).toMatchObject({ code: 'zitat_abweichend' })
+    expect(bereichPruefen).toHaveBeenCalledTimes(2)
+    // Jedes Vorkommen wird an seiner Stelle im neuen Text geprüft.
+    const [[, text1, von1], [, text2, von2]] = bereichPruefen.mock.calls
+    expect(text1).toBe(text2)
+    expect(text1.slice(von1, von1 + 6)).toBe('Schlaf')
+    expect(text2.slice(von2, von2 + 6)).toBe('Schlaf')
+    expect(von2).toBeGreaterThan(von1)
+    expect(spurUpdate).not.toHaveBeenCalled()
+  })
+
+  it('meldet Zahlen ohne Beleg einmal je Zahl', async () => {
+    docSetzen(KAPITEL, 'A x. B x.')
+    expect((await bearbeiten({ alt: 'x', neu: '12,5 Prozent', alleVorkommen: true })).zahlen_ohne_beleg).toEqual(['12,5'])
+  })
+
+  it('lehnt mehr als 500 Vorkommen mit zu_viele_vorkommen und der Zahl ab', async () => {
+    docSetzen(KAPITEL, 'x '.repeat(501))
+    const fehler = await fehlerVon(bearbeiten({ alt: 'x', neu: 'y', alleVorkommen: true }))
+    expect(fehler).toMatchObject({ status: 422, typ: 'zu_viele_vorkommen', zusatz: { anzahl: 501 } })
+    expect(fehler.message).toContain('501')
+    expect(spurUpdate).not.toHaveBeenCalled()
+  })
+
+  it('hält Abstand zur Grenze offener Änderungen', async () => {
+    docSetzen(KAPITEL, 'x '.repeat(10), Array.from({ length: 1975 }, (_, i) => ({ id: `c${i}`, op: { p: 0, i: 'x' } })))
+    expect(await fehlerVon(bearbeiten({ alt: 'x', neu: 'y', alleVorkommen: true }))).toMatchObject({ code: 'grenze_changes' })
+  })
+
+  it('verlangt einen Alttext', async () => {
+    expect(await fehlerVon(bearbeiten({ alt: '', neu: 'y', alleVorkommen: true }))).toMatchObject({ typ: 'eingabe_ungueltig', zusatz: { feld: 'alt' } })
+  })
+})
+
 describe('Idempotenz', () => {
   it('liefert bei Wiederholung dasselbe Ergebnis, ohne erneut zu schreiben', async () => {
     const erst = await bearbeiten()

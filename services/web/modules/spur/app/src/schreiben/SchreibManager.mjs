@@ -7,6 +7,8 @@ import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocat
 import SafePath from '../../../../../app/src/Features/Project/SafePath.mjs'
 import EditorHttpController from '../../../../../app/src/Features/Editor/EditorHttpController.mjs'
 import { WerkzeugFehler } from '../mcp/fehler.mjs'
+import { Problem } from '../probleme.mjs'
+import { eingabeUngueltig } from '../recherche/ohneDoi.mjs'
 import { zitateFinden } from '../pruefung/latex.mjs'
 import { bereichPruefen, bibBereichPruefen } from '../pruefung/PruefManager.mjs'
 import { bearbeitungen } from '../sammlungen.mjs'
@@ -20,6 +22,7 @@ import { spurUpdate } from './spurUpdate.mjs'
 
 // document-updater trennt Clients ab 2000 offenen Changes; wir halten Abstand.
 const GRENZE_CHANGES = 1990
+const MAX_VORKOMMEN = 500
 
 // Namen und Pfade wie der Web-Weg prüfen: SafePath für erlaubte Zeichen und reservierte Namen,
 // _nameIsAcceptableLength für die Länge jedes Teils (unter 150 Zeichen). Längere Namen legt
@@ -195,11 +198,13 @@ async function mitSchluessel({ projectId, botId, schluessel, argumente }, schrei
   return ergebnis
 }
 
-export async function docEdit({ projectId, botId, menschId, docId, pfad, alt, neu, schluessel }) {
+export async function docEdit({ projectId, botId, menschId, docId, pfad, alt, neu, schluessel, alleVorkommen = false }) {
   if (pfad !== undefined) pruefePfad(pfad)
-  const argumente = { werkzeug: 'doc_edit', docId, pfad, alt, neu }
+  if (alleVorkommen && !alt) throw eingabeUngueltig('alt')
+  // Ohne alle_vorkommen bleibt der Fingerabdruck wie vor P15.
+  const argumente = { werkzeug: 'doc_edit', docId, pfad, alt, neu, ...(alleVorkommen && { alleVorkommen }) }
   return await mitSchluessel({ projectId, botId, schluessel, argumente }, () =>
-    bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
+    bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu, alleVorkommen })
   )
 }
 
@@ -221,43 +226,78 @@ async function nachDemSchreiben({ projectId, lauf, menschId, docId, vorher, rot,
   if (menschId) await LaufAktionen.sofortAnnehmen(projectId, { ...lauf, docs }, menschId, neu)
 }
 
-async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu }) {
+// Wo der Alttext ersetzt wird: genau eine Stelle, mit alle_vorkommen jede (ohne Überlappung), ohne Alttext das Ende.
+function stellenFuer(text, alt, alleVorkommen) {
+  if (!alt) return [text.length]
+  if (!alleVorkommen) {
+    const treffer = vorkommen(text, alt)
+    if (treffer.length > 1) throw new WerkzeugFehler('konflikt', 'spur_fehler_alttext_mehrfach')
+    if (treffer.length === 0) throw new WerkzeugFehler('konflikt', 'spur_fehler_alttext_fehlt')
+    return treffer
+  }
+  const treffer = []
+  for (let i = text.indexOf(alt); i >= 0; i = text.indexOf(alt, i + alt.length)) treffer.push(i)
+  if (treffer.length === 0) throw new WerkzeugFehler('konflikt', 'spur_fehler_alttext_fehlt')
+  if (treffer.length > MAX_VORKOMMEN) {
+    throw new Problem(422, 'zu_viele_vorkommen', 'spur_fehler_zu_viele_vorkommen', { anzahl: treffer.length, max: MAX_VORKOMMEN }, { anzahl: treffer.length })
+  }
+  return treffer
+}
+
+async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu, alleVorkommen }) {
   const doc = await docAufloesen(projectId, docId, pfad)
   const { lines, version, ranges } = await DocumentUpdaterHandler.promises.getDocument(
     projectId,
     doc.docId,
     -1
   )
-  if ((ranges?.changes?.length ?? 0) >= GRENZE_CHANGES) {
+  const offen = ranges?.changes?.length ?? 0
+  if (offen >= GRENZE_CHANGES) {
     throw new WerkzeugFehler(
       'grenze_changes',
       'spur_fehler_zu_viele_changes'
     )
   }
   const text = lines.join('\n')
-  let start = text.length
-  if (alt) {
-    const treffer = vorkommen(text, alt)
-    if (treffer.length > 1) throw new WerkzeugFehler('konflikt', 'spur_fehler_alttext_mehrfach')
-    if (treffer.length === 0) throw new WerkzeugFehler('konflikt', 'spur_fehler_alttext_fehlt')
-    start = treffer[0]
+  const stellen = stellenFuer(text, alt, alleVorkommen)
+  // Je Stelle bis zu zwei Changes (Löschung und Einfügung); viele Stellen dürfen die Grenze nicht auf einmal reißen.
+  if (alleVorkommen && offen + 2 * stellen.length > GRENZE_CHANGES) {
+    throw new WerkzeugFehler('grenze_changes', 'spur_fehler_zu_viele_changes')
   }
-  const neuerText = text.slice(0, start) + neu + text.slice(start + alt.length)
+  // Lage jeder Stelle im neuen Text: Davor stehende Stellen haben ihn schon um die Längendifferenz verschoben.
+  const versatz = neu.length - alt.length
+  const neueStellen = stellen.map((start, k) => start + k * versatz)
+  const neuerText = alleVorkommen ? text.replaceAll(alt, neu) : text.slice(0, stellen[0]) + neu + text.slice(stellen[0] + alt.length)
   const istBib = /\.bib$/.test(doc.pfad)
-  const rot = istBib
-    ? await bibSperre(projectId, doc.docId, neuerText, start, start + neu.length)
-    : await pruefSperre(projectId, neuerText, start, start + neu.length)
+  // Alle Prüfungen vor dem Schreiben: Schlägt eine Stelle fehl, wird nichts geschrieben.
+  const rot = []
+  for (const start of neueStellen) {
+    rot.push(
+      ...(istBib
+        ? await bibSperre(projectId, doc.docId, neuerText, start, start + neu.length)
+        : await pruefSperre(projectId, neuerText, start, start + neu.length))
+    )
+  }
 
   // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt, in .bib-Dateien stehen nur Metadaten.
   const ohnePruefung = istBib || /(^|\/)ergebnisse\.tex$/.test(doc.pfad)
   const ohneLage = ohnePruefung ? [] : zahlenOhneBeleg(neu)
   // Die Lage kostet einen Lauf über den Text davor; nur bestimmen, wenn das Stück Zahlen hat.
-  const lage = ohneLage.length ? lageImDokument(neuerText, start) : null
-  const kandidaten = ohneLage.length ? zahlenOhneBeleg(neu, [], lage) : []
-  const zahlen = kandidaten.length ? zahlenOhneBeleg(neu, await ergebnisZahlen(projectId), lage) : []
-  const op = opsFuer(start, alt, neu)
+  const lagen = ohneLage.length ? neueStellen.map(start => lageImDokument(neuerText, start)) : []
+  const kandidaten = lagen.flatMap(lage => zahlenOhneBeleg(neu, [], lage))
+  const belegt = kandidaten.length ? await ergebnisZahlen(projectId) : []
+  const zahlen = kandidaten.length ? [...new Set(lagen.flatMap(lage => zahlenOhneBeleg(neu, belegt, lage)))] : []
+  const op = [...stellen].reverse().flatMap(start => opsFuer(start, alt, neu))
   const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
-  let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot, zahlen_ohne_beleg: zahlen }
+  let ergebnis = {
+    doc_id: doc.docId,
+    version,
+    lauf_id: lauf._id,
+    aenderung: false,
+    rot,
+    zahlen_ohne_beleg: zahlen,
+    ...(alleVorkommen && { ersetzt: stellen.length }),
+  }
   if (op.length) {
     await spurUpdate(projectId, doc.docId, op, version, { userId: botId, tracked: true })
     ergebnis = { ...ergebnis, aenderung: true }
@@ -266,6 +306,7 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
         docId: doc.docId,
         rot,
         zahlen: zahlen.map(zahl => ({ zahl, pfad: doc.pfad })),
+        ...(alleVorkommen && { anzahl: stellen.length }),
       })
       await nachDemSchreiben({
         projectId,
@@ -274,7 +315,7 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
         docId: doc.docId,
         vorher: ranges?.changes,
         rot,
-        bereich: { von: start, bis: start + neu.length },
+        bereich: { von: neueStellen[0], bis: neueStellen.at(-1) + neu.length },
       })
     } catch (error) {
       // Geschrieben ist geschrieben: Ein Fehler beim Mitzählen oder Annehmen darf die Reservierung nicht freigeben,

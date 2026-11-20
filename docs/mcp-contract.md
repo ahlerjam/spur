@@ -26,6 +26,7 @@ Status: draft before run 0. Changes to names and error codes count as a breaking
 | `check_report` | P1 | Check report of the project; `zaehlung` counts citations by `status` (`geprueft`, `ohne_quelle`, `ohne_seitenangabe`, `beleg_ohne_wortlaut`, `nicht_pruefbar`), and every citation that was not checked names its `grund` (P6). `zaehlung.markiert` counts every citation with `problem: true`, including those without a source or not checkable, so it matches the "Markiert" filter and the headline of the panel (P10). `beleg_ohne_wortlaut` is a citation that names a source without quoting its wording (a bare `\cite`); it no longer counts as `geprueft`. `uebersprungen` counts citations in hidden parts that the report leaves out (P8, see "Hidden parts and quote macros"). Each key of a citation is a row of its own; `seitenbasis` says whether the page was checked against the printed page (`gedruckt`) or the PDF page (`pdf`) (P14, see "Citations, keys and pages in the check report") |
 | `bib_list` | P1 | References and their status; `abweichungen` lists fields that are missing or differ from Crossref (P13, see "Reference data") |
 | `doc_edit` | P1 | Change as a track change, with the expected old text and an idempotency key |
+| `doc_edit` | P15 | `alle_vorkommen: true` replaces every occurrence of `alt` (non-overlapping, at most 500) as track changes of the same run in one update; the answer carries `ersetzt` (the count). The citation and number checks run on the new text of every occurrence; if one fails, nothing is written. `zahlen_ohne_beleg` names each number once. Without the parameter `doc_edit` behaves as before, and its `konflikt` for an old text that occurs more than once names `alle_vorkommen`. Errors: `konflikt` (old text not found, as before), `zu_viele_vorkommen` (422, more than 500 occurrences; `anzahl` is the count), `eingabe_ungueltig` (`feld: "alt"`, empty `alt`), `grenze_changes` (the replacements would take the document past 1990 open changes) |
 | `doc_create` | P1 | Create a document at `pfad` with `inhalt`; missing folders are created, the content arrives as a track change of Claude. Same checks as `doc_edit`. Errors see "Error codes of `doc_edit` and `doc_create`" |
 | `run_status`, `run_finish` | P1 | Query a run and end it with a summary |
 | `wait_for_event` | P1 | Waits up to 100 s for the next job (`max_sekunden` 1 to 3600, default 100; P8) and sends progress every 30 s. See "Waiting for jobs" |
@@ -73,7 +74,8 @@ Each bot has at most one waiting call; a new one ends the older one with `abgelo
 |---|---|
 | `zitat_abweichend` | The wording is not in the source |
 | `quelle_fehlt` | There is no source with text for the citation |
-| `konflikt` | The expected old text no longer matches; read again |
+| `konflikt` | The expected old text no longer matches; read again. If it occurs more than once, the message names `alle_vorkommen` (P15) |
+| `zu_viele_vorkommen` | `doc_edit` with `alle_vorkommen` (P15): more than 500 occurrences; `anzahl` is the count |
 | `doc_fehlt` | The document is deleted |
 | `grenze_changes` | The document is approaching 2000 open changes |
 | `keine_rechte` | The project role does not allow this, or the project does not exist |

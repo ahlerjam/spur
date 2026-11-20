@@ -11,8 +11,11 @@
 - f3: `spur-hochladen --projektdatei` gilt für genau eine Datei; die Ausgabe lautet `<datei>: Datei <pfad>`.
 - f3: Pfade für Projektdateien: Abschnitte aus Buchstaben, Ziffern, Leerzeichen und `-_.()`, nicht mit Punkt oder Leerzeichen beginnend, höchstens 200 Zeichen. Der Dateityp muss zur Endung passen (ein PNG mit `.jpg` ist `dateityp_nicht_erlaubt`), weil pdfLaTeX den Typ an der Endung erkennt.
 - f3: `quellenangabe` lautet `Aus \textcite{<key>}, S. <PDF-Seite>, Lizenz <Name>.`; Unpaywall-Angaben wie `CC-BY-4.0` oder `pd` werden auf `cc-by` bzw. `public-domain` normalisiert.
+- f4: Mit `alle_vorkommen` zählt jede Ersetzung als eigene Änderung des Laufs (Laufkarte „Änderungen: 12“); ohne den Parameter bleibt es eine je `doc_edit`. Überlappende Treffer zählen einmal (wie `replaceAll`). Ein leerer Alttext mit `alle_vorkommen` ist `eingabe_ungueltig` (`feld: "alt"`). Die Grenze offener Changes (1990) prüft der neue Modus samt der neuen Changes, der alte Weg bleibt unverändert.
+- f4: Im Browser nimmt die E2E die 12 Ersetzungen erst mit „Alle annehmen“ an; „Lauf rückgängig“ zeigt die Karte nur für angenommene Läufe (wie bisher), danach stehen alle 12 `fill=blue!20` wieder da.
 
 ## Angepasste ältere Tests
+- Meldung `spur_fehler_alttext_mehrfach` nennt jetzt `alle_vorkommen` (Spec); Code `konflikt` unverändert.
 - Meldung `spur_fehler_link_verbraucht` nennt nicht mehr `source_upload_link`, weil es jetzt zwei Arten von Links gibt (Code `link_verbraucht` unverändert).
 - Unit-Test „source_read kürzt auf max_zeichen“ prüft die Antwort mit `toEqual`; sie enthält jetzt zusätzlich `ab_zeichen`, `bis_zeichen` und `zeichen_gesamt`.
 - `pdf.test.mjs`: `seitenBild` nimmt die Breite jetzt als Option (`{ breite }`), weil die längste Kante (`{ kante }`) dazukam.

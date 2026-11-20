@@ -53,7 +53,7 @@
         "Ein Ersatz, der an einer der Stellen einen erfundenen Wortlaut in ein Zitat schriebe, wird ganz abgelehnt; `doc_read` zeigt das Dokument unverändert",
         "Ein Alttext mit mehr als 500 Vorkommen liefert 422 `zu_viele_vorkommen` mit der Zahl"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {

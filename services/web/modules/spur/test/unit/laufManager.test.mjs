@@ -84,6 +84,12 @@ describe('Lauf weiterführen', () => {
     expect(gespeichert).toMatchObject({ aenderungen: 2, docs: [doc], rot: [{ grund: 'nicht_pruefbar', auszug: 'X' }] })
   })
 
+  it('aenderungMerken zählt bei alle_vorkommen jede Ersetzung (P15)', async () => {
+    const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
+    await LaufManager.aenderungMerken(lauf, { docId: new ObjectId(), rot: [], anzahl: 12 })
+    expect((await LaufManager.offenerLauf(projekt, bot)).aenderungen).toBe(12)
+  })
+
   it('aenderungMerken sammelt Zahlen ohne Beleg für die Lauf-Karte', async () => {
     const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
     await LaufManager.aenderungMerken(lauf, { docId: new ObjectId(), rot: [], zahlen: [{ zahl: '412', pfad: 'main.tex' }] })

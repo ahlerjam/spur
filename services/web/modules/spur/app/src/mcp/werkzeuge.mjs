@@ -360,18 +360,22 @@ const schluessel = z.string().min(8).max(200)
 Object.assign(WERKZEUGE, {
   doc_edit: {
     description:
-      'Ersetzt den erwarteten Alttext (muss genau einmal vorkommen) durch neuen Text, als Track Change. Ohne Alttext wird am Ende angefügt. Zitate im berührten Bereich werden gegen die Quellen geprüft.',
+      'Ersetzt den erwarteten Alttext (muss genau einmal vorkommen) durch neuen Text, als Track Change. Ohne Alttext wird am Ende angefügt. Zitate im berührten Bereich werden gegen die Quellen geprüft. ' +
+      'Mit alle_vorkommen: true ersetzt spur jedes Vorkommen (höchstens 500) als Track Changes desselben Laufs, etwa für eine Farbumstellung; ersetzt nennt die Anzahl. ' +
+      'Scheitert die Prüfung an einer Stelle, wird nichts geschrieben.',
     inputSchema: z.object({
       project_id: id,
       doc_id: id.optional(),
       pfad: z.string().optional(),
       alt: z.string().max(100000).default(''),
       neu: z.string().max(100000),
+      alle_vorkommen: z.boolean().optional(),
       idempotenz_schluessel: schluessel,
     }),
     async ausfuehren(args, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, args.project_id, SCHREIBEN)
       return await SchreibManager.docEdit({
+        alleVorkommen: args.alle_vorkommen === true,
         projectId,
         botId,
         menschId,
