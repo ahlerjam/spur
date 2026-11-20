@@ -20,7 +20,7 @@ export type Quelle = {
   titelabgleich?: 'passt' | 'abweichend' | 'nicht_pruefbar' | null
   autorenabgleich?: 'aus_pdf' | 'bestaetigt' | 'abweichend' | null
   metadaten?: 'unvollstaendig' | null
-  versatzQuelle: 'pagelabels' | 'bestaetigt' | null
+  versatzQuelle: 'pagelabels' | 'seitentext' | 'bestaetigt' | null
   ocr: {
     status: 'laeuft' | 'fertig' | 'fehler' | 'abgebrochen'
     fertig: number

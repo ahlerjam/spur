@@ -132,21 +132,15 @@ export function zeilenBewerten(fund, kontext) {
   if (fund.belege.length <= 1) return [zeileBewerten(fund, kontext)]
   const ohneWortlaut = beleg => zeileBewerten({ ...fund, roh: '', belege: [beleg] }, kontext)
   if (!fund.roh) return fund.belege.map(ohneWortlaut)
-  const mitWortlaut = beleg => zeileBewerten({ ...fund, belege: [beleg] }, kontext)
-  let traeger = -1
-  let zeile = null
-  for (const [i, beleg] of fund.belege.entries()) {
-    zeile = mitWortlaut(beleg)
-    if (WORTLAUT_GEFUNDEN.includes(zeile.wortlaut)) {
-      traeger = i
-      break
-    }
+  // Bis zum ersten Treffer prüfen; die geprüften Zeilen bleiben für den Rückfall ohne Treffer.
+  const versuche = []
+  for (const beleg of fund.belege) {
+    versuche.push(zeileBewerten({ ...fund, belege: [beleg] }, kontext))
+    if (WORTLAUT_GEFUNDEN.includes(versuche.at(-1).wortlaut)) break
   }
-  if (traeger < 0) {
-    traeger = Math.max(0, fund.belege.findIndex(b => quelleZu(b.key, kontext.bibEintraege, kontext.quellen)))
-    zeile = mitWortlaut(fund.belege[traeger])
-  }
-  return fund.belege.map((beleg, i) => (i === traeger ? zeile : ohneWortlaut(beleg)))
+  let traeger = versuche.length - 1
+  if (!WORTLAUT_GEFUNDEN.includes(versuche[traeger].wortlaut)) traeger = Math.max(0, versuche.findIndex(z => z.quelleId))
+  return fund.belege.map((beleg, i) => (i === traeger ? versuche[i] : ohneWortlaut(beleg)))
 }
 
 export function istProblem(zeile) {
