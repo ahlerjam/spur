@@ -23,7 +23,7 @@
         "Das Projekt kompiliert ohne Fehler, und `sources_list` zeigt den Titel als Klartext mit „&“",
         "Ein Titel mit `{`, `}` oder `\\` aus Crossref bricht die `.bib` weiterhin nicht (bestehender Test bleibt grün)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f3",
