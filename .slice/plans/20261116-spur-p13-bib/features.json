@@ -75,7 +75,7 @@
         "Claude ergänzt die Felder mit `doc_edit`; danach liefert `bib_list` für `alt2024` `abweichungen: []` und das Abzeichen ist weg",
         "Ist der Crossref-Fake abgeschaltet, liefert `bib_list` `abweichungen: null` mit dem Grund `crossref_nicht_erreichbar`"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     }
   ]
