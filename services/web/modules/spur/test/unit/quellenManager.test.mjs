@@ -147,6 +147,33 @@ describe('Titelabgleich beim Aufnehmen', () => {
   })
 })
 
+describe('Autorenabgleich beim Aufnehmen', () => {
+  const GANDHI_JOSHI = [{ family: 'Gandhi', given: 'Kiran' }, { family: 'Joshi', given: 'Mira' }]
+  const mitAutoren = (datei, autoren) => aufnehmen(datei, datei, { meta: { gefunden: true, titel: 'Egal', autoren } })
+
+  it('übernimmt die Reihenfolge der ersten PDF-Seite in die Metadaten (Gandhi/Joshi)', async () => {
+    const quelle = await mitAutoren('arxiv2402.05555.pdf', GANDHI_JOSHI)
+    expect(quelle.autoren).toBe('aus_pdf')
+    expect(quelle.meta.autoren.map(a => a.family)).toEqual(['Joshi', 'Gandhi'])
+    const gespeichert = await datenbank.db.collection('spurSources').findOne({ _id: quelle._id })
+    expect(gespeichert).toMatchObject({ autoren: 'aus_pdf', meta: { autoren: [{ family: 'Joshi' }, { family: 'Gandhi' }] } })
+  })
+
+  it('meldet abweichend, wenn ein Nachname auf der ersten Seite fehlt, und lässt die Reihenfolge', async () => {
+    const quelle = await mitAutoren('arxiv2402.06666.pdf', GANDHI_JOSHI)
+    expect(quelle.autoren).toBe('abweichend')
+    expect(quelle.meta.autoren).toEqual(GANDHI_JOSHI)
+  })
+
+  it('bestätigt Müller gegen Muller im PDF', async () => {
+    expect((await mitAutoren('arxiv2402.07777.pdf', [{ family: 'Müller', given: 'Jonas' }, { family: 'Silva', given: 'Ana' }])).autoren).toBe('bestaetigt')
+  })
+
+  it('gleicht einen Scan ohne Text nicht ab', async () => {
+    expect(await mitAutoren('scan.pdf', GANDHI_JOSHI)).not.toHaveProperty('autoren')
+  })
+})
+
 describe('Abfragen', () => {
   let smith
   let interview

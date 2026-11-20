@@ -165,4 +165,40 @@ describe('Prüfbericht-Panel', function () {
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
     await screen.findByText('1 Stelle, keine markiert')
   })
+
+  it('zeigt Abweichungen von Crossref als neutrales Abzeichen, das die Felder aufklappt (P13)', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, {
+      zeilen: [
+        {
+          ...zeile('gruen', false),
+          key: 'alt2024',
+          auszug: 'Alter Eintrag',
+          wortlaut: null,
+          status: 'beleg_ohne_wortlaut',
+          abweichungen: [
+            { feld: 'volume', eintrag: null, erwartet: '35' },
+            { feld: 'year', eintrag: '2024', erwartet: '2025' },
+            { feld: 'eintragstyp', eintrag: 'article', erwartet: 'online' },
+          ],
+        },
+        zeile('rot', true),
+      ],
+      zaehlung: { geprueft: 1, markiert: 1, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 1, nicht_pruefbar: 0 },
+    })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    const knopf = await screen.findByRole('button', { name: /Literaturdaten unvollständig/ })
+    expect(knopf.className).to.include('bg-info')
+    expect(knopf.getAttribute('aria-expanded')).to.equal('false')
+    expect(screen.queryByText(/volume:/)).to.not.exist
+    fireEvent.click(knopf)
+    expect(knopf.getAttribute('aria-expanded')).to.equal('true')
+    screen.getByText('volume: fehlt (Crossref: 35)')
+    screen.getByText('year: 2024 (Crossref: 2025)')
+    screen.getByText('Eintragstyp: @article (Crossref: @online)')
+    fireEvent.click(screen.getByRole('radio', { name: /^Markiert/ }))
+    expect(screen.queryByText('Alter Eintrag')).to.not.exist
+    expect(screen.queryByRole('button', { name: /Literaturdaten unvollständig/ })).to.not.exist
+  })
 })

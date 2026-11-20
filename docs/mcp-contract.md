@@ -22,7 +22,7 @@ Status: draft before run 0. Changes to names and error codes count as a breaking
 | `sources_list`, `source_search`, `source_read` | P1 | Search sources and read sections |
 | `quote_mark` | P1 | Mark a passage in a source |
 | `check_report` | P1 | Check report of the project; `zaehlung` counts citations by `status` (`geprueft`, `ohne_quelle`, `ohne_seitenangabe`, `beleg_ohne_wortlaut`, `nicht_pruefbar`), and every citation that was not checked names its `grund` (P6). `zaehlung.markiert` counts every citation with `problem: true`, including those without a source or not checkable, so it matches the "Markiert" filter and the headline of the panel (P10). `beleg_ohne_wortlaut` is a citation that names a source without quoting its wording (a bare `\cite`); it no longer counts as `geprueft`. `uebersprungen` counts citations in hidden parts that the report leaves out (P8, see "Hidden parts and quote macros") |
-| `bib_list` | P1 | References and their status |
+| `bib_list` | P1 | References and their status; `abweichungen` lists fields that are missing or differ from Crossref (P13, see "Reference data") |
 | `doc_edit` | P1 | Change as a track change, with the expected old text and an idempotency key |
 | `doc_create` | P1 | Create a document at `pfad` with `inhalt`; missing folders are created, the content arrives as a track change of Claude. Same checks as `doc_edit`. Errors see "Error codes of `doc_edit` and `doc_create`" |
 | `run_status`, `run_finish` | P1 | Query a run and end it with a summary |
@@ -126,6 +126,28 @@ On 429, 503 and network errors spur asks a search service up to three times (pau
 Title check: after each download spur compares the title from the metadata with the text of the first three pages and the title field of the PDF (lower case, without punctuation and accents). It matches when at least half of the title words with four or more letters occur, and at least three (all of them when there are fewer). A PDF of a different work is rejected as `falsches_pdf` and the next location is tried. The source and `sources_list` carry `titelabgleich`: `passt`, `abweichend` or `nicht_pruefbar` (no text layer on the first three pages, or no title word with four letters). Uploads through `source_upload_link` and `pdf_url` are never rejected for the title; with `abweichend` the answer and `sources_list` carry `hinweis` "Titel im PDF passt nicht zu den Metadaten". Sources added before P12 have no `titelabgleich`.
 
 Sources without a DOI: `source_add` with `pdf_url` (a public https address that returns the PDF directly, at most 50 MB; no handles or URNs) and `metadaten`: `titel` (required), `autoren` (list of `family`, `given`), `jahr`, `art` (`thesis`, `report`, `working_paper`, `book`, `misc`), `institution`, `abschluss` (free text such as "Masterarbeit") and `url`. The `.bib` gets an entry for the kind (`@thesis` with `type` and `institution`, `@report`, `@book`, `@misc`) with `url` and `urldate`. The same `pdf_url` or the same file again answers `quelle_vorhanden`. An address that is not public https answers `pdf_fehlt` without being fetched. The upload link takes the same fields as form fields (`titel`, `autoren` as "Family, Given; …", `jahr`, `art`, `institution`, `url`); without `doi` they produce the same entry, and the answer names `key`.
+
+## Reference data (P13)
+
+New `.bib` entries from `source_add` with `doi` and from `source_upload_link` follow biblatex-apa (APA 7):
+
+- Entry type by the Crossref `type`: `journal-article` → `@article` (`journal`), `book-chapter` → `@incollection` (`booktitle`, `publisher`), `book` and `monograph` → `@book` (`publisher`), `proceedings-article` → `@inproceedings` (`booktitle`, `publisher`), any other type → `@misc`. Fields without a value are left out, never empty.
+- `volume` and `number` come from Crossref `volume` and `issue`. An article number (`article-number`) goes into `eid` and `pages` is left out.
+- `year` is the year of the printed issue: `published-print`, then `journal-issue.published-print`, then `issued` (the earlier of print and online). The key of a new source uses the same year (`oldemeyer2025`, not `oldemeyer2024`).
+- Preprints (an arXiv DOI `10.48550/arXiv.…` or Crossref `posted-content`) become `@online` with `author`, `title`, `date` (year), `eprint` (`arXiv`, otherwise the archive from `group-title` or `institution`, such as `PsyArXiv`) and `doi`, without `journal`.
+- HTML entities and tags in title, journal, authors and publisher are resolved before LaTeX escaping (`&amp;` → `\&`); `<i>` and `<em>` become `\textit{…}`, other tags are dropped with their text kept. `sources_list` carries `titel` as plain text. Existing entries are never changed by spur.
+
+Author check: after reading a PDF with a text layer spur compares the family names from the metadata with the first page (ignoring case and accents, whole words). The source, `source_add`, `sources_list` and the upload answer carry `autoren`:
+
+- `aus_pdf`: all names are on the first page in a different order; the `.bib` entry uses the order of the PDF.
+- `bestaetigt`: all names are there in the same order.
+- `abweichend`: at least one name is missing; the order of the metadata stays and `autoren_hinweis` says "Autoren im PDF nicht gefunden – bitte prüfen". The sources panel shows the same text.
+
+Scans without text, sources without authors and sources added before P13 have no `autoren`.
+
+Every upload through `source_upload_link` gets a `.bib` entry. With `doi` and Crossref metadata it is the full entry above, with a key from the first family name and the year. Without metadata (no `doi`, a DOI that Crossref does not know, or Crossref not reachable) it is `@misc` with the title from the form field `titel`, else the title field of the PDF, else the file name without extension; the key comes from the file name and the DOI is not written into the entry. Such a source and its answer carry `metadaten: "unvollstaendig"`, the answer also `metadaten_hinweis` with the reason (no DOI, DOI not found at Crossref, or Crossref not reachable); `spur-hochladen` prints it as a second line. A file with the same name or the same DOI as a source of the project answers `vorhanden` and adds nothing.
+
+`bib_list` gives each reference `abweichungen`, a list of `{feld, eintrag, erwartet}`: `feld` is `volume`, `number`, `pages`, `year` or `eintragstyp`, `eintrag` the value in the `.bib` (`null` when missing) and `erwartet` the value according to Crossref (for `eintragstyp` the type that fits the kind of work, such as `online` for a preprint). A field counts only when Crossref names a value; missing `pages` do not count, different ones do; `year` is read from `year`, else from `date`; `@misc` is expected for no type and every entry type fits it. An empty list means the entry matches. Deviations are hints and never make a reference a problem. When nothing can be compared, `abweichungen` is `null` with `abweichungen_grund`: `ohne_doi`, `crossref_nicht_erreichbar`, `registrierstelle_nicht_erreichbar` or `nicht_bei_crossref` (the DOI is registered elsewhere or not at all). arXiv DOIs are checked for the entry type only, without Crossref. In `check_report` a citation of a reference with deviations carries the same `abweichungen`; the check report panel shows the neutral badge "Literaturdaten unvollständig", which unfolds the fields with both values.
 
 ## Search log and PRISMA totals (P12)
 

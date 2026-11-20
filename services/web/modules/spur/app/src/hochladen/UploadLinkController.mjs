@@ -1,7 +1,9 @@
 // POST /spur/hochladen/:token – ohne Sitzung und CSRF; das Token entscheidet. Antwortet je Datei mit Quellen-ID
 // oder Grund, im Format, das das Plugin-Skript spur-hochladen ausgibt.
 import { open, rm } from 'node:fs/promises'
+import Path from 'node:path'
 import { meldung } from '../meldungen.mjs'
+import { titelFeld } from '../pdf.mjs'
 import { mitProblemen, Problem, problemSenden } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import { quellen } from '../sammlungen.mjs'
@@ -11,6 +13,7 @@ import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import { autorenAusText, metadatenOhneDoi, WERKFELDER } from '../recherche/ohneDoi.mjs'
 import { doiPruefen } from '../recherche/Recherche.mjs'
+import { literaturBefund } from '../recherche/autorenabgleich.mjs'
 import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as UploadLink from './UploadLink.mjs'
@@ -43,15 +46,21 @@ async function istPdf(pfad) {
 }
 
 // Metadaten der angegebenen DOI, damit Titel und .bib nicht von einer DOI im PDF-Text abhängen. Ohne Antwort des
-// Registers entsteht die Quelle trotzdem.
+// Registers entsteht die Quelle trotzdem; hinweis sagt dann, warum die Angaben fehlen.
 async function doiMetadaten(doi) {
   try {
     const { meta } = await Aufnahme.metadaten(doi)
-    return meta.gefunden ? meta : undefined
+    return meta.gefunden ? { meta } : { hinweis: meldung('spur_hinweis_doi_nicht_gefunden', { doi }) }
   } catch (error) {
-    if (error instanceof Problem) return undefined
+    if (error instanceof Problem) return { hinweis: meldung('spur_hinweis_doi_crossref_fehlt') }
     throw error
   }
+}
+
+// Ohne Metadaten: Titel aus dem Formular, sonst aus dem PDF, sonst der Dateiname; der Eintrag wird @misc.
+async function ersatzMeta(req, stamm) {
+  const titel = req.body?.titel ? String(req.body.titel).slice(0, 500) : await titelFeld(req.file.path).catch(() => null)
+  return { titel: titel || stamm, art: 'misc' }
 }
 
 // Ohne DOI, aber mit Angaben zum Werk (Autoren, Jahr, Art, Institution): Die Quelle bekommt wie bei source_add mit
@@ -76,20 +85,30 @@ async function ohneDoiAufnehmen(link, req, dateiname) {
   return await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
 }
 
+// Jeder Upload bekommt einen .bib-Eintrag: mit DOI aus Crossref wie bei source_add, sonst @misc mit dem Vermerk
+// metadaten: 'unvollstaendig'.
 async function neueQuelle(link, req, dateiname) {
   const doi = req.body?.doi ? doiPruefen(String(req.body.doi)) : undefined
   if (!doi && WERKFELDER.some(feld => req.body?.[feld])) return await ohneDoiAufnehmen(link, req, dateiname)
-  const titel = req.body?.titel ? String(req.body.titel).slice(0, 500) : undefined
-  const meta = titel ? { titel } : doi ? await doiMetadaten(doi) : undefined
-  return await QuellenManager.aufnehmen({
+  const alle = await QuellenManager.alle(link.projectId)
+  const vorhanden = alle.find(q => q.dateiname === dateiname || (doi && q.doi?.toLowerCase() === doi.toLowerCase()))
+  if (vorhanden) return { vorhanden }
+  const register = doi ? await doiMetadaten(doi) : { hinweis: meldung('spur_hinweis_metadaten_ohne_doi') }
+  const stamm = Path.basename(dateiname, Path.extname(dateiname))
+  const { key, docs } = await Aufnahme.neuerKey(link.projectId, alle, register.meta ?? { titel: stamm })
+  const quelle = await QuellenManager.aufnehmen({
     projectId: link.projectId,
     userId: link.menschId,
     dateiname,
     tempPfad: req.file.path,
     groesse: req.file.size,
+    key,
     doi,
-    meta,
+    meta: register.meta ?? (await ersatzMeta(req, stamm)),
+    ...(!register.meta && { metadaten: 'unvollstaendig' }),
   })
+  const angelegt = await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
+  return register.meta ? angelegt : { ...angelegt, metadatenHinweis: register.hinweis }
 }
 
 async function aufnehmen(link, req, dateiname) {
@@ -135,6 +154,8 @@ export const hochladen = mitProblemen(async (req, res) => {
       quelle_id: String(ergebnis._id),
       key: ergebnis.key,
       ...titelBefund(ergebnis),
+      ...literaturBefund(ergebnis),
+      ...(ergebnis.metadatenHinweis && { metadaten_hinweis: ergebnis.metadatenHinweis }),
       ...(eintrag && { beschaffung_id: String(eintrag._id) }),
     })
   } finally {

@@ -75,6 +75,10 @@ before(async () => {
         }
         if (datei === 'b.pdf') return json(res, 200, { datei, status: 'vorhanden', quelle_id: QUELLE_ID })
         if (datei === 'scan.pdf') return json(res, 200, { datei, status: 'abgelehnt', grund: 'Datei ist keine PDF-Datei' })
+        if (datei === 'nirgends.pdf') {
+          const metadaten_hinweis = 'Crossref kennt die DOI 10.9999/nirgends.1 nicht. Der .bib-Eintrag ist @misc mit dem Titel; prüfe die DOI und ergänze die Angaben.'
+          return json(res, 200, { datei, status: 'angelegt', quelle_id: QUELLE_ID, key: 'nirgends', metadaten: 'unvollstaendig', metadaten_hinweis })
+        }
         return json(res, 200, { datei, status: 'angelegt', quelle_id: QUELLE_ID })
       }
       json(res, 404, { fehler: 'nicht_gefunden', detail: 'unbekannt' })
@@ -219,6 +223,16 @@ test('spur-hochladen gibt für Quellen ohne DOI Autoren, Jahr, Art, Institution 
     { ...uploads[0], pfad: undefined, datei: undefined },
     { pfad: undefined, datei: undefined, doi: undefined, titel: 'AI at Work', autoren: 'Meyer, Jana; Okafor, Chidi', jahr: '2023', art: 'report', institution: 'OECD', url: 'https://oecd.example/ai-at-work?a=1&b=2' }
   )
+})
+
+test('spur-hochladen nennt unvollständige Metadaten in einer zweiten Zeile (P13)', async () => {
+  writeFileSync(join(arbeit, 'nirgends.pdf'), PDF)
+  const r = await laufAsync('spur-hochladen', [`${basis}/upload/ok`, 'nirgends.pdf', '--doi', '10.9999/nirgends.1'])
+  assert.equal(r.status, 0, r.stderr)
+  assert.deepEqual(r.stdout.trim().split('\n'), [
+    `nirgends.pdf: Quelle ${QUELLE_ID}`,
+    'nirgends.pdf: Crossref kennt die DOI 10.9999/nirgends.1 nicht. Der .bib-Eintrag ist @misc mit dem Titel; prüfe die DOI und ergänze die Angaben.',
+  ])
 })
 
 test('spur-hochladen verlangt zu jeder Option einen Wert', () => {

@@ -182,6 +182,23 @@ describe('Quellen-Panel', function () {
     expect((await zeile('scan.pdf')).textContent).not.to.match(/Titel im PDF|Lizenz/)
   })
 
+  it('warnt nur bei Autoren, die im PDF fehlen, und nennt unvollständige Metadaten (P13)', async function () {
+    fetchMock.get(QUELLEN, {
+      quellen: [
+        quelle('joshi2024', { titel: 'Replay order', autorenabgleich: 'aus_pdf' }),
+        quelle('gandhi2024', { titel: 'Offline consolidation', autorenabgleich: 'abweichend' }),
+        quelle('notizen', { titel: 'Field notes 2023', metadaten: 'unvollstaendig' }),
+      ],
+      gesamt: 3,
+    })
+    zeigen()
+    const zeile = async (name: string) => (await screen.findByRole('button', { name: new RegExp(name) })).closest('li')!
+    expect((await zeile('Replay order')).textContent).not.to.match(/Autoren im PDF|Metadaten/)
+    expect((await zeile('Offline consolidation')).textContent).to.contain('Autoren im PDF nicht gefunden – bitte prüfen')
+    expect((await zeile('Field notes 2023')).textContent).to.contain('Metadaten unvollständig')
+    expect((await zeile('Field notes 2023')).textContent).not.to.contain('Autoren im PDF')
+  })
+
   it('nennt bei Quellen ohne DOI die Art des Werks neben Autoren und Jahr', async function () {
     fetchMock.get(QUELLEN, {
       quellen: [

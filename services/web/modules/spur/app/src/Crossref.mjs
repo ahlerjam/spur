@@ -1,9 +1,11 @@
 import logger from '@overleaf/logger'
+import { klartext } from './pruefung/bib.mjs'
 import { crossrefCache } from './sammlungen.mjs'
 import { jetzt, paperApiBasis, umgebung } from './schalter.mjs'
 
 const BASIS = 'https://api.crossref.org'
 const TAG_MS = 24 * 60 * 60 * 1000
+const WERK_FASSUNG = 2
 const ZURUECKGEZOGEN = new Set(['retraction', 'withdrawal', 'removal'])
 const KORREKTUR = new Set([
   'correction',
@@ -13,6 +15,16 @@ const KORREKTUR = new Set([
   'clarification',
 ])
 
+const jahrVon = datum => datum?.['date-parts']?.[0]?.[0] ?? null
+const wert = text => (text ? klartext(String(text)) || null : null)
+
+// `issued` ist das frühere von Druck und Online-Vorabveröffentlichung; zitiert wird das Jahr der Heftausgabe.
+function jahre(message) {
+  const jahr = jahrVon(message['published-print']) ?? jahrVon(message['journal-issue']?.['published-print']) ?? jahrVon(message.issued)
+  const online = jahrVon(message['published-online']) ?? jahrVon(message.issued)
+  return { jahr, ...(online && jahr && online !== jahr && { jahrOnline: online }) }
+}
+
 export function werkAuswerten(message) {
   const updates = (message['updated-by'] ?? []).map(u =>
     (u.type ?? '').toLowerCase()
@@ -20,18 +32,30 @@ export function werkAuswerten(message) {
   let retraction = 'keine_meldung'
   if (updates.some(t => KORREKTUR.has(t))) retraction = 'korrektur'
   if (updates.some(t => ZURUECKGEZOGEN.has(t))) retraction = 'zurueckgezogen'
-  const issued = message.issued?.['date-parts']?.[0]?.[0]
+  const titelRoh = message.title?.[0]
+  const zusatz = {
+    band: wert(message.volume),
+    heft: wert(message.issue ?? message['journal-issue']?.issue),
+    artikelnummer: wert(message['article-number']),
+    verlag: wert(message.publisher),
+    archiv: wert(message['group-title'] ?? message.institution?.[0]?.name),
+    // Nur mit Auszeichnung: Daraus wird in der .bib \textit, der Klartext steht in titel.
+    titelHtml: /<(i|em)\b/i.test(titelRoh ?? '') ? titelRoh : null,
+  }
+  const { jahr, ...online } = jahre(message)
   return {
     gefunden: true,
-    titel: message.title?.[0] ?? null,
+    titel: wert(titelRoh),
     autoren: (message.author ?? []).map(a => ({
-      family: a.family ?? a.name ?? '',
-      given: a.given ?? '',
+      family: wert(a.family ?? a.name) ?? '',
+      given: wert(a.given) ?? '',
     })),
-    jahr: issued ?? null,
-    journal: message['container-title']?.[0] ?? null,
-    seiten: message.page ?? null,
+    jahr,
+    ...online,
+    journal: wert(message['container-title']?.[0]),
+    seiten: wert(message.page),
     typ: message.type ?? null,
+    ...Object.fromEntries(Object.entries(zusatz).filter(([, w]) => w)),
     retraction,
   }
 }
@@ -87,13 +111,15 @@ export async function werk(doi) {
   const _id = doi.toLowerCase()
   const cache = await crossrefCache()
   const eintrag = await cache.findOne({ _id })
-  if (eintrag && jetzt() - eintrag.abgerufenAm < TAG_MS) return eintrag.werk
+  // Vor P13 gecachte Werke haben weder Band noch Heft noch das Jahr der Heftausgabe.
+  const veraltet = eintrag?.werk?.gefunden && eintrag.fassung !== WERK_FASSUNG
+  if (eintrag && !veraltet && jetzt() - eintrag.abgerufenAm < TAG_MS) return eintrag.werk
   if (Date.now() < netzfehlerBis) return eintrag?.werk ?? null
   try {
     const neu = await abrufen(doi)
     await cache.updateOne(
       { _id },
-      { $set: { werk: neu, abgerufenAm: jetzt() } },
+      { $set: { werk: neu, abgerufenAm: jetzt(), fassung: WERK_FASSUNG } },
       { upsert: true }
     )
     return neu

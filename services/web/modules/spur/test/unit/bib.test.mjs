@@ -10,9 +10,10 @@ describe('bibLesen', () => {
 }
 @book{meier2020, title = "Gedächtnis", DOI = "10.1000/xyz" }
 `
+    const leer = { volume: null, number: null, pages: null, eid: null, year: null, date: null }
     expect([...bibLesen(bib).values()]).toEqual([
-      { key: 'smith2024', doi: '10.5555/spur.2024.001' },
-      { key: 'meier2020', doi: '10.1000/xyz' },
+      { key: 'smith2024', typ: 'article', doi: '10.5555/spur.2024.001', ...leer },
+      { key: 'meier2020', typ: 'book', doi: '10.1000/xyz', ...leer },
     ])
   })
 
@@ -36,6 +37,12 @@ describe('bibLesen', () => {
   it('findet eine DOI hinter verschachtelten Klammern und escaped Anführungszeichen', () => {
     const bib = '@article{k, title = {A {B {C}} D}, note = "ein \\" Zitat", doi = {10.1/k}}'
     expect(bibLesen(bib).get('k').doi).toBe('10.1/k')
+  })
+
+  it('liest Typ, Band, Heft, Seiten, Artikelnummer, Jahr und Datum für den Abgleich mit Crossref', () => {
+    const bib = '@Article{a, VOLUME = {35}, number = "2", pages = {101--118}, year = { 2024 }, doi = {10.1/a}}\n@online{b, date = {2024-01-03}, eid = {e1}}'
+    expect(bibLesen(bib).get('a')).toMatchObject({ typ: 'article', volume: '35', number: '2', pages: '101--118', year: '2024', date: null })
+    expect(bibLesen(bib).get('b')).toMatchObject({ typ: 'online', date: '2024-01-03', eid: 'e1', volume: null })
   })
 
   it('liest nichts aus Text ohne Einträge', () => {

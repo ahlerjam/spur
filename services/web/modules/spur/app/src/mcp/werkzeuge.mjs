@@ -11,12 +11,13 @@ import { rolleFuerClaude, rolleImVertrag } from '../rechte.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import { bibLesen } from '../pruefung/bib.mjs'
-import { referenzStatus } from '../pruefung/bewertung.mjs'
+import { abweichungen, referenzStatus } from '../pruefung/bewertung.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
 import * as Suchprotokoll from '../recherche/Suchprotokoll.mjs'
 import { eingabeUngueltig } from '../recherche/ohneDoi.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
+import { literaturBefund } from '../recherche/autorenabgleich.mjs'
 import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
@@ -140,7 +141,9 @@ export const WERKZEUGE = {
   sources_list: {
     description:
       'Quellen eines Projekts mit Status, ohne Text. titelabgleich (passt, abweichend, nicht_pruefbar) vergleicht den Titel ' +
-      'aus den Metadaten mit dem Anfang des PDFs; bei abweichend sagt hinweis, dass das PDF ein anderes Werk sein kann.',
+      'aus den Metadaten mit dem Anfang des PDFs; bei abweichend sagt hinweis, dass das PDF ein anderes Werk sein kann. ' +
+      'titel ist Klartext. autoren (aus_pdf, bestaetigt, abweichend) vergleicht die Nachnamen mit der ersten PDF-Seite; ' +
+      'nur bei abweichend steht autoren_hinweis. metadaten: unvollstaendig heißt, der .bib-Eintrag ist @misc ohne Register.',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
@@ -151,10 +154,12 @@ export const WERKZEUGE = {
           dateiname: q.dateiname,
           key: q.key,
           doi: q.doi,
+          titel: q.meta?.titel ?? null,
           seiten: q.seitenzahl,
           status: q.status,
           fassung: q.fassung,
           ...titelBefund(q),
+          ...literaturBefund(q),
         })),
         cursor
       )
@@ -233,7 +238,10 @@ export const WERKZEUGE = {
 
   bib_list: {
     description:
-      'Referenzen aus den .bib-Dateien mit Status der DOI: Crossref, sonst die Registrierstelle laut doi.org (registrierstelle).',
+      'Referenzen aus den .bib-Dateien mit Status der DOI: Crossref, sonst die Registrierstelle laut doi.org (registrierstelle). ' +
+      'abweichungen listet {feld, eintrag, erwartet} für volume, number, pages, year und eintragstyp, die laut Crossref fehlen ' +
+      'oder anders sind; [] heißt stimmt, null mit abweichungen_grund heißt nicht prüfbar. Abweichungen sind Hinweise, ' +
+      'kein Problem; ergänze die Felder mit doc_edit.',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
@@ -245,7 +253,7 @@ export const WERKZEUGE = {
       teil.eintraege = await Promise.all(
         teil.eintraege.map(async e => {
           const werk = e.doi ? await Crossref.pruefen(e.doi) : null
-          return { key: e.key, doi: e.doi, ...referenzStatus(e, werk) }
+          return { key: e.key, doi: e.doi, ...referenzStatus(e, werk), ...abweichungen(e, werk) }
         })
       )
       return teil
@@ -505,7 +513,7 @@ Object.assign(WERKZEUGE, {
       const quelle = doi
         ? await Beschaffung.aufnehmenOderVormerken({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
         : await Aufnahme.perUrl({ projectId, userId: menschId, pdfUrl, metadaten })
-      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi, ...titelBefund(quelle) }
+      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi, ...titelBefund(quelle), ...literaturBefund(quelle) }
     },
   },
 
@@ -563,7 +571,9 @@ Object.assign(WERKZEUGE, {
     description:
       'Einmal-Link, über den du PDFs vom Rechner direkt in dieses Projekt hochlädst (nicht über MCP): ' +
       'curl -F datei=@paper.pdf [-F doi=…] [-F titel=…] <link> oder das Plugin-Skript spur-hochladen. ' +
-      `Gilt ${UploadLink.GUELTIG_MINUTEN} Minuten für bis zu ${UploadLink.MAX_DATEIEN} Dateien. Die Quellen gehören zum Lauf.`,
+      `Gilt ${UploadLink.GUELTIG_MINUTEN} Minuten für bis zu ${UploadLink.MAX_DATEIEN} Dateien. Die Quellen gehören zum Lauf. ` +
+      'Jede Datei bekommt einen .bib-Eintrag: mit doi aus Crossref, sonst @misc mit metadaten: unvollstaendig und ' +
+      'metadaten_hinweis (Grund, etwa DOI bei Crossref nicht gefunden).',
     inputSchema: z.object({ project_id: id }),
     async ausfuehren({ project_id: pid }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)

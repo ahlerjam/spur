@@ -18,6 +18,8 @@ export type Quelle = {
   lizenz?: string | null
   werkart?: 'thesis' | 'report' | 'working_paper' | 'book' | 'misc' | null
   titelabgleich?: 'passt' | 'abweichend' | 'nicht_pruefbar' | null
+  autorenabgleich?: 'aus_pdf' | 'bestaetigt' | 'abweichend' | null
+  metadaten?: 'unvollstaendig' | null
   versatzQuelle: 'pagelabels' | 'bestaetigt' | null
   ocr: {
     status: 'laeuft' | 'fertig' | 'fehler' | 'abgebrochen'
