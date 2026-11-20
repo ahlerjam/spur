@@ -121,6 +121,12 @@ describe('docEdit', () => {
     expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, { docId: String(KAPITEL), rot: [], zahlen: [] })
   })
 
+  it('merkt die Kennung der neuen Changes am Lauf (P15)', async () => {
+    spurUpdate.mockResolvedValue('f'.repeat(18))
+    await bearbeiten()
+    expect(laufManager.aenderungMerken).toHaveBeenCalledWith(lauf, { docId: String(KAPITEL), rot: [], zahlen: [], seed: 'f'.repeat(18) })
+  })
+
   it('meldet frei getippte Zahlen und merkt sie am Lauf', async () => {
     const ergebnis = await bearbeiten({ neu: 'Es waren 412 Personen, seit 2019.' })
     expect(ergebnis.zahlen_ohne_beleg).toEqual(['412'])

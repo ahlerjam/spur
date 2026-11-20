@@ -8066,6 +8066,62 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(zaehlen(zurueck, 'fill=blue!20') === 12 && !zurueck.includes('gray!20'), `Nach „Lauf rückgängig“: ${zaehlen(zurueck, 'fill=blue!20')}-mal blue!20`)
   }
 
+  features.p15f5 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const pid = await projektId(token, 'E2E P15 Lauf')
+    await projektOeffnen('E2E P15 Lauf')
+    const automatik = async an =>
+      await page.evaluate(
+        async ([p, wert]) => {
+          const t = document.querySelector('meta[name="ol-csrfToken"]').content
+          return (await fetch(`/spur/project/${p}/claude/automatik`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': t }, body: JSON.stringify({ an: wert }) })).status
+        },
+        [pid, an]
+      )
+    ok((await automatik(true)) === 204, 'Automatik nicht eingeschaltet')
+    try {
+      const schreiben = async (alt, neu) => {
+        const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: schluessel() })
+        ok(!r.fehler, `doc_edit ${neu}: ${json(r.inhalt)}`)
+        return r.inhalt
+      }
+      await schreiben('Alpha.', 'Alpha ergänzt.')
+      await schreiben('Beta.', 'Beta ergänzt.')
+      // Rot: eine Zitierform, die spur nicht prüfen kann; sie wird nie automatisch angenommen.
+      const rot = await schreiben('Gamma.', 'Gamma. \\meincite{smith2024}')
+      ok(rot.rot.length === 1, `Dritte Änderung nicht rot: ${json(rot)}`)
+
+      const ERWARTET = json({ gesamt: 3, automatisch_angenommen: 2, offen: 1, rot: 1 })
+      const status = (await werkzeug(token, 'run_status', { project_id: pid })).inhalt
+      ok(json(status.aenderungen) === ERWARTET, `run_status: ${json(status.aenderungen)}`)
+      for (const teil of ['Zwei Änderungen stehen bereits im Text', 'Eine Änderung wartet als Track Change auf deine Entscheidung', '„Lauf rückgängig“ nimmt alle drei zurück']) {
+        ok(status.hinweis.includes(teil), `hinweis ohne „${teil}“: ${status.hinweis}`)
+      }
+      const ende = (await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Drei Absätze ergänzt.' })).inhalt
+      ok(json(ende.aenderungen) === ERWARTET && ende.hinweis === status.hinweis, `run_finish: ${json(ende)}`)
+
+      await panelOeffnen('Claude')
+      await karte().getByText('2 automatisch angenommen, 1 offen', { exact: true }).waitFor({ timeout: 20000 })
+      await page.locator('.cm-content [class*="ol-cm-change"]', { hasText: 'meincite' }).first().waitFor({ timeout: 20000 })
+      await karte().locator('.spur-lauf-aenderung', { hasText: 'meincite' }).getByRole('button', { name: 'Annehmen' }).click()
+      await karte().getByText('Angenommen', { exact: true }).waitFor({ timeout: 20000 })
+      const danach = (await werkzeug(token, 'run_status', { project_id: pid })).inhalt
+      ok(danach.aenderungen.offen === 0 && danach.lauf.status === 'angenommen', `Nach dem Annehmen: ${json(danach)}`)
+    } finally {
+      await automatik(false)
+    }
+
+    const leer = await projektId(token, 'E2E P15 Nur Antwort')
+    const antwort = await werkzeug(token, 'reply', { project_id: leer, text: 'Ich habe nur gelesen.' })
+    ok(!antwort.fehler, `reply: ${json(antwort.inhalt)}`)
+    const ohne = (await werkzeug(token, 'run_status', { project_id: leer })).inhalt
+    ok(ohne.aenderungen.gesamt === 0, `Lauf ohne Textänderung: ${json(ohne)}`)
+    const zahlwort = /\b(null|eins?|eine[rnms]?|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\b|\d/i
+    ok(ohne.hinweis && !zahlwort.test(ohne.hinweis), `Hinweis mit Zahlenwort: ${ohne.hinweis}`)
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

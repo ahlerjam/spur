@@ -10,6 +10,7 @@ import { Problem } from '../probleme.mjs'
 import { einstellungen, laeufe, quellen } from '../sammlungen.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as LaufManager from './LaufManager.mjs'
+import { laufStand, seedVon } from './laufStand.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
 import { rolleFuerClaude } from '../rechte.mjs'
 import { heutigePosition, kontextUm, umkehrOps } from './ops.mjs'
@@ -173,6 +174,7 @@ export async function annehmen(
         op: c.op,
         ...kontextUm(d.text, c.op),
         stapel,
+        seed: seedVon(c.id),
         ...(automatisch && { automatisch: true, pfad: d.pfad, zeile: d.text.slice(0, c.op.p).split('\n').length }),
       })
     }
@@ -376,8 +378,16 @@ export async function allesAnnehmen(projectId, botId, menschId) {
   return { angenommen }
 }
 
+const offeneChanges = async (projectId, lauf) =>
+  lauf.status === 'offen' || lauf.status === 'fertig' ? await aenderungen(projectId, lauf) : []
+
 export async function laufDaten(projectId, lauf) {
   if (!lauf) return { lauf: null, aenderungen: [] }
-  const liste = lauf.status === 'offen' || lauf.status === 'fertig' ? await aenderungen(projectId, lauf) : []
-  return { lauf: LaufManager.laufFuerClient(lauf), aenderungen: fuerKarte(liste, lauf) }
+  const liste = await offeneChanges(projectId, lauf)
+  return { lauf: { ...LaufManager.laufFuerClient(lauf), stand: laufStand(lauf, liste).aenderungen }, aenderungen: fuerKarte(liste, lauf) }
+}
+
+// Für run_status und run_finish: Zahlen und ein Satz, was angenommen ist und was offen steht.
+export async function stand(projectId, lauf) {
+  return laufStand(lauf, lauf ? await offeneChanges(projectId, lauf) : [])
 }

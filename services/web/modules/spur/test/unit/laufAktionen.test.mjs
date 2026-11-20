@@ -167,7 +167,19 @@ describe('fuerKarte und laufDaten', () => {
   it('laufDaten ist ohne Lauf leer und lädt bei abgeschlossenen Läufen keine Changes', async () => {
     expect(await LaufAktionen.laufDaten(projekt, null)).toEqual({ lauf: null, aenderungen: [] })
     const fertig = await lauf({ status: 'angenommen' })
-    expect(await LaufAktionen.laufDaten(projekt, fertig)).toEqual({ lauf: { id: fertig._id, status: 'angenommen' }, aenderungen: [] })
+    expect(await LaufAktionen.laufDaten(projekt, fertig)).toEqual({
+      lauf: { id: fertig._id, status: 'angenommen', stand: { gesamt: 1, automatisch_angenommen: 0, offen: 0, rot: 0 } },
+      aenderungen: [],
+    })
+  })
+
+  it('laufDaten und stand zählen offene Bearbeitungen über die Kennung ihrer Changes (P15)', async () => {
+    const seed = 'e'.repeat(18)
+    docSetzen('Text', [change(`${seed}000001`, { p: 0, i: 'neu' })])
+    const l = await lauf({ aenderungen: 1, bearbeitungen: [{ seed, anzahl: 1, rot: false }] })
+    expect((await LaufAktionen.laufDaten(projekt, l)).lauf.stand).toEqual({ gesamt: 1, automatisch_angenommen: 0, offen: 1, rot: 0 })
+    expect(await LaufAktionen.stand(projekt, l)).toMatchObject({ aenderungen: { offen: 1 }, hinweis: expect.stringContaining('Track Change') })
+    expect(await LaufAktionen.stand(projekt, null)).toMatchObject({ aenderungen: { gesamt: 0 } })
   })
 
   it('laufDaten zeigt bei offenen und fertigen Läufen die Changes', async () => {
@@ -207,7 +219,7 @@ describe('annehmen', () => {
     const danach = await gespeichert(l)
     expect(danach.status).toBe('angenommen')
     expect(danach.angenommen).toEqual([
-      { docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }), stapel: expect.any(String) },
+      { docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }), stapel: expect.any(String), seed: 'a' },
     ])
   })
 
@@ -480,7 +492,7 @@ describe('Sofort annehmen (Schalter „Alles von Claude automatisch annehmen“)
     const danach = await gespeichert(l)
     expect(danach.status).toBe('offen')
     expect(danach.angenommen).toEqual([
-      expect.objectContaining({ docId: doc, op: { p: 9, i: 'neu' }, automatisch: true, pfad: 'kapitel.tex', zeile: 1 }),
+      expect.objectContaining({ docId: doc, op: { p: 9, i: 'neu' }, automatisch: true, pfad: 'kapitel.tex', zeile: 1, seed: 'a' }),
     ])
   })
 

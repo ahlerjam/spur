@@ -13,6 +13,7 @@ const admin = new ObjectId()
 const bot = new ObjectId()
 const projekt = String(new ObjectId())
 const kontext = { menschId: anna, botId: bot }
+const STAND = { aenderungen: { gesamt: 3, automatisch_angenommen: 2, offen: 1, rot: 1 }, hinweis: 'Zwei Änderungen stehen bereits im Text.' }
 
 beforeAll(async () => {
   datenbank = await testDatenbank()
@@ -33,7 +34,7 @@ beforeEach(async () => {
       beenden: vi.fn(async () => {}),
       laufFuerClient: vi.fn(l => l && { id: l._id, status: l.status }),
     },
-    LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
+    LaufAktionen: { nachLaufende: vi.fn(async () => {}), stand: vi.fn(async () => STAND) },
     Inbox: {
       warteAufEreignis: vi.fn(),
       seit: vi.fn(),
@@ -432,15 +433,16 @@ describe('Schreiben', () => {
     expect(m.SchreibManager.docEdit).not.toHaveBeenCalled()
   })
 
-  it('run_status zeigt den letzten Lauf', async () => {
-    expect(await aufruf('run_status', { project_id: projekt })).toEqual({ lauf: { id: 'l1', status: 'offen' } })
+  it('run_status zeigt den letzten Lauf mit seinem Stand', async () => {
+    expect(await aufruf('run_status', { project_id: projekt })).toEqual({ lauf: { id: 'l1', status: 'offen' }, ...STAND })
+    expect(m.LaufAktionen.stand).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1', status: 'offen' })
   })
 
   it('run_finish beendet den offenen Lauf und stößt die Automatik an', async () => {
     const ergebnis = await aufruf('run_finish', { project_id: projekt, zusammenfassung: 'Geglättet.' })
     expect(m.LaufManager.beenden).toHaveBeenCalledWith({ _id: 'l1' }, 'Geglättet.')
     expect(m.LaufAktionen.nachLaufende).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1' })
-    expect(ergebnis).toEqual({ lauf: { id: 'l1', status: 'offen' } })
+    expect(ergebnis).toEqual({ lauf: { id: 'l1', status: 'offen' }, ...STAND })
   })
 
   it('run_finish meldet kein_lauf, wenn keiner offen ist', async () => {

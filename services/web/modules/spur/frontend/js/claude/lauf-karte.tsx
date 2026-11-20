@@ -20,6 +20,7 @@ export type Lauf = {
   zusammenfassung: string | null
   angelegt?: { art: 'datei' | 'ordner' | 'quelle'; pfad?: string; name?: string }[]
   automatisch?: { pfad: string; zeile: number; art: 'einfuegung' | 'loeschung'; text: string }[]
+  stand?: { gesamt: number; automatisch_angenommen: number; offen: number; rot: number }
 }
 
 export type Aenderung = {
@@ -151,6 +152,11 @@ export default function LaufKarte({
           <p className="spur-zeile-meta">
             {t('spur_lauf_umfang', { dateien: lauf.dateien, anzahl: lauf.aenderungen })}
           </p>
+          {lauf.stand && lauf.stand.gesamt > 0 && (
+            <p className="spur-zeile-meta spur-lauf-stand">
+              {t('spur_lauf_stand', { automatisch: lauf.stand.automatisch_angenommen, offen: lauf.stand.offen })}
+            </p>
+          )}
           {lauf.zusammenfassung && <p className="spur-nachricht-text">{lauf.zusammenfassung}</p>}
           {laufOffen && zuPruefen.length > 0 && (
             <div className="spur-lauf-rot" role="status">

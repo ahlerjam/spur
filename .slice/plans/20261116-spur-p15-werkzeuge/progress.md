@@ -13,8 +13,17 @@
 - f3: `quellenangabe` lautet `Aus \textcite{<key>}, S. <PDF-Seite>, Lizenz <Name>.`; Unpaywall-Angaben wie `CC-BY-4.0` oder `pd` werden auf `cc-by` bzw. `public-domain` normalisiert.
 - f4: Mit `alle_vorkommen` zählt jede Ersetzung als eigene Änderung des Laufs (Laufkarte „Änderungen: 12“); ohne den Parameter bleibt es eine je `doc_edit`. Überlappende Treffer zählen einmal (wie `replaceAll`). Ein leerer Alttext mit `alle_vorkommen` ist `eingabe_ungueltig` (`feld: "alt"`). Die Grenze offener Changes (1990) prüft der neue Modus samt der neuen Changes, der alte Weg bleibt unverändert.
 - f4: Im Browser nimmt die E2E die 12 Ersetzungen erst mit „Alle annehmen“ an; „Lauf rückgängig“ zeigt die Karte nur für angenommene Läufe (wie bisher), danach stehen alle 12 `fill=blue!20` wieder da.
+- f5: Eine Bearbeitung (`doc_edit`) erkennt spur am Seed ihrer Change-IDs (`tc` in `spurUpdate`, RangesTracker setzt ihn vor jede ID). Der Lauf merkt sich je Bearbeitung `{seed, anzahl, rot}`, angenommene Changes ihren Seed. `offen` kommt live aus den Track Changes im Dokument, also stimmt es auch nach dem Annehmen im Browser. `rot` bleibt nach dem Annehmen stehen (Zahl der rot markierten Änderungen des Laufs); der Satz im `hinweis` nennt nur offene rote.
+- f5: `hinweis` nutzt Zahlwörter bis zwölf (aus `spur_zahlwoerter` der Sprachdatei), darüber Ziffern. Ohne Lauf (nur `reply` legt keinen an) liefert `run_status` `lauf: null`, `aenderungen.gesamt: 0` und einen Satz ohne Zahlen.
+- f5: Die Laufkarte zeigt „2 automatisch angenommen, 1 offen“ unter „Dateien · Änderungen“, nur wenn der Lauf etwas geändert hat.
+
+## Needs decision
+- f5: Soll eine Zahl ohne Beleg eine Änderung rot machen (nie automatisch angenommen)?
+  Interim: Wie bisher (Entscheidung „Auto-Annahme bleibt, wie sie ist“) bleibt nur ein Zitat-Prüfbefund rot; Zahlen ohne Beleg werden gemeldet und trotzdem automatisch angenommen. Die E2E-Ausgangslage von f5 nutzt deshalb als rote Änderung ein nicht prüfbares Zitat (`\meincite{smith2024}`) statt einer Zahl ohne Beleg.
+  Options: A (empfohlen) so lassen, Zahlen bleiben ein Hinweis | B Zahlen ohne Beleg wie rote Zitate nie automatisch annehmen
 
 ## Angepasste ältere Tests
+- `laufAktionen.test.mjs`: `laufDaten` liefert am Lauf zusätzlich `stand`; angenommene Changes tragen `seed`. `werkzeuge.test.mjs`: `run_status`/`run_finish` liefern zusätzlich `aenderungen` und `hinweis`.
 - Meldung `spur_fehler_alttext_mehrfach` nennt jetzt `alle_vorkommen` (Spec); Code `konflikt` unverändert.
 - Meldung `spur_fehler_link_verbraucht` nennt nicht mehr `source_upload_link`, weil es jetzt zwei Arten von Links gibt (Code `link_verbraucht` unverändert).
 - Unit-Test „source_read kürzt auf max_zeichen“ prüft die Antwort mit `toEqual`; sie enthält jetzt zusätzlich `ab_zeichen`, `bis_zeichen` und `zeichen_gesamt`.

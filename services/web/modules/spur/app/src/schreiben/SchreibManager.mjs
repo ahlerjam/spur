@@ -299,13 +299,14 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu, a
     ...(alleVorkommen && { ersetzt: stellen.length }),
   }
   if (op.length) {
-    await spurUpdate(projectId, doc.docId, op, version, { userId: botId, tracked: true })
+    const seed = await spurUpdate(projectId, doc.docId, op, version, { userId: botId, tracked: true })
     ergebnis = { ...ergebnis, aenderung: true }
     try {
       await LaufManager.aenderungMerken(lauf, {
         docId: doc.docId,
         rot,
         zahlen: zahlen.map(zahl => ({ zahl, pfad: doc.pfad })),
+        seed,
         ...(alleVorkommen && { anzahl: stellen.length }),
       })
       await nachDemSchreiben({

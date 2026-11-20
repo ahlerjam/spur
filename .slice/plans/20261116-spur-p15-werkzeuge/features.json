@@ -67,7 +67,7 @@
         "Nimmt die Nutzerin die offene Änderung an, zeigt `run_status` `offen: 0` und der Lauf steht auf „angenommen“",
         "Ein Lauf ohne Textänderung (nur `reply`) liefert `aenderungen.gesamt: 0` und einen Hinweis ohne Zahlenwörter"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {

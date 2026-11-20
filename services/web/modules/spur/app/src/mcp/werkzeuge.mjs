@@ -410,16 +410,20 @@ Object.assign(WERKZEUGE, {
   },
 
   run_status: {
-    description: 'Zustand des aktuellen oder letzten Laufs im Projekt.',
+    description:
+      'Zustand des aktuellen oder letzten Laufs im Projekt. aenderungen zählt gesamt, automatisch_angenommen (stehen ' +
+      'schon im Text), offen (als Track Change sichtbar, warten auf die Person) und rot (wegen eines Prüfbefunds nie ' +
+      'automatisch angenommen); hinweis sagt den Stand in einem Satz. „Lauf rückgängig“ nimmt auch Angenommenes zurück.',
     inputSchema: z.object({ project_id: id }),
     async ausfuehren({ project_id: pid }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
-      return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
+      const lauf = await LaufManager.letzterLauf(projectId, botId)
+      return { lauf: LaufManager.laufFuerClient(lauf), ...(await LaufAktionen.stand(projectId, lauf)) }
     },
   },
 
   run_finish: {
-    description: 'Beendet den offenen Lauf mit einer Zusammenfassung für die Lauf-Karte.',
+    description: 'Beendet den offenen Lauf mit einer Zusammenfassung für die Lauf-Karte. Liefert aenderungen und hinweis wie run_status.',
     inputSchema: z.object({ project_id: id, zusammenfassung: z.string().min(1).max(2000) }),
     async ausfuehren({ project_id: pid, zusammenfassung }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, SCHREIBEN)
@@ -427,7 +431,8 @@ Object.assign(WERKZEUGE, {
       if (!lauf) throw new WerkzeugFehler('kein_lauf', 'spur_fehler_kein_lauf')
       await LaufManager.beenden(lauf, zusammenfassung)
       await LaufAktionen.nachLaufende(projectId, lauf)
-      return { lauf: LaufManager.laufFuerClient(await LaufManager.letzterLauf(projectId, botId)) }
+      const beendet = await LaufManager.letzterLauf(projectId, botId)
+      return { lauf: LaufManager.laufFuerClient(beendet), ...(await LaufAktionen.stand(projectId, beendet)) }
     },
   },
 
