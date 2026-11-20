@@ -27,7 +27,7 @@
         "`\\meincite{smith2024}` (unbekannter Befehl) bleibt „nicht prüfbar“ mit dem Grund `zitierform_unbekannt`",
         "Die Kopfzeile des Berichts im Browser nennt Zahlen, die zur Summe der Zeilen passen"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
