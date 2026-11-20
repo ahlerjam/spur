@@ -2,7 +2,8 @@
   "state": "running",
   "builderModel": "opus",
   "builderAdvisor": "opus",
-  "where": "cloud",
   "cloudSession": "https://claude.ai/code/session_01XpJUcfWmSdtxrkxKkC8jyY",
-  "started": "2026-11-20T10:55:09Z"
+  "runBranch": "slice/run-20261116-spur-p16-tex",
+  "sessionId": "a227fb8d-7452-4a88-9a77-a00082d935c7",
+  "started": "2026-11-20T11:36:33Z"
 }
