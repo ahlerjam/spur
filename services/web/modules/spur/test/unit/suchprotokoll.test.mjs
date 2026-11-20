@@ -78,6 +78,15 @@ describe('festhalten und liste', () => {
     expect(zweite.weiter).toBe(false)
   })
 
+  it('verträgt gleichzeitige Suchen mit denselben Treffern und zählt jeden Treffer einmal', async () => {
+    const liste = Array.from({ length: 40 }, (_, i) => treffer(`10.1/p${i}`))
+    await Promise.all(Array.from({ length: 8 }, (_, i) => anfrage(`parallel ${i}`, 0, { OpenAlex: 40 }, liste)))
+    const eintraege = await datenbank.db.collection('spurSearchLog').find({ projectId }).toArray()
+    expect(eintraege).toHaveLength(8)
+    expect(eintraege.reduce((summe, e) => summe + e.neu, 0)).toBe(40)
+    expect(await Protokoll.prisma(projectId)).toMatchObject({ identifiziert: 320, gesichtet: 40, dubletten: 280 })
+  })
+
   it('kennt nur das eigene Projekt', async () => {
     await anfrage('fremd', 0, { OpenAlex: 1 }, [treffer('10.1/a')], new ObjectId())
     expect((await Protokoll.liste(projectId)).eintraege).toEqual([])

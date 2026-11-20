@@ -145,7 +145,7 @@
   "spur_fehler_bot_schutz": "The paper is open access, but the servers refused the download. It loads in a browser: download it there and upload the PDF.",
   "spur_fehler_bot_schutz_vorgemerkt": "The paper is open access, but the servers refused the download. It loads in a browser: download it there and upload the PDF. It is now on the acquisition list.",
   "spur_fehler_change_ids": "change_ids must be a list of strings.",
-  "spur_fehler_eingabe_doi_oder_pdf_url": "Give exactly one of the fields doi and pdf_url (__feld__).",
+  "spur_fehler_eingabe_doi_oder_pdf_url": "Give exactly one of the fields doi and pdf_url. The field concerned is __feld__.",
   "spur_fehler_eingabe_feld": "The field __feld__ is missing or invalid. Correct it and send again.",
   "spur_fehler_falsches_pdf": "The title in the PDF does not match the metadata.",
   "spur_fehler_nicht_frei_vorgemerkt": "No open full text found. The paper is now on the acquisition list.",

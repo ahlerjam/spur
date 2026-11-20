@@ -24,23 +24,31 @@ function schluesselVon(treffer) {
 // Hält eine Anfrage fest (auch Folgeseiten). dienste: je Dienst { dienst, antwort, versuche, treffer, gesamt };
 // treffer: die zusammengeführten Treffer dieser Anfrage.
 export async function festhalten({ projectId, userId, anfrage, seite, dienste, treffer }) {
+  const _id = new ObjectId()
   const datum = jetzt()
-  let neu = 0
-  if (treffer.length) {
-    const ergebnis = await (await suchtreffer()).bulkWrite(
-      treffer.map(t => ({
-        updateOne: {
-          filter: { projectId, schluessel: schluesselVon(t) },
-          update: { $setOnInsert: { doi: t.doi?.toLowerCase() ?? null, titel: t.titel ?? null, titelSchluessel: titelNormal(t.titel), jahr: t.jahr ?? null, erstmals: datum } },
-          upsert: true,
-        },
-      })),
-      { ordered: false }
-    )
-    neu = ergebnis.upsertedCount
+  const sammlung = await suchtreffer()
+  // Jeder Treffer merkt sich die Anfrage, die ihn zuerst gefunden hat. Daraus zählt spur die neuen Treffer; die Zahl
+  // der Upserts taugt dafür nicht, weil gleichzeitige Suchen denselben Treffer anlegen wollen.
+  try {
+    if (treffer.length) {
+      await sammlung.bulkWrite(
+        treffer.map(t => ({
+          updateOne: {
+            filter: { projectId, schluessel: schluesselVon(t) },
+            update: { $setOnInsert: { doi: t.doi?.toLowerCase() ?? null, titel: t.titel ?? null, titelSchluessel: titelNormal(t.titel), jahr: t.jahr ?? null, erstmals: datum, anfrageId: _id } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      )
+    }
+  } catch (error) {
+    // Doppelter Schlüssel: Eine gleichzeitige Suche hat den Treffer gerade angelegt; er zählt bei ihr als neu.
+    if (!(error.writeErrors ?? [error]).every(e => e.code === 11000)) throw error
   }
+  const neu = treffer.length ? await sammlung.countDocuments({ projectId, anfrageId: _id }) : 0
   const geliefert = dienste.reduce((summe, d) => summe + d.treffer, 0)
-  await (await suchprotokoll()).insertOne({ projectId, userId, datum, anfrage, seite, dienste, geliefert, neu })
+  await (await suchprotokoll()).insertOne({ _id, projectId, userId, datum, anfrage, seite, dienste, geliefert, neu })
 }
 
 // Einträge von vor P12 stehen je Dienst einzeln im Protokoll und kennen nur die Trefferzahl des Dienstes.

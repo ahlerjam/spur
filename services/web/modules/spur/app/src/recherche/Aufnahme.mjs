@@ -73,7 +73,8 @@ const zuGross = () => new Problem(413, 'zu_gross', 'spur_fehler_volltext_zu_gros
 const istHtml = (inhalt, typ) => /html/i.test(typ ?? '') || /^\s*<(!doctype|html|head|body)\b/i.test(inhalt.subarray(0, 200).toString('latin1'))
 
 // Ein Abruf. Ergebnis: 'pdf' (Datei liegt unter ziel), 'html', der HTTP-Status als Text, 'kein_pdf', 'zu_gross',
-// 'gesperrt' (Adresse nicht erlaubt) oder 'netzfehler'.
+// 'gesperrt' (Adresse nicht erlaubt) oder 'netzfehler'. fundortLaden ergänzt 'zeit_abgelaufen', wenn die Frist des
+// Aufrufs schon vor dem ersten Versuch um war.
 async function einmalLaden(url, ziel, signal) {
   let antwort
   try {
@@ -126,7 +127,7 @@ const WIEDERHOLBAR = ['netzfehler', '429', '503']
 async function fundortLaden(url, ziel, frist) {
   for (let versuch = 1; ; versuch++) {
     const rest = frist - Date.now()
-    if (rest <= 0) return { ergebnis: 'netzfehler' }
+    if (rest <= 0) return { ergebnis: 'zeit_abgelaufen' }
     const abruf = await einmalLaden(url, ziel, AbortSignal.timeout(rest))
     if (!WIEDERHOLBAR.includes(abruf.ergebnis) || versuch === VERSUCHE) return abruf
     const pause = pauseMs(abruf.retryAfter, versuch)

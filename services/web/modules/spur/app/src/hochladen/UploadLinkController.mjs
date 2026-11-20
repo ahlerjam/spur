@@ -76,25 +76,29 @@ async function ohneDoiAufnehmen(link, req, dateiname) {
   return await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
 }
 
-async function aufnehmen(link, req, dateiname) {
+async function neueQuelle(link, req, dateiname) {
   const doi = req.body?.doi ? doiPruefen(String(req.body.doi)) : undefined
   if (!doi && WERKFELDER.some(feld => req.body?.[feld])) return await ohneDoiAufnehmen(link, req, dateiname)
   const titel = req.body?.titel ? String(req.body.titel).slice(0, 500) : undefined
   const meta = titel ? { titel } : doi ? await doiMetadaten(doi) : undefined
+  return await QuellenManager.aufnehmen({
+    projectId: link.projectId,
+    userId: link.menschId,
+    dateiname,
+    tempPfad: req.file.path,
+    groesse: req.file.size,
+    doi,
+    meta,
+  })
+}
+
+async function aufnehmen(link, req, dateiname) {
   try {
-    return await QuellenManager.aufnehmen({
-      projectId: link.projectId,
-      userId: link.menschId,
-      dateiname,
-      tempPfad: req.file.path,
-      groesse: req.file.size,
-      doi,
-      meta,
-    })
+    return await neueQuelle(link, req, dateiname)
   } catch (error) {
     if (error instanceof Problem && error.typ === 'quelle_vorhanden') {
       const vorhanden = await (await quellen()).findOne({ projectId: link.projectId, dateiname })
-      return { vorhanden }
+      if (vorhanden) return { vorhanden }
     }
     throw error
   }

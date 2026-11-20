@@ -48,3 +48,11 @@
   - Ein Merkmal `meta.herkunft` statt der zwei Metadatenformen (`gefunden` bei DOI, `art` ohne DOI).
   - Alte Protokolleinträge per Migration ins neue Format bringen; heute liest `istAlt` beide Formen.
 
+
+## /code-review medium (661a28817e..HEAD)
+- Behoben: (1) Gleichzeitige Suchen mit denselben Treffern zählten `neu` falsch (Test: 8 parallele Suchen mit 40 gleichen Treffern ergaben 56 neue). Jeder Treffer merkt sich jetzt die Anfrage, die ihn angelegt hat (`anfrageId`, Index `projectId_1_anfrageId_1`); doppelte Schlüssel aus parallelen Upserts bricht die Suche nicht mehr ab. (2) Fundorte, die nach Ablauf der 60 s nicht mehr versucht wurden, stehen in `versucht` als `zeit_abgelaufen` statt `netzfehler` (Vertrag ergänzt). (3) Upload ohne DOI: Ein paralleles `quelle_vorhanden` antwortet wie beim DOI-Pfad mit `vorhanden`. (4) Scheitert das Vermerken von `pdf_fehlt` im Suchprotokoll, kommt trotzdem der eigentliche Fehler mit `versucht`.
+- Nicht geändert: Treffer ohne DOI und Titel zählen je Suche neu (es gibt nichts zum Vergleichen; so in der Spec). Quellen aus `pdf_url` zählen nicht als „aufgenommen“, weil die Spec „aufgenommen“ an `source_add` oder Upload mit der DOI bindet. Anfragen ohne Antwort eines Dienstes stehen im Protokoll, weil die Spec jede Anfrage verlangt. `vormerken` auf einen beschafften Eintrag ist nicht erreichbar: `loeschen` setzt den Eintrag beim Entfernen der Quelle wieder auf offen, und mit vorhandener Quelle endet `source_add` vorher mit `quelle_vorhanden`. `prisma` per Aggregation: siehe /simplify.
+- Spec-Abgleich: Alle Schritte der fünf Features sind durch `p12f1`–`p12f5` abgedeckt. Die Web-Route `/recherche/protokoll` liefert je Zeile `zeit`, `seite`, `dienste`, `treffer`, `dubletten` statt `datum`, `dienst`, `treffer` und dazu `prisma`; der CSV-Export hat neue Spalten. Das verlangt die Spec („Die Web-Ansicht des Protokolls und der CSV-Export zeigen dieselben Spalten und Summen“); einziger Abnehmer der Route ist das eigene Frontend. Die MCP-Werkzeuge behalten alle bisherigen Felder.
+
+## Texte
+- humanizer-de (Modus sachlich): Preflight `low`, keine Cluster. Geändert: `spur_fehler_eingabe_doi_oder_pdf_url` nennt das Feld jetzt in einem eigenen Satz statt in einer unerklärten Klammer. humanizer (englisch): keine Muster aus Abschnitt A bis E; dieselbe Änderung in `en.json`.

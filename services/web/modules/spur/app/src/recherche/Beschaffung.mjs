@@ -59,7 +59,11 @@ export async function aufnehmenOderVormerken({ projectId, userId, doi }) {
     return await Aufnahme.perDoi({ projectId, userId, doi })
   } catch (error) {
     const wert = Aufnahme.doiNormal(doi)
-    if (error.typ === 'pdf_fehlt') await Suchprotokoll.aufnahmeFehlerMerken(projectId, wert, 'pdf_fehlt')
+    if (error.typ === 'pdf_fehlt') {
+      await Suchprotokoll.aufnahmeFehlerMerken(projectId, wert, 'pdf_fehlt').catch(merkFehler =>
+        logger.warn({ err: merkFehler, doi: wert }, 'spur: gescheiterte Aufnahme nicht im Suchprotokoll vermerkt')
+      )
+    }
     if (!['nicht_frei', 'bot_schutz'].includes(error.typ)) throw error
     try {
       await vormerken({ projectId, userId, doi: wert, grund: error.typ, adresse: error.zusatz?.adresse ?? null })
