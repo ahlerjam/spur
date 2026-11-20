@@ -31,7 +31,11 @@
 - /code-review medium: behoben sind fehlende Pakete auch bei einem Compile, der trotz Fehler als Erfolg zählt; kein Spiegel-Abruf bei abgeschalteten TeX-Paketen (`grund: "abgeschaltet"`); Index-Timeout 30 s statt 120 s; eine 79-Zeichen-Zeile vor „! …“ verschluckt die Meldung nicht mehr; unsichere Dateinamen am Endpunkt ergeben `paket: null` statt 400; `compile_log` fragt nach einem Spiegel-Ausfall neu; `dateiIndexVergessen` verwirft auch einen laufenden Abruf.
 - Security-Review: `/security-review` braucht `origin/HEAD`, das im Worktree fehlt; ein Subagent hat `git diff c361a6be8f..HEAD` geprüft: keine Funde.
 - Texte mit humanizer-de/humanizer geprüft; geändert: „Gib genau eins an: …“ (de/en).
-- Der volle E2E-Lauf dauert länger als die 60 s des run-code-Werkzeugs; er läuft deshalb über `test/tmp-e2e-start.js` (nicht im Repo), das die Suite startet und das Ergebnis in die Konsole schreibt.
+- Der volle E2E-Lauf dauert länger als die 60 s des run-code-Werkzeugs; er lief deshalb über ein Startskript (nicht im Repo), das die Suite startet und das Ergebnis in die Browser-Konsole schreibt.
+- Erster Gesamtlauf: `p5f8` rot, weil `661a28817e` (vor diesem Plan) vier Ideen in `docs/backlog.md` ergänzte und die Zahl im Schritt nicht nachzog; die Zahl steht jetzt auf 45 mit Verweis auf den Commit. `p10f4` rot mit „Rohprotokoll“-Timeout, einzeln danach ok (derselbe Wackler wie in P10).
+- Letzter Gesamtlauf nach der letzten Änderung (`2e3802658a`, 13:06 bis 13:27): 102 von 102 ok, `p16f1b` übersprungen (Dev-Image älter als P16).
+- Screenshots des Log-Bereichs mit „Fehlendes Paket: spurdemo (für spurdemo.sty)“ bei 1280 und 360 px: im Stil eines Log-Eintrags mit roter Fehlerkante, kein seitliches Rollen bei 360 px; die enge Teilung bei 360 px ist Overleafs Editor-Layout.
+- `spur-dev test`: grün, 92 % Zeilen; `node --test tools/tests/*.test.mjs`: 76 grün; Frontend-Test `fehlende-pakete.test.tsx`: 4 grün.
 
 ## Vorschläge
 - Eine `latexmkrc` im Projekt ist Perl und läuft auf dem Server; restricted shell escape ist deshalb keine Sandbox (ADR 0007). Wer fremde Projekte kompiliert, braucht eine echte Sandbox für den Kompilierdienst.
