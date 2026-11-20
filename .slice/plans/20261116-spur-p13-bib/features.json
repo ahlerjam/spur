@@ -12,7 +12,7 @@
         "Für `10.5555/spur.enr.001` liefert der Fake `article-number: \"e0209899\"`, `volume: \"14\"`, `issue: \"1\"` und keine `page`: Der Eintrag hat `eid = {e0209899}` und kein Feld `pages`",
         "Das Projekt kompiliert mit `biblatex` im Stil `apa`; im PDF (über `page_image` der Seite mit dem Literaturverzeichnis) steht beim ersten Eintrag „35(2), 101–118“ und das Jahr 2025"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f2",
