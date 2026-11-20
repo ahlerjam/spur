@@ -1,5 +1,5 @@
 {
-  "state": "running",
+  "state": "done",
   "builderModel": "opus",
   "dependsOn": [
     "20261116-spur-p12-quellen"
@@ -7,5 +7,6 @@
   "builderAdvisor": "opus",
   "runBranch": "slice/run-20261116-spur-p13-bib",
   "sessionId": "bbecd275-dd76-47db-86ca-4016ba30b5a7",
-  "started": "2026-11-20T13:12:30Z"
+  "started": "2026-11-20T13:12:30Z",
+  "finished": "2026-11-20T17:17:06Z"
 }
