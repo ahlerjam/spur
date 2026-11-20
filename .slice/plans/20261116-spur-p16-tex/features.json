@@ -24,7 +24,7 @@
         "`docs/adr` bekommt einen Eintrag, der den gewählten Weg und die Grenze (kein volles Shell-Escape) festhält, mit der Fundstelle in der minted-Doku",
         "Die README nennt `minted` mit einem Drei-Zeilen-Beispiel"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f3",

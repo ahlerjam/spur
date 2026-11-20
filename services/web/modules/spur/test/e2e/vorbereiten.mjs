@@ -421,6 +421,28 @@ Text davor.
 \end{document}
 `,
   })
+  // P16: nur Pakete, die schon vor P16 im Image waren.
+  await neuAnlegen(a, 'E2E TeX Basis', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage[ngerman]{babel}
+\usepackage{csquotes}
+\usepackage{siunitx}
+\begin{document}
+\section{Messung}
+\enquote{Silbentrennung} klappt: Die Probe wog \qty{12.5}{\gram} bei \qty{21}{\degreeCelsius}.
+\end{document}
+`,
+  })
+  // P16: zwei Pakete, die nur der TeX-Live-Fake kennt; LaTeX bricht am ersten ab.
+  await neuAnlegen(a, 'E2E Fehlende Pakete', {
+    'main.tex': String.raw`\documentclass{beamer}
+\usepackage{spurdemo}
+\usetheme{focus}
+\begin{document}
+\begin{frame}{Pakete}\spurdemo\end{frame}
+\end{document}
+`,
+  })
   await TexPakete.drosselZuruecksetzen(a._id)
   await neuAnlegen(a, 'E2E Hochladen', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Hochladen B', { 'main.tex': LEER })

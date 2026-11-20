@@ -6751,6 +6751,82 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Geteilt.' })
   }
 
+  // Anteil dunkler Pixel einer Seite aus page_image; eine leere Seite hat fast keine.
+  async function dunkleSeite(token, pid, seite) {
+    const { daten } = await mcp(token, 'tools/call', { name: 'page_image', arguments: { project_id: pid, seite } })
+    const [inhalt] = daten.result.content
+    ok(!daten.result.isError && inhalt.mimeType === 'image/png', `page_image: ${JSON.stringify(daten.result).slice(0, 300)}`)
+    return await page.evaluate(async png => {
+      const bild = new Image()
+      bild.src = `data:image/png;base64,${png}`
+      await bild.decode()
+      const leinwand = document.createElement('canvas')
+      leinwand.width = bild.width
+      leinwand.height = bild.height
+      const ctx = leinwand.getContext('2d')
+      ctx.drawImage(bild, 0, 0)
+      const { data } = ctx.getImageData(0, 0, bild.width, bild.height)
+      let dunkel = 0
+      for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] < 384) dunkel++
+      return dunkel / (bild.width * bild.height)
+    }, inhalt.data)
+  }
+
+  features.p16f1 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
+    const liste = dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0].split(/[\s\\]+/).filter(Boolean)
+    ok(JSON.stringify(liste) === JSON.stringify([...new Set(liste)].sort()), 'Paketliste nicht alphabetisch oder mit Dubletten')
+    const fehlen = ['apa7', 'booktabs', 'caption', 'float', 'lineno', 'pgfplots', 'threeparttable', 'cleveref', 'setspace', 'minted'].filter(p => !liste.includes(p))
+    ok(fehlen.length === 0, `Fehlt im Image: ${fehlen}`)
+    const apa7 = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke/apa7-arbeit.tex`)
+    ok(apa7.includes('\\documentclass[man]{apa7}') && apa7.includes('\\begin{threeparttable}'), 'apa7-arbeit.tex fehlt oder ist unvollständig')
+    const workflow = await repoDatei(`${REPO}/.github/workflows/dev-image.yml`)
+    const schritt = workflow.split('- name: Smoke-Dokumente kompilieren')[1]?.split('\n      - name:')[0] ?? ''
+    for (const teil of ['apa7-arbeit', 'grep "not found"', '-interaction=batchmode']) ok(schritt.includes(teil), `Workflow-Schritt ohne ${teil}`)
+    ok(/- name: Größe vorher/.test(workflow) && /- name: Größe nachher/.test(workflow), 'Workflow meldet die Größe nicht vorher und nachher')
+    const readme = (await repoDatei(`${REPO}/README.md`)).split('### TeX packages\n')[1]?.split('\n### ')[0] ?? ''
+    for (const teil of ['apa7', 'booktabs', 'pgfplots', 'tex_package_add']) ok(readme.includes(teil), `README ohne ${teil}`)
+  }
+
+  features.p16f2 = async () => {
+    const REPO = `${FIXTURES}/../../../../../..`
+    const beispiel = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke/minted-beispiel.tex`)
+    ok(beispiel.includes('\\begin{minted}{python}\ndef mittel(xs): return sum(xs)/len(xs)\n\\end{minted}') && beispiel.includes('\\begin{minted}{r}'), 'minted-beispiel.tex ohne Python- und R-Beispiel')
+    const dockerfile = await repoDatei(`${REPO}/server-ce/Dockerfile-base`)
+    const liste = dockerfile.split('tlmgr install --repository ${TEXLIVE_MIRROR}')[1].split('&&')[0].split(/[\s\\]+/)
+    for (const paket of ['minted', 'fvextra', 'latex2pydata', 'newfloat', 'catchfile', 'upquote']) ok(liste.includes(paket), `${paket} nicht in der Paketliste`)
+    const nachher = dockerfile.split('tlmgr path add')[1] ?? ''
+    ok(nachher.includes('latexminted --version') && /python3 -c .*version_info < \(3, 8\)/.test(nachher), 'Dockerfile prüft latexminted und Python nicht')
+    const runner = await repoDatei(`${REPO}/services/clsi/app/js/LatexRunner.js`)
+    ok(!/shell-escape|enable-write18/.test(runner), 'LatexRunner.js übergibt Shell-Escape')
+    const workflow = await repoDatei(`${REPO}/.github/workflows/dev-image.yml`)
+    const schritt = workflow.split('- name: Smoke-Dokumente kompilieren')[1]?.split('\n      - name:')[0] ?? ''
+    for (const teil of ['minted-beispiel', 'shell-escape', 'You must invoke LaTeX with the -shell-escape flag', '/tmp/spur-shell-test', 'output.pdf']) ok(schritt.includes(teil), `Workflow-Schritt ohne ${teil}`)
+    const schalter = await repoDatei(`${REPO}/services/web/modules/spur/scripts/smoke/shell-escape.tex`)
+    ok(schalter.includes('\\immediate\\write18{touch /tmp/spur-shell-test}'), 'shell-escape.tex fehlt')
+    const adr = await repoDatei(`${REPO}/docs/adr/0007-minted-ohne-shell-escape.md`)
+    ok(adr.includes('minted.dtx') && adr.includes('no longer required') && /-shell-escape/.test(adr), 'ADR ohne Fundstelle oder Grenze')
+    const readme = (await repoDatei(`${REPO}/README.md`)).split('### TeX packages\n')[1]?.split('\n### ')[0] ?? ''
+    const block = /```latex\n([\s\S]*?)```/.exec(readme)?.[1].trim().split('\n') ?? []
+    ok(block.length === 3 && block[0] === '\\begin{minted}{python}', `README ohne Drei-Zeilen-Beispiel: ${block}`)
+  }
+
+  // Braucht ein Dev-Image aus dem Workflow `Dev image` mit dem Stand von P16; ein älteres hat die Pakete aus P6 nicht.
+  features.p16f1b = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E TeX Basis')
+    const apa7 = await werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'apa7' })
+    if (apa7.inhalt.im_image !== true) return { uebersprungen: 'Dev-Image älter als P16 (apa7 nicht im Image), Workflow „Dev image“ neu starten' }
+    const job = await kompiliertBeiClaude(token, pid)
+    ok(job.ergebnis?.compile === 'success', `Compile mit babel, csquotes, siunitx: ${JSON.stringify(job.ergebnis)}`)
+    const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: pid })
+    ok(log.fehler.length === 0, `compile_log: ${JSON.stringify(log.fehler)}`)
+    const anteil = await dunkleSeite(token, pid, 1)
+    ok(anteil > 0.002, `Seite 1 ohne Text (${anteil})`)
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`
@@ -6762,9 +6838,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     // Ein abgebrochener Schritt kann eine angehaltene Route hinterlassen; sie hielte jede spätere Anfrage fest.
     await page.unrouteAll({ behavior: 'ignoreErrors' })
     try {
-      await lauf()
+      const stand = await lauf()
       ok(konsolenFehler.length === 0, `Fehler: ${konsolenFehler.join(' | ')}`)
-      ergebnis.push(`${id} ok`)
+      ergebnis.push(stand?.uebersprungen ? `${id} übersprungen: ${stand.uebersprungen}` : `${id} ok`)
     } catch (error) {
       // Die Zeile im Stapel hilft beim Finden des Schritts (run-code liefert keine Dateinamen).
       const stelle = (error.stack ?? '').split('\n').filter(z => /<anonymous>:\d+/.test(z)).slice(0, 6).map(z => z.match(/:(\d+):\d+\)?$/)?.[1]).join(' < ')

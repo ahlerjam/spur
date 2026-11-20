@@ -96,7 +96,17 @@ Projects count when the user owns them, including archived ones and those in the
 
 ### TeX packages
 
-The image contains TeX Live with a fixed list of packages. If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. By default a package may have 100 MB unpacked, all packages of a project together 300 MB, and each person can add 60 packages per hour; only successful installations count. Admins change these values under Admin → Grenzen. The storage limit of the project and Overleaf's 2000 files per project still apply. On a server error or a network problem spur tries three times, then the second mirror `https://mirror.ctan.org/systems/texlive/tlnet`. If an installation breaks off, spur removes what it had created, and the next call starts clean. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
+The image contains TeX Live `scheme-basic` and a curated list in `server-ce/Dockerfile-base`, enough for a usual thesis without downloads: the class `apa7` with `biblatex-apa` and `biber`, `babel` for German and English, `csquotes`, tables (`booktabs`, `threeparttable`, `tabularx`, `longtable`, `multirow`, `makecell`), figures and diagrams (`float`, `caption`, `subcaption`, `wrapfig`, `pgfplots`, TikZ), `lineno`, `setspace`, `geometry`, `fancyhdr`, `titlesec`, `enumitem`, `microtype`, `hyperref`, `cleveref`, `mathtools`, `siunitx`, `mhchem`, `listings`, `minted`, `algorithms`, `glossaries`, `acronym`, `todonotes`, KOMA-Script, `fontspec` and Beamer with `metropolis`. Everything else comes into the project with `tex_package_add`. After a failed compile, `compile_log` names each missing file and its TeX Live package in `fehlende_pakete`, and the log pane in the editor shows it above the log.
+
+Code listings with `minted` work without `-shell-escape`, because TeX Live trusts its helper `latexminted` ([ADR 0007](docs/adr/0007-minted-ohne-shell-escape.md)). With `\usepackage{minted}` in the preamble:
+
+```latex
+\begin{minted}{python}
+def mittel(xs): return sum(xs)/len(xs)
+\end{minted}
+```
+
+If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. By default a package may have 100 MB unpacked, all packages of a project together 300 MB, and each person can add 60 packages per hour; only successful installations count. Admins change these values under Admin → Grenzen. The storage limit of the project and Overleaf's 2000 files per project still apply. On a server error or a network problem spur tries three times, then the second mirror `https://mirror.ctan.org/systems/texlive/tlnet`. If an installation breaks off, spur removes what it had created, and the next call starts clean. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
 
 ### Research services
 
