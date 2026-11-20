@@ -69,3 +69,9 @@
 - Leeres Suchprotokoll: erklärt den Zustand, Export ausgegraut. Unverändert.
 - Suchprotokoll: Die Summenzeile ist das eine fette Element (PRISMA). Geändert: Zahl und Begriff einer Summe brechen nicht mehr auseinander („7 / gesichtet“); die Dienste einer Anfrage stehen als eine fließende Zeile statt vier gleicher Zeilen und brechen nur zwischen Diensten um. Ein erster Versuch ließ die Summenzeile bei 360 px über das Panel hinauslaufen und wurde korrigiert.
 - Beschaffungsliste: Gründe als graue Abzeichen neben dem Status. Geändert: Die beiden Links stehen bündig untereinander (vorher war „In der Bibliothek holen“ nach dem Umbruch eingerückt).
+
+## Weitere Prüfungen nach der letzten Codeänderung
+- `spur-dev test`: grün, 92,07 % Zeilenabdeckung. `node --test tools/tests/*.test.mjs`: 71 von 71.
+- `spur-hochladen` einmal echt gegen den Dev-Server (Link aus `source_upload_link` mit dem E2E-Token): `--titel "AI at Work (Skript)" --autoren "Meyer, Jana; Okafor, Chidi" --jahr 2023 --art report --institution OECD` ergab `Quelle <id>` und in der `.bib` `@report{meyer2023,` mit `author = {Meyer, Jana and Okafor, Chidi}`.
+- Overleafs Suiten: `frontend` am Stück: bestanden 1797, fehlgeschlagen 14, bekannt 14, neu 0. `web` brach am Stück wie in P5 ohne Ergebnis ab (Protokoll endet mitten in der Punktreihe, keine `web.json`); in vier Teilen über Pfadargumente: Teil 1 (Analytics bis Exports) 1641/1/1/0, Teil 2 (Features bis Security, ohne `helpers`, das keine Tests enthält) 1401/133/133/0, Teil 3 (ServerAdmin bis Tutorial) 1171/20/20/0, Teil 4 (Uploads, User, UserMembership, util, Module launchpad, spur, user-activate) zuerst 1925/20/19/1.
+- Der eine neue Fehler war ein eigener Test: `werkzeuge.test.mjs` verglich den deutschen Text „doi und pdf_url“, Overleafs Lauf hat Englisch. Der Test vergleicht jetzt über `meldung(...)` (Regel aus P5). Danach `spur-dev upstream web modules/spur/test/unit`: 1072/0/0/0.

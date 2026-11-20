@@ -521,7 +521,7 @@ describe('Recherche', () => {
     mitStufe('owner')
     const beide = await fehlerVon(aufruf('source_add', { project_id: projekt, doi: '10.1/x', pdf_url: 'https://trepo.example/thesis.pdf' }))
     expect(beide).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'pdf_url' } })
-    expect(beide.message).toContain('doi und pdf_url')
+    expect(beide.message).toBe(meldung('spur_fehler_eingabe_doi_oder_pdf_url', { feld: 'pdf_url' }))
     const keines = await fehlerVon(aufruf('source_add', { project_id: projekt }))
     expect(keines).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'doi' } })
     expect(m.Aufnahme.perUrl).not.toHaveBeenCalled()
