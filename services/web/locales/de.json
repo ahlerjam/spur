@@ -531,6 +531,7 @@
   "spur_fehler_tex_paket_unbekannt": "Das Paket gibt es im TeX-Live-Archiv nicht. Prüf den Namen auf ctan.org; der TeX-Live-Name kann vom Dateinamen abweichen.",
   "spur_fehler_tex_paket_oder_datei": "Gib entweder „paket“ (den TeX-Live-Namen) oder „datei“ (etwa „booktabs.sty“) an, nicht beides und nicht keins.",
   "spur_fehler_tex_datei_name": "Das ist kein Dateiname: nur Buchstaben, Ziffern, Punkt, Bindestrich, Plus und Unterstrich, etwa „booktabs.sty“.",
+  "spur_fehler_tex_dateien_viele": "Höchstens __anzahl__ Dateien je Anfrage.",
   "spur_fehler_tex_datei_unbekannt": "Kein TeX-Live-Paket enthält __datei__. Prüf den Dateinamen im Log; eigene Dateien gehören direkt ins Projekt.",
   "spur_tex_fehlendes_paket": "Fehlendes Paket: __paket__ (für __datei__)",
   "spur_tex_fehlende_datei": "Fehlende Datei: __datei__",

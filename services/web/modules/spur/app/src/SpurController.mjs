@@ -388,11 +388,15 @@ async function laeufeDaten(req, bot, vor) {
 
 // Für den Log-Bereich im Editor: Der Browser liest die fehlenden Dateien aus dem Log, der Server kennt die Pakete.
 export const fehlendePakete = mitProblemen(async (req, res) => {
-  const dateien = [req.query.datei ?? []].flat()
-  if (dateien.length > 20 || !dateien.every(dateiNameGueltig)) {
-    throw new Problem(400, 'eingabe_ungueltig', 'spur_fehler_tex_datei_name')
-  }
-  res.json({ fehlende_pakete: await TexPakete.fehlendePakete(dateien) })
+  const dateien = [req.query.datei ?? []].flat().filter(datei => typeof datei === 'string')
+  if (dateien.length > 20) throw new Problem(400, 'eingabe_ungueltig', 'spur_fehler_tex_dateien_viele', { anzahl: 20 })
+  // Eigene Dateien mit Pfad (kapitel/a.tex) gehören zu keinem Paket; sie stehen ohne Nachschlagen da.
+  const gefunden = await TexPakete.fehlendePakete(dateien.filter(dateiNameGueltig))
+  res.json({
+    fehlende_pakete: dateien.map(
+      datei => gefunden.find(e => e.datei === datei) ?? { datei, paket: null, im_image: false }
+    ),
+  })
 })
 
 export const claudeStatus = mitProblemen(async (req, res) => {

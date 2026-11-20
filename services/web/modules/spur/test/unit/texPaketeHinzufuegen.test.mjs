@@ -288,6 +288,27 @@ describe('TexPakete.fehlendePakete', () => {
     expect(await T.fehlendePakete(['spurtestfuenf.sty'])).toEqual([{ datei: 'spurtestfuenf.sty', paket: 'spurtestfuenf', im_image: false }])
   })
 
+  it('fragt keinen Spiegel, wenn TeX-Pakete abgeschaltet sind', async () => {
+    vi.doMock('../../app/src/grenzen/Grenzen.mjs', async () => ({
+      ...(await vi.importActual('../../app/src/grenzen/Grenzen.mjs')),
+      standard: async () => ({ texPaketeAus: true }),
+    }))
+    vi.resetModules()
+    const aus = await import('../../app/src/kompilieren/TexPakete.mjs')
+    expect(await aus.fehlendePakete(['spurtestfuenf.sty'])).toEqual([{ datei: 'spurtestfuenf.sty', paket: null, im_image: false, grund: 'abgeschaltet' }])
+    expect(abrufe).toEqual([])
+    vi.doUnmock('../../app/src/grenzen/Grenzen.mjs')
+  })
+
+  it('behält nach dem Vergessen keine Datenbank aus einem Abruf, der davor begann', async () => {
+    const laeuft = T.fehlendePakete(['spurtestfuenf.sty'])
+    while (!abrufe.length) await new Promise(r => setTimeout(r, 1))
+    T.dateiIndexVergessen()
+    await laeuft
+    await T.fehlendePakete(['spurtestfuenf.sty'])
+    expect(abrufe.filter(a => a.endsWith(':index'))).toHaveLength(2)
+  })
+
   it('nimmt den zweiten Spiegel, wenn der erste ausfällt', async () => {
     antworten = { texlive: [503] }
     expect((await T.fehlendePakete(['spurtestfuenf.sty']))[0].paket).toBe('spurtestfuenf')

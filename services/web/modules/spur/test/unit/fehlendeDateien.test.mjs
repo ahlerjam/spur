@@ -63,4 +63,10 @@ describe('fehlendeDateien', () => {
     expect(fehlendeDateien("Package biblatex Info: ... file 'biblatex-dm.cfg' not found.")).toEqual([])
     expect(fehlendeDateien('')).toEqual([])
   })
+
+  it('hängt an eine volle Zeile keine neue Fehlermeldung an', () => {
+    const voll = '(/usr/local/texlive/2026/texmf-dist/tex/latex/base/size10.clo'.padEnd(79, 'x')
+    expect(voll).toHaveLength(79)
+    expect(fehlendeDateien(`${voll}\n! LaTeX Error: File \`booktabs.sty' not found.`)).toEqual(['booktabs.sty'])
+  })
 })

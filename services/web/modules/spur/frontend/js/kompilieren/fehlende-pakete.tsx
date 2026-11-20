@@ -7,6 +7,9 @@ import { anfrage, projektPfad } from '../api'
 
 type Eintrag = { datei: string; paket: string | null }
 
+// Wie viele Dateien der Server je Anfrage nachschlägt.
+const MAX_DATEIEN = 20
+
 export function FehlendePaketeZeilen({ rawLog }: { rawLog?: string }) {
   const { t } = useTranslation()
   const schluessel = useMemo(() => fehlendeDateien(rawLog ?? '').join('\n'), [rawLog])
@@ -18,7 +21,7 @@ export function FehlendePaketeZeilen({ rawLog }: { rawLog?: string }) {
     setEintraege(dateien.map(datei => ({ datei, paket: null })))
     if (!dateien.length) return
     let aktuell = true
-    const suche = new URLSearchParams(dateien.map(datei => ['datei', datei]))
+    const suche = new URLSearchParams(dateien.slice(0, MAX_DATEIEN).map(datei => ['datei', datei]))
     anfrage<{ fehlende_pakete: Eintrag[] }>(projektPfad(`/tex-pakete/fehlend?${suche}`))
       .then(antwort => aktuell && setEintraege(antwort.fehlende_pakete))
       .catch(() => {})

@@ -6,11 +6,16 @@ const MUSTER = [
   [/^! Font [^=\s]+=(\S+)(?: at \S+| scaled \d+)? not loadable: Metric \(TFM\) file not found\./, ([, font]) => `${font}.tfm`],
 ]
 
-// TeX bricht Logzeilen nach 79 Zeichen um; eine volle Zeile geht in der nächsten weiter.
+// TeX bricht Logzeilen nach 79 Zeichen um; eine volle Zeile geht in der nächsten weiter, außer dort beginnt eine
+// Fehlermeldung (wie LOG_WRAP_LIMIT in Overleafs latex-log-parser).
 function zeilen(log) {
   const ergebnis = []
   let offen = ''
   for (const zeile of log.split('\n')) {
+    if (offen && zeile.startsWith('! ')) {
+      ergebnis.push(offen)
+      offen = ''
+    }
     offen += zeile
     if (zeile.length === MAX_ZEILE) continue
     ergebnis.push(offen)

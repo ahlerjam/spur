@@ -136,9 +136,11 @@ async function herunterladen(paket, ziel, grenze) {
 // vorgehalten: Der nächste Aufruf fragt neu.
 let dateiIndex = null
 let indexLaden = null
+let generation = 0
 
 async function indexVon(url) {
-  const antwort = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(120000) })
+  // Ein gescheiterter Compile wartet auf die Zuordnung; 2,8 MB brauchen keine zwei Minuten.
+  const antwort = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(30000) })
   if (!antwort.ok) {
     await antwort.body?.cancel()
     throw new Error(`Status ${antwort.status}`)
@@ -169,24 +171,30 @@ async function indexHolen() {
 
 async function aktuellerIndex() {
   if (dateiIndex && dateiIndex.bis > Date.now()) return dateiIndex.index
-  indexLaden ??= indexHolen()
-    .then(index => {
-      if (index) dateiIndex = { index, bis: Date.now() + TAG_MS }
-      return index
-    })
-    .finally(() => {
-      indexLaden = null
-    })
+  if (!indexLaden) {
+    const stand = generation
+    indexLaden = indexHolen()
+      .then(index => {
+        if (index && stand === generation) dateiIndex = { index, bis: Date.now() + TAG_MS }
+        return index
+      })
+      .finally(() => {
+        if (stand === generation) indexLaden = null
+      })
+  }
   return await indexLaden
 }
 
-// Für Tests im Dev-Stack: Der nächste Aufruf lädt die Datenbank neu.
+// Für Tests im Dev-Stack: Der nächste Aufruf lädt die Datenbank neu, auch wenn gerade ein Abruf läuft.
 export function dateiIndexVergessen() {
+  generation++
   dateiIndex = null
+  indexLaden = null
 }
 
 export async function fehlendePakete(dateien) {
   if (!dateien.length) return []
+  if (await abgeschaltet()) return dateien.map(datei => ({ datei, paket: null, im_image: false, grund: 'abgeschaltet' }))
   const index = await aktuellerIndex()
   return dateien.map(datei => ({
     datei,

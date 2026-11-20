@@ -66,7 +66,7 @@ export async function starten({ projectId, menschId, botId }) {
             ergebnis: {
               compile: ergebnis.status,
               dateien: (ergebnis.outputFiles ?? []).map(f => f.path),
-              fehlende_pakete: ergebnis.status === 'success' ? [] : await paketeDesBuilds(build),
+              fehlende_pakete: await paketeDesBuilds(build),
             },
             buildId: build.buildId,
             clsiServerId: build.clsiServerId,
@@ -123,6 +123,12 @@ async function paketeDesBuilds(build) {
   }
 }
 
+// Jobs von vor P16 haben keine Liste; eine Liste aus einem Ausfall des Spiegels gilt nicht weiter.
+async function gespeicherteOderNeue(gespeichert, text) {
+  if (gespeichert && !gespeichert.some(e => e.grund)) return gespeichert
+  return await fehlendePakete(fehlendeDateien(text))
+}
+
 export async function log({ projectId, botId }) {
   const job = await letzterCompile(projectId, botId)
   const text = (await ausgabe(job, 'output.log')).toString('utf8')
@@ -130,8 +136,7 @@ export async function log({ projectId, botId }) {
     job_id: job._id,
     compile: job.ergebnis.compile,
     fehler: fehlerAusLog(text),
-    // Jobs von vor P16 haben die Liste noch nicht.
-    fehlende_pakete: job.ergebnis.fehlende_pakete ?? (await fehlendePakete(fehlendeDateien(text))),
+    fehlende_pakete: await gespeicherteOderNeue(job.ergebnis.fehlende_pakete, text),
     ende: text.slice(-MAX_LOG),
   }
 }

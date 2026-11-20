@@ -177,12 +177,19 @@ describe('Fehlende TeX-Pakete', () => {
     expect(eine.body.fehlende_pakete).toHaveLength(1)
   })
 
-  it('lehnt unsichere Namen und mehr als 20 Dateien mit 400 ab, ohne nachzuschlagen', async () => {
-    for (const datei of ['../x.sty', ['a.sty', { b: 1 }], Array.from({ length: 21 }, (_, i) => `d${i}.sty`)]) {
-      const { res } = await ausfuehren(C.fehlendePakete, req({ query: { datei } }))
-      expect(res.statusCode).toBe(400)
-      expect(res.body.type).toContain('eingabe_ungueltig')
-    }
+  it('schlägt unsichere Namen nicht nach und nennt sie ohne Paket', async () => {
+    const { res } = await ausfuehren(C.fehlendePakete, req({ query: { datei: ['kapitel/einleitung.tex', 'booktabs.sty', { b: 1 }] } }))
+    expect(m.TexPakete.fehlendePakete).toHaveBeenCalledWith(['booktabs.sty'])
+    expect(res.body.fehlende_pakete).toEqual([
+      { datei: 'kapitel/einleitung.tex', paket: null, im_image: false },
+      { datei: 'booktabs.sty', paket: null, im_image: false },
+    ])
+  })
+
+  it('lehnt mehr als 20 Dateien mit 400 ab, ohne nachzuschlagen', async () => {
+    const { res } = await ausfuehren(C.fehlendePakete, req({ query: { datei: Array.from({ length: 21 }, (_, i) => `d${i}.sty`) } }))
+    expect(res.statusCode).toBe(400)
+    expect(res.body.type).toContain('eingabe_ungueltig')
     expect(m.TexPakete.fehlendePakete).not.toHaveBeenCalled()
   })
 })

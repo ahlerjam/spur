@@ -170,6 +170,21 @@ describe('Compile-Jobs', () => {
       expect(m.TexPakete.fehlendePakete).not.toHaveBeenCalledWith(expect.arrayContaining([expect.anything()]))
     })
 
+    it('stehen auch im Ergebnis eines Compiles, der trotz Fehler als Erfolg zählt', async () => {
+      dateien['output.log'] = Buffer.from(FEHLT)
+      const job = await fertig((await Kompilieren.starten({ projectId, menschId: mensch, botId: bot })).job_id)
+      expect(job.ergebnis).toMatchObject({ compile: 'success', fehlende_pakete: [{ datei: 'spurdemo.sty', paket: 'spurdemo' }] })
+    })
+
+    it('ermittelt compile_log neu, wenn der Spiegel beim Compile nicht erreichbar war', async () => {
+      dateien['output.log'] = Buffer.from(FEHLT)
+      gescheitert()
+      m.TexPakete.fehlendePakete.mockResolvedValueOnce([{ datei: 'spurdemo.sty', paket: null, im_image: false, grund: 'spiegel_nicht_erreichbar' }])
+      const job = await fertig((await Kompilieren.starten({ projectId, menschId: mensch, botId: bot })).job_id)
+      expect(job.ergebnis.fehlende_pakete[0].grund).toBe('spiegel_nicht_erreichbar')
+      expect((await Kompilieren.log({ projectId, botId: bot })).fehlende_pakete).toEqual([{ datei: 'spurdemo.sty', paket: 'spurdemo', im_image: false }])
+    })
+
     it('lassen den Job nicht scheitern, wenn das Log fehlt', async () => {
       delete dateien['output.log']
       gescheitert()

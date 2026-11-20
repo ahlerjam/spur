@@ -233,6 +233,7 @@
   "spur_fehler_tex_paket_unbekannt": "The TeX Live archive has no such package. Check the name on ctan.org; the TeX Live name can differ from the file name.",
   "spur_fehler_tex_paket_oder_datei": "Give either \"paket\" (the TeX Live name) or \"datei\" (such as \"booktabs.sty\"), not both and not neither.",
   "spur_fehler_tex_datei_name": "That is not a file name: use letters, digits, dots, hyphens, plus signs and underscores, such as \"booktabs.sty\".",
+  "spur_fehler_tex_dateien_viele": "At most __anzahl__ files per request.",
   "spur_fehler_tex_datei_unbekannt": "No TeX Live package contains __datei__. Check the file name in the log; your own files belong in the project.",
   "spur_tex_fehlendes_paket": "Missing package: __paket__ (for __datei__)",
   "spur_tex_fehlende_datei": "Missing file: __datei__",
