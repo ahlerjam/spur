@@ -69,11 +69,13 @@ before(async () => {
         const body = Buffer.concat(chunks).toString('latin1')
         const feld = n => body.match(new RegExp(`name="${n}"\\r\\n\\r\\n([^\\r]*)`))?.[1]
         const datei = body.match(/filename="([^"]*)"/)?.[1]
-        uploads.push({ pfad: url.pathname, datei, doi: feld('doi'), titel: feld('titel'), ...Object.fromEntries(['autoren', 'jahr', 'art', 'institution', 'url'].map(n => [n, feld(n)])) })
+        uploads.push({ pfad: url.pathname, datei, doi: feld('doi'), titel: feld('titel'), ...Object.fromEntries(['autoren', 'jahr', 'art', 'institution', 'url'].map(n => [n, feld(n)])), ...(feld('projektdatei') && { projektdatei: feld('projektdatei') }) })
         if (url.pathname === '/upload/abgelaufen') {
           return json(res, 410, { fehler: 'link_abgelaufen', detail: 'Link abgelaufen' })
         }
         if (datei === 'b.pdf') return json(res, 200, { datei, status: 'vorhanden', quelle_id: QUELLE_ID })
+        if (feld('projektdatei') === 'abbildungen/da.pdf') return json(res, 409, { title: 'konflikt', detail: 'Die Datei abbildungen/da.pdf gibt es im Projekt schon.' })
+        if (feld('projektdatei')) return json(res, 200, { datei, status: 'angelegt', pfad: feld('projektdatei') })
         if (datei === 'scan.pdf') return json(res, 200, { datei, status: 'abgelehnt', grund: 'Datei ist keine PDF-Datei' })
         if (datei === 'nirgends.pdf') {
           const metadaten_hinweis = 'Crossref kennt die DOI 10.9999/nirgends.1 nicht. Der .bib-Eintrag ist @misc mit dem Titel; prüfe die DOI und ergänze die Angaben.'
@@ -262,5 +264,27 @@ test('spur-hochladen meldet fehlende Dateien', async () => {
   const r = await laufAsync('spur-hochladen', [`${basis}/upload/ok`, 'fehlt.pdf'])
   assert.notEqual(r.status, 0)
   assert.match(r.stdout, /fehlt\.pdf: Datei nicht gefunden/)
+  assert.equal(uploads.length, 0)
+})
+
+test('spur-hochladen legt mit --projektdatei eine Datei im Projekt an und meldet ihren Pfad (P15)', async () => {
+  writeFileSync(join(arbeit, 'diagramm.pdf'), PDF)
+  const r = await laufAsync('spur-hochladen', [`${basis}/upload/ok`, 'diagramm.pdf', '--projektdatei', 'abbildungen/diagramm.pdf'])
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(r.stdout.trim(), 'diagramm.pdf: Datei abbildungen/diagramm.pdf')
+  assert.equal(uploads[0].projektdatei, 'abbildungen/diagramm.pdf')
+})
+
+test('spur-hochladen meldet einen Fehler bei --projektdatei mit dem Grund', async () => {
+  writeFileSync(join(arbeit, 'diagramm.pdf'), PDF)
+  const r = await laufAsync('spur-hochladen', [`${basis}/upload/ok`, 'diagramm.pdf', '--projektdatei', 'abbildungen/da.pdf'])
+  assert.equal(r.status, 1)
+  assert.equal(r.stdout.trim(), 'diagramm.pdf: Die Datei abbildungen/da.pdf gibt es im Projekt schon.')
+})
+
+test('spur-hochladen nimmt --projektdatei nur für genau eine Datei', () => {
+  const r = lauf('spur-hochladen', [`${basis}/upload/ok`, 'a.png', 'b.png', '--projektdatei', 'abbildungen/a.png'])
+  assert.equal(r.status, 2)
+  assert.match(r.stderr, /--projektdatei gilt für genau eine Datei/)
   assert.equal(uploads.length, 0)
 })

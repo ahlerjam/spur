@@ -303,3 +303,12 @@ writeFileSync(
   join(here, 'lang2024.pdf'),
   buildPdf({ pages: [['Long-term effects of sleep training', 'K. Lang'], langSeite2], title: 'Long-term effects of sleep training', size: 5 })
 )
+// P15: Quellen mit einer Abbildung auf PDF-Seite 3; die Lizenz setzt vorbereiten.mjs beim Aufnehmen.
+const mitAbbildung = (datei, titel, autor) =>
+  writeFileSync(
+    join(here, datei),
+    buildPdf({ pages: [[titel, autor], filler(2), ['Figure 2 shows the effect per group.', ...filler(3)]], title: titel, grafiken: { 2: BALKEN } })
+  )
+mitAbbildung('offen2023.pdf', 'Open data on sleep and recall', 'L. Offen')
+mitAbbildung('verlag2022.pdf', 'Proprietary sleep metrics', 'V. Verlag')
+mitAbbildung('nd2021.pdf', 'Sleep stages without derivatives', 'N. Dee')

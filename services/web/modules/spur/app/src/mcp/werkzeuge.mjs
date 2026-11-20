@@ -23,6 +23,7 @@ import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
 import * as TexPakete from '../kompilieren/TexPakete.mjs'
+import * as Projektdatei from '../hochladen/Projektdatei.mjs'
 import * as UploadLink from '../hochladen/UploadLink.mjs'
 import * as Erwaehnung from '../erwaehnung/Erwaehnung.mjs'
 import { meldung } from '../meldungen.mjs'
@@ -610,6 +611,42 @@ Object.assign(WERKZEUGE, {
     async ausfuehren({ project_id: pid }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
       return await UploadLink.erzeugen({ projectId, menschId, botId })
+    },
+  },
+
+  file_upload_link: {
+    description:
+      'Einmal-Link für eigene Bilder vom Rechner als Projektdateien (nicht über MCP): spur-hochladen <link> bild.png ' +
+      '--projektdatei abbildungen/bild.png oder curl -F datei=@bild.png -F projektdatei=abbildungen/bild.png <link>. ' +
+      `Gilt ${UploadLink.GUELTIG_MINUTEN} Minuten für bis zu ${UploadLink.MAX_PROJEKTDATEIEN} Dateien. Erlaubt sind PNG, JPEG und PDF ` +
+      'bis 10 MB, geprüft am Dateianfang; sonst dateityp_nicht_erlaubt oder zu_gross, ein vorhandener Pfad ergibt konflikt. ' +
+      'Die Dateien gehören zum Lauf; „Lauf rückgängig“ entfernt sie. Für Quellen-PDFs gilt source_upload_link.',
+    inputSchema: z.object({ project_id: id }),
+    async ausfuehren({ project_id: pid }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      return await UploadLink.erzeugen({ projectId, menschId, botId, art: 'datei' })
+    },
+  },
+
+  source_figure_add: {
+    description:
+      'Legt einen Ausschnitt einer Quellseite als PNG mit 300 dpi ins Projekt, etwa eine Abbildung für \\includegraphics. ' +
+      'ausschnitt {x, y, breite, hoehe} in Anteilen 0–1 der Seite (y von oben; source_page_image zeigt die Seite), pfad im ' +
+      'Projekt mit Endung .png. Nur bei offener Lizenz (CC BY, CC BY-SA, CC BY-NC, CC BY-NC-SA, CC0, Public Domain); ' +
+      'sonst lizenz_fehlt: Dann zeichnest du die Abbildung nach („in Anlehnung an“) oder nennst den Rechtevorbehalt. ' +
+      'Die Antwort nennt lizenz und quellenangabe, eine fertige Zeile für die Bildunterschrift. Die Datei gehört zum Lauf.',
+    inputSchema: z.object({
+      project_id: id,
+      quelle_id: id,
+      pdf_seite: z.number().int().min(1),
+      // Ausschnitt und Pfad prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feld ergibt.
+      ausschnitt: z.object({ x: z.number(), y: z.number(), breite: z.number(), hoehe: z.number() }).partial(),
+      pfad: z.string().max(1024),
+    }),
+    async ausfuehren({ project_id: pid, quelle_id: qid, pdf_seite: seite, ausschnitt, pfad }, { menschId, botId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      const quelle = await QuellenManager.holen(projectId, qid)
+      return await Projektdatei.abbildungAusQuelle({ projectId, menschId, botId, quelle, seite, ausschnitt, pfad })
     },
   },
 

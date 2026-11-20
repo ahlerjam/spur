@@ -441,13 +441,18 @@ async function gerendert(quelle, nummer, zusatz, groesse) {
 
 const KANTE_CLAUDE = 1600
 
-// Seitenbild für source_page_image: groß genug für Abbildungen, klein genug für ein Modell.
-export async function seitenBildFuerClaude(quelle, nummer) {
+// Für Seitenbilder und Ausschnitte: nur PDF-Quellen haben Seiten.
+export function seitePruefen(quelle, nummer) {
   if (quelle.art !== 'pdf') throw new Problem(409, 'quelle_ohne_seiten', 'spur_fehler_quelle_ohne_seiten')
   if (nummer > quelle.seitenzahl) {
     const seiten = quelle.seitenzahl
     throw new Problem(404, 'seite_nicht_gefunden', 'spur_fehler_seite_nicht_gefunden', { seite: nummer, seiten }, { seiten })
   }
+}
+
+// Seitenbild für source_page_image: groß genug für Abbildungen, klein genug für ein Modell.
+export async function seitenBildFuerClaude(quelle, nummer) {
+  seitePruefen(quelle, nummer)
   return await fs.readFile(await gerendert(quelle, nummer, `-k${KANTE_CLAUDE}`, { kante: KANTE_CLAUDE }))
 }
 

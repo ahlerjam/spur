@@ -42,6 +42,7 @@ beforeEach(async () => {
     Beschaffung: { perDoiZuordnen: vi.fn(async () => null) },
     pdf: { titelFeld: vi.fn(async () => null) },
     LaufManager: { laufFuerSchreiben: vi.fn(async () => ({})), angelegtMerken: vi.fn(async () => {}) },
+    Projektdatei: { anlegen: vi.fn(async ({ pfad }) => ({ pfad })) },
     vorhanden: null,
   }
   vi.resetModules()
@@ -53,6 +54,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => m.LaufManager)
   vi.doMock('../../app/src/pdf.mjs', () => m.pdf)
+  vi.doMock('../../app/src/hochladen/Projektdatei.mjs', () => m.Projektdatei)
   vi.doMock('../../app/src/schalter.mjs', () => ({ jetzt: () => new Date('2026-11-16T10:00:00Z') }))
   C = await import('../../app/src/hochladen/UploadLinkController.mjs')
   ;({ Problem } = await import('../../app/src/probleme.mjs'))
@@ -187,5 +189,45 @@ describe('Upload über den Einmal-Link', () => {
     const { res } = await hochladen(REPORT)
     expect(res.statusCode).toBe(403)
     expect(m.QuellenManager.aufnehmen).not.toHaveBeenCalled()
+  })
+
+  describe('Projektdateien (P15)', () => {
+    const dateiLink = () => m.UploadLink.verbrauchen.mockResolvedValue({ projectId, menschId, botId: m.bot, art: 'datei' })
+    beforeEach(() => {
+      m.bot = new ObjectId()
+    })
+
+    it('legt die Datei unter projektdatei an und antwortet mit dem Pfad', async () => {
+      dateiLink()
+      const { res } = await hochladen({ projektdatei: 'abbildungen/diagramm.pdf' }, 'report.pdf')
+      expect(res.body).toEqual({ datei: 'report.pdf', status: 'angelegt', pfad: 'abbildungen/diagramm.pdf' })
+      expect(m.Projektdatei.anlegen).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId, menschId, botId: m.bot, pfad: 'abbildungen/diagramm.pdf', groesse: 1234 })
+      )
+      expect(m.QuellenManager.aufnehmen).not.toHaveBeenCalled()
+    })
+
+    it('meldet Fehler beim Anlegen als Problem mit Code', async () => {
+      dateiLink()
+      m.Projektdatei.anlegen.mockRejectedValue(new Problem(422, 'dateityp_nicht_erlaubt', 'spur_fehler_dateityp_nicht_erlaubt'))
+      const { res } = await hochladen({ projektdatei: 'bild.png' })
+      expect(res.statusCode).toBe(422)
+      expect(res.body).toMatchObject({ title: 'dateityp_nicht_erlaubt', detail: meldung('spur_fehler_dateityp_nicht_erlaubt') })
+    })
+
+    it('verlangt projektdatei bei einem Link für Projektdateien', async () => {
+      dateiLink()
+      const { res } = await hochladen({})
+      expect(res.statusCode).toBe(422)
+      expect(res.body).toMatchObject({ title: 'eingabe_ungueltig', feld: 'projektdatei' })
+    })
+
+    it('nimmt über einen Quellen-Link keine Projektdatei an', async () => {
+      const { res } = await hochladen({ projektdatei: 'abbildungen/a.pdf' })
+      expect(res.statusCode).toBe(422)
+      expect(res.body).toMatchObject({ title: 'falscher_link' })
+      expect(m.Projektdatei.anlegen).not.toHaveBeenCalled()
+      expect(m.QuellenManager.aufnehmen).not.toHaveBeenCalled()
+    })
   })
 })

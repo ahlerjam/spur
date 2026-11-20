@@ -38,7 +38,7 @@
         "Eine Textdatei, die in `bild.png` umbenannt wurde, wird mit `dateityp_nicht_erlaubt` abgelehnt; eine Datei über 10 MB mit `zu_gross`",
         "Die Laufkarte im Browser listet beide Dateien unter den Dateien des Laufs; nach „Lauf rückgängig“ sind sie aus dem Dateibaum verschwunden"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {

@@ -2,6 +2,7 @@ import { promiseMapWithLimit } from '@overleaf/promise-utils'
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
 import EditorRealTimeController from '../../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
+import ProjectEntityHandler from '../../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
 import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
@@ -116,14 +117,27 @@ async function angelegtEntfernen(projectId, lauf, userId) {
       if (quelle) await QuellenManager.loeschen(quelle)
       continue
     }
-    try {
-      await EditorController.promises.deleteEntityWithPath(projectId, `/${eintrag.pfad}`, 'spur', userId)
-    } catch (error) {
-      if (!(error instanceof Errors.NotFoundError)) throw error
-    }
+    await pfadEntfernen(projectId, eintrag.pfad, userId)
     if (eintrag.paket) await paketEntfernt(projectId, eintrag.paket)
   }
+  // Ordner, die erst der Lauf angelegt hat (etwa abbildungen/), nur wenn niemand etwas hineingelegt hat.
+  const ordner = (lauf.angelegt ?? []).map(e => e.ordner).filter(Boolean)
+  if (ordner.length) {
+    const { docs, files } = await ProjectEntityHandler.promises.getAllEntities(projectId)
+    const pfade = [...docs, ...files].map(e => e.path)
+    for (const o of ordner) {
+      if (!pfade.some(p => p.startsWith(`/${o}/`))) await pfadEntfernen(projectId, o, userId)
+    }
+  }
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { angelegt: [] } })
+}
+
+async function pfadEntfernen(projectId, pfad, userId) {
+  try {
+    await EditorController.promises.deleteEntityWithPath(projectId, `/${pfad}`, 'spur', userId)
+  } catch (error) {
+    if (!(error instanceof Errors.NotFoundError)) throw error
+  }
 }
 
 // `roteMit`: Rote Zitate nimmt nur an, wer es ausdrücklich verlangt (rote_mit); sonst bleiben sie offen, auch wenn

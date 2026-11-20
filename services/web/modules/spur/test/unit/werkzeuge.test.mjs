@@ -54,6 +54,8 @@ beforeEach(async () => {
       status: vi.fn(),
     },
     TexPakete: { hinzufuegen: vi.fn(async () => ({ paket: 'xfrac', dateien: [], fehlende_abhaengigkeiten: [] })) },
+    UploadLink: { GUELTIG_MINUTEN: 15, MAX_DATEIEN: 50, MAX_PROJEKTDATEIEN: 20, erzeugen: vi.fn(async () => ({ link: 'https://x/spur/hochladen/t' })) },
+    Projektdatei: { abbildungAusQuelle: vi.fn(async ({ pfad }) => ({ pfad, lizenz: 'cc-by', quellenangabe: 'Aus \\textcite{offen2023}, S. 3, Lizenz CC BY.' })) },
     Aufnahme: {
       perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })),
       perUrl: vi.fn(async () => ({ _id: 'q2', key: 'virtanen2024', dateiname: 'virtanen2024.pdf', doi: null, titelabgleich: 'passt' })),
@@ -84,6 +86,8 @@ beforeEach(async () => {
   vi.doMock('../../app/src/recherche/Aufnahme.mjs', () => m.Aufnahme)
   vi.doMock('../../app/src/kompilieren/Kompilieren.mjs', () => m.Kompilieren)
   vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => m.TexPakete)
+  vi.doMock('../../app/src/hochladen/UploadLink.mjs', () => m.UploadLink)
+  vi.doMock('../../app/src/hochladen/Projektdatei.mjs', () => m.Projektdatei)
   vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
   vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
   vi.doMock('../../app/src/erwaehnung/Erwaehnung.mjs', () => m.Erwaehnung)
@@ -645,5 +649,28 @@ describe('Recherche', () => {
     mitStufe('readAndWrite')
     await aufruf('tex_package_add', { project_id: projekt, datei: 'booktabs.sty' })
     expect(m.TexPakete.hinzufuegen).toHaveBeenLastCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: undefined, datei: 'booktabs.sty' })
+  })
+
+  it('file_upload_link verlangt Schreibrecht und erzeugt einen Link für Projektdateien', async () => {
+    mitStufe('review')
+    expect(await fehlerVon(aufruf('file_upload_link', { project_id: projekt }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    expect(await aufruf('file_upload_link', { project_id: projekt })).toEqual({ link: 'https://x/spur/hochladen/t' })
+    expect(m.UploadLink.erzeugen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, art: 'datei' })
+    expect(WERKZEUGE.file_upload_link.description).toMatch(/--projektdatei/)
+  })
+
+  it('source_figure_add verlangt Schreibrecht und reicht Quelle, Seite, Ausschnitt und Pfad weiter', async () => {
+    const args = { project_id: projekt, quelle_id: 'q1', pdf_seite: 3, ausschnitt: { x: 0.1, y: 0.2, breite: 0.8, hoehe: 0.4 }, pfad: 'abbildungen/offen2023-abb2.png' }
+    mitStufe('review')
+    expect(await fehlerVon(aufruf('source_figure_add', args))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('owner')
+    m.QuellenManager.holen.mockResolvedValue({ _id: 'q1', key: 'offen2023' })
+    expect(await aufruf('source_figure_add', args)).toMatchObject({ pfad: 'abbildungen/offen2023-abb2.png', lizenz: 'cc-by' })
+    expect(m.Projektdatei.abbildungAusQuelle).toHaveBeenCalledWith({
+      projectId: new ObjectId(projekt), menschId: anna, botId: bot, quelle: { _id: 'q1', key: 'offen2023' }, seite: 3, ausschnitt: args.ausschnitt, pfad: args.pfad,
+    })
+    // Ausschnitt und Pfad prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feld ergibt.
+    expect(WERKZEUGE.source_figure_add.inputSchema.safeParse({ ...args, quelle_id: projekt, ausschnitt: { x: 0, y: 0, breite: 0, hoehe: 2 }, pfad: 'a.jpg' }).success).toBe(true)
   })
 })

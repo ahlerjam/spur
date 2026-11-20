@@ -580,12 +580,22 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await p15Vorbereiten(a)
 }
 
+const P15_ABBILDUNGEN = String.raw`\documentclass{article}
+\usepackage{graphicx}
+\begin{document}
+Abbildungen.
+\end{document}`
+
 // P15: Werkzeuge. lang2024 hat auf PDF-Seite 2 9.500 Zeichen.
 async function p15Vorbereiten(a) {
   const quellen = await neuAnlegen(a, 'E2E P15 Quellen', { 'main.tex': LEER })
   await quelleAusFixture(quellen._id, a._id, 'lang2024.pdf')
   await quelleAusFixture(quellen._id, a._id, 'smith2024.pdf')
   await webAufnehmen({ projectId: quellen._id, userId: a._id, url: 'http://127.0.0.1/spur/dev/web/testseite' })
+  const abbildungen = await neuAnlegen(a, 'E2E P15 Abbildungen', { 'main.tex': P15_ABBILDUNGEN })
+  for (const [datei, lizenz] of [['offen2023.pdf', 'cc-by'], ['verlag2022.pdf', null], ['nd2021.pdf', 'cc-by-nd']]) {
+    await quelleAusFixture(abbildungen._id, a._id, datei, { lizenz })
+  }
   const b = await konto('e2e-p15b@example.org')
   const fremd = await neuAnlegen(b, 'E2E P15 Fremd', { 'main.tex': LEER })
   await quelleAusFixture(fremd._id, b._id, 'smith2024.pdf')

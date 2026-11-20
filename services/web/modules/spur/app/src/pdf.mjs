@@ -74,6 +74,20 @@ export async function seitenBild(pfad, seite, ziel, { breite = null, kante = nul
   return `${ziel}.png`
 }
 
+// Ausschnitt einer Seite als PNG; x, y, breite und hoehe sind Anteile der Seite (0 bis 1, y von oben).
+export async function ausschnittBild(pfad, seite, ziel, { x, y, breite, hoehe }, dpi = 300) {
+  const groesse = await seitenGroesse(pfad, seite)
+  const px = punkte => Math.round((punkte * dpi) / 72)
+  const rechteck = [
+    ['-x', px(x * groesse.breite)],
+    ['-y', px(y * groesse.hoehe)],
+    ['-W', px(breite * groesse.breite)],
+    ['-H', px(hoehe * groesse.hoehe)],
+  ].flatMap(([name, wert]) => [name, String(wert)])
+  await ausfuehren('pdftocairo', ['-png', '-singlefile', '-r', String(dpi), ...rechteck, '-f', String(seite), '-l', String(seite), pfad, ziel], GRENZEN)
+  return `${ziel}.png`
+}
+
 const ENTITAETEN = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
 const entschluesseln = text => text.replace(/&(amp|lt|gt|quot|apos);/g, (_m, name) => ENTITAETEN[name])
 const runden = zahl => Math.round(zahl * 1000) / 1000

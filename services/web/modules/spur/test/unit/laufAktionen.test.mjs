@@ -13,6 +13,7 @@ let geloeschteDocs
 let spurUpdate
 let acceptChanges
 let emitToRoom
+let restPfade
 let geloeschtePfade
 let paketEntfernt
 let quelleGeloescht
@@ -44,6 +45,10 @@ beforeEach(async () => {
     default: { promises: { deleteEntityWithPath: async (_p, pfad) => geloeschtePfade.push(pfad) } },
   }))
   vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => ({ paketEntfernt }))
+  restPfade = []
+  vi.doMock('../../../../app/src/Features/Project/ProjectEntityHandler.mjs', () => ({
+    default: { promises: { getAllEntities: async () => ({ docs: [], files: restPfade.map(path => ({ path })) }) } },
+  }))
   quelleGeloescht = vi.fn(async () => {})
   vi.doMock('../../app/src/QuellenManager.mjs', () => ({ loeschen: quelleGeloescht }))
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -366,6 +371,21 @@ describe('zuruecknehmen', () => {
     expect(paketEntfernt).toHaveBeenCalledWith(projekt, 'foo')
     expect(spurUpdate).toHaveBeenCalledTimes(1)
     expect(await gespeichert(l)).toMatchObject({ status: 'zurueckgenommen', angelegt: [] })
+  })
+
+  it('entfernt einen vom Lauf angelegten Ordner nur, wenn er danach leer ist (P15)', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'owner' })
+    const angelegt = [
+      { art: 'datei', pfad: 'abbildungen/a.png', ordner: 'abbildungen' },
+      { art: 'datei', pfad: 'abbildungen/b.pdf' },
+    ]
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf', '/abbildungen'])
+
+    geloeschtePfade = []
+    restPfade = ['/abbildungen/eigenes.png']
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf'])
   })
 
   it('übergeht schon gelöschte Dateien', async () => {

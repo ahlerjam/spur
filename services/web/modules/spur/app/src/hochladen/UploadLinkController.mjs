@@ -1,5 +1,6 @@
 // POST /spur/hochladen/:token – ohne Sitzung und CSRF; das Token entscheidet. Antwortet je Datei mit Quellen-ID
-// oder Grund, im Format, das das Plugin-Skript spur-hochladen ausgibt.
+// oder Grund, im Format, das das Plugin-Skript spur-hochladen ausgibt; ein Link für Projektdateien (file_upload_link)
+// legt die Datei unter dem Pfad aus dem Feld projektdatei an.
 import { open, rm } from 'node:fs/promises'
 import Path from 'node:path'
 import { meldung } from '../meldungen.mjs'
@@ -11,11 +12,12 @@ import { rolleFuerClaude } from '../rechte.mjs'
 import { jetzt } from '../schalter.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
-import { autorenAusText, kurz, metadatenOhneDoi, WERKFELDER } from '../recherche/ohneDoi.mjs'
+import { autorenAusText, eingabeUngueltig, kurz, metadatenOhneDoi, WERKFELDER } from '../recherche/ohneDoi.mjs'
 import { doiPruefen } from '../recherche/Recherche.mjs'
 import { literaturBefund } from '../recherche/autorenabgleich.mjs'
 import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
+import * as Projektdatei from './Projektdatei.mjs'
 import * as UploadLink from './UploadLink.mjs'
 
 const ANLEGEN = ['readAndWrite', 'owner']
@@ -118,6 +120,14 @@ export const hochladen = mitProblemen(async (req, res) => {
     }
     if (!req.file) throw new Problem(400, 'datei_fehlt', 'spur_fehler_datei_fehlt')
     const dateiname = Buffer.from(req.file.originalname, 'latin1').toString('utf8')
+    const projektdatei = req.body?.projektdatei
+    if (link.art === 'datei') {
+      if (!projektdatei) throw eingabeUngueltig('projektdatei')
+      const { projectId, menschId, botId } = link
+      const { pfad } = await Projektdatei.anlegen({ projectId, menschId, botId, pfad: String(projektdatei), datei: req.file.path, groesse: req.file.size })
+      return res.json({ datei: dateiname, status: 'angelegt', pfad })
+    }
+    if (projektdatei) throw new Problem(422, 'falscher_link', 'spur_fehler_link_nur_quellen')
     if (!(await istPdf(req.file.path))) {
       return res.json({ datei: dateiname, status: 'abgelehnt', grund: meldung('spur_fehler_keine_pdf') })
     }

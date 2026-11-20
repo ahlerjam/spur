@@ -53,4 +53,16 @@ describe('Einmal-Link', () => {
     expect(ergebnisse.filter(e => e.status === 'fulfilled')).toHaveLength(50)
     expect(ergebnisse.find(e => e.status === 'rejected').reason).toMatchObject({ status: 410, typ: 'link_verbraucht' })
   })
+
+  it('erlaubt für Projektdateien 20 Uploads und merkt sich die Art (P15)', async () => {
+    const link = await UploadLink.erzeugen({ projectId: projekt, menschId: anna, botId: bot, art: 'datei' })
+    expect(link).toMatchObject({ gueltig_minuten: 15, max_dateien: 20 })
+    const token = link.link.split('/').pop()
+    expect(await UploadLink.pruefen(token)).toMatchObject({ art: 'datei' })
+    const ergebnisse = await Promise.allSettled(Array.from({ length: 21 }, () => UploadLink.verbrauchen(token)))
+    expect(ergebnisse.filter(e => e.status === 'fulfilled')).toHaveLength(20)
+    const fehler = ergebnisse.find(e => e.status === 'rejected').reason
+    expect(fehler).toMatchObject({ status: 410, typ: 'link_verbraucht' })
+    expect(fehler.message).toContain('20')
+  })
 })

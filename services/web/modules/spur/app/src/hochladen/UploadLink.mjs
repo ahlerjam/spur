@@ -1,5 +1,6 @@
-// Einmal-Links, über die Claude Code PDFs vom Rechner der Nutzer direkt an spur schickt (nicht über MCP).
-// Gespeichert wird nur der Hash des Tokens; jeder Upload verbraucht atomar einen von 50 Plätzen.
+// Einmal-Links, über die Claude Code Dateien vom Rechner der Nutzer direkt an spur schickt (nicht über MCP): PDFs als
+// Quellen (art „quelle“, 50 Plätze) oder Bilder als Projektdateien (art „datei“, 20 Plätze). Gespeichert wird nur der
+// Hash des Tokens; jeder Upload verbraucht atomar einen Platz.
 import { createHash, randomBytes } from 'node:crypto'
 import Settings from '@overleaf/settings'
 import { Problem } from '../probleme.mjs'
@@ -8,17 +9,22 @@ import { jetzt } from '../schalter.mjs'
 
 export const GUELTIG_MINUTEN = 15
 export const MAX_DATEIEN = 50
+export const MAX_PROJEKTDATEIEN = 20
+const MAX = { quelle: MAX_DATEIEN, datei: MAX_PROJEKTDATEIEN }
 
 const hash = token => createHash('sha256').update(token).digest('hex')
 
-export async function erzeugen({ projectId, menschId, botId }) {
+// Links von vor P15 tragen keine Art: Sie sind für Quellen.
+const artVon = link => link.art ?? 'quelle'
+
+export async function erzeugen({ projectId, menschId, botId, art = 'quelle' }) {
   const token = randomBytes(32).toString('hex')
   const ablauf = new Date(jetzt().getTime() + GUELTIG_MINUTEN * 60 * 1000)
-  await (await links()).insertOne({ hash: hash(token), projectId, menschId, botId, ablauf, genutzt: 0 })
+  await (await links()).insertOne({ hash: hash(token), projectId, menschId, botId, art, ablauf, genutzt: 0 })
   return {
     link: `${Settings.siteUrl}/spur/hochladen/${token}`,
     gueltig_minuten: GUELTIG_MINUTEN,
-    max_dateien: MAX_DATEIEN,
+    max_dateien: MAX[art],
     gueltig_bis: ablauf.toISOString(),
   }
 }
@@ -30,7 +36,7 @@ export function ungueltig() {
 function grund(link) {
   return link.ablauf <= jetzt()
     ? new Problem(410, 'link_abgelaufen', 'spur_fehler_link_abgelaufen')
-    : new Problem(410, 'link_verbraucht', 'spur_fehler_link_verbraucht', { max: MAX_DATEIEN })
+    : new Problem(410, 'link_verbraucht', 'spur_fehler_link_verbraucht', { max: MAX[artVon(link)] })
 }
 
 // Prüft ohne zu verbrauchen, damit ein ungültiger Link gar nicht erst eine Datei annimmt.
@@ -38,18 +44,25 @@ export async function pruefen(token) {
   if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) throw ungueltig()
   const link = await (await links()).findOne({ hash: hash(token) })
   if (!link) throw ungueltig()
-  if (link.ablauf <= jetzt() || link.genutzt >= MAX_DATEIEN) throw grund(link)
-  return link
+  if (link.ablauf <= jetzt() || link.genutzt >= MAX[artVon(link)]) throw grund(link)
+  return { ...link, art: artVon(link) }
 }
 
 export async function verbrauchen(token) {
   if (typeof token !== 'string' || !/^[0-9a-f]{64}$/.test(token)) throw ungueltig()
   const verbraucht = await (await links()).findOneAndUpdate(
-    { hash: hash(token), genutzt: { $lt: MAX_DATEIEN }, ablauf: { $gt: jetzt() } },
+    {
+      hash: hash(token),
+      ablauf: { $gt: jetzt() },
+      $or: [
+        { art: 'datei', genutzt: { $lt: MAX_PROJEKTDATEIEN } },
+        { art: { $ne: 'datei' }, genutzt: { $lt: MAX_DATEIEN } },
+      ],
+    },
     { $inc: { genutzt: 1 } },
     { returnDocument: 'after' }
   )
-  if (verbraucht) return verbraucht
+  if (verbraucht) return { ...verbraucht, art: artVon(verbraucht) }
   await pruefen(token)
   throw new Error('Upload-Link weder gültig noch ungültig')
 }

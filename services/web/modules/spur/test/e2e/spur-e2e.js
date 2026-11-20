@@ -858,7 +858,7 @@ async page => {
       // P12: Suchprotokoll und Ausschluss für PRISMA.
       const P12 = ['search_log', 'paper_exclude']
       // P15: Werkzeuge, die Claude beim Arbeiten gefehlt haben.
-      const P15 = ['source_page_image']
+      const P15 = ['source_page_image', 'source_figure_add', 'file_upload_link']
       const erwartet = [...P1, ...P2, ...P3, ...P7, ...P12, ...P15].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
@@ -7900,9 +7900,21 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
   // Breite und Höhe eines PNG aus dem IHDR-Block.
   const pngMasse = base64 => {
-    const kopf = atob(base64.slice(0, 44))
-    const zahl = i => ((kopf.charCodeAt(i) << 24) | (kopf.charCodeAt(i + 1) << 16) | (kopf.charCodeAt(i + 2) << 8) | kopf.charCodeAt(i + 3)) >>> 0
-    return { breite: zahl(16), hoehe: zahl(20) }
+    const png = Buffer.from(base64, 'base64')
+    return { breite: png.readUInt32BE(16), hoehe: png.readUInt32BE(20) }
+  }
+
+  // Pixel in der Farbe des orangefarbenen Balkens der P15-Abbildung (BALKEN in erzeuge-fixtures.mjs).
+  async function orangePixel(base64) {
+    return await page.evaluate(async daten => {
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${daten}`)).blob())
+      const ctx = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')
+      ctx.drawImage(bitmap, 0, 0)
+      const { data } = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+      let n = 0
+      for (let i = 0; i < data.length; i += 4) if (data[i] > 180 && data[i + 1] > 80 && data[i + 1] < 150 && data[i + 2] < 80) n++
+      return n
+    }, base64)
   }
 
   features.p15f2 = async () => {
@@ -7927,16 +7939,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const masse = pngMasse(inhalt.data)
     ok(Math.max(masse.breite, masse.hoehe) <= 1600 && masse.hoehe > 1500, `Seite 4 misst ${json(masse)}`)
     // Das Diagramm (orangefarbener Balken) ist auf dem Bild zu sehen.
-    const orange = await page.evaluate(async daten => {
-      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${daten}`)).blob())
-      const leinwand = new OffscreenCanvas(bitmap.width, bitmap.height)
-      const ctx = leinwand.getContext('2d')
-      ctx.drawImage(bitmap, 0, 0)
-      const { data } = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
-      let n = 0
-      for (let i = 0; i < data.length; i += 4) if (data[i] > 180 && data[i + 1] > 80 && data[i + 1] < 150 && data[i + 2] < 80) n++
-      return n
-    }, inhalt.data)
+    const orange = await orangePixel(inhalt.data)
     ok(orange > 10000, `Kein Diagramm auf Seite 4 (${orange} orange Pixel)`)
 
     const fehler = r => JSON.parse(r.content[0].text)
@@ -7950,6 +7953,75 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
     const fremdeQuelle = await bild({ project_id: fremd.pid, quelle_id: fremd.quelle('smith2024').id, pdf_seite: 4 })
     ok(fremdeQuelle.isError && fehler(fremdeQuelle).fehler === 'keine_rechte', `Fremdes Projekt: ${json(fehler(fremdeQuelle))}`)
+  }
+
+  features.p15f3 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const { pid, quelle } = await p15Quellen(token, 'E2E P15 Abbildungen')
+    const pfade = async () => (await jsonVon(`/project/${pid}/entities`)).entities.map(e => e.path)
+    const AUSSCHNITT = { x: 0.1, y: 0.2, breite: 0.8, hoehe: 0.4 }
+    const PFAD = 'abbildungen/offen2023-abb2.png'
+    const abbildung = async (key, args = {}) =>
+      await werkzeug(token, 'source_figure_add', { project_id: pid, quelle_id: quelle(key).id, pdf_seite: 3, ausschnitt: AUSSCHNITT, pfad: PFAD, ...args })
+
+    const offen = await abbildung('offen2023')
+    ok(!offen.fehler && offen.inhalt.pfad === PFAD && offen.inhalt.lizenz === 'cc-by', `offen2023: ${json(offen.inhalt)}`)
+    for (const teil of ['\\textcite{offen2023}', 'S. 3', 'CC BY']) ok(offen.inhalt.quellenangabe.includes(teil), `quellenangabe ohne „${teil}“: ${offen.inhalt.quellenangabe}`)
+    ok((await pfade()).includes(`/${PFAD}`), `${PFAD} fehlt im Dateibaum`)
+
+    const einbinden = await werkzeug(token, 'doc_edit', {
+      project_id: pid, pfad: 'main.tex', alt: 'Abbildungen.', neu: `Abbildungen.\n\n\\includegraphics[width=0.8\\textwidth]{${PFAD}}`, idempotenz_schluessel: schluessel(),
+    })
+    ok(!einbinden.fehler, `doc_edit: ${json(einbinden.inhalt)}`)
+    let job
+    for (let i = 0; i < 10; i++) {
+      job = await kompiliertBeiClaude(token, pid)
+      if (job.ergebnis?.compile !== 'too-recently-compiled') break
+      await page.waitForTimeout(1500)
+    }
+    ok(job.ergebnis?.compile === 'success', `Compile: ${json(job.ergebnis)}`)
+    const { daten } = await mcp(token, 'tools/call', { name: 'page_image', arguments: { project_id: pid, seite: 1 } })
+    const orange = await orangePixel(daten.result.content[0].data)
+    ok(orange > 2000, `Die Abbildung fehlt auf Seite 1 des PDFs (${orange} orange Pixel)`)
+
+    for (const key of ['verlag2022', 'nd2021']) {
+      const r = await abbildung(key, { pfad: `abbildungen/${key}.png` })
+      ok(r.fehler && r.inhalt.fehler === 'lizenz_fehlt' && /in Anlehnung an/.test(r.inhalt.detail) && /Erlaubnis/.test(r.inhalt.detail), `${key}: ${json(r.inhalt)}`)
+      ok(!(await pfade()).includes(`/abbildungen/${key}.png`), `${key}: Datei trotz lizenz_fehlt angelegt`)
+    }
+    for (const [args, erwartet] of [
+      [{ ausschnitt: { ...AUSSCHNITT, breite: 0 }, pfad: 'abbildungen/null.png' }, 'eingabe_ungueltig'],
+      [{ ausschnitt: { ...AUSSCHNITT, x: 1.2 }, pfad: 'abbildungen/gross.png' }, 'eingabe_ungueltig'],
+      [{ pfad: 'abbildungen/abb.jpg' }, 'eingabe_ungueltig'],
+      [{}, 'konflikt'],
+    ]) {
+      const r = await abbildung('offen2023', args)
+      ok(r.fehler && r.inhalt.fehler === erwartet, `${json(args)}: ${json(r.inhalt)}, erwartet ${erwartet}`)
+    }
+
+    const { inhalt: link } = await werkzeug(token, 'file_upload_link', { project_id: pid })
+    ok(link.gueltig_minuten === 15 && link.max_dateien === 20 && link.link.startsWith(`${BASE}/spur/hochladen/`), `file_upload_link: ${json(link)}`)
+    const diagramm = await perLink(link.link, { name: 'diagramm.pdf', mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/offen2023.pdf`) }, { projektdatei: 'abbildungen/diagramm.pdf' })
+    ok(diagramm.status === 200 && diagramm.daten?.status === 'angelegt' && diagramm.daten.pfad === 'abbildungen/diagramm.pdf', `diagramm.pdf: ${json(diagramm)}`)
+    ok((await pfade()).includes('/abbildungen/diagramm.pdf'), 'diagramm.pdf fehlt im Dateibaum')
+    const text = await perLink(link.link, { name: 'bild.png', mimeType: 'image/png', buffer: Buffer.from('Nur Text, umbenannt.\n') }, { projektdatei: 'abbildungen/bild.png' })
+    ok(text.status === 422 && text.daten?.title === 'dateityp_nicht_erlaubt', `Text als bild.png: ${json(text)}`)
+    const riesig = Buffer.alloc(10 * 1024 * 1024 + 1)
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(riesig)
+    const gross = await perLink(link.link, { name: 'gross.png', mimeType: 'image/png', buffer: riesig }, { projektdatei: 'abbildungen/gross.png' })
+    ok(gross.status === 413 && gross.daten?.title === 'zu_gross', `Datei über 10 MB: ${json(gross)}`)
+
+    await projektOeffnen('E2E P15 Abbildungen')
+    await panelOeffnen('Claude')
+    for (const datei of [PFAD, 'abbildungen/diagramm.pdf']) await karte().getByText(datei, { exact: true }).waitFor({ timeout: 20000 })
+    await karte().getByRole('button', { name: 'Lauf rückgängig' }).click()
+    await karte().getByText('Zurückgenommen', { exact: true }).waitFor({ timeout: 20000 })
+    const nachher = await pfade()
+    ok(!nachher.some(p => p.startsWith('/abbildungen')), `Nach „Lauf rückgängig“: ${json(nachher)}`)
+    await panelSichern(DATEIBAUM, page.locator('.file-tree').getByRole('treeitem', { name: 'main.tex' }))
+    await page.locator('.file-tree').getByRole('treeitem', { name: 'abbildungen' }).waitFor({ state: 'detached', timeout: 20000 })
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
