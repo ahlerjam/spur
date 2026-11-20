@@ -1,5 +1,5 @@
 import logger from '@overleaf/logger'
-import { klartext } from './pruefung/bib.mjs'
+import { klartext } from './fremdtext.mjs'
 import { crossrefCache } from './sammlungen.mjs'
 import { jetzt, paperApiBasis, umgebung } from './schalter.mjs'
 

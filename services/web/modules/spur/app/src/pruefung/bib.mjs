@@ -1,5 +1,4 @@
-import _ from 'lodash'
-import sanitizeHtml from 'sanitize-html'
+import { ohneTags, textAus } from '../fremdtext.mjs'
 
 const EINTRAG = /@([a-zA-Z]+)\s*\{\s*([^,\s]+)\s*,/g
 
@@ -53,18 +52,12 @@ export function latexSicher(text) {
 
 export const autorName = a => [a.family, a.given].filter(Boolean).join(', ')
 
-// sanitize-html löst alle Entities auf und maskiert im Text danach nur &, <, > und "; _.unescape macht das rückgängig.
-const ohneTags = (html, allowedTags) => sanitizeHtml(html, { allowedTags, allowedAttributes: {} })
-
-// Crossref liefert Titel und Namen mit HTML-Entities und Tags (`&amp;`, `<i>`, `<sub>`).
-// Ungültige Zeichennummern werden zu U+FFFD, das pdfLaTeX nicht setzen kann: weglassen.
-export const klartext = html => _.unescape(ohneTags(html, [])).replace(/\uFFFD/g, '').trim()
-
-// Wie klartext, aber kursiv bleibt kursiv. sanitize-html schließt offene Tags, die Klammern gehen also immer auf.
+// Wie klartext, aber kursiv bleibt kursiv. sanitize-html schließt offene Tags, die Klammern gehen also immer auf. Erst
+// zerlegen, dann auflösen: Ein maskiertes `&lt;i&gt;` bleibt so Text.
 function htmlZuLatex(html) {
   return ohneTags(html, ['i', 'em'])
     .split(/(<\/?(?:i|em)>)/)
-    .map(teil => (/^<(i|em)>$/.test(teil) ? '\\textit{' : /^<\//.test(teil) ? '}' : latexSicher(_.unescape(teil))))
+    .map(teil => (/^<(i|em)>$/.test(teil) ? '\\textit{' : /^<\//.test(teil) ? '}' : latexSicher(textAus(teil))))
     .join('')
     .trim()
 }
@@ -119,16 +112,16 @@ const NACH_TYP = {
   monograph: { typ: 'book', verlag: true },
   'proceedings-article': { typ: 'inproceedings', behaelter: 'booktitle', verlag: true },
 }
-// Ohne Typ (Quellen von vor P6) bleibt es beim Zeitschriftenartikel.
-const OHNE_TYP = NACH_TYP['journal-article']
+const PREPRINT = { typ: 'online' }
 
-const istPreprint = (doi, meta) => ARXIV_DOI.test(doi ?? '') || ['preprint', 'posted-content'].includes(meta.typ)
+// Form des Eintrags eines Werks mit DOI. Ohne Typ (Quellen von vor P6) bleibt es beim Zeitschriftenartikel.
+function formVon(doi, meta) {
+  if (ARXIV_DOI.test(doi ?? '') || ['preprint', 'posted-content'].includes(meta.typ)) return PREPRINT
+  return meta.typ ? (NACH_TYP[meta.typ] ?? { typ: 'misc' }) : NACH_TYP['journal-article']
+}
 
 // Der erwartete Eintragstyp eines Werks mit DOI; bib_list vergleicht ihn mit dem Eintrag.
-export function eintragstyp(doi, meta) {
-  if (istPreprint(doi, meta)) return 'online'
-  return meta.typ ? (NACH_TYP[meta.typ]?.typ ?? 'misc') : OHNE_TYP.typ
-}
+export const eintragstyp = (doi, meta) => formVon(doi, meta).typ
 
 const autorenFeld = meta => text(meta.autoren?.map(autorName).join(' and '))
 const titelFeld = (meta, ersatz) => (meta.titelHtml ? htmlZuLatex(meta.titelHtml) : text(meta.titel ?? ersatz))
@@ -152,8 +145,8 @@ export function bibEintrag(key, quelle) {
   const ohneRegister = !quelle.doi || quelle.metadaten === 'unvollstaendig'
   if (ohneRegister && OHNE_DOI[quelle.meta?.art]) return ohneDoiEintrag(key, quelle)
   const meta = quelle.meta?.gefunden ? quelle.meta : {}
-  if (istPreprint(quelle.doi, meta)) return preprintEintrag(key, quelle, meta)
-  const form = meta.typ ? (NACH_TYP[meta.typ] ?? { typ: 'misc' }) : OHNE_TYP
+  const form = formVon(quelle.doi, meta)
+  if (form === PREPRINT) return preprintEintrag(key, quelle, meta)
   return alsBib(form.typ, key, [
     ['author', autorenFeld(meta)],
     ['title', titelFeld(meta, quelle.dateiname)],

@@ -157,9 +157,9 @@ async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfa
   if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
   const endung = Path.extname(dateiname).toLowerCase()
   const inhalt = await AUSLESER[endung](tempPfad)
-  const ausPdf = ersatz && (doi || !inhalt.meta?.gefunden) ? null : inhalt.meta
-  const werk = meta ?? ausPdf ?? ersatz ?? null
-  const metadaten = ersatz && werk === ersatz ? 'unvollstaendig' : null
+  // Ersatzangaben gelten nur, wenn weder meta noch eine DOI im PDF (ohne vorgegebene DOI) Metadaten liefern.
+  const metadaten = ersatz && !meta && (doi || !inhalt.meta?.gefunden) ? 'unvollstaendig' : null
+  const werk = metadaten ? ersatz : (meta ?? inhalt.meta)
   // Ersatzangaben (Titel aus dem PDF oder dem Dateinamen) gleicht spur nicht mit dem PDF ab.
   const pruefen = endung === '.pdf' && !metadaten
   const abgleich = pruefen && meta?.titel ? await titelPruefen(meta.titel, inhalt.seiten, tempPfad) : null

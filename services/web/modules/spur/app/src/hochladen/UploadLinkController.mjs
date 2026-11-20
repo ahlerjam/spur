@@ -11,7 +11,7 @@ import { rolleFuerClaude } from '../rechte.mjs'
 import { jetzt } from '../schalter.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
-import { autorenAusText, metadatenOhneDoi, WERKFELDER } from '../recherche/ohneDoi.mjs'
+import { autorenAusText, kurz, metadatenOhneDoi, WERKFELDER } from '../recherche/ohneDoi.mjs'
 import { doiPruefen } from '../recherche/Recherche.mjs'
 import { literaturBefund } from '../recherche/autorenabgleich.mjs'
 import { titelBefund } from '../recherche/titelabgleich.mjs'
@@ -59,41 +59,27 @@ async function doiMetadaten(doi) {
 
 // Ohne Metadaten: Titel aus dem Formular, sonst aus dem PDF, sonst der Dateiname; der Eintrag wird @misc.
 async function ersatzMeta(req, stamm) {
-  const titel = req.body?.titel ? String(req.body.titel).slice(0, 500) : await titelFeld(req.file.path).catch(() => null)
+  const titel = kurz(req.body?.titel, 500) || (await titelFeld(req.file.path).catch(() => null))
   return { titel: titel || stamm, art: 'misc' }
 }
 
-// Ohne DOI, aber mit Angaben zum Werk (Autoren, Jahr, Art, Institution): Die Quelle bekommt wie bei source_add mit
-// pdf_url einen Key aus Nachname und Jahr und einen .bib-Eintrag passend zur Art.
-async function ohneDoiAufnehmen(link, req, dateiname) {
-  const { autoren, ...felder } = req.body
+// Angaben zum Werk ohne DOI (Autoren, Jahr, Art, Institution) ergeben wie bei source_add mit pdf_url einen Key aus
+// Nachname und Jahr und einen .bib-Eintrag passend zur Art.
+function angabenOhneDoi(body) {
+  const { autoren, ...felder } = body
   const angaben = metadatenOhneDoi({ ...felder, autoren: autorenAusText(autoren) })
-  const meta = angaben.url ? { ...angaben, abgerufenAm: jetzt() } : angaben
-  const alle = await QuellenManager.alle(link.projectId)
-  const vorhanden = alle.find(q => q.dateiname === dateiname)
-  if (vorhanden) return { vorhanden }
-  const { key, docs } = await Aufnahme.neuerKey(link.projectId, alle, meta)
-  const quelle = await QuellenManager.aufnehmen({
-    projectId: link.projectId,
-    userId: link.menschId,
-    dateiname,
-    tempPfad: req.file.path,
-    groesse: req.file.size,
-    key,
-    meta,
-  })
-  return await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
+  return angaben.url ? { ...angaben, abgerufenAm: jetzt() } : angaben
 }
 
-// Jeder Upload bekommt einen .bib-Eintrag: mit DOI aus Crossref wie bei source_add, ohne DOI aus einer DOI im PDF,
-// sonst @misc mit dem Vermerk metadaten: 'unvollstaendig'.
+// Jeder Upload bekommt einen .bib-Eintrag: mit DOI aus Crossref wie bei source_add, mit Angaben zum Werk passend zur
+// Art, ohne beides aus einer DOI im PDF, sonst @misc mit dem Vermerk metadaten: 'unvollstaendig' und einem Hinweis.
 async function neueQuelle(link, req, dateiname) {
   const doi = req.body?.doi ? doiPruefen(String(req.body.doi)) : undefined
-  if (!doi && WERKFELDER.some(feld => req.body?.[feld])) return await ohneDoiAufnehmen(link, req, dateiname)
+  const mitAngaben = !doi && WERKFELDER.some(feld => req.body?.[feld])
   const alle = await QuellenManager.alle(link.projectId)
   const vorhanden = alle.find(q => q.dateiname === dateiname || (doi && q.doi?.toLowerCase() === doi.toLowerCase()))
   if (vorhanden) return { vorhanden }
-  const register = doi ? await doiMetadaten(doi) : { hinweis: meldung('spur_hinweis_metadaten_ohne_doi') }
+  const register = mitAngaben ? { meta: angabenOhneDoi(req.body) } : doi ? await doiMetadaten(doi) : { hinweis: meldung('spur_hinweis_metadaten_ohne_doi') }
   const stamm = Path.basename(dateiname, Path.extname(dateiname))
   const { key, docs } = await Aufnahme.neuerKey(link.projectId, alle, register.meta ?? { titel: stamm })
   const quelle = await QuellenManager.aufnehmen({
@@ -107,8 +93,8 @@ async function neueQuelle(link, req, dateiname) {
     meta: register.meta,
     ...(!register.meta && { ersatz: await ersatzMeta(req, stamm) }),
   })
-  const angelegt = await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
-  return quelle.metadaten ? { ...angelegt, metadatenHinweis: register.hinweis } : angelegt
+  await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
+  return { quelle, hinweis: quelle.metadaten ? register.hinweis : null }
 }
 
 async function aufnehmen(link, req, dateiname) {
@@ -145,17 +131,18 @@ export const hochladen = mitProblemen(async (req, res) => {
     if (ergebnis.vorhanden) {
       return res.json({ datei: dateiname, status: 'vorhanden', quelle_id: String(ergebnis.vorhanden._id) })
     }
-    const eintrag = await Beschaffung.perDoiZuordnen(link.projectId, ergebnis, link.menschId)
+    const { quelle, hinweis } = ergebnis
+    const eintrag = await Beschaffung.perDoiZuordnen(link.projectId, quelle, link.menschId)
     const lauf = await LaufManager.laufFuerSchreiben(link.projectId, link.botId)
-    await LaufManager.angelegtMerken(lauf, [{ art: 'quelle', quelleId: ergebnis._id, name: dateiname }])
+    await LaufManager.angelegtMerken(lauf, [{ art: 'quelle', quelleId: quelle._id, name: dateiname }])
     res.json({
       datei: dateiname,
       status: 'angelegt',
-      quelle_id: String(ergebnis._id),
-      key: ergebnis.key,
-      ...titelBefund(ergebnis),
-      ...literaturBefund(ergebnis),
-      ...(ergebnis.metadatenHinweis && { metadaten_hinweis: ergebnis.metadatenHinweis }),
+      quelle_id: String(quelle._id),
+      key: quelle.key,
+      ...titelBefund(quelle),
+      ...literaturBefund(quelle),
+      ...(hinweis && { metadaten_hinweis: hinweis }),
       ...(eintrag && { beschaffung_id: String(eintrag._id) }),
     })
   } finally {

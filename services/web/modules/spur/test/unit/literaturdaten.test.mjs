@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { werkAuswerten } from '../../app/src/Crossref.mjs'
 import { arxivWerk } from '../../app/src/recherche/dienste.mjs'
-import { bibEintrag, bibLesen, klartext } from '../../app/src/pruefung/bib.mjs'
+import { bibEintrag, bibLesen } from '../../app/src/pruefung/bib.mjs'
+import { klartext } from '../../app/src/fremdtext.mjs'
 import { abweichungen } from '../../app/src/pruefung/bewertung.mjs'
 import { fixture } from './hilfen/quellen.mjs'
 
@@ -107,6 +108,11 @@ describe('bibEintrag (P13)', () => {
       journal: 'Information \\& Management',
     })
     expect(eintrag).not.toMatch(/amp;|<i>|&#/)
+  })
+
+  it('lässt ein maskiertes &lt;i&gt; als Text stehen', () => {
+    const meta = werkAuswerten({ title: ['<i>Kursiv</i> und &lt;i&gt;wörtlich'], type: 'journal-article' })
+    expect(felder(bibEintrag('k', mitDoi('10.1/k', meta))).title).toBe('\\textit{Kursiv} und <i>wörtlich')
   })
 
   it('hält die Klammern auch bei unausgeglichenen Tags und LaTeX-Zeichen im Titel', () => {

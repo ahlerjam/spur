@@ -4,6 +4,9 @@
 - Wie P12: `spur-dev up` aus diesem Worktree, `dev-schalter.json` mit dem Crossref-Fake. Einzelne Unit-Testdateien über einen lokalen Läufer im Modulordner (nicht im Repo), der vitest über `vitest/node` startet und nur Fehler ausgibt: `spur-dev run modules/spur/laeufer.mjs <dateien>`.
 - Frontend-Tests einzeln: `spur-dev upstream frontend modules/spur/test/frontend/<datei>`.
 
+- Abschluss: Die Basis laut Skill (Elter von `slice: plan …`, `96dc84ad3e`) liegt vor dem Merge von P12; `<base>..HEAD` enthielte P12 vollständig. `/simplify`, `/code-review` und die Sicherheitsprüfung laufen deshalb über den P13-Diff ab dem Startcommit des Laufs: `2dce78cd84..HEAD`.
+- E2E-Läufe: `.playwright-mcp/mach-wrapper.sh [ids]` (gitignoriert) erzeugt `start.js` und `poll.js`; der Zustand liegt am `page`-Objekt (`globalThis` überlebt zwischen zwei run-code-Aufrufen nicht).
+
 ## Needs decision
 
 ## Replies
