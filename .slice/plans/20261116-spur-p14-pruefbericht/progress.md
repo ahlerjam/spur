@@ -67,4 +67,8 @@ Nachgetragen: P14 baut keine neue Ansicht, sondern drei Abzeichen in die bestehe
 - P14, bewusst nach Spec belassen: Bücher oder Scans mit Vorspann und ohne erkannte Seitenzahlen werden gegen die PDF-Seite geprüft; ein Zitat von S. 45 auf PDF-Seite 45 gilt als „PDF-Seite: stimmt“, auch wenn gedruckt S. 33 dasteht. Das Abzeichen nennt die PDF-Seite; ob solche Quellen besser einen bestätigten Versatz brauchen, wäre eine Owner-Entscheidung.
 - P16 `TexPakete.mjs:172`: Ausfall der Paketdatenbank kurz vorhalten. P12 `werkzeuge.mjs:420`: `paper_search` liefert ab Seite 50 einen Cursor, der wieder Seite 50 liefert. P12 `Recherche.mjs:82`: Fehler beim Protokollieren lässt die Suche scheitern. P12 `Beschaffung.mjs:42`: `vormerken` überschreibt beschaffte Einträge. `.slice/decisions.md`: D15 doppelt vergeben.
 
+### /simplify auf der letzten Codeänderung (c2089b1)
+- Übernommen: `ABSATZ` aus latex.mjs statt eigener Regex in zahlen.mjs.
+- Vorschlag (älterer Code aus P6/P10, von P14 nicht geändert): `BEFEHL_ARGUMENTE`, `SIUNITX` und `OPTIONAL` in zahlen.mjs laufen mit `\s*` über Leerzeilen; `\section{…}` + Leerzeile + `{\small … 1234 …}` meldet die Zahl nicht. Leerraum dort auf `[ \t]*` bzw. ohne Absatzgrenze begrenzen.
+
 ## Replies

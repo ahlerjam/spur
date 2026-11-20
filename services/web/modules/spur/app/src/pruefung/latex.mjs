@@ -155,7 +155,7 @@ function leitetZitatEin(text, beleg) {
   return ZITAT_BEGINN.test(ende < 0 ? rest : rest.slice(0, ende))
 }
 
-const ABSATZ = /\n[ \t]*\n/
+export const ABSATZ = /\n[ \t]*\n/
 
 function folgenderBeleg(text, pos) {
   let p = leerraumEnde(text, pos)

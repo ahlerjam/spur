@@ -1,4 +1,4 @@
-import { klammerEnde } from '../pruefung/latex.mjs'
+import { ABSATZ, klammerEnde } from '../pruefung/latex.mjs'
 // Heuristik für Zahlen in Claudes Text, die nicht aus ergebnisse.tex stammen.
 // Gemeldet: Zahlen im Fließtext, Werte in \num, \qty, \SI, \SIrange und in Formeln Dezimalzahlen und Zahlen
 // ab drei Stellen. Nicht gemeldet: Seitenangaben, Jahreszahlen, Datum, Uhrzeit (auch „9 Uhr“), Versionsnummern (auch „Python 3.12“), Befehlsargumente, Kommentare, Grafiken (TikZ,
@@ -87,7 +87,7 @@ function argumenteEnde(text, pos, maxPflicht = Infinity) {
     if (text[p] === '=') p++
     while (/\s/.test(text[p] ?? '')) p++
     // Nach einer Leerzeile beginnt ein neuer Absatz, keine Argumente mehr.
-    if (/\n[ \t]*\n/.test(text.slice(pos, p))) return pos
+    if (ABSATZ.test(text.slice(pos, p))) return pos
     const zu = { '[': ']', '{': '}' }[text[p]]
     if (zu === '}' && pflicht++ >= maxPflicht) return pos
     const ende = zu ? klammerEnde(text, p, text[p], zu) : -1
