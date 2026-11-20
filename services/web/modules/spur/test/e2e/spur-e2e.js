@@ -3238,8 +3238,9 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
     const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
-    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei.
-    ok(eintraege === 41, `Backlog hat ${eintraege} Einträge statt 41`)
+    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei; vier Ideen aus
+    // dem Altprojekt academic-research (661a28817e).
+    ok(eintraege === 45, `Backlog hat ${eintraege} Einträge statt 45`)
     ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /lacks \d+ keys/.test(backlog), 'Backlog ohne Transformers, Tesseract oder fehlende Übersetzungen')
   }
 
