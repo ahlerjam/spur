@@ -11,7 +11,7 @@
         "Im Dev-Stack kompiliert ein zweites, kleines Dokument, das nur Pakete des bisherigen Images lädt (`article`, `babel` mit ngerman, `csquotes`, `siunitx`), weiterhin ohne Fehler; `page_image` der ersten Seite zeigt den Text. Das APA-Dokument selbst kompiliert erst im neuen Image, also im Workflow",
         "Die README nennt in einem Absatz, welche Pakete das Image mitbringt und dass alles andere mit `tex_package_add` ins Projekt kommt"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f2",

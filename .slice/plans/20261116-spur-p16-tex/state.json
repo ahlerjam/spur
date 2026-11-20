@@ -1,10 +1,10 @@
 {
-  "state": "partial",
+  "state": "done",
   "builderModel": "opus",
   "builderAdvisor": "opus",
   "cloudSession": "https://claude.ai/code/session_01XpJUcfWmSdtxrkxKkC8jyY",
   "runBranch": "slice/run-20261116-spur-p16-tex",
   "sessionId": "a227fb8d-7452-4a88-9a77-a00082d935c7",
   "started": "2026-11-20T11:36:33Z",
-  "finished": "2026-11-20T18:07:57Z"
+  "finished": "2026-11-20T20:50:15Z"
 }

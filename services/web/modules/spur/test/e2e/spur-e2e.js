@@ -7682,7 +7682,8 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: pid })
     ok(log.fehler.length === 0, `compile_log: ${JSON.stringify(log.fehler)}`)
     const anteil = await dunkleSeite(token, pid, 1)
-    ok(anteil > 0.002, `Seite 1 ohne Text (${anteil})`)
+    // Überschrift und eine Zeile ergeben bei 110 dpi knapp 0,1 % dunkle Pixel; eine leere Seite hat nur die Seitenzahl.
+    ok(anteil > 0.0005, `Seite 1 ohne Text (${anteil})`)
   }
 
   // P14: Prüfbericht ohne blinde Flecken. Die Testprojekte haben je Stelle eine eigene Zeile (main.tex:6, :8, …).
