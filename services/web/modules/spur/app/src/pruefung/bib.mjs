@@ -141,7 +141,8 @@ function preprintEintrag(key, quelle, meta) {
     ['title', titelFeld(meta, quelle.dateiname)],
     ['date', ohneKlammern(meta.jahr)],
     ['eprint', text(archiv)],
-    ['doi', ohneKlammern(quelle.doi)],
+    // spur speichert DOIs klein; arXiv schreibt seine DOIs als 10.48550/arXiv.<id>.
+    ['doi', ohneKlammern(quelle.doi?.replace(ARXIV_DOI, '10.48550/arXiv.'))],
   ])
 }
 

@@ -30,7 +30,8 @@ beforeEach(async () => {
     rechte: { rolleFuerClaude: vi.fn(async () => 'owner') },
     QuellenManager: {
       alle: vi.fn(async () => []),
-      aufnehmen: vi.fn(async eingabe => ({ _id: new ObjectId(), ...eingabe, key: eingabe.key ?? 'aus-dateiname' })),
+      // Wie QuellenManager: Ersatzangaben gelten, wenn das PDF keine DOI mit Metadaten trägt (die Fixtures tragen keine).
+      aufnehmen: vi.fn(async ({ ersatz, ...eingabe }) => ({ _id: new ObjectId(), ...eingabe, key: eingabe.key ?? 'aus-dateiname', ...(ersatz && { meta: ersatz, metadaten: 'unvollstaendig' }) })),
     },
     sammlungen: { quellen: async () => ({ findOne: vi.fn(async () => m.vorhanden) }) },
     Aufnahme: {
@@ -109,7 +110,7 @@ describe('Upload über den Einmal-Link', () => {
   it('legt mit nur einem Titel einen @misc-Eintrag mit Key aus dem Dateinamen an (P13)', async () => {
     const { res } = await hochladen({ titel: 'Testbericht' })
     expect(m.Aufnahme.neuerKey).toHaveBeenCalledWith(projectId, [], { titel: 'report' })
-    expect(m.QuellenManager.aufnehmen.mock.calls[0][0]).toMatchObject({ meta: { titel: 'Testbericht', art: 'misc' }, metadaten: 'unvollstaendig' })
+    expect(m.QuellenManager.aufnehmen.mock.calls[0][0]).toMatchObject({ ersatz: { titel: 'Testbericht', art: 'misc' } })
     expect(m.Aufnahme.mitBibEintrag).toHaveBeenCalledTimes(1)
     expect(res.body).toMatchObject({ status: 'angelegt', metadaten: 'unvollstaendig', metadaten_hinweis: meldung('spur_hinweis_metadaten_ohne_doi') })
   })
@@ -118,7 +119,7 @@ describe('Upload über den Einmal-Link', () => {
     m.pdf.titelFeld.mockResolvedValueOnce('Field notes 2023')
     await hochladen({}, 'notizen.pdf')
     await hochladen({}, 'report.pdf')
-    expect(m.QuellenManager.aufnehmen.mock.calls.map(([e]) => e.meta)).toEqual([
+    expect(m.QuellenManager.aufnehmen.mock.calls.map(([e]) => e.ersatz)).toEqual([
       { titel: 'Field notes 2023', art: 'misc' },
       { titel: 'report', art: 'misc' },
     ])
@@ -139,7 +140,7 @@ describe('Upload über den Einmal-Link', () => {
     const { res } = await hochladen({ doi: '10.5555/spur.heft.001' }, 'mikalef.pdf')
     expect(m.Aufnahme.neuerKey).toHaveBeenCalledWith(projectId, [], meta)
     expect(m.QuellenManager.aufnehmen.mock.calls[0][0]).toMatchObject({ key: 'oldemeyer2025', doi: '10.5555/spur.heft.001', meta })
-    expect(m.QuellenManager.aufnehmen.mock.calls[0][0]).not.toHaveProperty('metadaten')
+    expect(m.QuellenManager.aufnehmen.mock.calls[0][0]).not.toHaveProperty('ersatz')
     expect(m.Aufnahme.mitBibEintrag.mock.calls[0][1]).toEqual([{ pfad: 'references.bib' }])
     expect(res.body).toMatchObject({ status: 'angelegt', key: 'oldemeyer2025' })
     expect(res.body).not.toHaveProperty('metadaten')
@@ -150,9 +151,9 @@ describe('Upload über den Einmal-Link', () => {
     const unbekannt = await hochladen({ doi: '10.9999/nirgends.1' }, 'unbekannt.pdf')
     m.Aufnahme.metadaten.mockRejectedValueOnce(new Problem(502, 'dienst_fehlt', 'spur_fehler_crossref_nicht_erreichbar'))
     const weg = await hochladen({ doi: '10.5555/spur.bot.001' })
-    expect(m.QuellenManager.aufnehmen.mock.calls.map(([e]) => [e.doi, e.meta, e.metadaten])).toEqual([
-      ['10.9999/nirgends.1', { titel: 'unbekannt', art: 'misc' }, 'unvollstaendig'],
-      ['10.5555/spur.bot.001', { titel: 'report', art: 'misc' }, 'unvollstaendig'],
+    expect(m.QuellenManager.aufnehmen.mock.calls.map(([e]) => [e.doi, e.meta, e.ersatz])).toEqual([
+      ['10.9999/nirgends.1', undefined, { titel: 'unbekannt', art: 'misc' }],
+      ['10.5555/spur.bot.001', undefined, { titel: 'report', art: 'misc' }],
     ])
     expect(unbekannt.res.body.metadaten_hinweis).toBe(meldung('spur_hinweis_doi_nicht_gefunden', { doi: '10.9999/nirgends.1' }))
     expect(weg.res.body.metadaten_hinweis).toBe(meldung('spur_hinweis_doi_crossref_fehlt'))

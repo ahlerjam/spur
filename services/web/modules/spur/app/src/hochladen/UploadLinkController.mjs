@@ -85,8 +85,8 @@ async function ohneDoiAufnehmen(link, req, dateiname) {
   return await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
 }
 
-// Jeder Upload bekommt einen .bib-Eintrag: mit DOI aus Crossref wie bei source_add, sonst @misc mit dem Vermerk
-// metadaten: 'unvollstaendig'.
+// Jeder Upload bekommt einen .bib-Eintrag: mit DOI aus Crossref wie bei source_add, ohne DOI aus einer DOI im PDF,
+// sonst @misc mit dem Vermerk metadaten: 'unvollstaendig'.
 async function neueQuelle(link, req, dateiname) {
   const doi = req.body?.doi ? doiPruefen(String(req.body.doi)) : undefined
   if (!doi && WERKFELDER.some(feld => req.body?.[feld])) return await ohneDoiAufnehmen(link, req, dateiname)
@@ -104,11 +104,11 @@ async function neueQuelle(link, req, dateiname) {
     groesse: req.file.size,
     key,
     doi,
-    meta: register.meta ?? (await ersatzMeta(req, stamm)),
-    ...(!register.meta && { metadaten: 'unvollstaendig' }),
+    meta: register.meta,
+    ...(!register.meta && { ersatz: await ersatzMeta(req, stamm) }),
   })
   const angelegt = await Aufnahme.mitBibEintrag(link.projectId, docs, quelle, link.menschId)
-  return register.meta ? angelegt : { ...angelegt, metadatenHinweis: register.hinweis }
+  return quelle.metadaten ? { ...angelegt, metadatenHinweis: register.hinweis } : angelegt
 }
 
 async function aufnehmen(link, req, dateiname) {

@@ -124,7 +124,7 @@ describe('bibEintrag (P13)', () => {
       title: 'Sleep-like replay improves memory consolidation',
       date: '2024',
       eprint: 'arXiv',
-      doi: '10.48550/arxiv.2401.01234',
+      doi: '10.48550/arXiv.2401.01234',
     })
   })
 

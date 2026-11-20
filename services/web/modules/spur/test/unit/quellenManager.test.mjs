@@ -174,6 +174,28 @@ describe('Autorenabgleich beim Aufnehmen', () => {
   })
 })
 
+describe('Ersatzangaben beim Upload (P13)', () => {
+  const ERSATZ = { titel: 'notizen', art: 'misc' }
+
+  it('nimmt die Ersatzangaben ohne Metadaten und gleicht sie nicht mit dem PDF ab', async () => {
+    const quelle = await aufnehmen('notizen.pdf', 'notizen.pdf', { ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ meta: ERSATZ, metadaten: 'unvollstaendig' })
+    expect(quelle).not.toHaveProperty('titelabgleich')
+    expect(quelle).not.toHaveProperty('autoren')
+  })
+
+  it('bevorzugt die Metadaten einer DOI im PDF-Text, wenn keine DOI vorgegeben ist', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf', { ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ doi: '10.5555/spur.2024.001', meta: { titel: 'Sleep and Memory' }, autoren: 'bestaetigt' })
+    expect(quelle).not.toHaveProperty('metadaten')
+  })
+
+  it('nimmt bei vorgegebener, unbekannter DOI die Ersatzangaben, nicht die DOI im PDF', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf', { doi: '10.9999/nirgends.1', ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ doi: '10.9999/nirgends.1', meta: ERSATZ, metadaten: 'unvollstaendig' })
+  })
+})
+
 describe('Abfragen', () => {
   let smith
   let interview

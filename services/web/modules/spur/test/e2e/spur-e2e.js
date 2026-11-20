@@ -1496,12 +1496,12 @@ async page => {
 
     const arxiv = paperTreffer('Sleep-like replay improves memory consolidation in artificial neural networks')
     await arxiv.getByRole('button', { name: 'Aufnehmen' }).click()
-    await arxiv.getByText('Aufgenommen als „smith2024“', { exact: false }).waitFor({ timeout: 30000 })
+    await arxiv.getByText('Aufgenommen als „gandhi2024“', { exact: false }).waitFor({ timeout: 30000 })
 
     await panelOeffnen('Quellen')
     const zeile = name => page.locator('.spur-panel .spur-zeile', { hasText: name })
     await zeile('keller2014.pdf').getByText('2 Seiten · Text erkannt').waitFor()
-    await zeile('smith2024.pdf').getByText('Volltext nur in diesem Projekt').waitFor()
+    await zeile('gandhi2024.pdf').getByText('Volltext nur in diesem Projekt').waitFor()
     ok((await zeile('keller2014.pdf').getByText('Volltext nur in diesem Projekt').count()) === 0, 'keller nur im Projekt')
 
     const token = 'spur_e2e_fake'
@@ -1509,7 +1509,8 @@ async page => {
     const bib = (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
     ok(bib.includes('@article{keller2014,') && bib.includes('doi = {10.1371/journal.pone.0099999}'), `.bib:\n${bib}`)
     ok(bib.includes('title = {Sleep spindles predict overnight memory consolidation}'), `.bib-Titel:\n${bib}`)
-    ok(bib.includes('@article{smith2024,') && bib.includes('author = {Smith, Alice and Lee, Ben}'), `.bib arXiv:\n${bib}`)
+    // Seit P13 ist ein arXiv-Preprint @online (die Autoren des Fixtures heißen seitdem wie im Plan Gandhi und Joshi).
+    ok(bib.includes('@online{gandhi2024,') && bib.includes('author = {Gandhi, Kiran and Joshi, Mira}') && bib.includes('eprint = {arXiv}'), `.bib arXiv:\n${bib}`)
 
     // Der arXiv-Volltext ohne Lizenz bleibt im Projekt: „Holen“ in ein anderes Projekt nimmt nur keller2014 mit.
     await projektOeffnen('E2E Recherche Ziel')
@@ -1517,7 +1518,7 @@ async page => {
     await quelleHolen('E2E Recherche')
     await sichtbar('1 Quelle geholt')
     await zeile('keller2014.pdf').waitFor()
-    ok((await zeile('smith2024.pdf').count()) === 0, 'arXiv-Volltext wurde mitkopiert')
+    ok((await zeile('gandhi2024.pdf').count()) === 0, 'arXiv-Volltext wurde mitkopiert')
 
     const unbekannt = await werkzeug(token, 'source_add', { project_id: pid, doi: '10.9999/gibt.es.nicht' })
     ok(unbekannt.fehler && unbekannt.inhalt.fehler === 'doi_nicht_gefunden' && unbekannt.inhalt.detail === 'DOI nicht gefunden', `source_add: ${JSON.stringify(unbekannt.inhalt)}`)
@@ -7233,6 +7234,297 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
         await liste.getByText('Frei, Download blockiert', { exact: true }).waitFor({ timeout: 20000 })
         await liste.getByText('Nicht frei verfügbar', { exact: true }).waitFor()
         await pruefen(`Beschaffung ${design}`, liste.getByRole('link', { name: 'Im Browser herunterladen' }))
+      })
+    }
+  }
+
+  // P13: Verlässliche Literaturdaten.
+  const bibVon = async (token, pid) => (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
+  const bibBlock = (bib, kopf) => bib.split(/\n(?=@)/).find(b => b.startsWith(kopf)) ?? ''
+  const mitFeldern = (block, felder, was) => {
+    for (const feld of felder) ok(block.includes(`  ${feld}`), `${was} ohne „${feld}“:\n${block}`)
+  }
+  // Kompiliert im Editor und wartet, bis das Muster in der Textebene des PDFs steht (Leerraum vereinheitlicht).
+  async function imPdf(muster, timeout = 120000) {
+    await page.waitForFunction(
+      m => new RegExp(m).test([...document.querySelectorAll('.pdf-viewer .textLayer')].map(e => e.textContent).join(' ').replace(/\s+/g, ' ')),
+      muster,
+      { timeout }
+    ).catch(async () => fail(`PDF ohne /${muster}/: ${(await pdfText()).slice(0, 800)}`))
+  }
+  const pdfText = () => page.evaluate(() => [...document.querySelectorAll('.pdf-viewer .textLayer')].map(e => e.textContent).join(' ').replace(/\s+/g, ' '))
+  async function sauberKompiliert(token, pid, was) {
+    const job = await kompiliertBeiClaude(token, pid)
+    ok(job.status === 'fertig' && job.ergebnis.compile === 'success', `${was}: ${JSON.stringify(job)}`)
+    const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: pid })
+    ok(log.fehler.length === 0, `${was}, Fehler im Log: ${JSON.stringify(log.fehler)}`)
+    return log
+  }
+  const aufnehmenOk = async (token, pid, doi) => {
+    const r = await werkzeug(token, 'source_add', { project_id: pid, doi })
+    ok(!r.fehler, `source_add ${doi}: ${JSON.stringify(r.inhalt)}`)
+    return r.inhalt
+  }
+
+  features.p13f1 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P13 Heft')
+    await fakeSteuern({ cachesLeeren: true })
+    // Crossref: published-online 2024-11-03, published-print 2025-02-01, issued 2024-11-03.
+    const heft = await aufnehmenOk(token, pid, '10.5555/spur.heft.001')
+    ok(heft.key === 'oldemeyer2025', `Key: ${JSON.stringify(heft)}`)
+    mitFeldern(bibBlock(await bibVon(token, pid), '@article{oldemeyer2025,'), ['volume = {35}', 'number = {2}', 'pages = {101--118}', 'year = {2025}'], 'oldemeyer2025')
+
+    for (const [doi, key] of [['10.5555/spur.heft.002', 'morley2021'], ['10.5555/spur.kap.001', 'berg2019'], ['10.5555/spur.enr.001', 'reyes2019']]) {
+      ok((await aufnehmenOk(token, pid, doi)).key === key, `${doi} ohne Key ${key}`)
+    }
+    const bib = await bibVon(token, pid)
+    const morley = bibBlock(bib, '@article{morley2021,')
+    mitFeldern(morley, ['year = {2021}'], 'morley2021')
+    ok(!/volume|number|= \{\}/.test(morley), `morley2021 mit leeren Feldern:\n${morley}`)
+    mitFeldern(bibBlock(bib, '@incollection{berg2019,'), ['booktitle = {Handbook of Sleep}', 'publisher = {Springer}'], '@incollection berg2019')
+    const reyes = bibBlock(bib, '@article{reyes2019,')
+    mitFeldern(reyes, ['eid = {e0209899}', 'volume = {14}', 'number = {1}'], 'reyes2019')
+    ok(!reyes.includes('pages'), `reyes2019 mit pages:\n${reyes}`)
+
+    await sauberKompiliert(token, pid, 'P13 Heft')
+    await seitenPng(token, pid, 1)
+    await projektOeffnen('E2E P13 Heft')
+    await kompilieren()
+    await imPdf(String.raw`Oldemeyer, L\., & Mikalef, P\. \(2025\)`)
+    // Die Textebene verliert am Zeilenende das Leerzeichen.
+    await imPdf(String.raw`Government Information Quarterly, 35\s?\(2\),\s?101–118`)
+  }
+
+  features.p13f2 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P13 Entities')
+    await fakeSteuern({ cachesLeeren: true })
+    // Crossref liefert „Artificial intelligence &amp; firm performance: <i>A review</i> of H<sub>2</sub>O &#8211; 50% more“.
+    ok((await aufnehmenOk(token, pid, '10.5555/spur.ent.001')).key === 'asplund2023', 'Key asplund2023 fehlt')
+    const bib = await bibVon(token, pid)
+    mitFeldern(bibBlock(bib, '@article{asplund2023,'), [
+      String.raw`title = {Artificial intelligence \& firm performance: \textit{A review} of H2O – 50\% more}`,
+      String.raw`journal = {Information \& Management}`,
+    ], 'asplund2023')
+    ok(!/amp;|<i>|&#/.test(bib), `HTML-Reste in der .bib:\n${bib}`)
+    await sauberKompiliert(token, pid, 'P13 Entities')
+    const quelle = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege.find(q => q.key === 'asplund2023')
+    ok(quelle?.titel === 'Artificial intelligence & firm performance: A review of H2O – 50% more', `sources_list: ${JSON.stringify(quelle)}`)
+    // Klammern und Backslash aus Crossref prüft weiter der Unit-Test „maskiert fremde Metadaten im neuen .bib-Eintrag“.
+  }
+
+  features.p13f3 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P13 Preprint')
+    await fakeSteuern({ cachesLeeren: true })
+    ok((await aufnehmenOk(token, pid, '10.48550/arXiv.2401.01234')).key === 'gandhi2024', 'Key gandhi2024 fehlt')
+    ok((await aufnehmenOk(token, pid, '10.5555/spur.pre.001')).key === 'lindgren2022', 'Key lindgren2022 fehlt')
+    const bib = await bibVon(token, pid)
+    const arxiv = bibBlock(bib, '@online{gandhi2024,')
+    mitFeldern(arxiv, ['eprint = {arXiv}', 'doi = {10.48550/arXiv.2401.01234}', 'date = {2024}'], '@online gandhi2024')
+    ok(!arxiv.includes('journal'), `gandhi2024 mit journal:\n${arxiv}`)
+    const psy = bibBlock(bib, '@online{lindgren2022,')
+    mitFeldern(psy, ['eprint = {PsyArXiv}'], '@online lindgren2022')
+    ok(!psy.includes('journal'), `lindgren2022 mit journal:\n${psy}`)
+
+    const log = await sauberKompiliert(token, pid, 'P13 Preprint')
+    ok(!/Warning[^\n]*(gandhi2024|lindgren2022)/.test(log.ende), `Warnung zu einem Preprint:\n${log.ende}`)
+    await seitenPng(token, pid, 1)
+    const { inhalt } = await werkzeug(token, 'bib_list', { project_id: pid })
+    for (const key of ['gandhi2024', 'lindgren2022']) {
+      const e = inhalt.eintraege.find(x => x.key === key)
+      ok(Array.isArray(e?.abweichungen) && !e.abweichungen.some(a => a.feld === 'eintragstyp'), `bib_list ${key}: ${JSON.stringify(e)}`)
+    }
+    await projektOeffnen('E2E P13 Preprint')
+    await kompilieren()
+    // Erster Eintrag nach APA: Gandhi; nach dem Titel steht das Archiv, kein leerer Zeitschriftenname.
+    await imPdf(String.raw`References\s?Gandhi, K\., & Joshi, M\. \(2024\)\. Sleep-like replay improves memory consolidation\s?in artificial neural networks\. arXiv\.`)
+    ok(!/\. ,|, ,|\(\)/.test(await pdfText()), `Leere Felder im Verzeichnis: ${await pdfText()}`)
+  }
+
+  features.p13f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P13 Autoren')
+    // repoBytes ersetzt den Seiteninhalt: die Datei lesen, bevor das Projekt offen ist.
+    const scan = { name: 'scan.pdf', mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/scan.pdf`) }
+    await fakeSteuern({ cachesLeeren: true })
+    const quellen = async () => (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    // arXiv: Gandhi, Joshi; Seite 1 des PDFs: „Mira Joshi, Kiran Gandhi“.
+    const umgestellt = await aufnehmenOk(token, pid, '10.48550/arXiv.2402.05555')
+    ok(umgestellt.autoren === 'aus_pdf' && !('autoren_hinweis' in umgestellt), `source_add 2402.05555: ${JSON.stringify(umgestellt)}`)
+    mitFeldern(bibBlock(await bibVon(token, pid), `@online{${umgestellt.key},`), ['author = {Joshi, Mira and Gandhi, Kiran}'], '2402.05555')
+    // Seite 1 nennt nur Gandhi.
+    const fehlt = await aufnehmenOk(token, pid, '10.48550/arXiv.2402.06666')
+    mitFeldern(bibBlock(await bibVon(token, pid), `@online{${fehlt.key},`), ['author = {Gandhi, Kiran and Joshi, Mira}'], '2402.06666')
+    // Müller in den Metadaten, Muller im PDF.
+    const umlaut = await aufnehmenOk(token, pid, '10.48550/arXiv.2402.07777')
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const gescannt = await perLink(link.link, scan, { doi: '10.5555/spur.oa.007' })
+    ok(gescannt.daten?.status === 'angelegt' && !('autoren' in gescannt.daten), `Upload scan.pdf: ${JSON.stringify(gescannt)}`)
+
+    const liste = await quellen()
+    const von = id => liste.find(q => q.id === id)
+    ok(von(umgestellt.quelle_id)?.autoren === 'aus_pdf' && !von(umgestellt.quelle_id).autoren_hinweis, `sources_list aus_pdf: ${JSON.stringify(von(umgestellt.quelle_id))}`)
+    ok(von(fehlt.quelle_id)?.autoren === 'abweichend' && von(fehlt.quelle_id).autoren_hinweis === 'Autoren im PDF nicht gefunden – bitte prüfen', `sources_list abweichend: ${JSON.stringify(von(fehlt.quelle_id))}`)
+    ok(von(umlaut.quelle_id)?.autoren === 'bestaetigt', `sources_list Müller: ${JSON.stringify(von(umlaut.quelle_id))}`)
+    ok(von(gescannt.daten.quelle_id)?.status === 'kein_text' && !('autoren' in von(gescannt.daten.quelle_id)), `sources_list Scan: ${JSON.stringify(von(gescannt.daten.quelle_id))}`)
+
+    await projektOeffnen('E2E P13 Autoren')
+    await panelOeffnen('Quellen')
+    const HINWEIS = 'Autoren im PDF nicht gefunden – bitte prüfen'
+    await quellenZeile('Offline consolidation in recurrent networks').getByText(HINWEIS).waitFor({ timeout: 20000 })
+    for (const titel of ['Replay order in hippocampal place cell sequences', 'Spindle coupling across cortical regions', 'Scanned field notes on night shifts']) {
+      await quellenZeile(titel).waitFor()
+      ok((await quellenZeile(titel).getByText(HINWEIS).count()) === 0, `Hinweis an „${titel}“`)
+    }
+  }
+
+  features.p13f5 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P13 Upload')
+    await fakeSteuern({ cachesLeeren: true })
+    ok((await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege.length === 0, 'Projekt nicht leer')
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    // spur-hochladen schickt dieselben Formularfelder; Ausgabe und Hinweiszeile prüft tools/tests/plugin-skripte.test.mjs.
+    const heft = await perLink(link.link, 'mikalef.pdf', { doi: '10.5555/spur.heft.001' })
+    ok(heft.daten?.status === 'angelegt' && heft.daten.key === 'oldemeyer2025' && !('metadaten' in heft.daten), `mikalef.pdf: ${JSON.stringify(heft)}`)
+    mitFeldern(bibBlock(await bibVon(token, pid), '@article{oldemeyer2025,'), ['volume = {35}', 'number = {2}', 'year = {2025}', 'doi = {10.5555/spur.heft.001}'], 'Upload mikalef.pdf')
+
+    const notizen = await perLink(link.link, 'notizen.pdf')
+    ok(notizen.daten?.status === 'angelegt' && notizen.daten.metadaten === 'unvollstaendig', `notizen.pdf: ${JSON.stringify(notizen)}`)
+    mitFeldern(bibBlock(await bibVon(token, pid), `@misc{${notizen.daten.key},`), ['title = {Field notes 2023}'], 'Upload notizen.pdf')
+
+    const unbekannt = await perLink(link.link, 'unbekannt.pdf', { doi: '10.9999/nirgends.1' })
+    ok(unbekannt.daten?.status === 'angelegt' && unbekannt.daten.metadaten === 'unvollstaendig', `unbekannt.pdf: ${JSON.stringify(unbekannt)}`)
+    ok(unbekannt.daten.metadaten_hinweis?.startsWith('Crossref kennt die DOI 10.9999/nirgends.1 nicht.'), `Hinweis: ${unbekannt.daten.metadaten_hinweis}`)
+    const misc = bibBlock(await bibVon(token, pid), `@misc{${unbekannt.daten.key},`)
+    ok(misc && !misc.includes('nirgends'), `@misc für die unbekannte DOI:\n${misc || (await bibVon(token, pid))}`)
+
+    const nochmal = await perLink(link.link, 'mikalef.pdf', { doi: '10.5555/spur.heft.001' })
+    ok(nochmal.daten?.status === 'vorhanden' && nochmal.daten.quelle_id === heft.daten.quelle_id, `Zweiter Upload: ${JSON.stringify(nochmal)}`)
+    const bib = await bibVon(token, pid)
+    ok((bib.match(/@article\{oldemeyer2025/g) ?? []).length === 1 && !bib.includes('oldemeyer2025a'), `Zweiter Eintrag:\n${bib}`)
+    const liste = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    ok(liste.length === 3 && liste.find(q => q.id === notizen.daten.quelle_id)?.metadaten === 'unvollstaendig', `sources_list: ${JSON.stringify(liste)}`)
+
+    await projektOeffnen('E2E P13 Upload')
+    await panelOeffnen('Quellen')
+    await quellenZeile('Field notes 2023').getByText('Metadaten unvollständig', { exact: true }).waitFor({ timeout: 20000 })
+    ok((await quellenZeile('Dynamic capabilities').getByText('Metadaten unvollständig').count()) === 0, 'Hinweis an der Quelle mit DOI')
+  }
+
+  features.p13f6 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P13 Alt')
+    await fakeSteuern({ cachesLeeren: true })
+    const eintrag = async key => (await werkzeug(token, 'bib_list', { project_id: pid })).inhalt.eintraege.find(e => e.key === key)
+    const gleich = (ist, soll, was) => ok(JSON.stringify(ist) === JSON.stringify(soll), `${was}: ${JSON.stringify(ist)}`)
+    const alt = await eintrag('alt2024')
+    gleich(alt?.abweichungen, [
+      { feld: 'volume', eintrag: null, erwartet: '35' },
+      { feld: 'number', eintrag: null, erwartet: '2' },
+      { feld: 'year', eintrag: '2024', erwartet: '2025' },
+    ], 'alt2024')
+    const replay = await eintrag('replay2024')
+    gleich(replay?.abweichungen, [{ feld: 'eintragstyp', eintrag: 'article', erwartet: 'online' }], 'replay2024')
+    const zeilen = (await werkzeug(token, 'check_report', { project_id: pid })).inhalt.eintraege
+    for (const key of ['alt2024', 'replay2024']) {
+      const z = zeilen.find(x => x.key === key)
+      ok(z && z.problem !== true && z.abweichungen?.length, `check_report ${key}: ${JSON.stringify(z)}`)
+    }
+    ok(alt.problem !== true && replay.problem !== true, 'bib_list mit problem')
+
+    await projektOeffnen('E2E P13 Alt')
+    await panelOeffnen('Prüfbericht')
+    const stelle = page.locator('.spur-panel .spur-zeile', { has: page.locator('.spur-zeile-key', { hasText: /^alt2024$/ }) }).first()
+    const abzeichen = stelle.getByRole('button', { name: /Literaturdaten unvollständig/ })
+    await abzeichen.waitFor({ timeout: 30000 })
+    ok((await abzeichen.getAttribute('class')).includes('bg-info'), `Abzeichen nicht neutral: ${await abzeichen.getAttribute('class')}`)
+    await abzeichen.click()
+    for (const text of ['volume: fehlt (Crossref: 35)', 'number: fehlt (Crossref: 2)', 'year: 2024 (Crossref: 2025)']) await stelle.getByText(text, { exact: true }).waitFor()
+    await berichtFilter('Markiert')
+    await stelle.waitFor({ state: 'detached', timeout: 10000 }).catch(() => fail('alt2024 unter „Markiert“'))
+    await berichtFilter('Alle')
+
+    const edit = await werkzeug(token, 'doc_edit', {
+      project_id: pid,
+      pfad: 'references.bib',
+      alt: '  year = {2024},\n  doi = {10.5555/spur.heft.001}',
+      neu: '  year = {2025},\n  volume = {35},\n  number = {2},\n  pages = {101--118},\n  doi = {10.5555/spur.heft.001}',
+      idempotenz_schluessel: `p13f6-${Date.now()}`,
+    })
+    ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
+    gleich((await eintrag('alt2024'))?.abweichungen, [], 'alt2024 nach doc_edit')
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Literaturdaten ergänzt.' })
+    await page.locator('.spur-panel').getByRole('button', { name: 'Erneut prüfen' }).click()
+    await stelle.waitFor({ timeout: 30000 })
+    await page.waitForFunction(() => {
+      const zeile = [...document.querySelectorAll('.spur-panel .spur-zeile')].find(z => z.querySelector('.spur-zeile-key')?.textContent === 'alt2024')
+      return zeile && !/Literaturdaten unvollständig/.test(zeile.textContent)
+    }, null, { timeout: 30000 })
+
+    await fakeSteuern({ ausfall: ['crossref'], cachesLeeren: true })
+    try {
+      const weg = await eintrag('alt2024')
+      ok(weg?.abweichungen === null && weg.abweichungen_grund === 'crossref_nicht_erreichbar', `Ohne Crossref: ${JSON.stringify(weg)}`)
+    } finally {
+      await fakeSteuern({ cachesLeeren: true })
+    }
+  }
+
+  // P13: Hinweis im Quellen-Panel und Abzeichen im Prüfbericht bei 360 und 1280 px, hell und dunkel. Läuft nach p13f4 und p13f6.
+  features.p13ansicht = async () => {
+    await anmelden('e2e-a@example.org')
+    // aufklappen: nach jeder Breite erneut, weil das Panel beim Umbruch neu entsteht.
+    const pruefen = async (wo, bereich, aufklappen = async () => {}) => {
+      for (const px of [360, 1280]) {
+        await breite(px)
+        await aufklappen()
+        await bereich.first().waitFor({ timeout: 20000 })
+        await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'), null, { timeout: 5000 }).catch(() => {})
+        const panel = page.locator('.spur-panel').first()
+        ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1), `${wo} läuft über bei ${px} px`)
+        const schlecht = await unlesbar(panel)
+        ok(schlecht.length === 0, `${wo} bei ${px} px schlecht lesbar: ${schlecht.join(' | ')}`)
+        await ohneSeitlichesRollen(`${wo} ${px} px`)
+      }
+      await breite(1280)
+    }
+    for (const thema of ['', 'light-']) {
+      const design = thema ? 'hell' : 'dunkel'
+      await mitDesign(thema, async () => {
+        await projektOeffnen('E2E P13 Autoren')
+        await panelOeffnen('Quellen')
+        await pruefen(`Quellen-Panel ${design}`, page.getByText('Autoren im PDF nicht gefunden – bitte prüfen'))
+        await projektOeffnen('E2E P13 Alt')
+        await panelOeffnen('Prüfbericht')
+        const knopf = page.getByRole('button', { name: /Literaturdaten unvollständig/ }).first()
+        await knopf.waitFor({ timeout: 30000 })
+        // Eine Neuprüfung kurz nach dem Öffnen baut die Zeilen neu auf und klappt das Abzeichen wieder zu.
+        const aufklappen = async () => {
+          for (let versuch = 1; versuch <= 5; versuch++) {
+            await page.locator('.spur-panel .spur-zeitpunkt').waitFor({ timeout: 30000 })
+            await page.waitForFunction(() => !document.querySelector('.spur-panel [role="status"]')?.textContent.trim(), null, { timeout: 30000 })
+            await knopf.waitFor({ timeout: 30000 })
+            if ((await knopf.getAttribute('aria-expanded')) !== 'true') {
+              await knopf.focus()
+              await page.keyboard.press('Enter')
+              ok((await knopf.getAttribute('aria-expanded')) === 'true', 'Abzeichen lässt sich nicht per Tastatur aufklappen')
+              ok(await knopf.evaluate(el => getComputedStyle(el).outlineStyle !== 'none'), 'Kein sichtbarer Fokus am Abzeichen')
+            }
+            await page.waitForTimeout(3000)
+            if ((await knopf.getAttribute('aria-expanded')) === 'true') return
+          }
+          fail('Abzeichen klappt immer wieder zu')
+        }
+        await pruefen(`Prüfbericht ${design}`, page.getByText('Eintragstyp: @article (Crossref: @online)'), aufklappen)
       })
     }
   }
