@@ -12,7 +12,7 @@
         "Steht zwischen `\\textcite[S.~347]{smith2024}` und dem Zitat ein Satzende („… zeigt das. \\enquote{…}“), wird nicht verknüpft: Die `\\textcite`-Stelle bleibt „Beleg ohne Wortlaut“",
         "Folgt dem Zitat ein Beleg mit anderem Key, gilt dieser, nicht der vorangestellte"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
