@@ -35,6 +35,8 @@
 - Erster Gesamtlauf: `p5f8` rot, weil `661a28817e` (vor diesem Plan) vier Ideen in `docs/backlog.md` ergänzte und die Zahl im Schritt nicht nachzog; die Zahl steht jetzt auf 45 mit Verweis auf den Commit. `p10f4` rot mit „Rohprotokoll“-Timeout, einzeln danach ok (derselbe Wackler wie in P10).
 - Letzter Gesamtlauf nach der letzten Änderung (`2e3802658a`, 13:06 bis 13:27): 102 von 102 ok, `p16f1b` übersprungen (Dev-Image älter als P16).
 - Screenshots des Log-Bereichs mit „Fehlendes Paket: spurdemo (für spurdemo.sty)“ bei 1280 und 360 px: im Stil eines Log-Eintrags mit roter Fehlerkante, kein seitliches Rollen bei 360 px; die enge Teilung bei 360 px ist Overleafs Editor-Layout.
+- Overleafs Suiten: frontend 1798 bestanden, 14 bekannt, 0 neu (ein erster Lauf hatte `recherche-panel.test.tsx` einmal rot: `lastCall()` traf die Protokoll-Abfrage des Panels statt der Suche; einzeln und im zweiten Gesamtlauf grün, Wackler des Tests); web 6055 bestanden, 173 bekannt, 0 neu.
+- Helles Design geprüft: Zeile über dem Log mit Kontrast 16:1 (rgb(27,34,44) auf Weiß), Screenshot bei 1280 px.
 - `spur-dev test`: grün, 92 % Zeilen; `node --test tools/tests/*.test.mjs`: 76 grün; Frontend-Test `fehlende-pakete.test.tsx`: 4 grün.
 
 ## Vorschläge
