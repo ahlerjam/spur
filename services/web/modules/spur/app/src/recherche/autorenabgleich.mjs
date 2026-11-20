@@ -11,18 +11,21 @@ function vorkommen(text, name) {
 // Korrespondenzzeile davor verschiebt die Reihenfolge so nicht. Ergebnis: je Name seine Stelle in diesem Block.
 function autorenblock(fundstellen) {
   const alle = fundstellen.flatMap((stellen, name) => stellen.map(stelle => ({ stelle, name }))).sort((a, b) => a.stelle - b.stelle)
+  // Zwei Zeiger: ende läuft vor, bis alle Namen im Fenster sind, dann rückt start nach, solange das so bleibt.
+  const anzahl = new Map()
   let bester = null
-  for (let start = 0; start < alle.length; start++) {
-    const letzte = new Map()
-    for (let ende = start; ende < alle.length; ende++) {
-      letzte.set(alle[ende].name, alle[ende].stelle)
-      if (letzte.size < fundstellen.length) continue
-      const spanne = alle[ende].stelle - alle[start].stelle
-      if (!bester || spanne < bester.spanne) bester = { spanne, letzte }
-      break
+  for (let start = 0, ende = 0; ende < alle.length; ende++) {
+    anzahl.set(alle[ende].name, (anzahl.get(alle[ende].name) ?? 0) + 1)
+    while (anzahl.size === fundstellen.length) {
+      if (!bester || alle[ende].stelle - alle[start].stelle < bester.spanne) bester = { spanne: alle[ende].stelle - alle[start].stelle, start, ende }
+      const name = alle[start++].name
+      if (anzahl.get(name) === 1) anzahl.delete(name)
+      else anzahl.set(name, anzahl.get(name) - 1)
     }
   }
-  return fundstellen.map((_, name) => bester.letzte.get(name))
+  const stellen = new Map()
+  for (let i = bester.start; i <= bester.ende; i++) if (!stellen.has(alle[i].name)) stellen.set(alle[i].name, alle[i].stelle)
+  return fundstellen.map((_, name) => stellen.get(name))
 }
 
 // Vergleicht die Autoren aus den Metadaten mit der ersten Seite des PDFs. Stehen alle Nachnamen dort, gilt die

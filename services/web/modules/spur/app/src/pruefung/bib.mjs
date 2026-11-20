@@ -62,8 +62,8 @@ function htmlZuLatex(html) {
     .trim()
 }
 
-// Crossref-Daten, Webseiten-Titel und Dateinamen sind fremder Text: maskieren, damit die Klammern
-// der .bib halten.
+// Crossref-Daten, Webseiten-Titel und Dateinamen sind fremder Text: maskieren, damit die Klammern der .bib halten und
+// TeX nichts ausführt (auch `^^5c` ergäbe sonst einen Backslash). Nur doi und url stehen wörtlich (ohneKlammern).
 const text = wert => wert && latexSicher(String(wert))
 const ohneKlammern = wert => wert && String(wert).replace(/[{}\\]/g, '')
 const alsBib = (typ, key, felder) => {
@@ -94,7 +94,7 @@ function ohneDoiEintrag(key, { meta }) {
   return alsBib(form.typ, key, [
     ['author', text(meta.autoren?.map(autorName).join(' and '))],
     ['title', text(meta.titel)],
-    ['year', ohneKlammern(meta.jahr)],
+    ['year', text(meta.jahr)],
     ['type', form.mitType && text(meta.abschluss ?? form.type)],
     [form.stelle, text(meta.institution)],
     ['url', ohneKlammern(meta.url)],
@@ -132,7 +132,7 @@ function preprintEintrag(key, quelle, meta) {
   return alsBib('online', key, [
     ['author', autorenFeld(meta)],
     ['title', titelFeld(meta, quelle.dateiname)],
-    ['date', ohneKlammern(meta.jahr)],
+    ['date', text(meta.jahr)],
     ['eprint', text(archiv)],
     // spur speichert DOIs klein; arXiv schreibt seine DOIs als 10.48550/arXiv.<id>.
     ['doi', ohneKlammern(quelle.doi?.replace(ARXIV_DOI, '10.48550/arXiv.'))],
@@ -152,12 +152,12 @@ export function bibEintrag(key, quelle) {
     ['title', titelFeld(meta, quelle.dateiname)],
     [form.behaelter, form.behaelter && text(meta.journal)],
     ['publisher', form.verlag && text(meta.verlag)],
-    ['year', ohneKlammern(meta.jahr)],
-    ['volume', ohneKlammern(meta.band)],
-    ['number', ohneKlammern(meta.heft)],
+    ['year', text(meta.jahr)],
+    ['volume', text(meta.band)],
+    ['number', text(meta.heft)],
     // biblatex-apa setzt die Artikelnummer aus eid an die Stelle der Seiten (Testreferenz 10.1:6).
-    ['eid', ohneKlammern(meta.artikelnummer)],
-    ['pages', !meta.artikelnummer && ohneKlammern(meta.seiten?.replace('-', '--'))],
+    ['eid', text(meta.artikelnummer)],
+    ['pages', !meta.artikelnummer && meta.seiten && text(meta.seiten).replace('-', '--')],
     ['doi', ohneKlammern(quelle.doi)],
   ])
 }

@@ -40,6 +40,13 @@ describe('autorenAbgleich', () => {
     expect(autorenAbgleich(autoren, 'The Smith effect\nBob Jones and Alice Smith').autoren.map(a => a.family)).toEqual(['Jones', 'Smith'])
   })
 
+  it('bleibt bei sehr vielen Vorkommen schnell (linear statt quadratisch)', () => {
+    const text = `${'li '.repeat(200000)}wang`
+    const start = performance.now()
+    expect(autorenAbgleich([{ family: 'Li', given: 'A' }, { family: 'Wang', given: 'B' }], text).zustand).toBe('bestaetigt')
+    expect(performance.now() - start).toBeLessThan(2000)
+  })
+
   it('gleicht nichts ab ohne Autoren oder ohne Text', () => {
     expect(autorenAbgleich([], 'Text')).toBeNull()
     expect(autorenAbgleich(undefined, 'Text')).toBeNull()

@@ -115,6 +115,16 @@ describe('bibEintrag (P13)', () => {
     expect(felder(bibEintrag('k', mitDoi('10.1/k', meta))).title).toBe('\\textit{Foo} bar')
   })
 
+  it('maskiert TeX-Zeichen auch in Band, Heft, Artikelnummer, Seiten und Jahr (^^-Notation, %)', () => {
+    const meta = { ...werkAuswerten(WERKE['10.5555/spur.heft.001']), band: '^^5cinput^^7bx^^7d', heft: '3%', seiten: '1$-2#', artikelnummer: undefined }
+    const f = felder(bibEintrag('k', mitDoi('10.5555/spur.heft.001', meta)))
+    expect(f.volume).toBe('\\textasciicircum{}\\textasciicircum{}5cinput\\textasciicircum{}\\textasciicircum{}7bx\\textasciicircum{}\\textasciicircum{}7d')
+    expect(f.number).toBe('3\\%')
+    expect(f.pages).toBe('1\\$--2\\#')
+    const nummer = felder(bibEintrag('k', mitDoi('10.5555/spur.enr.001', { ...werkAuswerten(WERKE['10.5555/spur.enr.001']), artikelnummer: 'e1^^5c' })))
+    expect(nummer.eid).toBe('e1\\textasciicircum{}\\textasciicircum{}5c')
+  })
+
   it('lässt ein maskiertes &lt;i&gt; als Text stehen', () => {
     const meta = werkAuswerten({ title: ['<i>Kursiv</i> und &lt;i&gt;wörtlich'], type: 'journal-article' })
     expect(felder(bibEintrag('k', mitDoi('10.1/k', meta))).title).toBe('\\textit{Kursiv} und <i>wörtlich')
