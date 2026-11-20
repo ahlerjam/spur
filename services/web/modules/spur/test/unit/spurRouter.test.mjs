@@ -114,6 +114,7 @@ describe('Rechte der Routen', () => {
     ['get', '/spur/project/:project_id/zitate/zugewiesen', 'lesen', 'zugewiesen'],
     ['get', '/spur/project/:project_id/pruefbericht', 'lesen', 'pruefbericht'],
     ['get', '/spur/project/:project_id/claude', 'lesen', 'claudeStatus'],
+    ['get', '/spur/project/:project_id/tex-pakete/fehlend', 'lesen', 'fehlendePakete'],
     ['post', '/spur/project/:project_id/claude/auftrag', 'lesen', 'claudeAuftrag'],
     ['post', Q, 'schreiben', 'quelleHochladen'],
     ['post', `${Q}/holen`, 'schreiben', 'quellenHolen'],

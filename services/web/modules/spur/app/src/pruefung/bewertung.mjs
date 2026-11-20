@@ -1,3 +1,4 @@
+import { ARXIV_DOI, eintragstyp } from './bib.mjs'
 import { latexZuText, seiteAusBeleg } from './latex.mjs'
 import { normalisieren, wortlautPruefen } from './wortlaut.mjs'
 
@@ -47,6 +48,33 @@ export function referenzStatus(eintrag, doiWerk) {
   return { referenz: 'gefunden', registrierstelle, retraction: doiWerk.retraction }
 }
 
+const seitenNormal = wert => wert?.replace(/\s+/g, '').replace(/[-–—]+/g, '-') ?? null
+
+// Was einem .bib-Eintrag laut Crossref fehlt oder anders ist. Nur Felder, die Crossref selbst nennt; fehlende Seiten
+// zählen nicht, andere schon. Eine leere Liste heißt: stimmt; null mit abweichungen_grund: nicht prüfbar.
+export function abweichungen(eintrag, doiWerk) {
+  const nicht = abweichungen_grund => ({ abweichungen: null, abweichungen_grund })
+  if (!eintrag?.doi) return nicht('ohne_doi')
+  const typ = (erwartet, liste) => {
+    if (erwartet !== 'misc' && eintrag.typ !== erwartet) liste.push({ feld: 'eintragstyp', eintrag: eintrag.typ, erwartet })
+    return { abweichungen: liste }
+  }
+  // arXiv-DOIs stehen bei DataCite; dass es ein Preprint ist, sagt schon die DOI.
+  if (ARXIV_DOI.test(eintrag.doi)) return typ('online', [])
+  if (!doiWerk) return nicht('crossref_nicht_erreichbar')
+  if (doiWerk.nichtPruefbar) return nicht(doiWerk.nichtPruefbar)
+  if (!doiWerk.gefunden || doiWerk.registrierstelle !== 'crossref') return nicht('nicht_bei_crossref')
+  const liste = []
+  const vergleichen = (feld, imEintrag, erwartet, gleich = (a, b) => a === b) => {
+    if (erwartet != null && !gleich(imEintrag, String(erwartet))) liste.push({ feld, eintrag: imEintrag ?? null, erwartet: String(erwartet) })
+  }
+  vergleichen('volume', eintrag.volume, doiWerk.band)
+  vergleichen('number', eintrag.number, doiWerk.heft)
+  if (eintrag.pages && !doiWerk.artikelnummer) vergleichen('pages', eintrag.pages, doiWerk.seiten, (a, b) => seitenNormal(a) === seitenNormal(b))
+  vergleichen('year', eintrag.year ?? eintrag.date?.slice(0, 4) ?? null, doiWerk.jahr)
+  return typ(eintragstyp(eintrag.doi, doiWerk), liste)
+}
+
 export function zeileBewerten(fund, kontext) {
   const { bibEintraege, quellen, seitenJeQuelle, werke } = kontext
   const basis = {
@@ -64,10 +92,10 @@ export function zeileBewerten(fund, kontext) {
   if (!beleg) return { ...basis, wortlaut: 'nicht_pruefbar', key: null, seite: null }
   const quelle = quelleZu(beleg.key, bibEintraege, quellen)
   const eintrag = bibEintraege.get(beleg.key)
-  const referenz = referenzStatus(
-    eintrag,
-    eintrag?.doi ? werke.get(eintrag.doi.toLowerCase()) : null
-  )
+  const werk = eintrag?.doi ? werke.get(eintrag.doi.toLowerCase()) : null
+  const referenz = referenzStatus(eintrag, werk)
+  // Nur Hinweise: Die Zeile zeigt sie, markiert sie aber nicht.
+  const fehlt = eintrag ? abweichungen(eintrag, werk).abweichungen : null
   const ergebnis = {
     ...basis,
     key: beleg.key,
@@ -75,6 +103,7 @@ export function zeileBewerten(fund, kontext) {
     quelleId: quelle?._id ?? null,
     dateiname: quelle?.dateiname ?? null,
     ...referenz,
+    ...(fehlt?.length && { abweichungen: fehlt }),
   }
   if (!quelle) {
     return { ...ergebnis, wortlaut: fund.roh ? 'quelle_fehlt' : null, seite: null }

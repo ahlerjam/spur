@@ -6,7 +6,8 @@ import express from 'express'
 import { crossrefCache, paperCache } from '../sammlungen.mjs'
 import { devSchalterSetzen } from '../schalter.mjs'
 import { modellOrdner } from '../semantik/einbetten.mjs'
-import { texLiveFake } from './TexLiveFake.mjs'
+import { texLiveDatenbankFake, texLiveFake } from './TexLiveFake.mjs'
+import { dateiIndexVergessen } from '../kompilieren/TexPakete.mjs'
 
 const FIXTURES = new URL('../../../test/fixtures/', import.meta.url)
 const KATALOG = JSON.parse(readFileSync(new URL('papers.json', FIXTURES), 'utf8'))
@@ -160,6 +161,7 @@ paperFake.post('/_steuerung', express.json(), async (req, res) => {
   // Antworten cacht spur einen Tag; ein Test, der Dienste umschaltet, muss danach wirklich abrufen.
   if (req.body?.cachesLeeren) {
     await Promise.all([crossrefCache, paperCache].map(async sammlung => await (await sammlung()).deleteMany({})))
+    dateiIndexVergessen()
   }
   if (req.body?.protokollLeeren) zustand.protokoll = []
   if (req.body?.schalter) devSchalterSetzen(req.body.schalter)
@@ -195,6 +197,7 @@ paperFake.use((req, res, next) => {
 
 // Zwei TeX-Live-Spiegel, damit Tests Störungen je Spiegel setzen können (stoerungen.texlive, stoerungen['texlive-b']).
 paperFake.get(['/texlive/archive/:datei', '/texlive-b/archive/:datei'], texLiveFake)
+paperFake.get(['/texlive/tlpkg/texlive.tlpdb.xz', '/texlive-b/tlpkg/texlive.tlpdb.xz'], texLiveDatenbankFake)
 
 const pdfSenden = (res, datei) => res.type('application/pdf').sendFile(fileURLToPath(new URL(datei, FIXTURES)))
 

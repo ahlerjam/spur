@@ -1424,3 +1424,45 @@ $spur-sm: 575.98px;
 .spur-pruef-feld .spur-zeile-meta {
   margin: var(--spacing-02) 0 0;
 }
+
+// Über den Einträgen im Log-Bereich, im Stil eines Log-Eintrags mit Fehlerfarbe.
+.spur-fehlende-pakete {
+  margin: 0;
+  padding: var(--spacing-04);
+  list-style: none;
+  background-color: var(--bg-primary-themed);
+  border-left: 4px solid var(--border-danger-themed);
+  border-radius: var(--border-radius-base);
+  color: var(--content-primary-themed);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+
+  li + li {
+    margin-top: var(--spacing-02);
+  }
+}
+
+// P13: Das Abzeichen „Literaturdaten unvollständig“ ist ein Knopf, der die Felder aufklappt.
+.spur-badge-knopf {
+  border: 0;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--border-active-themed, var(--blue-50));
+    outline-offset: 2px;
+  }
+
+  .material-symbols {
+    font-size: 1em;
+    vertical-align: -0.125em;
+  }
+}
+
+.spur-abweichungen {
+  flex-basis: 100%;
+  margin: 0;
+  padding-left: var(--spacing-06);
+  font-size: var(--font-size-02);
+  color: var(--content-secondary-themed);
+  overflow-wrap: anywhere;
+}

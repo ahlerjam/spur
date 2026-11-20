@@ -2,9 +2,7 @@
   "state": "running",
   "builderModel": "opus",
   "builderAdvisor": "opus",
-  "where": "cloud",
-  "cloudSession": "https://claude.ai/code/session_01XpJUcf57bq5GgwckcGH2Sy",
-  "started": "2026-11-20T15:07:00Z",
+  "started": "2026-11-20T18:08:29Z",
   "runBranch": "slice/run-20261116-spur-p14-pruefbericht",
-  "sessionId": "349512fb-b2ad-4598-ba7e-ae1d2192736a"
+  "sessionId": "2dac96c7-fd17-434e-9fa0-2e7a7d749139"
 }

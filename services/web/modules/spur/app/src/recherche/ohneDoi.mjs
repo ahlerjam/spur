@@ -8,7 +8,7 @@ export const WERKFELDER = ['autoren', 'jahr', 'art', 'institution', 'abschluss',
 
 export const eingabeUngueltig = feld => new Problem(422, 'eingabe_ungueltig', 'spur_fehler_eingabe_feld', { feld }, { feld })
 
-const kurz = (wert, max) => (typeof wert === 'string' ? wert.replace(/\s+/g, ' ').trim().slice(0, max) : '')
+export const kurz = (wert, max) => (typeof wert === 'string' ? wert.replace(/\s+/g, ' ').trim().slice(0, max) : '')
 
 function httpAdresse(wert) {
   try {

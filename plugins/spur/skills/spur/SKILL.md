@@ -35,13 +35,7 @@ Each answer carries a `cursor`. If you think you missed something, `events_since
 
 ## Missing LaTeX packages
 
-The server has a fixed TeX Live. If a package or Beamer theme is missing, you can add it to the project yourself:
-
-1. Read the result of `compile` with `compile_log`. A missing package shows up as "File `X.sty' not found" (for a theme `beamerthemeX.sty`).
-2. Find the TeX Live package that contains the file. The package name can differ from the file name; a theme `beamerthemefocus.sty`, for example, is in `beamertheme-focus`.
-3. Call `tex_package_add` with that name. spur puts the files under `tex-pakete/<package>/` and adds a `latexmkrc` so the compiler finds them. `im_image` means the package is already installed; then the cause is elsewhere.
-4. Compile again.
-5. Add every package in `fehlende_abhaengigkeiten` the same way, then compile again.
+The server has a fixed TeX Live with the packages of a usual thesis. If a file is missing, `compile` fails and `job_status` and `compile_log` list each file that LaTeX reported as not found in `fehlende_pakete`, with its TeX Live `paket` (`null` if no package contains it, with `grund: "spiegel_nicht_erreichbar"` if the mirror did not answer); call `tex_package_add` with that `paket` or with `datei`, compile again, and add every package in `fehlende_abhaengigkeiten` the same way. spur puts the files under `tex-pakete/<package>/` with a `latexmkrc`; `im_image` means the package is already installed and the cause is elsewhere.
 
 The files belong to your run: the run card lists them, and "Lauf rückgängig" removes them. If the admin has turned the tool off or a package is too large, say so in the summary instead of looking for a workaround.
 

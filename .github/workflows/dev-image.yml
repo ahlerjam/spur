@@ -33,6 +33,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Größe vorher
+        run: |
+          if docker pull --quiet "$BASE" > /dev/null 2>&1; then
+            docker images --format 'vorher {{.Repository}}:{{.Tag}} {{.Size}}' "$BASE"
+          else
+            echo "vorher: kein Image $BASE"
+          fi
       - name: Basis bauen
         run: |
           cp server-ce/.dockerignore .dockerignore
@@ -41,13 +48,46 @@ jobs:
         run: |
           docker run --rm "$BASE" bash -lc '
             set -e
-            for f in biblatex.sty apa.bbx csquotes.sty natbib.sty beamer.cls; do
+            for f in biblatex.sty apa.bbx csquotes.sty natbib.sty beamer.cls apa7.cls booktabs.sty minted.sty; do
               kpsewhich "$f"
             done
             biber --version
             latexdiff --version
             pdftotext -v 2>&1 | head -1
             tesseract --list-langs 2>&1 | grep -x deu
+          '
+      # Smoke-Dokumente mit den Flags aus services/clsi/app/js/LatexRunner.js, ohne -shell-escape.
+      - name: Smoke-Dokumente kompilieren
+        run: |
+          docker run --rm -v "$PWD/services/web/modules/spur/scripts/smoke:/smoke:ro" "$BASE" bash -lc '
+            set -e
+            cp -r /smoke /tmp/k
+            cd /tmp/k
+            for doc in apa7-arbeit minted-beispiel shell-escape; do
+              aus="/tmp/k/aus-$doc"
+              mkdir -p "$aus"
+              latexmk -cd -jobname=output -auxdir="$aus" -outdir="$aus" -synctex=1 -interaction=batchmode -time -f -pdf "/tmp/k/$doc.tex" > /dev/null || true
+              if [ ! -f "$aus/output.pdf" ]; then
+                tail -40 "$aus/output.log"
+                echo "$doc: kein PDF"
+                exit 1
+              fi
+              # Nur Fehlerzeilen („! … not found“); biblatex meldet optionale Dateien als „Info: … not found“.
+              if grep -E "^! .*not found" "$aus/output.log"; then
+                echo "$doc: Datei fehlt im Image"
+                exit 1
+              fi
+              echo "$doc: PDF ok"
+            done
+            if grep -F "You must invoke LaTeX with the -shell-escape flag" aus-minted-beispiel/output.log; then
+              echo "minted braucht Shell-Escape"
+              exit 1
+            fi
+            if [ -e /tmp/spur-shell-test ]; then
+              echo "write18 hat einen Befehl ausgeführt"
+              exit 1
+            fi
+            echo "write18 gesperrt"
           '
       - name: Image bauen
         run: time docker build --progress=plain -f server-ce/Dockerfile --build-arg OVERLEAF_BASE_TAG="$BASE" -t "$IMAGE" .
@@ -68,7 +108,7 @@ jobs:
             time yarn run lezer-latex:generate
             time yarn run webpack:production
           '
-      - name: Größe melden
+      - name: Größe nachher
         run: docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep spur
       - name: Veröffentlichen
         run: |

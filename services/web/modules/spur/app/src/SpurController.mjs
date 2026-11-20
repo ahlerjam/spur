@@ -24,6 +24,8 @@ import * as Literatur from './literatur/Literatur.mjs'
 import * as Offenlegung from './offenlegung/Offenlegung.mjs'
 import * as Semantik from './semantik/Semantik.mjs'
 import * as Workflows from './workflows/Workflows.mjs'
+import * as TexPakete from './kompilieren/TexPakete.mjs'
+import { dateiNameGueltig } from './kompilieren/texArchiv.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -62,6 +64,8 @@ function quelleFuerClient(q) {
     // Art des Werks bei Quellen ohne DOI (thesis, report, …); `art` ist der Dateityp.
     werkart: q.meta?.art ?? null,
     titelabgleich: q.titelabgleich ?? null,
+    autorenabgleich: q.autoren ?? null,
+    metadaten: q.metadaten ?? null,
     ocr: QuellenManager.ocrZustand(q),
     web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }
@@ -388,6 +392,19 @@ async function laeufeDaten(req, bot, vor) {
     weitereLaeufe: weitere,
   }
 }
+
+// Für den Log-Bereich im Editor: Der Browser liest die fehlenden Dateien aus dem Log, der Server kennt die Pakete.
+export const fehlendePakete = mitProblemen(async (req, res) => {
+  const dateien = [req.query.datei ?? []].flat().filter(datei => typeof datei === 'string')
+  if (dateien.length > 20) throw new Problem(400, 'eingabe_ungueltig', 'spur_fehler_tex_dateien_viele', { anzahl: 20 })
+  // Eigene Dateien mit Pfad (kapitel/a.tex) gehören zu keinem Paket; sie stehen ohne Nachschlagen da.
+  const gefunden = await TexPakete.fehlendePakete(dateien.filter(dateiNameGueltig))
+  res.json({
+    fehlende_pakete: dateien.map(
+      datei => gefunden.find(e => e.datei === datei) ?? { datei, paket: null, im_image: false }
+    ),
+  })
+})
 
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)

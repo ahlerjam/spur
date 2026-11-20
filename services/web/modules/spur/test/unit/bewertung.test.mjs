@@ -76,6 +76,18 @@ describe('zeileBewerten', () => {
     expect(zeile).toMatchObject({ wortlaut: 'quelle_fehlt', quelleId: null, seite: null })
   })
 
+  it('hängt Abweichungen von Crossref an die Zeile, ohne sie zum Problem zu machen (P13)', () => {
+    const werke = new Map([['10.5555/spur.1', { gefunden: true, registrierstelle: 'crossref', retraction: 'keine_meldung', band: '35', jahr: 2025 }]])
+    const bibEintraege = new Map([['smith2024', { key: 'smith2024', typ: 'article', doi: '10.5555/spur.1', year: '2024' }]])
+    const zeile = zeileBewerten(fund({ roh: '', belege: [{ key: 'smith2024' }] }), kontext({ werke, bibEintraege }))
+    expect(zeile.abweichungen).toEqual([
+      { feld: 'volume', eintrag: null, erwartet: '35' },
+      { feld: 'year', eintrag: '2024', erwartet: '2025' },
+    ])
+    expect(istProblem(zeile)).toBe(false)
+    expect(zeileBewerten(fund(), kontext())).not.toHaveProperty('abweichungen')
+  })
+
   it('lässt den Wortlaut offen, wenn nur zitiert wird (ohne Anführung)', () => {
     expect(zeileBewerten(fund({ roh: '' }), kontext())).toMatchObject({ wortlaut: null, seite: null })
     expect(zeileBewerten(fund({ roh: '', belege: [{ key: 'x' }] }), kontext()).wortlaut).toBeNull()

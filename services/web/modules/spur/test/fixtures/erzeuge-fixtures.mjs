@@ -130,6 +130,22 @@ einfach('p12b.pdf', 'Sleep deprivation and working memory in nurses', 'B. Lindqv
 // Volltext zur gedrosselten Crossref-DOI (P6). Seit P12 gleicht spur den Titel ab, ein fremdes PDF fiele durch.
 einfach('foods2022.pdf', 'Testwerk fuer gedrosseltes Crossref', 'F. Drossel', ['Households discard a share of the food they buy.'])
 einfach('report.pdf', 'AI at Work', 'J. Meyer, C. Okafor', ['Firms adopt generative tools unevenly across occupations.'])
+// P13: Volltexte zu den Werken mit Band, Heft, Kapitel, Artikelnummer, Entities und Preprints; die Autoren stehen auf
+// Seite 1, wie spur sie für den Abgleich liest.
+einfach('mikalef.pdf', 'Dynamic capabilities for digital transformation in public agencies', 'Lena Oldemeyer, Patrick Mikalef', ['Agencies that sensed change early adapted their services faster.'])
+einfach('morley2021.pdf', 'Ethics as a service: a pragmatic operationalisation of AI ethics', 'Jessica Morley', ['Ethics boards rarely see the systems they approve.'])
+einfach('berg2019.pdf', 'Circadian rhythms in shift work', 'Hanna Berg', ['Rotating shifts delay the circadian phase.'])
+einfach('reyes2019.pdf', 'Napping habits of university students', 'Tomas Reyes', ['Most students napped twice a week.'])
+einfach('asplund2023.pdf', 'Artificial intelligence & firm performance: A review of H2O - 50% more', 'Ida Asplund', ['Firms with AI reported higher margins.'])
+einfach('lindgren2022.pdf', 'Mind wandering during online lectures', 'Sofia Lindgren', ['Attention dropped after twenty minutes.'])
+einfach('arxiv2402.05555.pdf', 'Replay order in hippocampal place cell sequences', 'Mira Joshi, Kiran Gandhi', ['Sequences replayed in reverse after reward.'])
+einfach('arxiv2402.06666.pdf', 'Offline consolidation in recurrent networks', 'Kiran Gandhi and the replay lab', ['Offline phases stabilised earlier tasks.'])
+einfach('arxiv2402.07777.pdf', 'Spindle coupling across cortical regions', 'Jonas Muller, Ana Silva', ['Spindles coupled more tightly in frontal regions.'])
+einfach('unbekannt.pdf', 'Notes on an unregistered working paper', 'Anonymous', ['The DOI on this paper was never registered.'])
+writeFileSync(
+  join(here, 'notizen.pdf'),
+  buildPdf({ pages: [['Observations from the sleep lab', 'Week 12'], ['Two participants left early.']], title: 'Field notes 2023' })
+)
 writeFileSync(
   join(here, 'deckblatt.pdf'),
   buildPdf({
@@ -207,7 +223,7 @@ writeFileSync(
   join(here, 'arxiv2401.01234.pdf'),
   buildPdf({
     pages: [
-      ['Sleep-like replay improves memory consolidation', 'in artificial neural networks', 'arXiv:2401.01234'],
+      ['Sleep-like replay improves memory consolidation', 'in artificial neural networks', 'Kiran Gandhi, Mira Joshi', 'arXiv:2401.01234'],
       ['Offline replay reduced catastrophic forgetting.'],
     ],
     title: 'Sleep-like replay improves memory consolidation in artificial neural networks',

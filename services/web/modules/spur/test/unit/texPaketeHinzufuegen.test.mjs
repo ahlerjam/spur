@@ -21,6 +21,7 @@ let server
 let basis
 let texRoot
 let archive
+let index
 let T
 let baum
 let antworten
@@ -54,13 +55,18 @@ beforeAll(async () => {
   await fs.mkdir(Path.join(texRoot, 'tlpkg'))
   await fs.writeFile(Path.join(texRoot, 'tlpkg', 'texlive.tlpdb'), 'name xcolor\nname beamer\n')
   archive = { spurtestfuenf: await archivBauen('spurtestfuenf', FUENF) }
+  const tlpdb = Path.join(texRoot, 'spiegel.tlpdb')
+  await fs.writeFile(tlpdb, `name spurtestfuenf\nrunfiles size=1\n${Object.keys(FUENF).map(p => ` RELOC/${p}`).join('\n')}\n\nname xcolor\nrunfiles size=1\n RELOC/tex/latex/xcolor/xcolor.sty\n`)
+  await tar('xz', ['-k', tlpdb])
+  index = await fs.readFile(`${tlpdb}.xz`)
   server = http.createServer((req, res) => {
-    const [, spiegel, paket] = /\/(texlive|texlive-b)\/archive\/([^/]+)\.tar\.xz$/.exec(req.url) ?? []
-    abrufe.push(`${spiegel}:${paket}`)
+    const [, spiegel, paket] = /\/(texlive|texlive-b)\/(?:archive\/([^/]+)\.tar\.xz|tlpkg\/texlive\.tlpdb\.xz)$/.exec(req.url) ?? []
+    abrufe.push(`${spiegel}:${paket ?? 'index'}`)
     const liste = antworten[spiegel] ?? []
     const status = liste.length ? liste.shift() : 200
     if (status === 'trennen') return req.socket.destroy()
     if (status !== 200) return res.writeHead(status).end('Fehler')
+    if (!paket) return res.writeHead(200, { 'Content-Type': 'application/x-xz' }).end(index)
     if (!archive[paket]) return res.writeHead(404).end()
     res.writeHead(200, { 'Content-Type': 'application/x-xz' }).end(archive[paket])
   })
@@ -252,5 +258,94 @@ describe('TexPakete.hinzufuegen', () => {
     const fehler = await fehlerVon(holen())
     expect(fehler).toMatchObject({ code: 'projekt_zu_viele_dateien' })
     expect(paketDateien()).toEqual([])
+  })
+})
+
+describe('TexPakete.fehlendePakete', () => {
+  it('ordnet Dateien über die Paketdatenbank des Spiegels zu, unbekannte mit paket null', async () => {
+    expect(await T.fehlendePakete(['spurtestfuenf.sty', 'gibtesnicht.sty'])).toEqual([
+      { datei: 'spurtestfuenf.sty', paket: 'spurtestfuenf', im_image: false },
+      { datei: 'gibtesnicht.sty', paket: null, im_image: false },
+    ])
+  })
+
+  it('lädt die Datenbank einmal und hält sie vor', async () => {
+    await T.fehlendePakete(['a.sty'])
+    await Promise.all([T.fehlendePakete(['b.sty']), T.fehlendePakete(['c.sty'])])
+    expect(abrufe.filter(a => a.endsWith(':index'))).toEqual(['texlive:index'])
+  })
+
+  it('fragt keinen Spiegel ohne fehlende Datei', async () => {
+    expect(await T.fehlendePakete([])).toEqual([])
+    expect(abrufe).toEqual([])
+  })
+
+  it('nennt den Grund, wenn kein Spiegel antwortet, und versucht es beim nächsten Mal neu', async () => {
+    antworten = { texlive: [503], 'texlive-b': ['trennen'] }
+    expect(await T.fehlendePakete(['spurtestfuenf.sty'])).toEqual([
+      { datei: 'spurtestfuenf.sty', paket: null, im_image: false, grund: 'spiegel_nicht_erreichbar' },
+    ])
+    expect(await T.fehlendePakete(['spurtestfuenf.sty'])).toEqual([{ datei: 'spurtestfuenf.sty', paket: 'spurtestfuenf', im_image: false }])
+  })
+
+  it('fragt keinen Spiegel, wenn TeX-Pakete abgeschaltet sind', async () => {
+    vi.doMock('../../app/src/grenzen/Grenzen.mjs', async () => ({
+      ...(await vi.importActual('../../app/src/grenzen/Grenzen.mjs')),
+      standard: async () => ({ texPaketeAus: true }),
+    }))
+    vi.resetModules()
+    const aus = await import('../../app/src/kompilieren/TexPakete.mjs')
+    expect(await aus.fehlendePakete(['spurtestfuenf.sty'])).toEqual([{ datei: 'spurtestfuenf.sty', paket: null, im_image: false, grund: 'abgeschaltet' }])
+    expect(abrufe).toEqual([])
+    vi.doUnmock('../../app/src/grenzen/Grenzen.mjs')
+  })
+
+  it('behält nach dem Vergessen keine Datenbank aus einem Abruf, der davor begann', async () => {
+    const laeuft = T.fehlendePakete(['spurtestfuenf.sty'])
+    while (!abrufe.length) await new Promise(r => setTimeout(r, 1))
+    T.dateiIndexVergessen()
+    await laeuft
+    await T.fehlendePakete(['spurtestfuenf.sty'])
+    expect(abrufe.filter(a => a.endsWith(':index'))).toHaveLength(2)
+  })
+
+  it('nimmt den zweiten Spiegel, wenn der erste ausfällt', async () => {
+    antworten = { texlive: [503] }
+    expect((await T.fehlendePakete(['spurtestfuenf.sty']))[0].paket).toBe('spurtestfuenf')
+  })
+})
+
+describe('TexPakete.hinzufuegen mit datei', () => {
+  const mitDatei = datei => T.hinzufuegen({ projectId, menschId, botId, datei })
+
+  it('löst die Datei zum Paket auf und legt es an', async () => {
+    const ergebnis = await mitDatei('spurtestfuenf.sty')
+    expect(ergebnis).toMatchObject({ paket: 'spurtestfuenf', im_image: false })
+    expect(paketDateien()).toHaveLength(5)
+  })
+
+  it('meldet eine Datei, die kein Paket enthält, als paket_unbekannt mit Dateinamen', async () => {
+    const fehler = await fehlerVon(mitDatei('gibtesnicht.sty'))
+    expect(fehler).toMatchObject({ code: 'paket_unbekannt' })
+    expect(fehler.message).toContain('gibtesnicht.sty')
+    expect(paketDateien()).toEqual([])
+  })
+
+  it('meldet einen nicht erreichbaren Spiegel beim Auflösen', async () => {
+    antworten = { texlive: [503], 'texlive-b': [503] }
+    expect(await fehlerVon(mitDatei('spurtestfuenf.sty'))).toMatchObject({ code: 'spiegel_nicht_erreichbar' })
+  })
+
+  it('verlangt genau eins von paket und datei und einen sicheren Dateinamen', async () => {
+    // Als Funktionen: Ein schon gestarteter Aufruf scheiterte, bevor ihn jemand erwartet (unbehandelte Ablehnung).
+    for (const aufruf of [
+      () => T.hinzufuegen({ projectId, menschId, botId }),
+      () => T.hinzufuegen({ projectId, menschId, botId, paket: 'spurtestfuenf', datei: 'spurtestfuenf.sty' }),
+      () => mitDatei('../x.sty'),
+      () => mitDatei('a b.sty'),
+    ]) {
+      expect(await fehlerVon(aufruf())).toMatchObject({ code: 'eingabe_ungueltig' })
+    }
+    expect(abrufe).toEqual([])
   })
 })

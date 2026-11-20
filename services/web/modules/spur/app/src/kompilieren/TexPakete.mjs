@@ -1,10 +1,13 @@
 // tex_package_add: holt ein Paket aus dem TeX-Live-Archiv des Spiegels, den das Image nutzt, und legt seine
 // Laufzeitdateien unter tex-pakete/<paket>/ ins Projekt. Eine latexmkrc im Projekt nimmt den Ordner in die Suchpfade.
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import Path from 'node:path'
+import readline from 'node:readline'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { setTimeout as warten } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
@@ -15,6 +18,8 @@ import { WerkzeugFehler } from '../mcp/fehler.mjs'
 import {
   abhaengigkeiten,
   datenbankLesen,
+  dateiIndexSammler,
+  dateiNamePruefen,
   eintraegePruefen,
   LATEXMKRC_BLOCK,
   latexmkrcErgaenzen,
@@ -39,6 +44,7 @@ const VERSUCHE_JE_SPIEGEL = 3
 const PAUSE_MS = 300
 const SPERRE_VERALTET_MS = 10 * 60 * 1000
 const STUNDE_MS = 60 * 60 * 1000
+const TAG_MS = 24 * STUNDE_MS
 
 let datenbank = null
 
@@ -124,6 +130,87 @@ async function herunterladen(paket, ziel, grenze) {
     throw new WerkzeugFehler('spiegel_nicht_erreichbar', 'spur_fehler_tex_spiegel_status', { status: letzter.status })
   }
   throw new WerkzeugFehler('spiegel_nicht_erreichbar', 'spur_fehler_tex_spiegel')
+}
+
+// Datei → Paket aus der texlive.tlpdb des Spiegels, je Installation einen Tag vorgehalten. Ein Ausfall wird nicht
+// vorgehalten: Der nächste Aufruf fragt neu.
+let dateiIndex = null
+let indexLaden = null
+let generation = 0
+
+async function indexVon(url) {
+  // Ein gescheiterter Compile wartet auf die Zuordnung; 2,8 MB brauchen keine zwei Minuten.
+  const antwort = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(30000) })
+  if (!antwort.ok) {
+    await antwort.body?.cancel()
+    throw new Error(`Status ${antwort.status}`)
+  }
+  const xz = spawn('xz', ['-dc'], { stdio: ['pipe', 'pipe', 'ignore'] })
+  const beendet = new Promise((fertig, fehler) => {
+    xz.on('error', fehler)
+    xz.on('close', code => (code === 0 ? fertig() : fehler(new Error(`xz: ${code}`))))
+  })
+  const sammler = dateiIndexSammler()
+  const lesen = async () => {
+    for await (const zeile of readline.createInterface({ input: xz.stdout, crlfDelay: Infinity })) sammler.zeile(zeile)
+  }
+  await Promise.all([pipeline(Readable.fromWeb(antwort.body), xz.stdin), lesen(), beendet])
+  return sammler.index
+}
+
+async function indexHolen() {
+  for (const spiegel of await spiegelListe()) {
+    try {
+      return await indexVon(`${spiegel}/tlpkg/texlive.tlpdb.xz`)
+    } catch (error) {
+      logger.warn({ err: error, spiegel }, 'TeX-Paketdatenbank des Spiegels nicht lesbar')
+    }
+  }
+  return null
+}
+
+async function aktuellerIndex() {
+  if (dateiIndex && dateiIndex.bis > Date.now()) return dateiIndex.index
+  if (!indexLaden) {
+    const stand = generation
+    indexLaden = indexHolen()
+      .then(index => {
+        if (index && stand === generation) dateiIndex = { index, bis: Date.now() + TAG_MS }
+        return index
+      })
+      .finally(() => {
+        if (stand === generation) indexLaden = null
+      })
+  }
+  return await indexLaden
+}
+
+// Für Tests im Dev-Stack: Der nächste Aufruf lädt die Datenbank neu, auch wenn gerade ein Abruf läuft.
+export function dateiIndexVergessen() {
+  generation++
+  dateiIndex = null
+  indexLaden = null
+}
+
+export async function fehlendePakete(dateien) {
+  if (!dateien.length) return []
+  if (await abgeschaltet()) return dateien.map(datei => ({ datei, paket: null, im_image: false, grund: 'abgeschaltet' }))
+  const index = await aktuellerIndex()
+  return dateien.map(datei => ({
+    datei,
+    paket: index?.get(datei) ?? null,
+    im_image: false,
+    ...(index ? {} : { grund: 'spiegel_nicht_erreichbar' }),
+  }))
+}
+
+async function paketFuerDatei(datei) {
+  dateiNamePruefen(datei)
+  const index = await aktuellerIndex()
+  if (!index) throw new WerkzeugFehler('spiegel_nicht_erreichbar', 'spur_fehler_tex_spiegel')
+  const paket = index.get(datei)
+  if (!paket) throw new WerkzeugFehler('paket_unbekannt', 'spur_fehler_tex_datei_unbekannt', { datei })
+  return paket
 }
 
 // Ein Paket gilt als installiert, wenn es einen Eintrag hat (der entsteht erst nach dem letzten Upload) und sein
@@ -255,9 +342,11 @@ async function dateienHochladen({ projectId, menschId, paket, dateien, ziel }) {
   return angelegt
 }
 
-export async function hinzufuegen({ projectId, menschId, botId, paket }) {
+export async function hinzufuegen({ projectId, menschId, botId, paket, datei }) {
   const einstellung = await standard()
   if (await abgeschaltet(einstellung)) throw new WerkzeugFehler('abgeschaltet', 'spur_fehler_tex_pakete_aus')
+  if (Boolean(paket) === Boolean(datei)) throw new WerkzeugFehler('eingabe_ungueltig', 'spur_fehler_tex_paket_oder_datei')
+  if (datei) paket = await paketFuerDatei(datei)
   paketNamePruefen(paket)
   const grenzen = texGrenzen(einstellung)
   const lokal = await lokaleDatenbank()

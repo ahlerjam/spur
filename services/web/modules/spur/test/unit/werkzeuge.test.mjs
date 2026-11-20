@@ -248,12 +248,12 @@ describe('Lesen im Projekt', () => {
     expect(await fehlerVon(aufruf('doc_read', { project_id: projekt, pfad: 'nope.tex' }))).toMatchObject({ code: 'doc_fehlt' })
   })
 
-  it('sources_list zeigt Status ohne Text', async () => {
+  it('sources_list zeigt Status und Titel ohne Text', async () => {
     m.QuellenManager.alle.mockResolvedValue([
-      { _id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', seitenzahl: 8, status: 'text', fassung: '', meta: { geheim: 1 } },
+      { _id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', seitenzahl: 8, status: 'text', fassung: '', meta: { titel: 'A & B', geheim: 1 } },
     ])
     expect(await aufruf('sources_list', { project_id: projekt })).toEqual({
-      eintraege: [{ id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', seiten: 8, status: 'text', fassung: '' }],
+      eintraege: [{ id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', titel: 'A & B', seiten: 8, status: 'text', fassung: '' }],
       naechster_cursor: null,
     })
   })
@@ -266,6 +266,18 @@ describe('Lesen im Projekt', () => {
       ['passt', undefined],
       ['abweichend', meldung('spur_hinweis_titel_abweichend')],
       ['nicht_pruefbar', undefined],
+    ])
+  })
+
+  it('sources_list nennt Autorenabgleich und unvollständige Metadaten; nur abweichend ist ein Hinweis (P13)', async () => {
+    const quelle = (id, felder) => ({ _id: id, dateiname: `${id}.pdf`, key: id, doi: null, seitenzahl: 2, status: 'text', fassung: '', ...felder })
+    m.QuellenManager.alle.mockResolvedValue([quelle('a', { autoren: 'aus_pdf' }), quelle('b', { autoren: 'abweichend' }), quelle('c', { metadaten: 'unvollstaendig' }), quelle('d')])
+    const { eintraege } = await aufruf('sources_list', { project_id: projekt })
+    expect(eintraege.map(e => [e.autoren, e.autoren_hinweis, e.metadaten])).toEqual([
+      ['aus_pdf', undefined, undefined],
+      ['abweichend', meldung('spur_hinweis_autoren_abweichend'), undefined],
+      [undefined, undefined, 'unvollstaendig'],
+      [undefined, undefined, undefined],
     ])
   })
 
@@ -303,16 +315,16 @@ describe('Lesen im Projekt', () => {
     expect(ergebnis).not.toHaveProperty('abschnitte')
   })
 
-  it('bib_list nennt den Status der DOI je Eintrag', async () => {
+  it('bib_list nennt den Status der DOI und die Abweichungen von Crossref je Eintrag', async () => {
     m.Crossref.pruefen.mockImplementation(async doi =>
-      ({ '10.1/a': { gefunden: true, retraction: 'zurueckgezogen' }, '10.1/c': { gefunden: false }, '10.1/d': null })[doi]
+      ({ '10.1/a': { gefunden: true, registrierstelle: 'crossref', retraction: 'zurueckgezogen', band: '7' }, '10.1/c': { gefunden: false }, '10.1/d': null })[doi]
     )
     const { eintraege } = await aufruf('bib_list', { project_id: projekt })
     expect(eintraege).toEqual([
-      { key: 'a', doi: '10.1/a', referenz: 'gefunden', retraction: 'zurueckgezogen' },
-      { key: 'b', doi: null, referenz: 'ohne_doi', retraction: null },
-      { key: 'c', doi: '10.1/c', referenz: 'nicht_gefunden', retraction: null },
-      { key: 'd', doi: '10.1/d', referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null },
+      { key: 'a', doi: '10.1/a', referenz: 'gefunden', registrierstelle: 'crossref', retraction: 'zurueckgezogen', abweichungen: [{ feld: 'volume', eintrag: null, erwartet: '7' }] },
+      { key: 'b', doi: null, referenz: 'ohne_doi', retraction: null, abweichungen: null, abweichungen_grund: 'ohne_doi' },
+      { key: 'c', doi: '10.1/c', referenz: 'nicht_gefunden', retraction: null, abweichungen: null, abweichungen_grund: 'nicht_bei_crossref' },
+      { key: 'd', doi: '10.1/d', referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null, abweichungen: null, abweichungen_grund: 'crossref_nicht_erreichbar' },
     ])
   })
 })
@@ -572,5 +584,13 @@ describe('Recherche', () => {
     mitStufe('readAndWrite')
     await aufruf('tex_package_add', { project_id: projekt, paket: 'xfrac' })
     expect(m.TexPakete.hinzufuegen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: 'xfrac' })
+  })
+
+  it('tex_package_add reicht datei statt paket weiter, auch nur mit Schreibrecht', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('tex_package_add', { project_id: projekt, datei: 'booktabs.sty' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    await aufruf('tex_package_add', { project_id: projekt, datei: 'booktabs.sty' })
+    expect(m.TexPakete.hinzufuegen).toHaveBeenLastCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: undefined, datei: 'booktabs.sty' })
   })
 })

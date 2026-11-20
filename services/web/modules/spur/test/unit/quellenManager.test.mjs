@@ -147,6 +147,55 @@ describe('Titelabgleich beim Aufnehmen', () => {
   })
 })
 
+describe('Autorenabgleich beim Aufnehmen', () => {
+  const GANDHI_JOSHI = [{ family: 'Gandhi', given: 'Kiran' }, { family: 'Joshi', given: 'Mira' }]
+  const mitAutoren = (datei, autoren) => aufnehmen(datei, datei, { meta: { gefunden: true, titel: 'Egal', autoren } })
+
+  it('übernimmt die Reihenfolge der ersten PDF-Seite in die Metadaten (Gandhi/Joshi)', async () => {
+    const quelle = await mitAutoren('arxiv2402.05555.pdf', GANDHI_JOSHI)
+    expect(quelle.autoren).toBe('aus_pdf')
+    expect(quelle.meta.autoren.map(a => a.family)).toEqual(['Joshi', 'Gandhi'])
+    const gespeichert = await datenbank.db.collection('spurSources').findOne({ _id: quelle._id })
+    expect(gespeichert).toMatchObject({ autoren: 'aus_pdf', meta: { autoren: [{ family: 'Joshi' }, { family: 'Gandhi' }] } })
+  })
+
+  it('meldet abweichend, wenn ein Nachname auf der ersten Seite fehlt, und lässt die Reihenfolge', async () => {
+    const quelle = await mitAutoren('arxiv2402.06666.pdf', GANDHI_JOSHI)
+    expect(quelle.autoren).toBe('abweichend')
+    expect(quelle.meta.autoren).toEqual(GANDHI_JOSHI)
+  })
+
+  it('bestätigt Müller gegen Muller im PDF', async () => {
+    expect((await mitAutoren('arxiv2402.07777.pdf', [{ family: 'Müller', given: 'Jonas' }, { family: 'Silva', given: 'Ana' }])).autoren).toBe('bestaetigt')
+  })
+
+  it('gleicht einen Scan ohne Text nicht ab', async () => {
+    expect(await mitAutoren('scan.pdf', GANDHI_JOSHI)).not.toHaveProperty('autoren')
+  })
+})
+
+describe('Ersatzangaben beim Upload (P13)', () => {
+  const ERSATZ = { titel: 'notizen', art: 'misc' }
+
+  it('nimmt die Ersatzangaben ohne Metadaten und gleicht sie nicht mit dem PDF ab', async () => {
+    const quelle = await aufnehmen('notizen.pdf', 'notizen.pdf', { ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ meta: ERSATZ, metadaten: 'unvollstaendig' })
+    expect(quelle).not.toHaveProperty('titelabgleich')
+    expect(quelle).not.toHaveProperty('autoren')
+  })
+
+  it('bevorzugt die Metadaten einer DOI im PDF-Text, wenn keine DOI vorgegeben ist', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf', { ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ doi: '10.5555/spur.2024.001', meta: { titel: 'Sleep and Memory' }, autoren: 'bestaetigt' })
+    expect(quelle).not.toHaveProperty('metadaten')
+  })
+
+  it('nimmt bei vorgegebener, unbekannter DOI die Ersatzangaben, nicht die DOI im PDF', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf', { doi: '10.9999/nirgends.1', ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ doi: '10.9999/nirgends.1', meta: ERSATZ, metadaten: 'unvollstaendig' })
+  })
+})
+
 describe('Abfragen', () => {
   let smith
   let interview

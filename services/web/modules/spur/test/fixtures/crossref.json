@@ -40,5 +40,11 @@
     "updated-by": [
       { "DOI": "10.5555/spur.correction-note", "type": "correction", "label": "Correction" }
     ]
-  }
+  },
+  "10.5555/spur.heft.001": { "DOI": "10.5555/spur.heft.001", "type": "journal-article", "title": ["Dynamic capabilities for digital transformation in public agencies"], "author": [{ "given": "Lena", "family": "Oldemeyer" },{ "given": "Patrick", "family": "Mikalef" }], "container-title": ["Government Information Quarterly"], "volume": "35", "issue": "2", "page": "101-118", "published-online": { "date-parts": [[2024,11,3]] }, "published-print": { "date-parts": [[2025,2,1]] }, "issued": { "date-parts": [[2024,11,3]] } },
+  "10.5555/spur.heft.002": { "DOI": "10.5555/spur.heft.002", "type": "journal-article", "title": ["Ethics as a service: a pragmatic operationalisation of AI ethics"], "author": [{ "given": "Jessica", "family": "Morley" }], "container-title": ["Minds and Machines"], "issued": { "date-parts": [[2021]] } },
+  "10.5555/spur.kap.001": { "DOI": "10.5555/spur.kap.001", "type": "book-chapter", "title": ["Circadian rhythms in shift work"], "author": [{ "given": "Hanna", "family": "Berg" }], "container-title": ["Handbook of Sleep"], "publisher": "Springer", "page": "45-67", "issued": { "date-parts": [[2019]] } },
+  "10.5555/spur.enr.001": { "DOI": "10.5555/spur.enr.001", "type": "journal-article", "title": ["Napping habits of university students"], "author": [{ "given": "Tomas", "family": "Reyes" }], "container-title": ["PLOS ONE"], "volume": "14", "issue": "1", "article-number": "e0209899", "published-online": { "date-parts": [[2019,1,9]] }, "issued": { "date-parts": [[2019,1,9]] } },
+  "10.5555/spur.ent.001": { "DOI": "10.5555/spur.ent.001", "type": "journal-article", "title": ["Artificial intelligence &amp; firm performance: <i>A review</i> of H<sub>2</sub>O &#8211; 50% more"], "author": [{ "given": "Ida", "family": "Asplund" }], "container-title": ["Information &amp; Management"], "volume": "60", "issue": "4", "page": "103-120", "issued": { "date-parts": [[2023]] } },
+  "10.5555/spur.pre.001": { "DOI": "10.5555/spur.pre.001", "type": "posted-content", "subtype": "preprint", "title": ["Mind wandering during online lectures"], "author": [{ "given": "Sofia", "family": "Lindgren" }], "institution": [{ "name": "PsyArXiv" }], "posted": { "date-parts": [[2022,3,1]] }, "issued": { "date-parts": [[2022,3,1]] } }
 }

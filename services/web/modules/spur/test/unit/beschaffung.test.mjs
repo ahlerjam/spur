@@ -125,6 +125,24 @@ describe('Beschaffungsliste', () => {
     expect([offen, beschafft]).toEqual([0, 1])
   })
 
+  it('behält beim Zuordnen die Metadaten der Quelle samt Autorenreihenfolge aus dem PDF', async () => {
+    await hinzufuegen('10.5555/spur.2024.001')
+    const eigene = { ...META, autoren: [{ family: 'Joshi', given: 'Mira' }, { family: 'Smith', given: 'Alice' }], band: '35' }
+    const quelle = await quelleAnlegen({ doi: '10.5555/spur.2024.001', meta: eigene })
+    await Beschaffung.perDoiZuordnen(projectId, quelle, userId)
+    expect(await datenbank.db.collection('spurSources').findOne({ _id: quelle._id })).toMatchObject({ meta: eigene })
+    expect(m.ZitatManager.bibSicherstellen.mock.calls[0][2].meta).toEqual(eigene)
+  })
+
+  it('nimmt für eine Quelle mit Ersatzangaben die Metadaten der Liste und behält den Vermerk, solange die .bib @misc bleibt', async () => {
+    await hinzufuegen('10.5555/spur.2024.001')
+    const quelle = await quelleAnlegen({ doi: '10.5555/spur.2024.001', meta: { titel: 'smith', art: 'misc' }, metadaten: 'unvollstaendig' })
+    await Beschaffung.perDoiZuordnen(projectId, quelle, userId)
+    const neu = await datenbank.db.collection('spurSources').findOne({ _id: quelle._id })
+    expect(neu).toMatchObject({ meta: META })
+    expect(neu.metadaten).toBe('unvollstaendig')
+  })
+
   it('lässt ein PDF ohne passende DOI offen', async () => {
     await hinzufuegen('10.5555/spur.2024.001')
     expect(await Beschaffung.perDoiZuordnen(projectId, await quelleAnlegen(), userId)).toBeNull()

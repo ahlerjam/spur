@@ -103,6 +103,8 @@ beforeEach(async () => {
   vi.doMock('../../app/src/schreiben/LaufAktionen.mjs', () => m.Aktionen)
   vi.doMock('../../app/src/schreiben/LaufManager.mjs', () => m.Lauf)
   vi.doMock('../../app/src/workflows/Workflows.mjs', () => m.Workflows)
+  m.TexPakete = { fehlendePakete: vi.fn(async dateien => dateien.map(datei => ({ datei, paket: null, im_image: false }))) }
+  vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => m.TexPakete)
   C = await import('../../app/src/SpurController.mjs')
 })
 
@@ -121,7 +123,7 @@ describe('Quellenliste und Suche', () => {
     m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
     const { res } = await ausfuehren(C.quellenListe, req({ query: { seite: '2' } }))
     expect(m.Quellen.liste).toHaveBeenCalledWith(projekt, { seite: 2 })
-    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', autoren: [], jahr: null, fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, lizenz: null, werkart: null, titelabgleich: null, ocr: null, web: null })
+    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', autoren: [], jahr: null, fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, lizenz: null, werkart: null, titelabgleich: null, autorenabgleich: null, metadaten: null, ocr: null, web: null })
     expect(res.body).toMatchObject({ gesamt: 1, seitengroesse: 100 })
   })
 
@@ -163,6 +165,32 @@ describe('Quellenliste und Suche', () => {
     const { res } = await ausfuehren(C.quellenSuche, req({ query: { q: 'x' } }))
     expect(res.body.treffer[0]).toEqual({ quelleId: q._id, seite: 2, quelle: expect.objectContaining({ id: q._id, dateiname: 'a.pdf' }) })
     expect(res.body.treffer[0].quelle).not.toHaveProperty('meta')
+  })
+})
+
+describe('Fehlende TeX-Pakete', () => {
+  it('ordnet eine oder mehrere Dateien aus der Anfrage zu', async () => {
+    const { res } = await ausfuehren(C.fehlendePakete, req({ query: { datei: ['spurdemo.sty', 'gibtesnicht.sty'] } }))
+    expect(res.body.fehlende_pakete.map(e => e.datei)).toEqual(['spurdemo.sty', 'gibtesnicht.sty'])
+    const { res: eine } = await ausfuehren(C.fehlendePakete, req({ query: { datei: 'spurdemo.sty' } }))
+    expect(m.TexPakete.fehlendePakete).toHaveBeenLastCalledWith(['spurdemo.sty'])
+    expect(eine.body.fehlende_pakete).toHaveLength(1)
+  })
+
+  it('schlägt unsichere Namen nicht nach und nennt sie ohne Paket', async () => {
+    const { res } = await ausfuehren(C.fehlendePakete, req({ query: { datei: ['kapitel/einleitung.tex', 'booktabs.sty', { b: 1 }] } }))
+    expect(m.TexPakete.fehlendePakete).toHaveBeenCalledWith(['booktabs.sty'])
+    expect(res.body.fehlende_pakete).toEqual([
+      { datei: 'kapitel/einleitung.tex', paket: null, im_image: false },
+      { datei: 'booktabs.sty', paket: null, im_image: false },
+    ])
+  })
+
+  it('lehnt mehr als 20 Dateien mit 400 ab, ohne nachzuschlagen', async () => {
+    const { res } = await ausfuehren(C.fehlendePakete, req({ query: { datei: Array.from({ length: 21 }, (_, i) => `d${i}.sty`) } }))
+    expect(res.statusCode).toBe(400)
+    expect(res.body.type).toContain('eingabe_ungueltig')
+    expect(m.TexPakete.fehlendePakete).not.toHaveBeenCalled()
   })
 })
 
