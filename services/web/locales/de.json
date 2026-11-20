@@ -534,7 +534,7 @@
   "spur_fehler_schon_beschafft": "Dieser Eintrag ist schon beschafft.",
   "spur_fehler_seite_fehlt": "Diese Seite gibt es in der Quelle nicht.",
   "spur_fehler_seite_nicht_erreichbar": "Seite nicht erreichbar. Bitte die Adresse prüfen oder später erneut versuchen.",
-  "spur_fehler_seite_nicht_gefunden": "Seite __seite__ gibt es nicht: Die Quelle hat __seiten__ Seiten. Wähle eine Seite von 1 bis __seiten__.",
+  "spur_fehler_seite_nicht_gefunden": "Seite __seite__ gibt es nicht: Die Quelle hat __seiten__ Seiten. Wähl eine Seite von 1 bis __seiten__.",
   "spur_fehler_seite_zu_gross": "Die Seite ist größer als 5 MB und lässt sich nicht aufnehmen.",
   "spur_fehler_semantik_aus": "Die semantische Suche ist auf dieser Installation aus.",
   "spur_fehler_spalte_fehlt": "Diese Spalte gibt es nicht. Bitte zuerst in der Matrix anlegen.",
