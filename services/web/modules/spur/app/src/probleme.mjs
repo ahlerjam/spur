@@ -16,11 +16,12 @@ export function problemSenden(res, problem) {
     .status(problem.status)
     .type('application/problem+json')
     .json({
+      // Zusatzfelder zuerst: Sie dürfen die Kernfelder nach RFC 9457 nicht überschreiben.
+      ...problem.zusatz,
       type: `urn:spur:problem:${problem.typ}`,
       title: problem.typ,
       status: problem.status,
       detail: problem.message,
-      ...problem.zusatz,
     })
 }
 

@@ -199,6 +199,15 @@ describe('ausschliessen', () => {
     expect((await Protokoll.prisma(projectId)).ausgeschlossen.nach_grund).toEqual({ Abschlussarbeit: 1 })
   })
 
+  it('zählt auch Gründe, die wie eingebaute Objektnamen heißen, als freien Text', async () => {
+    await ausschliessen({ doi: '10.1/a' }, 'constructor')
+    await ausschliessen({ doi: '10.1/b' }, 'toString')
+    await ausschliessen({ doi: '10.1/c' }, '__proto__')
+    const { ausgeschlossen } = await Protokoll.prisma(projectId)
+    expect(ausgeschlossen.gesamt).toBe(3)
+    expect(Object.entries(ausgeschlossen.nach_grund)).toEqual([['constructor', 1], ['toString', 1], ['__proto__', 1]])
+  })
+
   it('meldet 404 treffer_nicht_gefunden für eine DOI oder einen Titel, die in keiner Suche vorkamen', async () => {
     for (const felder of [{ doi: '10.9/nie-gesucht' }, { titel: 'Nie gesehen' }, { titel: '…' }]) {
       expect(await fehlerVon(ausschliessen(felder, 'egal'))).toMatchObject({

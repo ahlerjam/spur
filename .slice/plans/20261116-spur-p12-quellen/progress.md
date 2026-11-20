@@ -56,3 +56,9 @@
 
 ## Texte
 - humanizer-de (Modus sachlich): Preflight `low`, keine Cluster. Geändert: `spur_fehler_eingabe_doi_oder_pdf_url` nennt das Feld jetzt in einem eigenen Satz statt in einer unerklärten Klammer. humanizer (englisch): keine Muster aus Abschnitt A bis E; dieselbe Änderung in `en.json`.
+
+## Sicherheitsprüfung (Subagent auf `git diff 661a28817e..HEAD`)
+- Ergebnis: keine in Produktion ausnutzbare Lücke. Geprüft: SSRF über `pdf_url`, Unpaywall-/Europe-PMC-Adressen und Redirects (Fake-Ausnahme nur mit `SPUR_DEV=1`); `.bib`-Ausbruch; CSV-Formeln; Links auf `adresse` (nur http(s), `noopener`); Rechte je Projekt bei `source_add`, `search_log`, `paper_exclude`, `paper_search`; Mongo-Operatoren; `spur-hochladen`.
+- Behoben: Ausschlussgründe wie `constructor` oder `toString` verfälschten die Summen (Zähler jetzt ohne Prototyp, Test dazu). Zusatzfelder einer Fehlerantwort können die Kernfelder (`type`, `status`, `title`, `detail`, `fehler`) nicht mehr überschreiben (Test dazu).
+- Dabei gefunden: Der Testdatenbank fehlte der eindeutige Index auf `spurSearchHits`, der Test für parallele Suchen bestand deshalb nur zufällig. Index in `test/unit/hilfen/datenbank.mjs` ergänzt; der Test ist jetzt stabil grün.
+- Ansichten: Neuer E2E-Schritt `p12ansicht` prüft Quellen-Panel, Beschaffungsliste (beide Abzeichen), Suchprotokoll und leeres Suchprotokoll bei 360 und 1280 px, hell und dunkel, auf Überlauf und Kontrast ≥ 4,5:1.

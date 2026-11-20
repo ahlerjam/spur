@@ -89,8 +89,10 @@ export async function liste(projectId, { ab = 0, aufsteigend = false } = {}) {
   return { eintraege: eintraege.map(fuerClient), gesamt, weiter: ab + SEITE < gesamt }
 }
 
-const zaehlen = (zaehler, name, anzahl = 1) => {
-  zaehler[name] = (zaehler[name] ?? 0) + anzahl
+// Gründe sind freier Text: Zähler ohne Prototyp, damit „constructor“ oder „__proto__“ gewöhnliche Schlüssel sind.
+const zaehler = () => Object.create(null)
+const zaehlen = (stand, name, anzahl = 1) => {
+  stand[name] = (stand[name] ?? 0) + anzahl
 }
 
 // Summen für das PRISMA-Flussdiagramm. Es gilt identifiziert − dubletten = gesichtet und
@@ -102,7 +104,7 @@ export async function prisma(projectId) {
     (await quellen()).distinct('doi', { projectId, doi: { $type: 'string' } }),
     (await beschaffungen()).find({ projectId, status: 'offen' }, { projection: { doi: 1, grund: 1 } }).toArray(),
   ])
-  const nachDienst = {}
+  const nachDienst = zaehler()
   let ohneAbgleich = 0
   for (const anfrage of anfragen) {
     if (istAlt(anfrage)) {
@@ -114,8 +116,8 @@ export async function prisma(projectId) {
   }
   const aufgenommeneDois = new Set(quellenDois.map(doi => doi.toLowerCase()))
   const grundNachDoi = new Map(offeneListe.map(e => [e.doi, e.grund ?? null]))
-  const nachGrund = {}
-  const nichtBeschaffbar = {}
+  const nachGrund = zaehler()
+  const nichtBeschaffbar = zaehler()
   let aufgenommen = 0
   // Alte Einträge kennen ihre Treffer nicht einzeln: Sie zählen als gesichtet und offen.
   let offen = ohneAbgleich

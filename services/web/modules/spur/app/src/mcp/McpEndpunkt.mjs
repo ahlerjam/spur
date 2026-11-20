@@ -48,7 +48,7 @@ function antwortVon(ergebnis) {
 function fehlerVon(code, detail, zusatz) {
   return {
     isError: true,
-    content: [{ type: 'text', text: JSON.stringify({ fehler: code, detail, ...zusatz }) }],
+    content: [{ type: 'text', text: JSON.stringify({ ...zusatz, fehler: code, detail }) }],
   }
 }
 

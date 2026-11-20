@@ -7184,6 +7184,50 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok((await page.locator('.spur-prisma').count()) === 0, 'Summenzeile in einem Projekt ohne Suche')
   }
 
+  // P12: Die neuen Ansichten bei 360 und 1280 px, hell und dunkel: kein Überlauf, Kontrast mindestens 4,5:1.
+  // Läuft nach p12f1 und p12f5, deren Daten die Ansichten füllen.
+  features.p12ansicht = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    // Neben dem Eintrag „nicht frei“ aus p12f5 ein offener Eintrag mit blockiertem Download, damit beide Abzeichen stehen.
+    const pid = await projektId(token, 'E2E P12 Protokoll')
+    await fakeSteuern({ cachesLeeren: true })
+    const bot = await werkzeug(token, 'source_add', { project_id: pid, doi: '10.5555/spur.bot.001' })
+    ok(bot.inhalt.fehler === 'bot_schutz', `bot.001: ${JSON.stringify(bot.inhalt)}`)
+    const pruefen = async (wo, bereich) => {
+      for (const px of [360, 1280]) {
+        await breite(px)
+        await bereich.first().waitFor({ timeout: 20000 })
+        const panel = page.locator('.spur-panel').first()
+        ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1), `${wo} läuft über bei ${px} px`)
+        const schlecht = await unlesbar(panel)
+        ok(schlecht.length === 0, `${wo} bei ${px} px schlecht lesbar: ${schlecht.join(' | ')}`)
+        await ohneSeitlichesRollen(`${wo} ${px} px`)
+      }
+      await breite(1280)
+    }
+    for (const thema of ['', 'light-']) {
+      const design = thema ? 'hell' : 'dunkel'
+      await mitDesign(thema, async () => {
+        await projektOeffnen('E2E P12 Quellen')
+        await panelOeffnen('Quellen')
+        await pruefen(`Quellen-Panel ${design}`, page.getByText(/Titel im PDF passt nicht zu den Metadaten/))
+        await panelOeffnen('Recherche')
+        await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+        await pruefen(`Leeres Suchprotokoll ${design}`, page.locator('.spur-panel').getByText(/^Noch keine Suche/))
+        await projektOeffnen('E2E P12 Protokoll')
+        await panelOeffnen('Recherche')
+        await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+        await pruefen(`Suchprotokoll ${design}`, page.locator('.spur-prisma'))
+        await page.getByRole('tab', { name: 'Beschaffung' }).click()
+        const liste = page.locator('.spur-panel')
+        await liste.getByText('Frei, Download blockiert', { exact: true }).waitFor({ timeout: 20000 })
+        await liste.getByText('Nicht frei verfügbar', { exact: true }).waitFor()
+        await pruefen(`Beschaffung ${design}`, liste.getByRole('link', { name: 'Im Browser herunterladen' }))
+      })
+    }
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`
