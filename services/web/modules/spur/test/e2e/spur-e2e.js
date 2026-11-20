@@ -858,7 +858,7 @@ async page => {
       // P12: Suchprotokoll und Ausschluss für PRISMA.
       const P12 = ['search_log', 'paper_exclude']
       // P15: Werkzeuge, die Claude beim Arbeiten gefehlt haben.
-      const P15 = ['source_page_image', 'source_figure_add', 'file_upload_link']
+      const P15 = ['source_page_image', 'source_figure_add', 'file_upload_link', 'tex_file_read']
       const erwartet = [...P1, ...P2, ...P3, ...P7, ...P12, ...P15].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
@@ -8120,6 +8120,42 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(ohne.aenderungen.gesamt === 0, `Lauf ohne Textänderung: ${json(ohne)}`)
     const zahlwort = /\b(null|eins?|eine[rnms]?|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\b|\d/i
     ok(ohne.hinweis && !zahlwort.test(ohne.hinweis), `Hinweis mit Zahlenwort: ${ohne.hinweis}`)
+  }
+
+  features.p15f6 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const pid = await projektId(token, 'E2E P15 TeX')
+    const lesen = async args => await werkzeug(token, 'tex_file_read', { project_id: pid, ...args })
+
+    const klasse = await lesen({ name: 'article.cls' })
+    ok(!klasse.fehler && klasse.inhalt.pfad.endsWith('/article.cls') && klasse.inhalt.herkunft === 'installation' && klasse.inhalt.zeilen > 200, `article.cls: ${json({ ...klasse.inhalt, text: undefined })}`)
+    ok(klasse.inhalt.text.includes('\\ProvidesClass{article}'), 'article.cls ohne \\ProvidesClass{article}')
+    const ab200 = await lesen({ name: 'article.cls', ab_zeile: 200 })
+    ok(ab200.inhalt.ab_zeile === 200 && ab200.inhalt.text.split('\n')[0] === klasse.inhalt.text.split('\n')[199], `ab_zeile 200 beginnt mit ${json(ab200.inhalt.text.split('\n')[0])}`)
+
+    const fehlt = await lesen({ name: 'gibtesnicht.sty' })
+    ok(fehlt.fehler && fehlt.inhalt.fehler === 'tex_datei_nicht_gefunden' && fehlt.inhalt.detail.includes('tex_package_add'), `gibtesnicht.sty: ${json(fehlt.inhalt)}`)
+    for (const name of ['../../etc/passwd', '/etc/passwd', 'geheim.env']) {
+      const r = await lesen({ name })
+      ok(r.fehler && r.inhalt.fehler === 'eingabe_ungueltig' && r.inhalt.feld === 'name', `${name}: ${json(r.inhalt)}`)
+    }
+
+    const demo = await werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'spurdemo' })
+    ok(!demo.fehler && demo.inhalt.dateien.length > 0, `tex_package_add spurdemo: ${json(demo.inhalt)}`)
+    const ausProjekt = await lesen({ name: 'spurdemo.sty' })
+    ok(!ausProjekt.fehler && ausProjekt.inhalt.herkunft === 'projekt' && ausProjekt.inhalt.pfad.startsWith('tex-pakete/') && ausProjekt.inhalt.text.includes('\\ProvidesPackage{spurdemo}'), `spurdemo.sty: ${json(ausProjekt.inhalt)}`)
+
+    // spurzwei liefert nur der zweite Spiegel des Fakes; der erste antwortet 404.
+    await fakeSteuern({ protokollLeeren: true })
+    const zwei = await werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'spurzwei' })
+    ok(!zwei.fehler && zwei.inhalt.dateien.some(d => d.endsWith('spurzwei.sty')), `tex_package_add spurzwei: ${json(zwei.inhalt)}`)
+    const abrufe = (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.map(a => a.pfad).filter(p => p.includes('spurzwei'))
+    ok(abrufe.some(p => p.includes('/texlive/archive/')) && abrufe.some(p => p.includes('/texlive-b/archive/')), `Abrufe: ${json(abrufe)}`)
+
+    const keiner = await werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'spurgibtsnicht' })
+    ok(keiner.fehler && keiner.inhalt.fehler === 'paket_unbekannt' && /Das Paket gibt es im TeX-Live-Archiv nicht/.test(keiner.inhalt.detail), `Beide 404: ${json(keiner.inhalt)}`)
   }
 
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.

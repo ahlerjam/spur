@@ -159,9 +159,23 @@ describe('TexPakete.hinzufuegen', () => {
     expect(lauf.angelegt).toEqual([{ art: 'ordner', pfad: 'tex-pakete/spurtestfuenf', paket: 'spurtestfuenf', bytes }])
   })
 
-  it('meldet ein unbekanntes Paket ohne Wiederholung und ohne zweiten Spiegel', async () => {
-    expect(await fehlerVon(holen('spurtestgibtsnicht'))).toMatchObject({ code: 'paket_unbekannt' })
-    expect(abrufe).toEqual(['texlive:spurtestgibtsnicht'])
+  it('meldet ein Paket, das beide Spiegel nicht kennen, ohne Wiederholung als paket_unbekannt (P15)', async () => {
+    const fehler = await fehlerVon(holen('spurtestgibtsnicht'))
+    expect(fehler).toMatchObject({ code: 'paket_unbekannt' })
+    expect(fehler.message).toBe(meldung('spur_fehler_tex_paket_unbekannt'))
+    expect(abrufe).toEqual(['texlive:spurtestgibtsnicht', 'texlive-b:spurtestgibtsnicht'])
+  })
+
+  it('fragt bei 404 des ersten Spiegels den zweiten (P15)', async () => {
+    antworten.texlive = [404]
+    expect((await holen()).dateien).toHaveLength(5)
+    expect(abrufe).toEqual(['texlive:spurtestfuenf', 'texlive-b:spurtestfuenf'])
+  })
+
+  it('meldet nach 404 und Ausfall des zweiten Spiegels den Ausfall, keinen unbekannten Namen (P15)', async () => {
+    antworten.texlive = [404]
+    antworten['texlive-b'] = [502, 502, 502]
+    expect(await fehlerVon(holen())).toMatchObject({ code: 'spiegel_nicht_erreichbar' })
   })
 
   it('wiederholt bei 5xx und Verbindungsabbruch und nimmt den dritten Versuch', async () => {

@@ -1,7 +1,8 @@
 // Fake des TeX-Live-Archivs für Tests (nur mit SPUR_DEV=1, unter dem Paper-Fake eingehängt): baut <paket>.tar.xz
 // zur Anfrage aus den Dateien unter test/fixtures/texlive/<paket>/. Drei Pakete gibt es nur hier: eins mit einem
 // Eintrag außerhalb des Archivs (spurtest-ausbruch), eins über 100 MB (spurtest-riesig, nur der Header) und eins
-// mit 30 MB entpackt (spurtest-gross). Die Paketdatenbank (tlpkg/texlive.tlpdb.xz) entsteht aus denselben Ordnern.
+// mit 30 MB entpackt (spurtest-gross). spurzwei liefert nur der zweite Spiegel (texlive-b). Die Paketdatenbank
+// (tlpkg/texlive.tlpdb.xz) entsteht aus denselben Ordnern.
 import { spawn } from 'node:child_process'
 import { mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -43,6 +44,8 @@ export async function texLiveFake(req, res) {
     await grossVorbereiten()
     return archiv(res, ['-C', GROSS_ORDNER, 'fonts'])
   }
+  // spurzwei fehlt auf dem ersten Spiegel; tex_package_add muss dann den zweiten fragen.
+  if (paket === 'spurzwei' && !req.path.startsWith('/texlive-b/')) return res.sendStatus(404)
   const inhalt = paket && (await readdir(`${FIXTURES}${paket}`).catch(() => null))
   if (!inhalt) return res.sendStatus(404)
   archiv(res, ['-C', `${FIXTURES}${paket}`, ...inhalt])

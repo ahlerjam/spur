@@ -22,6 +22,7 @@ import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
+import * as TexDateien from '../kompilieren/TexDateien.mjs'
 import * as TexPakete from '../kompilieren/TexPakete.mjs'
 import * as Projektdatei from '../hochladen/Projektdatei.mjs'
 import * as UploadLink from '../hochladen/UploadLink.mjs'
@@ -670,6 +671,20 @@ Object.assign(WERKZEUGE, {
     async ausfuehren({ project_id: pid, paket, datei }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
       return await TexPakete.hinzufuegen({ projectId, menschId, botId, paket, datei })
+    },
+  },
+
+  tex_file_read: {
+    description:
+      'Liest eine Datei der TeX-Installation, etwa um das Verhalten einer Klasse zu verstehen (apa7.cls, biblatex.def). ' +
+      'name ist nur ein Dateiname mit Endung .cls, .sty, .bst, .bbx, .cbx, .lbx, .def, .cfg, .clo, .tex oder .ldf; ' +
+      'Dateien aus tex-pakete/ des Projekts werden zuerst gefunden. Liefert pfad, herkunft (projekt oder installation), ' +
+      'zeilen und bis zu 40.000 Zeichen ab ab_zeile (gekuerzt). Nicht gefunden: tex_datei_nicht_gefunden; dann holt ' +
+      'tex_package_add das Paket.',
+    inputSchema: z.object({ project_id: id, name: z.string().max(200), ab_zeile: z.number().int().min(1).optional() }),
+    async ausfuehren({ project_id: pid, name, ab_zeile: abZeile }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      return await TexDateien.lesen({ projectId, name, abZeile })
     },
   },
 

@@ -55,6 +55,7 @@ beforeEach(async () => {
       status: vi.fn(),
     },
     TexPakete: { hinzufuegen: vi.fn(async () => ({ paket: 'xfrac', dateien: [], fehlende_abhaengigkeiten: [] })) },
+    TexDateien: { lesen: vi.fn(async ({ name }) => ({ name, pfad: '/tex/article.cls', zeilen: 3, text: 'x' })) },
     UploadLink: { GUELTIG_MINUTEN: 15, MAX_DATEIEN: 50, MAX_PROJEKTDATEIEN: 20, erzeugen: vi.fn(async () => ({ link: 'https://x/spur/hochladen/t' })) },
     Projektdatei: { abbildungAusQuelle: vi.fn(async ({ pfad }) => ({ pfad, lizenz: 'cc-by', quellenangabe: 'Aus \\textcite{offen2023}, S. 3, Lizenz CC BY.' })) },
     Aufnahme: {
@@ -88,6 +89,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/kompilieren/Kompilieren.mjs', () => m.Kompilieren)
   vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => m.TexPakete)
   vi.doMock('../../app/src/hochladen/UploadLink.mjs', () => m.UploadLink)
+  vi.doMock('../../app/src/kompilieren/TexDateien.mjs', () => m.TexDateien)
   vi.doMock('../../app/src/hochladen/Projektdatei.mjs', () => m.Projektdatei)
   vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
   vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
@@ -118,6 +120,7 @@ describe('Rechte der Werkzeuge', () => {
     ['compile_log', {}],
     ['page_image', { seite: 1 }],
     ['source_page_image', { quelle_id: 'q', pdf_seite: 1 }],
+    ['tex_file_read', { name: 'article.cls' }],
   ]
 
   it.each(alleLesen)('%s verweigert Nutzern ohne Zugriff mit keine_rechte', async (name, args) => {
@@ -677,5 +680,14 @@ describe('Recherche', () => {
     })
     // Ausschnitt und Pfad prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feld ergibt.
     expect(WERKZEUGE.source_figure_add.inputSchema.safeParse({ ...args, quelle_id: projekt, ausschnitt: { x: 0, y: 0, breite: 0, hoehe: 2 }, pfad: 'a.jpg' }).success).toBe(true)
+  })
+
+  it('tex_file_read liest mit Leserecht und reicht Projekt, Name und Zeile weiter', async () => {
+    mitStufe('readOnly')
+    expect(await aufruf('tex_file_read', { project_id: projekt, name: 'article.cls', ab_zeile: 200 })).toMatchObject({ name: 'article.cls' })
+    expect(m.TexDateien.lesen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), name: 'article.cls', abZeile: 200 })
+    // Den Namen prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feld ergibt.
+    expect(WERKZEUGE.tex_file_read.inputSchema.safeParse({ project_id: projekt, name: '../../etc/passwd' }).success).toBe(true)
+    expect(WERKZEUGE.tex_file_read.description).toMatch(/tex_package_add/)
   })
 })

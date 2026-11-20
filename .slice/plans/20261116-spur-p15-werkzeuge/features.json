@@ -82,7 +82,7 @@
         "Der erste Spiegel des TeX-Live-Fakes antwortet für `spurzwei` mit 404, der zweite liefert das Archiv: `tex_package_add` legt das Paket an",
         "Antworten beide mit 404, lautet der Fehler wie bisher „Paket nicht gefunden“, nicht `spiegel_nicht_erreichbar`"
       ],
-      "passes": false
+      "passes": true
     }
   ]
 }

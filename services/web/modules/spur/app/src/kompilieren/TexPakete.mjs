@@ -74,6 +74,9 @@ class Wiederholen extends Error {
   }
 }
 
+// Ein Spiegel kennt das Paket nicht; ein anderer kann neuer sein.
+class NichtGefunden extends Error {}
+
 async function einmalHerunterladen(url, ziel, paket, grenze) {
   let antwort
   try {
@@ -81,7 +84,10 @@ async function einmalHerunterladen(url, ziel, paket, grenze) {
   } catch {
     throw new Wiederholen(null)
   }
-  if (antwort.status === 404) throw new WerkzeugFehler('paket_unbekannt', 'spur_fehler_tex_paket_unbekannt')
+  if (antwort.status === 404) {
+    await antwort.body?.cancel()
+    throw new NichtGefunden()
+  }
   if (antwort.status >= 500) {
     await antwort.body?.cancel()
     throw new Wiederholen(antwort.status)
@@ -111,21 +117,29 @@ async function einmalHerunterladen(url, ziel, paket, grenze) {
   }
 }
 
-// Je Spiegel drei Versuche bei 5xx und Netzfehlern, dann der nächste Spiegel. 404 und Größe brechen sofort ab.
+// Je Spiegel drei Versuche bei 5xx und Netzfehlern, dann der nächste Spiegel; bei 404 sofort der nächste. Unbekannt
+// ist ein Paket erst, wenn alle Spiegel 404 melden. Größe bricht sofort ab.
 async function herunterladen(paket, ziel, grenze) {
   let letzter
-  for (const spiegel of await spiegelListe()) {
+  let nichtGefunden = 0
+  const spiegel = await spiegelListe()
+  for (const basis of spiegel) {
     for (let versuch = 1; versuch <= VERSUCHE_JE_SPIEGEL; versuch++) {
       try {
-        return await einmalHerunterladen(`${spiegel}/archive/${paket}.tar.xz`, ziel, paket, grenze)
+        return await einmalHerunterladen(`${basis}/archive/${paket}.tar.xz`, ziel, paket, grenze)
       } catch (error) {
+        if (error instanceof NichtGefunden) {
+          nichtGefunden++
+          break
+        }
         if (!(error instanceof Wiederholen)) throw error
         letzter = error
-        logger.warn({ spiegel, paket, versuch, status: error.status }, 'TeX-Paketquelle antwortet nicht')
+        logger.warn({ spiegel: basis, paket, versuch, status: error.status }, 'TeX-Paketquelle antwortet nicht')
         if (versuch < VERSUCHE_JE_SPIEGEL) await warten(PAUSE_MS * versuch)
       }
     }
   }
+  if (nichtGefunden === spiegel.length) throw new WerkzeugFehler('paket_unbekannt', 'spur_fehler_tex_paket_unbekannt')
   if (letzter.status) {
     throw new WerkzeugFehler('spiegel_nicht_erreichbar', 'spur_fehler_tex_spiegel_status', { status: letzter.status })
   }

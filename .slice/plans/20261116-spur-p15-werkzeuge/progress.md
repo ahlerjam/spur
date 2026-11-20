@@ -16,6 +16,9 @@
 - f5: Eine Bearbeitung (`doc_edit`) erkennt spur am Seed ihrer Change-IDs (`tc` in `spurUpdate`, RangesTracker setzt ihn vor jede ID). Der Lauf merkt sich je Bearbeitung `{seed, anzahl, rot}`, angenommene Changes ihren Seed. `offen` kommt live aus den Track Changes im Dokument, also stimmt es auch nach dem Annehmen im Browser. `rot` bleibt nach dem Annehmen stehen (Zahl der rot markierten Änderungen des Laufs); der Satz im `hinweis` nennt nur offene rote.
 - f5: `hinweis` nutzt Zahlwörter bis zwölf (aus `spur_zahlwoerter` der Sprachdatei), darüber Ziffern. Ohne Lauf (nur `reply` legt keinen an) liefert `run_status` `lauf: null`, `aenderungen.gesamt: 0` und einen Satz ohne Zahlen.
 - f5: Die Laufkarte zeigt „2 automatisch angenommen, 1 offen“ unter „Dateien · Änderungen“, nur wenn der Lauf etwas geändert hat.
+- f6: `tex_file_read` nimmt zusätzlich `project_id` (Leserecht): Dateien aus `tex-pakete/` des Projekts werden zuerst gefunden, dafür braucht das Werkzeug das Projekt. Die Antwort nennt `herkunft` (`projekt` oder `installation`).
+- f6: `kpsewhich` läuft aus einem leeren Ordner (es sucht sonst auch im Arbeitsordner des Servers); ein Treffer außerhalb von `SELFAUTOPARENT` und `TEXMFLOCAL` gilt als nicht gefunden. Ungültige Namen erreichen `kpsewhich` nicht. Im CLSI-Log stand nach dem E2E-Lauf kein Zugriff auf `/etc` (`spur-dev logs clsi`).
+- f6: Antwortet ein Spiegel mit 404, fragt spur sofort den nächsten; `paket_unbekannt` erst, wenn alle 404 melden. 404 auf dem einen und Ausfall auf dem anderen Spiegel ergibt `spiegel_nicht_erreichbar`, weil spur dann nicht weiß, ob es das Paket gibt. Der TeX-Live-Fake liefert `spurzwei` nur auf dem zweiten Spiegel.
 
 ## Needs decision
 - f5: Soll eine Zahl ohne Beleg eine Änderung rot machen (nie automatisch angenommen)?
@@ -23,6 +26,7 @@
   Options: A (empfohlen) so lassen, Zahlen bleiben ein Hinweis | B Zahlen ohne Beleg wie rote Zitate nie automatisch annehmen
 
 ## Angepasste ältere Tests
+- `texPaketeHinzufuegen.test.mjs`: „meldet ein unbekanntes Paket ohne Wiederholung und ohne zweiten Spiegel“ fragt jetzt laut Spec auch den zweiten Spiegel (Backlog-Punkt).
 - `laufAktionen.test.mjs`: `laufDaten` liefert am Lauf zusätzlich `stand`; angenommene Changes tragen `seed`. `werkzeuge.test.mjs`: `run_status`/`run_finish` liefern zusätzlich `aenderungen` und `hinweis`.
 - Meldung `spur_fehler_alttext_mehrfach` nennt jetzt `alle_vorkommen` (Spec); Code `konflikt` unverändert.
 - Meldung `spur_fehler_link_verbraucht` nennt nicht mehr `source_upload_link`, weil es jetzt zwei Arten von Links gibt (Code `link_verbraucht` unverändert).
