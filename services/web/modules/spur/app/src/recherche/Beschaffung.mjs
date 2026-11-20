@@ -160,9 +160,9 @@ async function beschaffen(projectId, eintrag, quelle, userId) {
   }
   // Metadaten der Quelle sind frischer als die der Liste und tragen schon die Reihenfolge der Autoren aus dem PDF.
   const meta = quelle.meta?.gefunden ? quelle.meta : eintrag.meta
-  const mitDoi = { ...quelle, doi: eintrag.doi, meta, metadaten: undefined }
-  // Ersatzangaben eines Uploads sind damit überholt; ein schon geschriebener @misc-Eintrag bleibt, wie jeder Eintrag.
-  await (await quellen()).updateOne({ _id: quelle._id }, { $set: { doi: eintrag.doi, meta }, $unset: { metadaten: '' } })
+  const mitDoi = { ...quelle, doi: eintrag.doi, meta }
+  // Ein Upload mit Ersatzangaben behält metadaten: 'unvollstaendig': Sein @misc-Eintrag bleibt, spur ändert keine Einträge.
+  await (await quellen()).updateOne({ _id: quelle._id }, { $set: { doi: eintrag.doi, meta } })
   await ZitatManager.bibSicherstellen(projectId, await PruefManager.dokumente(projectId), mitDoi, userId)
   const ergebnis = await (await beschaffungen()).findOneAndUpdate(
     { _id: eintrag._id, status: 'offen' },

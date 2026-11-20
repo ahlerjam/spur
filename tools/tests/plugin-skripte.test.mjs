@@ -77,7 +77,7 @@ before(async () => {
         if (datei === 'scan.pdf') return json(res, 200, { datei, status: 'abgelehnt', grund: 'Datei ist keine PDF-Datei' })
         if (datei === 'nirgends.pdf') {
           const metadaten_hinweis = 'Crossref kennt die DOI 10.9999/nirgends.1 nicht. Der .bib-Eintrag ist @misc mit dem Titel; prüfe die DOI und ergänze die Angaben.'
-          return json(res, 200, { datei, status: 'angelegt', quelle_id: QUELLE_ID, key: 'nirgends', metadaten: 'unvollstaendig', metadaten_hinweis })
+          return json(res, 200, { datei, status: 'angelegt', quelle_id: QUELLE_ID, key: 'nirgends', autoren: 'abweichend', autoren_hinweis: 'Autoren im PDF nicht gefunden – bitte prüfen', metadaten: 'unvollstaendig', metadaten_hinweis })
         }
         return json(res, 200, { datei, status: 'angelegt', quelle_id: QUELLE_ID })
       }
@@ -225,12 +225,13 @@ test('spur-hochladen gibt für Quellen ohne DOI Autoren, Jahr, Art, Institution 
   )
 })
 
-test('spur-hochladen nennt unvollständige Metadaten in einer zweiten Zeile (P13)', async () => {
+test('spur-hochladen nennt Hinweise zu Autoren und Metadaten in eigenen Zeilen (P13)', async () => {
   writeFileSync(join(arbeit, 'nirgends.pdf'), PDF)
   const r = await laufAsync('spur-hochladen', [`${basis}/upload/ok`, 'nirgends.pdf', '--doi', '10.9999/nirgends.1'])
   assert.equal(r.status, 0, r.stderr)
   assert.deepEqual(r.stdout.trim().split('\n'), [
     `nirgends.pdf: Quelle ${QUELLE_ID}`,
+    'nirgends.pdf: Autoren im PDF nicht gefunden – bitte prüfen',
     'nirgends.pdf: Crossref kennt die DOI 10.9999/nirgends.1 nicht. Der .bib-Eintrag ist @misc mit dem Titel; prüfe die DOI und ergänze die Angaben.',
   ])
 })

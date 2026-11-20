@@ -4,7 +4,8 @@ const EINTRAG = /@([a-zA-Z]+)\s*\{\s*([^,\s]+)\s*,/g
 
 function feldWert(rumpf, name) {
   const m = new RegExp(`\\b${name}\\s*=\\s*[{"]`, 'i').exec(rumpf)
-  if (!m) return null
+  // BibTeX erlaubt Zahlen und @string-Namen ohne Klammern: year = 2020.
+  if (!m) return new RegExp(`\\b${name}\\s*=\\s*([\\w.:-]+)`, 'i').exec(rumpf)?.[1] ?? null
   const start = m.index + m[0].length
   const auf = m[0].at(-1)
   let tiefe = 1

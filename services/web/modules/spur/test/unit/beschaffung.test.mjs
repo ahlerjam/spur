@@ -134,13 +134,13 @@ describe('Beschaffungsliste', () => {
     expect(m.ZitatManager.bibSicherstellen.mock.calls[0][2].meta).toEqual(eigene)
   })
 
-  it('nimmt für eine Quelle mit Ersatzangaben die Metadaten der Liste und hebt den Vermerk auf', async () => {
+  it('nimmt für eine Quelle mit Ersatzangaben die Metadaten der Liste und behält den Vermerk, solange die .bib @misc bleibt', async () => {
     await hinzufuegen('10.5555/spur.2024.001')
     const quelle = await quelleAnlegen({ doi: '10.5555/spur.2024.001', meta: { titel: 'smith', art: 'misc' }, metadaten: 'unvollstaendig' })
     await Beschaffung.perDoiZuordnen(projectId, quelle, userId)
     const neu = await datenbank.db.collection('spurSources').findOne({ _id: quelle._id })
     expect(neu).toMatchObject({ meta: META })
-    expect(neu).not.toHaveProperty('metadaten')
+    expect(neu.metadaten).toBe('unvollstaendig')
   })
 
   it('lässt ein PDF ohne passende DOI offen', async () => {

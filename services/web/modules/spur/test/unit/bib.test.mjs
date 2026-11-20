@@ -45,6 +45,11 @@ describe('bibLesen', () => {
     expect(bibLesen(bib).get('b')).toMatchObject({ typ: 'online', date: '2024-01-03', eid: 'e1', volume: null })
   })
 
+  it('liest unverklammerte Zahlen und Bezeichner (year = 2020, month = jan)', () => {
+    const e = bibLesen('@article{k, year = 2020, volume = 12,\n  number=3, doi = {10.1/k}}').get('k')
+    expect(e).toMatchObject({ year: '2020', volume: '12', number: '3', doi: '10.1/k' })
+  })
+
   it('liest nichts aus Text ohne Einträge', () => {
     expect(bibLesen('% nur ein Kommentar').size).toBe(0)
   })

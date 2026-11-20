@@ -14,7 +14,7 @@ Für Quellen ohne DOI (Abschlussarbeit, Report, Working Paper): --titel mit --au
 .bib-Eintrag an. Mit --doi kommen die Metadaten von der DOI. Jede Datei bekommt einen
 .bib-Eintrag; ohne Metadaten ein @misc-Eintrag mit Titel. Je Datei eine Zeile:
   <datei>: Quelle <id>
-  <datei>: <hinweis>          (zusätzlich, wenn Metadaten fehlen, etwa die DOI unbekannt ist)
+  <datei>: <hinweis>          (zusätzlich je Hinweis: Titel oder Autoren passen nicht zum PDF, Metadaten fehlen)
   <datei>: schon vorhanden (Quelle <id>)
   <datei>: <grund>
 Exit 1, wenn eine Datei scheiterte.
@@ -76,8 +76,10 @@ for pfad in "${dateien[@]}"; do
   case "$code:$status" in
     200:angelegt)
       echo "$pfad: Quelle $(feld quelle_id)"
-      hinweis=$(feld metadaten_hinweis)
-      [ -z "$hinweis" ] || echo "$pfad: $hinweis" ;;
+      for name in hinweis autoren_hinweis metadaten_hinweis; do
+        hinweis=$(feld "$name")
+        [ -z "$hinweis" ] || echo "$pfad: $hinweis"
+      done ;;
     200:vorhanden) echo "$pfad: schon vorhanden (Quelle $(feld quelle_id))"; ;;
     200:abgelehnt) echo "$pfad: $(feld grund)"; rc=1 ;;
     *)
