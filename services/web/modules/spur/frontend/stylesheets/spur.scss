@@ -1002,6 +1002,8 @@ $spur-sm: 575.98px;
   display: inline-block;
   margin-top: var(--spacing-02);
   font-size: var(--font-size-02);
+  // Wie bei .spur-paper-doi: im dunklen Panel die Linkfarbe des Editors.
+  color: var(--link-ui-themed);
 }
 
 .spur-bibliothek-link + .spur-bibliothek-link {

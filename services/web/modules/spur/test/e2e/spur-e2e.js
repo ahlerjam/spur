@@ -7198,6 +7198,8 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       for (const px of [360, 1280]) {
         await breite(px)
         await bereich.first().waitFor({ timeout: 20000 })
+        // Knöpfe blenden ihre Farbe beim Freischalten über; gemessen wird erst der ruhende Zustand.
+        await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'), null, { timeout: 5000 }).catch(() => {})
         const panel = page.locator('.spur-panel').first()
         ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1), `${wo} läuft über bei ${px} px`)
         const schlecht = await unlesbar(panel)

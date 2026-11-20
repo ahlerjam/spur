@@ -244,7 +244,7 @@ export default function Beschaffung() {
                     <p className="spur-zeile-meta spur-paper-doi">{e.doi}</p>
                     {e.status === 'offen' && e.grund && (
                       <p className="spur-zeile-meta">
-                        <OLBadge bg="light" className="spur-grund-badge">
+                        <OLBadge bg="light" text="dark" className="spur-grund-badge">
                           {t(e.grund === 'bot_schutz' ? 'spur_grund_bot_schutz' : 'spur_grund_nicht_frei')}
                         </OLBadge>
                       </p>
