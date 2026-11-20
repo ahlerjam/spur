@@ -5,7 +5,7 @@ import { WerkzeugFehler } from '../mcp/fehler.mjs'
 export const ORDNER = 'tex-pakete'
 export const ZWEITER_SPIEGEL = 'https://mirror.ctan.org/systems/texlive/tlnet'
 const ENDUNGEN = new Set([
-  '.sty', '.cls', '.def', '.cfg', '.fd', '.ldf', '.clo', '.bst', '.tex', '.lua',
+  '.sty', '.cls', '.def', '.cfg', '.fd', '.ldf', '.clo', '.bst', '.bbx', '.cbx', '.lbx', '.dbx', '.tex', '.lua',
   '.pfb', '.tfm', '.vf', '.map', '.enc', '.otf', '.ttf',
 ])
 const SICHERER_DATEINAME = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/
@@ -20,6 +20,14 @@ foreach my $var ('TEXINPUTS', 'BSTINPUTS', 'TFMFONTS', 'T1FONTS', 'VFFONTS', 'EN
 export function paketNamePruefen(name) {
   if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name) || name.length > 100) {
     throw new WerkzeugFehler('eingabe_ungueltig', 'spur_fehler_tex_paket_name')
+  }
+}
+
+export const dateiNameGueltig = name => typeof name === 'string' && name.length <= 200 && SICHERER_DATEINAME.test(name)
+
+export function dateiNamePruefen(name) {
+  if (!dateiNameGueltig(name)) {
+    throw new WerkzeugFehler('eingabe_ungueltig', 'spur_fehler_tex_datei_name')
   }
 }
 
@@ -50,6 +58,29 @@ export function datenbankLesen(text) {
   const namen = new Set([...text.matchAll(/^name (\S+)$/gm)].map(m => m[1]))
   const spiegel = /^depend opt_location:(\S+)$/m.exec(text)?.[1] ?? ZWEITER_SPIEGEL
   return { namen, spiegel }
+}
+
+// Datei → Paket aus den runfiles der texlive.tlpdb, Zeile für Zeile (die Datei des Spiegels hat über 20 MB).
+// Architektur-Pakete (minted.x86_64-linux) und latex-dev zählen nicht; bei Dubletten gilt das erste Paket.
+export function dateiIndexSammler() {
+  const index = new Map()
+  let paket = null
+  let laufzeit = false
+  return {
+    index,
+    zeile(zeile) {
+      if (zeile.startsWith('name ')) {
+        paket = zeile.slice(5).includes('.') ? null : zeile.slice(5)
+        laufzeit = false
+      } else if (!zeile.startsWith(' ')) {
+        laufzeit = zeile.startsWith('runfiles ')
+      } else if (laufzeit && paket) {
+        const pfad = zeile.trim().split(' ')[0]
+        const name = Path.posix.basename(pfad)
+        if (ENDUNGEN.has(Path.posix.extname(name)) && !pfad.includes('/latex-dev/') && !index.has(name)) index.set(name, paket)
+      }
+    },
+  }
 }
 
 export function abhaengigkeiten(tlpobj) {

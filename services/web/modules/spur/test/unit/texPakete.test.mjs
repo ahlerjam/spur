@@ -124,3 +124,56 @@ describe('latexmkrc', () => {
     expect(T.latexmkrcErgaenzen(neu)).toBe(null)
   })
 })
+
+describe('Dateiindex der texlive.tlpdb', () => {
+  const TLPDB = `name 00texlive.config
+depend opt_location:https://mirror.example/tlnet
+
+name beamertheme-focus
+category Package
+runfiles size=12
+ RELOC/tex/latex/beamertheme-focus/beamerthemefocus.sty
+ RELOC/tex/latex/beamertheme-focus/beamercolorthemefocus.sty
+docfiles size=3
+ RELOC/doc/latex/beamertheme-focus/README.md
+catalogue-version 3.4
+
+name pgf
+runfiles size=900
+ RELOC/tex/latex/pgf/frontendlayer/tikz.sty
+ RELOC/tex/latex/pgf/README
+
+name latex-tools-dev
+runfiles size=10
+ RELOC/tex/latex-dev/tools/array.sty
+
+name tools
+runfiles size=10
+ RELOC/tex/latex/tools/array.sty
+
+name minted.x86_64-linux
+binfiles arch=x86_64-linux size=1
+ bin/x86_64-linux/latexminted.sty
+
+name lm
+runfiles size=1
+ RELOC/fonts/tfm/public/lm/ec-lmr10.tfm
+`
+  const lesen = text => {
+    const sammler = T.dateiIndexSammler()
+    for (const zeile of text.split('\n')) sammler.zeile(zeile)
+    return sammler.index
+  }
+
+  it('ordnet jeder Laufzeitdatei ihr Paket zu, nicht Dokumentation und nicht latex-dev', () => {
+    const index = lesen(TLPDB)
+    expect(index.get('beamerthemefocus.sty')).toBe('beamertheme-focus')
+    expect(index.get('beamercolorthemefocus.sty')).toBe('beamertheme-focus')
+    expect(index.get('tikz.sty')).toBe('pgf')
+    expect(index.get('array.sty')).toBe('tools')
+    expect(index.get('ec-lmr10.tfm')).toBe('lm')
+    expect(index.has('README.md')).toBe(false)
+    expect(index.has('README')).toBe(false)
+    expect(index.has('latexminted.sty')).toBe(false)
+  })
+})

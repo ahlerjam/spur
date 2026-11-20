@@ -3423,5 +3423,7 @@
   "heading_subparagraph": "",
   "log_level_error": "",
   "log_level_warning": "",
-  "log_level_typesetting": ""
+  "log_level_typesetting": "",
+  "spur_tex_fehlende_datei": "",
+  "spur_tex_fehlendes_paket": ""
 }

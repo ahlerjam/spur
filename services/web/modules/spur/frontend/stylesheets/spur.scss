@@ -1376,3 +1376,20 @@ $spur-sm: 575.98px;
 .spur-pruef-feld .spur-zeile-meta {
   margin: var(--spacing-02) 0 0;
 }
+
+// Über den Einträgen im Log-Bereich, im Stil eines Log-Eintrags mit Fehlerfarbe.
+.spur-fehlende-pakete {
+  margin: 0;
+  padding: var(--spacing-04);
+  list-style: none;
+  background-color: var(--bg-primary-themed);
+  border-left: 4px solid var(--border-danger-themed);
+  border-radius: var(--border-radius-base);
+  color: var(--content-primary-themed);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+
+  li + li {
+    margin-top: var(--spacing-02);
+  }
+}

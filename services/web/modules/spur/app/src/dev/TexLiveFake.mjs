@@ -1,7 +1,7 @@
 // Fake des TeX-Live-Archivs für Tests (nur mit SPUR_DEV=1, unter dem Paper-Fake eingehängt): baut <paket>.tar.xz
 // zur Anfrage aus den Dateien unter test/fixtures/texlive/<paket>/. Drei Pakete gibt es nur hier: eins mit einem
 // Eintrag außerhalb des Archivs (spurtest-ausbruch), eins über 100 MB (spurtest-riesig, nur der Header) und eins
-// mit 30 MB entpackt (spurtest-gross).
+// mit 30 MB entpackt (spurtest-gross). Die Paketdatenbank (tlpkg/texlive.tlpdb.xz) entsteht aus denselben Ordnern.
 import { spawn } from 'node:child_process'
 import { mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -46,4 +46,26 @@ export async function texLiveFake(req, res) {
   const inhalt = paket && (await readdir(`${FIXTURES}${paket}`).catch(() => null))
   if (!inhalt) return res.sendStatus(404)
   archiv(res, ['-C', `${FIXTURES}${paket}`, ...inhalt])
+}
+
+async function dateienUnter(ordner, pfad = '') {
+  const eintraege = await readdir(Path.join(ordner, pfad), { withFileTypes: true })
+  const listen = await Promise.all(
+    eintraege.map(e => (e.isDirectory() ? dateienUnter(ordner, Path.join(pfad, e.name)) : [Path.join(pfad, e.name)]))
+  )
+  return listen.flat()
+}
+
+export async function texLiveDatenbankFake(req, res) {
+  const pakete = (await readdir(FIXTURES, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => e.name)
+  const bloecke = await Promise.all(
+    pakete.map(async paket => {
+      const laufzeit = (await dateienUnter(`${FIXTURES}${paket}`)).filter(p => !p.startsWith('tlpkg/'))
+      return `name ${paket}\nrunfiles size=1\n${laufzeit.map(p => ` RELOC/${p}`).join('\n')}\n`
+    })
+  )
+  res.type('application/x-xz')
+  const xz = spawn('xz', ['-c'])
+  xz.stdout.pipe(res)
+  xz.stdin.end(bloecke.join('\n'))
 }

@@ -486,4 +486,12 @@ describe('Recherche', () => {
     await aufruf('tex_package_add', { project_id: projekt, paket: 'xfrac' })
     expect(m.TexPakete.hinzufuegen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: 'xfrac' })
   })
+
+  it('tex_package_add reicht datei statt paket weiter, auch nur mit Schreibrecht', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('tex_package_add', { project_id: projekt, datei: 'booktabs.sty' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    await aufruf('tex_package_add', { project_id: projekt, datei: 'booktabs.sty' })
+    expect(m.TexPakete.hinzufuegen).toHaveBeenLastCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: undefined, datei: 'booktabs.sty' })
+  })
 })

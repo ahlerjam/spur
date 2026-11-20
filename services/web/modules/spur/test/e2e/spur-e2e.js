@@ -6812,6 +6812,82 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(block.length === 3 && block[0] === '\\begin{minted}{python}', `README ohne Drei-Zeilen-Beispiel: ${block}`)
   }
 
+  features.p16f3 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E Fehlende Pakete')
+    const json = wert => JSON.stringify(wert)
+    // Der Editor kompiliert beim Öffnen selbst; ein Compile direkt danach meldet „too-recently-compiled“.
+    const kompilieren = async () => {
+      for (let i = 0; i < 10; i++) {
+        const job = await kompiliertBeiClaude(token, pid)
+        if (job.ergebnis?.compile !== 'too-recently-compiled') return job
+        await page.waitForTimeout(1500)
+      }
+      fail('Compile bleibt „too-recently-compiled“')
+    }
+    const fehlend = async erwartet => {
+      const job = await kompilieren()
+      ok(job.ergebnis.compile !== 'success' && json(job.ergebnis.fehlende_pakete) === json(erwartet), `job_status: ${json(job.ergebnis)}`)
+      const { inhalt: log } = await werkzeug(token, 'compile_log', { project_id: pid })
+      ok(json(log.fehlende_pakete) === json(erwartet), `compile_log: ${json(log.fehlende_pakete)}`)
+    }
+    const zeile = text => page.locator('.spur-fehlende-pakete').getByText(text, { exact: true })
+    // Kompiliert im Editor, bis der Lauf nicht mehr als „gerade erst kompiliert“ übersprungen wird.
+    const imEditor = async fertig => {
+      const uebersprungen = page.getByText('gerade erst kompiliert', { exact: false }).first()
+      for (let versuch = 1; ; versuch++) {
+        await page.getByRole('button', { name: KOMPILIEREN }).first().click()
+        await fertig.or(uebersprungen).waitFor({ state: 'visible', timeout: 120000 })
+        if (await fertig.isVisible()) return
+        ok(versuch < 5, 'Kompilieren wurde fünfmal übersprungen')
+        await page.waitForTimeout(10000)
+      }
+    }
+
+    await fakeSteuern({ cachesLeeren: true })
+    await fehlend([{ datei: 'spurdemo.sty', paket: 'spurdemo', im_image: false }])
+    await projektOeffnen('E2E Fehlende Pakete')
+    await imEditor(zeile('Fehlendes Paket: spurdemo (für spurdemo.sty)'))
+
+    const demo = await werkzeug(token, 'tex_package_add', { project_id: pid, datei: 'spurdemo.sty' })
+    ok(!demo.fehler && demo.inhalt.paket === 'spurdemo' && demo.inhalt.dateien.includes('tex-pakete/spurdemo/spurdemo.sty'), `spurdemo: ${json(demo.inhalt)}`)
+    await fehlend([{ datei: 'beamerthemefocus.sty', paket: 'beamertheme-focus', im_image: false }])
+    const focus = await werkzeug(token, 'tex_package_add', { project_id: pid, paket: 'beamertheme-focus' })
+    ok(!focus.fehler && focus.inhalt.dateien.includes('tex-pakete/beamertheme-focus/beamerthemefocus.sty'), `focus: ${json(focus.inhalt)}`)
+    const erfolg = await kompilieren()
+    ok(erfolg.ergebnis.compile === 'success' && json(erfolg.ergebnis.fehlende_pakete) === '[]', `Nach dem Nachladen: ${json(erfolg.ergebnis)}`)
+    ok(json((await werkzeug(token, 'compile_log', { project_id: pid })).inhalt.fehlende_pakete) === '[]', 'compile_log nach Erfolg nicht leer')
+    await imEditor(page.locator('.pdf-viewer .page').first())
+    await page.getByRole('button', { name: 'Protokoll anzeigen' }).click()
+    await page.getByText('Rohprotokoll', { exact: true }).first().waitFor({ timeout: 30000 })
+    ok((await page.locator('.spur-fehlende-pakete').count()) === 0, 'Zeile über dem Log nach erfolgreichem Compile noch da')
+
+    const bearbeitet = await werkzeug(token, 'doc_edit', {
+      project_id: pid, pfad: 'main.tex', alt: '\\usepackage{spurdemo}', neu: '\\usepackage{spurdemo}\n\\usepackage{gibtesnicht}', idempotenz_schluessel: `p16f3-${Date.now()}`,
+    })
+    ok(!bearbeitet.fehler, `doc_edit: ${json(bearbeitet.inhalt)}`)
+    await fehlend([{ datei: 'gibtesnicht.sty', paket: null, im_image: false }])
+    await imEditor(zeile('Fehlende Datei: gibtesnicht.sty'))
+    const unbekannt = await werkzeug(token, 'tex_package_add', { project_id: pid, datei: 'gibtesnicht.sty' })
+    ok(unbekannt.fehler && unbekannt.inhalt.fehler === 'paket_unbekannt' && unbekannt.inhalt.detail.includes('gibtesnicht.sty'), `gibtesnicht: ${json(unbekannt.inhalt)}`)
+
+    await fakeSteuern({ ausfall: ['texlive', 'texlive-b'], cachesLeeren: true })
+    try {
+      await fehlend([{ datei: 'gibtesnicht.sty', paket: null, im_image: false, grund: 'spiegel_nicht_erreichbar' }])
+    } finally {
+      await fakeSteuern({ cachesLeeren: true })
+    }
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Pakete nachgeladen.' })
+
+    const REPO = `${FIXTURES}/../../../../../..`
+    const skill = await repoDatei(`${REPO}/plugins/spur/skills/spur/SKILL.md`)
+    const ablauf = skill.split('## Missing LaTeX packages\n')[1]?.split('\n## ')[0] ?? ''
+    for (const teil of ['fehlende_pakete', 'datei']) ok(ablauf.includes(teil), `SKILL.md: Ablauf ohne „${teil}“`)
+    ok(!ablauf.includes('Find the TeX Live package that contains the file'), 'SKILL.md beschreibt noch die Suche im Log')
+  }
+
   // Braucht ein Dev-Image aus dem Workflow `Dev image` mit dem Stand von P16; ein älteres hat die Pakete aus P6 nicht.
   features.p16f1b = async () => {
     await anmelden('e2e-a@example.org')

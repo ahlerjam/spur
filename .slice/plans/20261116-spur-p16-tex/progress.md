@@ -3,6 +3,14 @@
 ## Stand
 - f1: alle Schritte gebaut, Schritt 5 lässt sich im Dev-Stack nicht prüfen (siehe Needs decision); `passes` bleibt false. E2E `p16f1` (Repo-Prüfungen) ok, `p16f1b` (Compile im Dev-Stack) übersprungen, solange das Dev-Image älter als P16 ist.
 - f2: besteht (`p16f2`).
+- f3: besteht (`p16f3`).
+
+## f3
+- Zuordnung Datei → Paket aus `<spiegel>/tlpkg/texlive.tlpdb.xz` (2,8 MB, entpackt 21 MB), gestreamt durch `xz -dc`, nur Laufzeitdateien mit den Endungen, die `tex_package_add` auch anlegt; im Speicher des Web-Prozesses 24 h vorgehalten, gleichzeitige Abfragen teilen einen Abruf, ein Ausfall wird nicht vorgehalten. Erst der Spiegel des Images, dann `mirror.ctan.org`, je einmal.
+- Kein `netz.mjs`: Die Spiegel-Adresse kommt aus der `texlive.tlpdb` des Images bzw. ist fest (wie beim Archiv-Download in P7), nie aus Nutzereingaben; im Dev-Stack ist der Fake lokal und wäre gesperrt.
+- Der Browser liest die fehlenden Dateien selbst aus dem Log (dasselbe Modul `fehlendeDateien.mjs` wie der Server) und fragt `GET /spur/project/<id>/tex-pakete/fehlend?datei=…` (Leserecht, höchstens 20 Dateien). Antwortet der Server nicht, stehen die Dateien ohne Paket da.
+- `.bbx`, `.cbx`, `.lbx`, `.dbx` zählen jetzt als Laufzeitdateien (vorher legte `tex_package_add` biblatex-Stile ohne diese Dateien an).
+- Fake: `texlive.tlpdb.xz` entsteht aus `test/fixtures/texlive/`; `_steuerung` mit `cachesLeeren` vergisst auch die Zuordnung.
 
 ## Needs decision
 - f1: Schritt 5 braucht ein Dev-Image mit den Paketen aus P6 (`babel-german`, `siunitx`). Das gezogene `ghcr.io/ahlerjam/spur-dev:amd64` ist älter: `kpsewhich ngerman.ldf` und `kpsewhich siunitx.sty` finden nichts, seine `texlive.tlpdb` hat 167 Pakete, Compile scheitert mit „Unknown option 'ngerman'“ und „File `siunitx.sty' not found“. Die Pakete stehen seit `eb7c4e1dc4` (P6 f9) in `server-ce/Dockerfile-base`; der Workflow `Dev image` lief seitdem offenbar nicht.

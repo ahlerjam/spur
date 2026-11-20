@@ -452,7 +452,9 @@ Object.assign(WERKZEUGE, {
   },
 
   job_status: {
-    description: 'Stand eines Jobs: „laeuft“, „fertig“ oder „fehlgeschlagen“, dazu das Ergebnis.',
+    description:
+      'Stand eines Jobs: „laeuft“, „fertig“ oder „fehlgeschlagen“, dazu das Ergebnis. Beim Compile nennt ' +
+      'ergebnis.fehlende_pakete fehlende Dateien mit ihrem TeX-Live-Paket.',
     inputSchema: z.object({ job_id: id }),
     async ausfuehren({ job_id: jobId }, { botId }) {
       return await Kompilieren.status(jobId, botId)
@@ -460,7 +462,9 @@ Object.assign(WERKZEUGE, {
   },
 
   compile_log: {
-    description: 'Fehler des letzten Compiles mit Zeile und Meldung, dazu das Ende des LaTeX-Logs.',
+    description:
+      'Fehler des letzten Compiles mit Zeile und Meldung, dazu das Ende des LaTeX-Logs. fehlende_pakete nennt je ' +
+      'fehlender Datei das TeX-Live-Paket (paket, null wenn unbekannt); tex_package_add holt es.',
     inputSchema: z.object({ project_id: id }),
     async ausfuehren({ project_id: pid }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
@@ -482,14 +486,15 @@ Object.assign(WERKZEUGE, {
 
   tex_package_add: {
     description:
-      'Holt ein TeX-Live-Paket (Name wie in TeX Live, etwa xfrac oder beamertheme-focus), das nicht im Image ist, ' +
-      'aus dem TeX-Live-Archiv ins Projekt unter tex-pakete/<paket>/. Danach neu kompilieren. ' +
+      'Holt ein TeX-Live-Paket, das nicht im Image ist, aus dem TeX-Live-Archiv ins Projekt unter tex-pakete/<paket>/. ' +
+      'Gib paket (Name wie in TeX Live, etwa xfrac oder beamertheme-focus) oder datei an (etwa booktabs.sty aus ' +
+      'fehlende_pakete von compile_log); spur sucht dann das Paket dazu. Danach neu kompilieren. ' +
       'fehlende_abhaengigkeiten nennt Pakete, die du ebenso holen musst; im_image heißt, es ist schon da. ' +
       'Die Dateien gehören zum Lauf; „Lauf rückgängig“ entfernt sie.',
-    inputSchema: z.object({ project_id: id, paket: z.string().min(1).max(200) }),
-    async ausfuehren({ project_id: pid, paket }, { menschId, botId }) {
+    inputSchema: z.object({ project_id: id, paket: z.string().min(1).max(200).optional(), datei: z.string().min(1).max(200).optional() }),
+    async ausfuehren({ project_id: pid, paket, datei }, { menschId, botId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
-      return await TexPakete.hinzufuegen({ projectId, menschId, botId, paket })
+      return await TexPakete.hinzufuegen({ projectId, menschId, botId, paket, datei })
     },
   },
 

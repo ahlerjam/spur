@@ -38,7 +38,7 @@
         "Im Browser steht nach dem gescheiterten Kompilieren über dem Log „Fehlendes Paket: spurdemo (für spurdemo.sty)“; bei unbekannter Zuordnung „Fehlende Datei: gibtesnicht.sty“; nach erfolgreichem Kompilieren ist die Zeile weg",
         "Der Abschnitt „Missing LaTeX packages“ im Plugin-Skill beschreibt den neuen Weg in zwei Sätzen statt der Suche im Log"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     }
   ]

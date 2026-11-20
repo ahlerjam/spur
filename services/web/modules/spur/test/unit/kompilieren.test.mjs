@@ -62,6 +62,10 @@ beforeEach(async () => {
   }))
   vi.doMock('@overleaf/settings', () => ({ default: { disablePerUserCompiles: true } }))
   vi.doMock('../../app/src/pdf.mjs', () => m.pdf)
+  m.TexPakete = {
+    fehlendePakete: vi.fn(async liste => liste.map(datei => ({ datei, paket: datei === 'spurdemo.sty' ? 'spurdemo' : null, im_image: false }))),
+  }
+  vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => m.TexPakete)
   vi.stubGlobal(
     'fetch',
     vi.fn(async url => {
@@ -143,5 +147,34 @@ describe('Compile-Jobs', () => {
 
   it('verlangt vor Log und Bild einen fertigen Compile', async () => {
     expect(await fehlerVon(Kompilieren.log({ projectId, botId: bot }))).toMatchObject({ code: 'kein_compile' })
+  })
+
+  describe('fehlende Pakete', () => {
+    const FEHLT = "(./main.tex\n! LaTeX Error: File `spurdemo.sty' not found.\n\nType X to quit or <RETURN> to proceed,\n! Emergency stop."
+    const gescheitert = () =>
+      m.CompileManager.promises.compile.mockResolvedValue({ status: 'failure', buildId: 'b-fehlt', outputFiles: [{ path: 'output.log' }] })
+
+    it('stehen im Ergebnis eines gescheiterten Compiles und in compile_log', async () => {
+      dateien['output.log'] = Buffer.from(FEHLT)
+      gescheitert()
+      const job = await fertig((await Kompilieren.starten({ projectId, menschId: mensch, botId: bot })).job_id)
+      const erwartet = [{ datei: 'spurdemo.sty', paket: 'spurdemo', im_image: false }]
+      expect(job).toMatchObject({ status: 'fertig', ergebnis: { compile: 'failure', fehlende_pakete: erwartet } })
+      expect((await Kompilieren.log({ projectId, botId: bot })).fehlende_pakete).toEqual(erwartet)
+    })
+
+    it('sind nach einem erfolgreichen Compile leer, ohne Abfrage', async () => {
+      const job = await fertig((await Kompilieren.starten({ projectId, menschId: mensch, botId: bot })).job_id)
+      expect(job.ergebnis.fehlende_pakete).toEqual([])
+      expect((await Kompilieren.log({ projectId, botId: bot })).fehlende_pakete).toEqual([])
+      expect(m.TexPakete.fehlendePakete).not.toHaveBeenCalledWith(expect.arrayContaining([expect.anything()]))
+    })
+
+    it('lassen den Job nicht scheitern, wenn das Log fehlt', async () => {
+      delete dateien['output.log']
+      gescheitert()
+      const job = await fertig((await Kompilieren.starten({ projectId, menschId: mensch, botId: bot })).job_id)
+      expect(job).toMatchObject({ status: 'fertig', ergebnis: { compile: 'failure', fehlende_pakete: [] } })
+    })
   })
 })

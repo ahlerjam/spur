@@ -23,6 +23,8 @@ import * as Literatur from './literatur/Literatur.mjs'
 import * as Offenlegung from './offenlegung/Offenlegung.mjs'
 import * as Semantik from './semantik/Semantik.mjs'
 import * as Workflows from './workflows/Workflows.mjs'
+import * as TexPakete from './kompilieren/TexPakete.mjs'
+import { dateiNameGueltig } from './kompilieren/texArchiv.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -383,6 +385,15 @@ async function laeufeDaten(req, bot, vor) {
     weitereLaeufe: weitere,
   }
 }
+
+// Für den Log-Bereich im Editor: Der Browser liest die fehlenden Dateien aus dem Log, der Server kennt die Pakete.
+export const fehlendePakete = mitProblemen(async (req, res) => {
+  const dateien = [req.query.datei ?? []].flat()
+  if (dateien.length > 20 || !dateien.every(dateiNameGueltig)) {
+    throw new Problem(400, 'eingabe_ungueltig', 'spur_fehler_tex_datei_name')
+  }
+  res.json({ fehlende_pakete: await TexPakete.fehlendePakete(dateien) })
+})
 
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)

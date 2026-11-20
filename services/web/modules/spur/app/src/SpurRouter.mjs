@@ -143,6 +143,7 @@ export default {
     webRouter.get('/spur/project/:project_id/pruefbericht/makros', ...lesen, SpurController.pruefMakros)
     webRouter.put('/spur/project/:project_id/pruefbericht/makros', ...schreiben, SpurController.pruefMakrosSetzen)
     webRouter.get('/spur/project/:project_id/claude', ...lesen, SpurController.claudeStatus)
+    webRouter.get('/spur/project/:project_id/tex-pakete/fehlend', ...lesen, SpurController.fehlendePakete)
     webRouter.post('/spur/project/:project_id/claude/auftrag', ...lesen, SpurController.claudeAuftrag)
     webRouter.get('/spur/project/:project_id/workflows', ...lesen, SpurController.workflows)
     webRouter.post('/spur/project/:project_id/workflows/:name/starten', ...lesen, SpurController.workflowStarten)
