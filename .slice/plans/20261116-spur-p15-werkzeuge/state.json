@@ -1,7 +1,8 @@
 {
   "state": "queued",
-  "builderModel": "fable",
+  "builderModel": "opus",
   "dependsOn": [
     "20261116-spur-p14-pruefbericht"
-  ]
+  ],
+  "builderAdvisor": "opus"
 }

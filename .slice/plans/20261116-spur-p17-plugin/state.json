@@ -1,9 +1,10 @@
 {
   "state": "queued",
-  "builderModel": "fable",
+  "builderModel": "opus",
   "dependsOn": [
     "20261116-spur-p13-bib",
     "20261116-spur-p15-werkzeuge",
     "20261116-spur-p16-tex"
-  ]
+  ],
+  "builderAdvisor": "opus"
 }
