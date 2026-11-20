@@ -228,6 +228,10 @@ Breite 0.45\linewidth, Abstand 1.5\baselineskip, 0.3\columnwidth, 12pt, 3.5mm, 2
     expect(zahlenOhneBeleg(String.raw`\scalebox{0.75}[0.8]{Wert 412}`)).toEqual(['412'])
   })
 
+  it('liest keine Klammer aus dem nächsten Absatz als Argument einer Einstellung', () => {
+    expect(zahlenOhneBeleg('\\setstretch{1.5}\n\n{\\small Die Stichprobe umfasst 1234 Personen.}')).toEqual(['1234'])
+  })
+
   it('meldet Zahlen im Fließtext und in Tabellenzellen weiter', () => {
     expect(zahlenOhneBeleg('Die Genauigkeit stieg um 12,5 Prozent auf 0,89.')).toEqual(['12,5', '0,89'])
     expect(zahlenOhneBeleg('Gruppe A & 75,7 \\\\')).toEqual(['75,7'])

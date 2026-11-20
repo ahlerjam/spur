@@ -60,4 +60,9 @@ Nachgetragen: P14 baut keine neue Ansicht, sondern drei Abzeichen in die bestehe
 - P12: `prisma()` liest bei jeder Seite des Suchprotokolls alle Treffer; nur auf der ersten Seite oder per Aggregation in Mongo zählen. Dublettenregel in `Recherche.zusammenfuehren` und `Suchprotokoll.schluesselVon` vereinheitlichen; der Grund „nicht beschaffbar“ steht an zwei Stellen.
 - P14: `seitenbasis` beim Aufnehmen an der Quelle festlegen statt in `seitenStatus` nach `art` zu unterscheiden.
 
+### Aus dem zweiten Code-Review auf `64f017e6..HEAD` (nach /simplify)
+- Behoben (P14): Argumente von Einstellungsbefehlen enden an einer Leerzeile; vorher fiel eine Klammergruppe im nächsten Absatz aus der Zahlenprüfung.
+- P14, bewusst nach Spec belassen: Bücher oder Scans mit Vorspann und ohne erkannte Seitenzahlen werden gegen die PDF-Seite geprüft; ein Zitat von S. 45 auf PDF-Seite 45 gilt als „PDF-Seite: stimmt“, auch wenn gedruckt S. 33 dasteht. Das Abzeichen nennt die PDF-Seite; ob solche Quellen besser einen bestätigten Versatz brauchen, wäre eine Owner-Entscheidung.
+- P16 `TexPakete.mjs:172`: Ausfall der Paketdatenbank kurz vorhalten. P12 `werkzeuge.mjs:420`: `paper_search` liefert ab Seite 50 einen Cursor, der wieder Seite 50 liefert. P12 `Recherche.mjs:82`: Fehler beim Protokollieren lässt die Suche scheitern. P12 `Beschaffung.mjs:42`: `vormerken` überschreibt beschaffte Einträge. `.slice/decisions.md`: D15 doppelt vergeben.
+
 ## Replies

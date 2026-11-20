@@ -86,6 +86,8 @@ function argumenteEnde(text, pos, maxPflicht = Infinity) {
     while (/\s/.test(text[p] ?? '')) p++
     if (text[p] === '=') p++
     while (/\s/.test(text[p] ?? '')) p++
+    // Nach einer Leerzeile beginnt ein neuer Absatz, keine Argumente mehr.
+    if (/\n[ \t]*\n/.test(text.slice(pos, p))) return pos
     const zu = { '[': ']', '{': '}' }[text[p]]
     if (zu === '}' && pflicht++ >= maxPflicht) return pos
     const ende = zu ? klammerEnde(text, p, text[p], zu) : -1
