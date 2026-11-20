@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
+import { meldung } from '../../app/src/meldungen.mjs'
 
 const FIXTURES = fileURLToPath(new URL('../fixtures/', import.meta.url))
 const projectId = new ObjectId()
@@ -172,8 +173,7 @@ describe('abbildungAusQuelle', () => {
   it.each([null, 'cc-by-nd', 'implied-oa'])('lehnt die Lizenz %s mit lizenz_fehlt ab und legt nichts an', async lizenz => {
     const fehler = await fehlerVon(holen(quelle(lizenz)))
     expect(fehler).toMatchObject({ status: 409, typ: 'lizenz_fehlt' })
-    expect(fehler.message).toMatch(/nachzeichnen|in Anlehnung an/i)
-    expect(fehler.message).toMatch(/Erlaubnis/)
+    expect(fehler.message).toBe(meldung('spur_fehler_lizenz_fehlt', { key: 'offen2023' }))
     expect(baum.size).toBe(0)
   })
 

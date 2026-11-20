@@ -180,7 +180,7 @@ describe('fuerKarte und laufDaten', () => {
     docSetzen('Text', [change(`${seed}000001`, { p: 0, i: 'neu' })])
     const l = await lauf({ aenderungen: 1, bearbeitungen: [{ seed, anzahl: 1, rot: false }] })
     expect((await LaufAktionen.laufDaten(projekt, l)).lauf.stand).toEqual({ gesamt: 1, automatisch_angenommen: 0, offen: 1, rot: 0 })
-    expect(await LaufAktionen.stand(projekt, l)).toMatchObject({ aenderungen: { offen: 1 }, hinweis: expect.stringContaining('Track Change') })
+    expect(await LaufAktionen.stand(projekt, l)).toMatchObject({ aenderungen: { offen: 1 }, hinweis: expect.stringContaining(meldung('spur_lauf_hinweis_offen_1')) })
     expect(await LaufAktionen.stand(projekt, null)).toMatchObject({ aenderungen: { gesamt: 0 } })
   })
 
