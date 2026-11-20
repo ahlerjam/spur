@@ -231,7 +231,7 @@
   "spur_fehler_tex_paket_gross": "Package __paket__ is __groesse__ MB unpacked; the limit is __mb__ MB. Ask your admin to raise the limit or add the package to the image.",
   "spur_fehler_tex_paket_name": "That is not a package name: use letters, digits, hyphens and underscores, as in TeX Live (for example \"xfrac\" or \"beamertheme-focus\").",
   "spur_fehler_tex_paket_unbekannt": "The TeX Live archive has no such package. Check the name on ctan.org; the TeX Live name can differ from the file name.",
-  "spur_fehler_tex_paket_oder_datei": "Give either \"paket\" (the TeX Live name) or \"datei\" (such as \"booktabs.sty\"), not both and not neither.",
+  "spur_fehler_tex_paket_oder_datei": "Give exactly one of \"paket\" (the TeX Live name) or \"datei\" (such as \"booktabs.sty\").",
   "spur_fehler_tex_datei_name": "That is not a file name: use letters, digits, dots, hyphens, plus signs and underscores, such as \"booktabs.sty\".",
   "spur_fehler_tex_dateien_viele": "At most __anzahl__ files per request.",
   "spur_fehler_tex_datei_unbekannt": "No TeX Live package contains __datei__. Check the file name in the log; your own files belong in the project.",
