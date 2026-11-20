@@ -1,8 +1,11 @@
 {
-  "state": "queued",
+  "state": "running",
   "builderModel": "opus",
   "dependsOn": [
     "20261116-spur-p14-pruefbericht"
   ],
-  "builderAdvisor": "opus"
+  "builderAdvisor": "opus",
+  "runBranch": "slice/run-20261116-spur-p15-werkzeuge",
+  "sessionId": "f57cbbf3-0f3b-40b3-80a4-61951b318af0",
+  "started": "2026-11-20T20:50:27Z"
 }
