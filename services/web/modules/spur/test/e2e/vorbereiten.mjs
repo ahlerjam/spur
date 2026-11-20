@@ -577,6 +577,13 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await neuAnlegen(a, 'E2E P13 Upload', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E P13 Alt', { 'main.tex': P13_ALT_MAIN, 'references.bib': P13_ALT_BIB })
   await p14Vorbereiten(a)
+  await p15Vorbereiten(a)
+}
+
+// P15: Werkzeuge. lang2024 hat auf PDF-Seite 2 9.500 Zeichen.
+async function p15Vorbereiten(a) {
+  const quellen = await neuAnlegen(a, 'E2E P15 Quellen', { 'main.tex': LEER })
+  await quelleAusFixture(quellen._id, a._id, 'lang2024.pdf')
 }
 
 const P14_KOPF = String.raw`\documentclass{article}

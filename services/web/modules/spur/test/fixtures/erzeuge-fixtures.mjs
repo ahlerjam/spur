@@ -277,3 +277,21 @@ writeFileSync(
     title: 'Teams and knowledge',
   })
 )
+// P15: Seite 2 hat 9.500 Zeichen (jede Zeile mit Zeilenumbruch, wie pdftotext -raw im Image sie liefert); der
+// Suchbegriff „persisted after twelve weeks“ steht bei Zeichen 6.037, hinter der Grenze von 4.000 Zeichen je source_read.
+const ZEILE = 150
+const fuellzeile = (n, laenge = ZEILE) => `Methods line ${n}: the cohort was followed with weekly sessions and structured interviews. `.repeat(3).slice(0, laenge - 1) + '.'
+const SATZ = 'The effect persisted after twelve weeks.'
+const satzAnfang = 6037 - SATZ.indexOf('persisted')
+const vorher = Math.floor(satzAnfang / (ZEILE + 1))
+const rest = 9500 - (satzAnfang + SATZ.length + 1)
+const langSeite2 = [
+  ...Array.from({ length: vorher }, (_, i) => fuellzeile(i + 1)),
+  `${fuellzeile(vorher + 1, satzAnfang % (ZEILE + 1))}${SATZ}`,
+  ...Array.from({ length: Math.floor(rest / (ZEILE + 1)) }, (_, i) => fuellzeile(vorher + 2 + i)),
+  fuellzeile(99, (rest % (ZEILE + 1)) - 1),
+]
+writeFileSync(
+  join(here, 'lang2024.pdf'),
+  buildPdf({ pages: [['Long-term effects of sleep training', 'K. Lang'], langSeite2], title: 'Long-term effects of sleep training', size: 5 })
+)

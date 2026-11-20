@@ -7858,6 +7858,44 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Grafik überarbeitet.' })
   }
 
+  // P15: Werkzeuge. Quellen des Projekts „E2E P15 Quellen“ nach Key.
+  async function p15Quellen(token, name = 'E2E P15 Quellen') {
+    const pid = await projektId(token, name)
+    const { inhalt } = await werkzeug(token, 'sources_list', { project_id: pid })
+    return { pid, quelle: key => inhalt.eintraege.find(q => q.key === key) ?? fail(`Quelle ${key} fehlt: ${JSON.stringify(inhalt.eintraege.map(q => q.key))}`) }
+  }
+
+  features.p15f1 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const { pid, quelle } = await p15Quellen(token)
+    const lang = quelle('lang2024')
+    const SATZ = 'The effect persisted after twelve weeks.'
+
+    const { inhalt: suche } = await werkzeug(token, 'source_search', { project_id: pid, query: 'persisted after twelve weeks' })
+    const treffer = suche.treffer.find(t => t.quelle_id === lang.id)
+    ok(treffer?.pdf_seite === 2 && treffer.position === 6037, `source_search: ${json(suche)}`)
+
+    const lesen = async args => await werkzeug(token, 'source_read', { project_id: pid, source_id: lang.id, pdf_seite: 2, ...args })
+    const ab = (await lesen({ ab_zeichen: 6000 })).inhalt
+    ok(ab.text.includes(SATZ), `ab 6000 ohne den Satz: ${json(ab.text.slice(0, 120))}`)
+    const felder = ({ ab_zeichen, bis_zeichen, zeichen_gesamt, gekuerzt }) => json({ ab_zeichen, bis_zeichen, zeichen_gesamt, gekuerzt })
+    ok(felder(ab) === json({ ab_zeichen: 6000, bis_zeichen: 9500, zeichen_gesamt: 9500, gekuerzt: false }), `ab 6000: ${felder(ab)}`)
+
+    const anfang = (await lesen({})).inhalt
+    ok(anfang.text.length === 4000 && anfang.gekuerzt === true && anfang.zeichen_gesamt === 9500, `ohne ab_zeichen: ${felder(anfang)}`)
+
+    const dahinter = (await lesen({ ab_zeichen: 20000 })).inhalt
+    ok(dahinter.text === '' && dahinter.zeichen_gesamt === 9500, `ab 20000: ${json(dahinter)}`)
+    const negativ = await lesen({ ab_zeichen: -1 })
+    ok(negativ.fehler && negativ.inhalt.fehler === 'eingabe_ungueltig' && negativ.inhalt.feld === 'ab_zeichen', `ab -1: ${json(negativ.inhalt)}`)
+
+    const { daten } = await mcp(token, 'tools/list')
+    const beschreibung = daten.result.tools.find(w => w.name === 'source_read').description
+    ok(/mit bis_zeichen als nächstes ab_zeichen weiter/.test(beschreibung), `Beschreibung: ${beschreibung}`)
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

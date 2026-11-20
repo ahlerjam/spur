@@ -302,9 +302,52 @@ describe('Lesen im Projekt', () => {
       quelle_id: 'q1',
       seite: 3,
       text: 'abcd',
+      ab_zeichen: 0,
+      bis_zeichen: 4,
+      zeichen_gesamt: 10,
       gekuerzt: true,
     })
     expect((await aufruf('source_read', { project_id: projekt, source_id: 'q1', pdf_seite: 3 })).gekuerzt).toBe(false)
+  })
+
+  describe('source_read ab einer Stelle', () => {
+    // Echter Fall: Treffer von source_search an Position 4858 und 6037 lagen hinter Zeichen 4000.
+    const text = `${'x'.repeat(6037)}The effect persisted after twelve weeks.${'y'.repeat(9500 - 6037 - 40)}`
+    const lesen = args => aufruf('source_read', { project_id: projekt, source_id: 'q1', pdf_seite: 2, ...args })
+    beforeEach(() => {
+      m.QuellenManager.holen.mockResolvedValue({ _id: 'q1' })
+      m.QuellenManager.seite.mockResolvedValue({ seite: 2, label: null, text })
+    })
+
+    it('liest ab ab_zeichen bis zum Seitenende', async () => {
+      const r = await lesen({ ab_zeichen: 6000 })
+      expect(r.text).toContain('The effect persisted after twelve weeks.')
+      expect(r).toMatchObject({ ab_zeichen: 6000, bis_zeichen: 9500, zeichen_gesamt: 9500, gekuerzt: false })
+    })
+
+    it('liest ab 4858 höchstens 4000 Zeichen', async () => {
+      expect(await lesen({ ab_zeichen: 4858 })).toMatchObject({ ab_zeichen: 4858, bis_zeichen: 8858, gekuerzt: true })
+    })
+
+    it('liefert ohne ab_zeichen die ersten 4000 Zeichen und die Gesamtzahl', async () => {
+      const r = await lesen({})
+      expect(r.text).toHaveLength(4000)
+      expect(r).toMatchObject({ ab_zeichen: 0, bis_zeichen: 4000, zeichen_gesamt: 9500, gekuerzt: true })
+    })
+
+    it('liefert hinter dem Seitenende leeren Text statt eines Fehlers', async () => {
+      expect(await lesen({ ab_zeichen: 20000 })).toMatchObject({ text: '', zeichen_gesamt: 9500, gekuerzt: false })
+    })
+
+    it('lehnt negatives ab_zeichen mit eingabe_ungueltig ab', async () => {
+      const fehler = await fehlerVon(lesen({ ab_zeichen: -1 }))
+      expect(fehler).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'ab_zeichen' } })
+      expect(WERKZEUGE.source_read.inputSchema.safeParse({ project_id: projekt, source_id: projekt, pdf_seite: 2, ab_zeichen: -1 }).success).toBe(true)
+    })
+
+    it('sagt in der Beschreibung, wie man weiterliest', () => {
+      expect(WERKZEUGE.source_read.description).toMatch(/bis_zeichen.*als nächstes ab_zeichen/)
+    })
   })
 
   it('check_report liefert Zeilen seitenweise samt Statistik', async () => {
