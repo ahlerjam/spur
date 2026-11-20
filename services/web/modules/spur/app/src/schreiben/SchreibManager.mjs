@@ -250,8 +250,10 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
 
   // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt, in .bib-Dateien stehen nur Metadaten.
   const ohnePruefung = istBib || /(^|\/)ergebnisse\.tex$/.test(doc.pfad)
-  const lage = lageImDokument(neuerText, start)
-  const kandidaten = ohnePruefung ? [] : zahlenOhneBeleg(neu, [], lage)
+  const ohneLage = ohnePruefung ? [] : zahlenOhneBeleg(neu)
+  // Die Lage kostet einen Lauf über den Text davor; nur bestimmen, wenn das Stück Zahlen hat.
+  const lage = ohneLage.length ? lageImDokument(neuerText, start) : null
+  const kandidaten = ohneLage.length ? zahlenOhneBeleg(neu, [], lage) : []
   const zahlen = kandidaten.length ? zahlenOhneBeleg(neu, await ergebnisZahlen(projectId), lage) : []
   const op = opsFuer(start, alt, neu)
   const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)

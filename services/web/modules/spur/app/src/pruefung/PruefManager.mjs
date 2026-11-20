@@ -263,13 +263,12 @@ export async function bericht(projectId) {
     const starts = zeilenStarts(doc.text)
     for (const { abschnitt, liste, uebersprungen: weg } of await zeilenFuer(projectId, teile, kontext, basis, nutzung)) {
       uebersprungen += weg
-      for (const [i, z] of liste.entries()) {
+      for (const z of liste) {
         const von = z.von + abschnitt.von
-        // Die Keys einer Stelle teilen die Position; ab dem zweiten unterscheidet der Key.
-        const gleicheStelle = i > 0 && liste[i - 1].von === z.von
         zeilen.push({
           ...z,
-          id: hash(doc.docId, String(von), ...(gleicheStelle ? [z.key ?? ''] : [])).slice(0, 12),
+          // Die Keys einer Stelle teilen die Position.
+          id: hash(doc.docId, String(von), z.key ?? '').slice(0, 12),
           docId: doc.docId,
           pfad: doc.pfad,
           von,

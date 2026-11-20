@@ -72,7 +72,7 @@ async function pdfAuslesen(pfad) {
 async function versatzBestimmen(pfad, texte, meta) {
   const spanne = meta?.gefunden ? meta.seiten : null
   const ausLabels = await versatzAusLabels(pfad).catch(() => null)
-  if (spanne && versatzInSpanne(ausLabels, texte.length, spanne)) return { versatz: ausLabels, versatzQuelle: 'pagelabels' }
+  if (versatzInSpanne(ausLabels, texte.length, spanne)) return { versatz: ausLabels, versatzQuelle: 'pagelabels' }
   const ausText = versatzAusSeitentext(texte)
   if (ausText != null && (!spanneBekannt(spanne) || versatzInSpanne(ausText, texte.length, spanne))) {
     return { versatz: ausText, versatzQuelle: 'seitentext' }

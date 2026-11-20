@@ -36,7 +36,7 @@ function maskieren(text) {
   return teile.join('')
 }
 
-function klammerEnde(text, start, auf, zu) {
+export function klammerEnde(text, start, auf, zu) {
   let tiefe = 0
   for (let i = start; i < text.length; i++) {
     const c = text[i]
@@ -203,7 +203,7 @@ function zitatBefehl(text, name, start, pos) {
     ? { belege: innen.belege, bis: inhalt.pos }
     : folgenderBeleg(text, inhalt.pos)
   // \textquote und \blockquote sind für Zitate gedacht: ohne Beleg nicht prüfbar statt unsichtbar.
-  return { ...zeileMitZitat(name, inhalt, start, inhalt.pos, beleg), ohneBelegUnbekannt: true }
+  return zeileMitZitat(name, inhalt, start, inhalt.pos, beleg)
 }
 
 function quoteUmgebung(text, start, pos) {
@@ -247,9 +247,11 @@ function unbekannteForm(text, name, start, pos) {
 }
 
 // Ein Zitat ohne Beleg: \textquote und \blockquote bleiben als nicht prüfbar sichtbar, sonst ist es nur Text.
-function ohneBelegBehandeln({ ohneBelegUnbekannt, ...zeile }) {
+const SICHTBAR_OHNE_BELEG = new Set(['textquote', 'blockquote'])
+
+function ohneBelegBehandeln(zeile) {
   if (zeile.belege.length) return zeile
-  return ohneBelegUnbekannt ? { ...zeile, form: 'unbekannt', befehl: zeile.form } : { ende: zeile.bis }
+  return SICHTBAR_OHNE_BELEG.has(zeile.form) ? { ...zeile, form: 'unbekannt', befehl: zeile.form } : { ende: zeile.bis }
 }
 
 const IST_UNBEKANNT = name =>

@@ -1,14 +1,16 @@
+import { klammerEnde } from '../pruefung/latex.mjs'
 // Heuristik für Zahlen in Claudes Text, die nicht aus ergebnisse.tex stammen.
 // Gemeldet: Zahlen im Fließtext, Werte in \num, \qty, \SI, \SIrange und in Formeln Dezimalzahlen und Zahlen
 // ab drei Stellen. Nicht gemeldet: Seitenangaben, Jahreszahlen, Datum, Uhrzeit (auch „9 Uhr“), Versionsnummern (auch „Python 3.12“), Befehlsargumente, Kommentare, Grafiken (TikZ,
 // pgfplots), Farbangaben, optionale Argumente und einzelne Ganzzahlen bis zwei Stellen in Formeln (Exponenten,
 // Indizes).
+const MATHE_UMGEBUNGEN = ['equation', 'align', 'gather', 'multline', 'eqnarray', 'math', 'displaymath']
 const MATHE = [
   /\$\$[\s\S]*?\$\$/g,
   /\$(?:\\.|[^$\\])*\$/g,
   /\\\([\s\S]*?\\\)/g,
   /\\\[[\s\S]*?\\\]/g,
-  /\\begin\{(equation|align|gather|multline|eqnarray|math|displaymath)\*?\}[\s\S]*?\\end\{\1\*?\}/g,
+  new RegExp(`\\\\begin\\{(${MATHE_UMGEBUNGEN.join('|')})\\*?\\}[\\s\\S]*?\\\\end\\{\\1\\*?\\}`, 'g'),
 ]
 const KOMMENTAR = /(?<!\\)%.*$/gm
 const DEFINITION = /\\(?:re)?newcommand\*?\s*\{?\\\w+\}?(?:\[\d\])?\s*\{(?:[^{}]|\{[^{}]*\})*\}/g
@@ -17,7 +19,6 @@ const GRAFIK_UMGEBUNGEN = [
   'scope', 'tikzcd', 'circuitikz', 'forest', 'pgfonlayer',
 ]
 const GRAFIK = new RegExp(`\\\\begin\\{(${GRAFIK_UMGEBUNGEN.join('|')})\\}[\\s\\S]*?\\\\end\\{\\1\\}`, 'g')
-const MATHE_UMGEBUNGEN = ['equation', 'align', 'gather', 'multline', 'eqnarray', 'math', 'displaymath']
 // Befehle, deren Argumente Einstellungen sind, keine Ergebnisse; die Argumente können verschachtelt sein.
 const EINSTELLUNGEN = new Set([
   'tikzset', 'tikzstyle', 'pgfplotsset', 'usetikzlibrary', 'geometry', 'hypersetup', 'captionsetup', 'setstretch',
@@ -73,16 +74,6 @@ function formelZahlen(formel) {
 // Alle Zahlen eines Textes, etwa aus ergebnisse.tex.
 export function zahlenIn(text) {
   return dezimalzeichen(text).match(ZAHL) ?? []
-}
-
-function klammerEnde(text, start, auf, zu) {
-  let tiefe = 0
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === '\\') i++
-    else if (text[i] === auf) tiefe++
-    else if (text[i] === zu && --tiefe === 0) return i
-  }
-  return -1
 }
 
 // Ende der Argumente ab pos: [..], {..} und bei \tikzstyle das „=[..]“, beliebig verschachtelt.
