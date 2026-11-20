@@ -69,7 +69,7 @@ before(async () => {
         const body = Buffer.concat(chunks).toString('latin1')
         const feld = n => body.match(new RegExp(`name="${n}"\\r\\n\\r\\n([^\\r]*)`))?.[1]
         const datei = body.match(/filename="([^"]*)"/)?.[1]
-        uploads.push({ pfad: url.pathname, datei, doi: feld('doi'), titel: feld('titel') })
+        uploads.push({ pfad: url.pathname, datei, doi: feld('doi'), titel: feld('titel'), ...Object.fromEntries(['autoren', 'jahr', 'art', 'institution', 'url'].map(n => [n, feld(n)])) })
         if (url.pathname === '/upload/abgelaufen') {
           return json(res, 410, { fehler: 'link_abgelaufen', detail: 'Link abgelaufen' })
         }
@@ -205,6 +205,26 @@ test('spur-hochladen nimmt Optionen vor den Dateien und gibt den Titel mit', asy
   const r = await laufAsync('spur-hochladen', ['--titel', 'Ein Titel; mit @Zeichen', `${basis}/upload/ok`, 'a.pdf'])
   assert.equal(r.status, 0, r.stderr)
   assert.equal(uploads[0].titel, 'Ein Titel; mit @Zeichen')
+})
+
+test('spur-hochladen gibt für Quellen ohne DOI Autoren, Jahr, Art, Institution und Adresse mit', async () => {
+  writeFileSync(join(arbeit, 'report.pdf'), PDF)
+  const r = await laufAsync('spur-hochladen', [
+    `${basis}/upload/ok`, 'report.pdf', '--titel', 'AI at Work', '--autoren', 'Meyer, Jana; Okafor, Chidi',
+    '--jahr', '2023', '--art', 'report', '--institution', 'OECD', '--url', 'https://oecd.example/ai-at-work?a=1&b=2',
+  ])
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(r.stdout.trim(), `report.pdf: Quelle ${QUELLE_ID}`)
+  assert.deepEqual(
+    { ...uploads[0], pfad: undefined, datei: undefined },
+    { pfad: undefined, datei: undefined, doi: undefined, titel: 'AI at Work', autoren: 'Meyer, Jana; Okafor, Chidi', jahr: '2023', art: 'report', institution: 'OECD', url: 'https://oecd.example/ai-at-work?a=1&b=2' }
+  )
+})
+
+test('spur-hochladen verlangt zu jeder Option einen Wert', () => {
+  const r = lauf('spur-hochladen', [`${basis}/upload/ok`, 'a.pdf', '--art'])
+  assert.equal(r.status, 2)
+  assert.match(r.stderr, /--art braucht einen Wert/)
 })
 
 test('spur-hochladen gibt abgelehnte Dateien mit Grund aus und endet mit Fehler', async () => {

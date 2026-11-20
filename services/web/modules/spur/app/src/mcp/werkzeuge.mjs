@@ -6,6 +6,7 @@ import * as LaufAktionen from '../schreiben/LaufAktionen.mjs'
 import * as LaufManager from '../schreiben/LaufManager.mjs'
 import * as SchreibManager from '../schreiben/SchreibManager.mjs'
 import { WerkzeugFehler } from './fehler.mjs'
+import { Problem } from '../probleme.mjs'
 import { rolleFuerClaude, rolleImVertrag } from '../rechte.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
@@ -13,7 +14,10 @@ import { bibLesen } from '../pruefung/bib.mjs'
 import { referenzStatus } from '../pruefung/bewertung.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
 import * as Recherche from '../recherche/Recherche.mjs'
+import * as Suchprotokoll from '../recherche/Suchprotokoll.mjs'
+import { eingabeUngueltig } from '../recherche/ohneDoi.mjs'
 import * as Aufnahme from '../recherche/Aufnahme.mjs'
+import { titelBefund } from '../recherche/titelabgleich.mjs'
 import * as Beschaffung from '../recherche/Beschaffung.mjs'
 import * as Literatur from '../literatur/Literatur.mjs'
 import * as Kompilieren from '../kompilieren/Kompilieren.mjs'
@@ -134,7 +138,9 @@ export const WERKZEUGE = {
   },
 
   sources_list: {
-    description: 'Quellen eines Projekts mit Status, ohne Text.',
+    description:
+      'Quellen eines Projekts mit Status, ohne Text. titelabgleich (passt, abweichend, nicht_pruefbar) vergleicht den Titel ' +
+      'aus den Metadaten mit dem Anfang des PDFs; bei abweichend sagt hinweis, dass das PDF ein anderes Werk sein kann.',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
@@ -148,6 +154,7 @@ export const WERKZEUGE = {
           seiten: q.seitenzahl,
           status: q.status,
           fassung: q.fassung,
+          ...titelBefund(q),
         })),
         cursor
       )
@@ -387,19 +394,71 @@ Object.assign(WERKZEUGE, {
   paper_search: {
     description:
       'Sucht Paper über arXiv, OpenAlex, Crossref und Semantic Scholar. Treffer mit DOI, Titel, Autoren, Jahr, Abstract, ' +
-      'Diensten und Open-Access-Status. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar, fehler nennt den ' +
-      'Grund; hinweis ist gesetzt, wenn keiner geantwortet hat. Die Suche landet im Suchprotokoll des Projekts.',
-    inputSchema: z.object({ project_id: id, anfrage: z.string().min(1).max(300), seite: z.number().int().min(0).max(50).optional() }),
-    async ausfuehren({ project_id: pid, anfrage, seite = 0 }, { menschId }) {
+      'Diensten und Open-Access-Status. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar und nennt die ' +
+      'versuche (bei 429, 503 und Netzfehlern fragt spur bis zu dreimal; 0 heißt: Antwort aus dem Cache). fehler nennt den ' +
+      'Grund; hinweis ist gesetzt, wenn keiner geantwortet hat. Weitere Seiten: cursor aus naechster_cursor (oder seite). ' +
+      'Jede Anfrage landet im Suchprotokoll des Projekts (search_log).',
+    inputSchema: z.object({
+      project_id: id,
+      anfrage: z.string().min(1).max(300),
+      seite: z.number().int().min(0).max(50).optional(),
+      cursor: z.string().regex(/^\d{1,2}$/).optional(),
+    }),
+    async ausfuehren({ project_id: pid, anfrage, seite = 0, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)
-      return await Recherche.suchen({ projectId, userId: menschId, anfrage, seite })
+      const ergebnis = await Recherche.suchen({ projectId, userId: menschId, anfrage, seite: cursor ? Math.min(50, Number(cursor)) : seite })
+      return { ...ergebnis, naechster_cursor: ergebnis.weiter ? String(ergebnis.seite + 1) : null }
+    },
+  },
+
+  search_log: {
+    description:
+      'Suchprotokoll des Projekts für ein PRISMA-Flussdiagramm, nur lesend. eintraege: jede Anfrage von paper_search in ' +
+      'zeitlicher Folge, auch Folgeseiten, mit zeit, anfrage, filter (derzeit immer null), seite, je Dienst status ' +
+      '(geantwortet, gedrosselt, nicht_erreichbar), treffer und versuche, dazu treffer (Summe) und dubletten der Anfrage. ' +
+      'prisma: identifiziert (alle gelieferten Treffer; identifiziert_nach_dienst je Dienst), dubletten (gleiche DOI, ohne ' +
+      'DOI gleicher Titel und gleiches Jahr), gesichtet, aufgenommen (Quelle mit dieser DOI), ausgeschlossen (gesamt und ' +
+      'nach_grund, über paper_exclude), nicht_beschaffbar (offene Einträge der Beschaffungsliste nach nicht_frei, bot_schutz, ' +
+      'pdf_fehlt) und offen. Es gilt identifiziert − dubletten = gesichtet und gesichtet = aufgenommen + ausgeschlossen.gesamt + ' +
+      'nicht_beschaffbar + offen. Einträge von vor dieser Fassung kennen ihre Treffer nicht einzeln: Sie zählen als ' +
+      'identifiziert, gesichtet und offen.',
+    inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
+    async ausfuehren({ project_id: pid, cursor }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, LESEN)
+      const ab = seiteAus(cursor)
+      const [{ eintraege, weiter }, prisma] = await Promise.all([
+        Suchprotokoll.liste(projectId, { ab, aufsteigend: true }),
+        Suchprotokoll.prisma(projectId),
+      ])
+      return { eintraege, naechster_cursor: weiter ? String(ab + Suchprotokoll.SEITE) : null, prisma }
+    },
+  },
+
+  paper_exclude: {
+    description:
+      'Schließt einen Treffer aus dem Suchprotokoll aus, per doi oder (ohne DOI) per titel, mit grund als freiem Text bis ' +
+      '200 Zeichen, etwa „falsche Population“. In search_log zählt er danach unter ausgeschlossen.nach_grund; ein zweiter ' +
+      'Aufruf für denselben Treffer ersetzt den Grund. Kam der Treffer in keiner Suche des Projekts vor: treffer_nicht_gefunden. ' +
+      'Ein Treffer ohne Entscheidung zählt als offen; eine aufgenommene Quelle zählt als aufgenommen, auch wenn sie vorher ' +
+      'ausgeschlossen war.',
+    inputSchema: z.object({
+      project_id: id,
+      doi: z.string().min(4).max(300).optional(),
+      titel: z.string().min(1).max(500).optional(),
+      grund: z.string().trim().min(1).max(200),
+    }),
+    async ausfuehren({ project_id: pid, doi, titel, grund }, { menschId }) {
+      const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
+      if (!doi && !titel) throw eingabeUngueltig('doi')
+      return await Suchprotokoll.ausschliessen({ projectId, userId: menschId, doi: doi && Recherche.doiPruefen(doi), titel, grund })
     },
   },
 
   paper_citations: {
     description:
       'Folgt Zitationen einer DOI über OpenAlex und Semantic Scholar: richtung „zitiert_von“ liefert Arbeiten, die sie zitieren, ' +
-      '„zitiert“ ihre Referenzen. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar; hinweis ist gesetzt, ' +
+      '„zitiert“ ihre Referenzen. dienste sagt je Dienst geantwortet, gedrosselt oder nicht_erreichbar und nennt die versuche ' +
+      '(wie bei paper_search); hinweis ist gesetzt, ' +
       'wenn keiner geantwortet hat (dann heißt die leere Liste nicht, dass es keine Zitationen gibt).',
     inputSchema: z.object({ doi: z.string().min(4).max(300), richtung: z.enum(['zitiert_von', 'zitiert']) }),
     async ausfuehren({ doi, richtung }) {
@@ -409,20 +468,52 @@ Object.assign(WERKZEUGE, {
 
   source_add: {
     description:
-      'Nimmt ein Paper per DOI auf: lädt den freien Volltext, legt die Quelle an und ergänzt die .bib mit den ' +
-      'DOI-Metadaten. Ohne freien Volltext: acquisition_add.',
-    inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
-    async ausfuehren({ project_id: pid, doi }, { menschId }) {
+      'Nimmt eine Quelle auf: entweder ein Paper per doi oder eine Quelle ohne DOI (Abschlussarbeit, Report, Working Paper) ' +
+      'per pdf_url mit metadaten. Genau eines von doi und pdf_url; sonst eingabe_ungueltig mit dem Feld. ' +
+      'Per doi lädt spur den freien Volltext, legt die Quelle an und ergänzt die .bib mit den ' +
+      'DOI-Metadaten. spur versucht alle freien Fundorte (Repositorien vor Verlagsseiten, dann Europe PMC). ' +
+      'Fehler: nicht_frei (kein freier Fundort), bot_schutz (frei, aber die Server haben spur abgewiesen; im Browser unter ' +
+      'adresse ladbar) und pdf_fehlt; versucht nennt je Adresse host, art und ergebnis. Bei nicht_frei und bot_schutz ' +
+      'setzt spur die DOI selbst auf die Beschaffungsliste; ein Upload mit dieser DOI erledigt den Eintrag. ' +
+      'pdf_url ist eine öffentliche https-Adresse, die direkt das PDF liefert (höchstens 50 MB; Handles und URNs löst spur ' +
+      'nicht auf). metadaten: titel (Pflicht), autoren ([{family, given}]), jahr, art (thesis, report, working_paper, book, ' +
+      'misc), institution, abschluss (etwa „Masterarbeit“) und url. Die .bib bekommt einen Eintrag passend zur Art mit url ' +
+      'und urldate. Dieselbe pdf_url oder dieselbe Datei noch einmal ergibt quelle_vorhanden.',
+    inputSchema: z.object({
+      project_id: id,
+      doi: z.string().max(300).optional(),
+      pdf_url: z.string().max(2000).optional(),
+      // Die Felder prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feldnamen ergibt.
+      metadaten: z
+        .object({
+          titel: z.string().optional(),
+          autoren: z.array(z.object({ family: z.string(), given: z.string().optional() })).optional(),
+          jahr: z.number().optional(),
+          art: z.string().optional(),
+          institution: z.string().optional(),
+          abschluss: z.string().optional(),
+          url: z.string().optional(),
+        })
+        .optional(),
+    }),
+    async ausfuehren({ project_id: pid, doi, pdf_url: pdfUrl, metadaten }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)
-      const quelle = await Aufnahme.perDoi({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
-      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi }
+      if (Boolean(doi) === Boolean(pdfUrl)) {
+        const feld = doi ? 'pdf_url' : 'doi'
+        throw new Problem(422, 'eingabe_ungueltig', 'spur_fehler_eingabe_doi_oder_pdf_url', { feld }, { feld })
+      }
+      const quelle = doi
+        ? await Beschaffung.aufnehmenOderVormerken({ projectId, userId: menschId, doi: Recherche.doiPruefen(doi) })
+        : await Aufnahme.perUrl({ projectId, userId: menschId, pdfUrl, metadaten })
+      return { quelle_id: quelle._id, key: quelle.key, dateiname: quelle.dateiname, doi: quelle.doi, ...titelBefund(quelle) }
     },
   },
 
   acquisition_add: {
     description:
-      'Setzt ein nicht freies Paper per DOI auf die Beschaffungsliste des Projekts. Die Person holt es in der Bibliothek ' +
-      'und lädt das PDF hoch; spur ordnet es per DOI zu.',
+      'Setzt ein Paper per DOI auf die Beschaffungsliste des Projekts. Die Person holt es in der Bibliothek ' +
+      'und lädt das PDF hoch; spur ordnet es per DOI zu. Nach nicht_frei oder bot_schutz von source_add steht die DOI ' +
+      'schon dort (beschaffung_vorhanden).',
     inputSchema: z.object({ project_id: id, doi: z.string().min(4).max(300) }),
     async ausfuehren({ project_id: pid, doi }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, ANLEGEN)

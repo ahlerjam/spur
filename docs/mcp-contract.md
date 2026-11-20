@@ -28,8 +28,10 @@ Status: draft before run 0. Changes to names and error codes count as a breaking
 | `run_status`, `run_finish` | P1 | Query a run and end it with a summary |
 | `wait_for_event` | P1 | Waits up to 100 s for the next job (`max_sekunden` 1 to 3600, default 100; P8) and sends progress every 30 s. See "Waiting for jobs" |
 | `events_since`, `reply` | P1 | `events_since` returns events after `cursor`, without a cursor the newest 100; events read here count as delivered. `reply` answers in the panel; with `kommentar_id` (P3) in the comment thread |
-| `paper_search`, `paper_citations` | P2 | Research |
-| `source_add`, `acquisition_add` | P2 | Add a source or put it on the acquisition list |
+| `paper_search`, `paper_citations` | P2 | Research. `paper_search` takes `cursor` (from `naechster_cursor`) or `seite` for further pages (P12) |
+| `source_add`, `acquisition_add` | P2 | Add a source or put it on the acquisition list. `source_add` takes either `doi` or, for a source without a DOI, `pdf_url` with `metadaten` (P12, see "Getting sources") |
+| `search_log` | P12 | Read-only search log of the project with the totals for a PRISMA flow diagram (`project_id`, `cursor`; 50 requests per page). See "Search log and PRISMA totals" |
+| `paper_exclude` | P12 | Exclude a hit of the search log with a reason (`project_id`, `doi` or `titel`, `grund` up to 200 characters). A second call for the same hit replaces the reason. Needs write access |
 | `job_status`, `compile`, `compile_log`, `page_image` | P2 | Compile and see the result |
 | `matrix_suggest` | P2 | Suggest a cell of the literature matrix; the person confirms (transitional until `suggest` arrives in P3) |
 | `suggest` | P3 | Put a suggestion (`art`, `titel`, `text`, optional `pfad`) into the suggestions panel; the text stays unchanged |
@@ -87,8 +89,11 @@ Unrecognized citation forms and DOIs that cannot be resolved are accepted, but m
 | `doi_nicht_gefunden` | The DOI registry does not know the DOI ("DOI nicht gefunden") |
 | `quelle_vorhanden` | A source for the DOI already exists ("Bereits vorhanden") |
 | `beschaffung_vorhanden` | The DOI is already on the acquisition list |
-| `nicht_frei` | `source_add`: no free full text; use `acquisition_add` instead |
-| `pdf_fehlt` | The free full text could not be loaded |
+| `nicht_frei` | `source_add`: Unpaywall knows no free location (paywall). spur puts the DOI on the acquisition list itself, reason "nicht frei verfügbar" (P12) |
+| `bot_schutz` | `source_add` (P12): the paper is free, but no location delivered a PDF and at least one answered with an HTML page or status 401, 403, 429 or 503. It loads in a browser; `adresse` is the best address for that, `versucht` lists every address. spur puts the DOI on the acquisition list itself, reason "frei, Download blockiert" |
+| `pdf_fehlt` | The full text could not be loaded for another reason (404, a PDF of a different work, an address that is not allowed); with `versucht` (P12) |
+| `eingabe_ungueltig` | `source_add` (P12): not exactly one of `doi` and `pdf_url`, or `metadaten.titel` is missing or a field of `metadaten` is invalid; `feld` names the field |
+| `treffer_nicht_gefunden` | `paper_exclude`: the DOI or title did not appear in any search of the project |
 | `dienst_fehlt` | Crossref does not respond right now, even after waiting out a 429 or 503; try again later |
 | `spalte_fehlt` | `matrix_suggest`: the column does not exist in the matrix |
 | `kommentar_fehlt` | `reply` with `kommentar_id`: the comment thread does not exist in the project |
@@ -111,6 +116,35 @@ The check report and the write lock in `doc_edit` treat a macro as a quote when 
 Every hit of `paper_search` carries `abstract` (from the first service that supplies one; otherwise empty).
 
 `paper_search` and `paper_citations` do not fail because of a single service: `fehler` names failed services with the reason, and the remaining hits still arrive. `dienste` lists every service asked with `antwort` `geantwortet`, `gedrosselt` or `nicht_erreichbar`. If no service answered, `hinweis` says so, so an empty list never looks like "no results". OpenAlex and Semantic Scholar work without an API key; a key only raises their limits.
+
+On 429, 503 and network errors spur asks a search service up to three times (pause as `Retry-After` says, at most 10 s, otherwise 1 and 2 s; 20 s in total per request) before it reports `gedrosselt` or `nicht_erreichbar`. Each entry of `dienste` carries `versuche`: the highest number of attempts for a single request to that service, 0 when the answer came from the cache (P12).
+
+## Getting sources (P12)
+
+`source_add` with `doi` tries every free location Unpaywall lists (`oa_locations` with `url_for_pdf`), repositories before publisher pages, then Europe PMC. Each address is repeated on network errors, 429 and 503 (three attempts, pauses as above, 60 s in total per call). Errors `bot_schutz` and `pdf_fehlt` carry `versucht`, one entry per address with `url`, `host`, `art` (`repository`, `publisher`, `europepmc`, or `pdf_url`) and `ergebnis`: `html`, the HTTP status as text (`403`, `404`), `kein_pdf`, `falsches_pdf`, `zu_gross`, `gesperrt` (address not allowed), `netzfehler` or `zeit_abgelaufen` (the 60 s of the call were used up before this address was tried).
+
+Title check: after each download spur compares the title from the metadata with the text of the first three pages and the title field of the PDF (lower case, without punctuation and accents). It matches when at least half of the title words with four or more letters occur, and at least three (all of them when there are fewer). A PDF of a different work is rejected as `falsches_pdf` and the next location is tried. The source and `sources_list` carry `titelabgleich`: `passt`, `abweichend` or `nicht_pruefbar` (no text layer on the first three pages, or no title word with four letters). Uploads through `source_upload_link` and `pdf_url` are never rejected for the title; with `abweichend` the answer and `sources_list` carry `hinweis` "Titel im PDF passt nicht zu den Metadaten". Sources added before P12 have no `titelabgleich`.
+
+Sources without a DOI: `source_add` with `pdf_url` (a public https address that returns the PDF directly, at most 50 MB; no handles or URNs) and `metadaten`: `titel` (required), `autoren` (list of `family`, `given`), `jahr`, `art` (`thesis`, `report`, `working_paper`, `book`, `misc`), `institution`, `abschluss` (free text such as "Masterarbeit") and `url`. The `.bib` gets an entry for the kind (`@thesis` with `type` and `institution`, `@report`, `@book`, `@misc`) with `url` and `urldate`. The same `pdf_url` or the same file again answers `quelle_vorhanden`. An address that is not public https answers `pdf_fehlt` without being fetched. The upload link takes the same fields as form fields (`titel`, `autoren` as "Family, Given; …", `jahr`, `art`, `institution`, `url`); without `doi` they produce the same entry, and the answer names `key`.
+
+## Search log and PRISMA totals (P12)
+
+Every `paper_search` request is logged, including further pages. `search_log` returns `eintraege` in chronological order and `prisma`:
+
+| Field | Meaning |
+|---|---|
+| `eintraege[].zeit`, `anfrage`, `seite`, `filter` | When, search text, page (from 0) and filters (always `null`; `paper_search` has none) |
+| `eintraege[].dienste[]` | Per service `dienst`, `status` (`geantwortet`, `gedrosselt`, `nicht_erreichbar`), `treffer` (hits delivered) and `versuche` |
+| `eintraege[].treffer`, `dubletten` | Hits delivered by all services for this request, and how many of them were already known |
+| `prisma.identifiziert`, `identifiziert_nach_dienst` | All hits delivered, in total and per service |
+| `prisma.dubletten` | Hits with a DOI already seen (normalized); without a DOI the same title (lower case, without punctuation) and year |
+| `prisma.gesichtet` | Distinct hits. `identifiziert − dubletten = gesichtet` |
+| `prisma.aufgenommen` | Hits whose DOI is a source of the project (`source_add` or an upload with the DOI) |
+| `prisma.ausgeschlossen` | `gesamt` and `nach_grund` (reason → count), set with `paper_exclude` |
+| `prisma.nicht_beschaffbar` | Hits with an open entry on the acquisition list, by reason `nicht_frei`, `bot_schutz` or `pdf_fehlt` (only reasons that occur) |
+| `prisma.offen` | Hits without a decision. `gesichtet = aufgenommen + ausgeschlossen.gesamt + nicht_beschaffbar + offen` |
+
+A source counts as `aufgenommen` even if the hit was excluded before; an excluded hit counts as `ausgeschlossen` even if it is on the acquisition list. Log entries from before P12 are stored per service and do not know their hits one by one: they keep `seite: 0`, count their hit number as `identifiziert`, `gesichtet` and `offen`, and have `dubletten: null`. The web view of the log and its CSV export show the same columns and totals.
 
 ## Events for `events_since`
 `task_created`, `chat_message`, `comment_mention`, `suggest_trigger`. Every event applies to exactly one bot.

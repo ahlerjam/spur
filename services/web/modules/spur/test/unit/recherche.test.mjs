@@ -11,6 +11,7 @@ let abrufe
 let ausfall
 let gedrosselt
 let sonder
+let stoerungen
 
 const ATOM = `<?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom">
@@ -96,6 +97,7 @@ beforeEach(async () => {
   abrufe = []
   ausfall = new Set()
   gedrosselt = new Set()
+  stoerungen = {}
   sonder = () => null
   schalter = schalterAttrappe()
   schalter.paperApiBasis = 'http://paper.test/fake'
@@ -107,8 +109,14 @@ beforeEach(async () => {
     vi.fn(async url => {
       const dienst = dienstAus(url)
       abrufe.push({ dienst, url: String(url), zeit: Date.now() })
-      if (ausfall.has(dienst)) return { ok: false, status: 503 }
-      if (gedrosselt.has(dienst)) return { ok: false, status: 429 }
+      const stoerung = stoerungen[dienst]
+      if (stoerung && stoerung.mal !== 0) {
+        if (stoerung.mal) stoerung.mal--
+        if (stoerung.trennen) throw new Error('ECONNRESET')
+        return { ok: false, status: stoerung.status, headers: new Headers(stoerung.retryAfter == null ? {} : { 'Retry-After': String(stoerung.retryAfter) }) }
+      }
+      if (ausfall.has(dienst)) return { ok: false, status: 500, headers: new Headers() }
+      if (gedrosselt.has(dienst)) return { ok: false, status: 429, headers: new Headers() }
       const extra = sonder(String(url))
       if (extra) return { ok: true, status: 200, json: async () => extra }
       const { text, json } = ANTWORTEN[dienst]()
@@ -117,6 +125,7 @@ beforeEach(async () => {
   )
   Recherche = await import('../../app/src/recherche/Recherche.mjs')
   Abruf = await import('../../app/src/recherche/abruf.mjs')
+  Abruf.zeit.warten = vi.fn(async () => {})
 })
 
 afterEach(() => {
@@ -236,25 +245,40 @@ describe('suchen', () => {
     ausfall.add('s2')
     const ergebnis = await suchen('sleep')
     expect(ergebnis.dienste).toEqual([
-      { dienst: 'arXiv', antwort: 'geantwortet' },
-      { dienst: 'OpenAlex', antwort: 'geantwortet' },
-      { dienst: 'Crossref', antwort: 'geantwortet' },
-      { dienst: 'Semantic Scholar', antwort: 'nicht_erreichbar' },
+      { dienst: 'arXiv', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'Crossref', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'Semantic Scholar', antwort: 'nicht_erreichbar', versuche: 1 },
     ])
     expect(ergebnis.hinweis).toBeNull()
   })
 
-  it('schreibt je Dienst Datum, Datenbank, Anfrage und Trefferzahl ins Protokoll', async () => {
+  it('hält jede Anfrage im Protokoll fest, auch Folgeseiten, mit Status, gelieferten Treffern und Versuchen je Dienst', async () => {
     ausfall.add('s2')
     await suchen('sleep memory consolidation')
     await suchen('sleep memory consolidation', 1)
-    const { eintraege } = await Recherche.protokoll(projectId)
-    expect(eintraege.map(e => [e.dienst, e.anfrage, e.treffer]).sort()).toEqual([
-      ['Crossref', 'sleep memory consolidation', 1],
-      ['OpenAlex', 'sleep memory consolidation', 25],
-      ['arXiv', 'sleep memory consolidation', 1],
+    const eintraege = await datenbank.db.collection('spurSearchLog').find({ projectId }).sort({ _id: 1 }).toArray()
+    expect(eintraege.map(e => [e.anfrage, e.seite, e.geliefert])).toEqual([
+      ['sleep memory consolidation', 0, 3],
+      ['sleep memory consolidation', 1, 3],
     ])
-    expect(eintraege[0].datum).toBeInstanceOf(Date)
+    expect(eintraege[0]).toMatchObject({ userId, neu: 2, datum: expect.any(Date) })
+    expect(eintraege[0].dienste).toEqual([
+      { dienst: 'arXiv', antwort: 'geantwortet', versuche: 1, treffer: 1, gesamt: 1 },
+      { dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1, treffer: 1, gesamt: 25 },
+      { dienst: 'Crossref', antwort: 'geantwortet', versuche: 1, treffer: 1, gesamt: 1 },
+      { dienst: 'Semantic Scholar', antwort: 'nicht_erreichbar', versuche: 1, treffer: 0, gesamt: null },
+    ])
+    // Dieselben Treffer noch einmal: nichts Neues.
+    expect(eintraege[1].neu).toBe(0)
+  })
+
+  it('hält auch eine Anfrage fest, auf die kein Dienst geantwortet hat', async () => {
+    for (const dienst of ['arxiv', 'openalex', 'crossref', 's2']) ausfall.add(dienst)
+    await suchen('sleep')
+    const [eintrag] = await datenbank.db.collection('spurSearchLog').find({ projectId }).toArray()
+    expect(eintrag).toMatchObject({ anfrage: 'sleep', geliefert: 0, neu: 0 })
+    expect(eintrag.dienste.map(d => d.antwort)).toEqual(Array(4).fill('nicht_erreichbar'))
   })
 
   it('lehnt eine leere Anfrage ab', async () => {
@@ -355,8 +379,8 @@ describe('zitationen', () => {
     const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
     expect(ergebnis.treffer.map(t => t.doi)).toEqual(['10.1/a'])
     expect(ergebnis.dienste).toEqual([
-      { dienst: 'OpenAlex', antwort: 'geantwortet' },
-      { dienst: 'Semantic Scholar', antwort: 'gedrosselt' },
+      { dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1 },
+      { dienst: 'Semantic Scholar', antwort: 'gedrosselt', versuche: 3 },
     ])
   })
 
@@ -372,17 +396,6 @@ describe('zitationen', () => {
   it('lehnt eine ungültige Richtung oder DOI ab', async () => {
     expect(await fehlerVon(Recherche.zitationen('10.1/a', 'quer'))).toMatchObject({ status: 400 })
     expect(await fehlerVon(Recherche.zitationen('keine-doi', 'zitiert'))).toMatchObject({ status: 400 })
-  })
-})
-
-describe('protokollCsv', () => {
-  it('schreibt Datum, Datenbank, Anfrage und Trefferzahl als CSV', async () => {
-    await suchen('sleep, "memory"')
-    const csv = await Recherche.protokollCsv(projectId)
-    const zeilen = csv.trim().split('\n')
-    expect(zeilen[0]).toBe('Datum,Datenbank,Anfrage,Trefferzahl')
-    expect(zeilen).toContain('2026-11-07T10:00:00.000Z,OpenAlex,"sleep, ""memory""",25')
-    expect(zeilen).toHaveLength(5)
   })
 })
 
@@ -420,3 +433,172 @@ describe('Unpaywall-Adresse', () => {
     expect(abrufe).toHaveLength(0)
   })
 })
+
+describe('Unpaywall-Fundorte', () => {
+  let dienste
+  beforeEach(async () => {
+    vi.stubEnv('UNPAYWALL_EMAIL', 'unpaywall@example.org')
+    dienste = await import('../../app/src/recherche/dienste.mjs')
+  })
+
+  it('liefert alle freien PDF-Adressen, Repositorien vor Verlagsseiten', async () => {
+    sonder = () => ({
+      doi: '10.1/x',
+      is_oa: true,
+      best_oa_location: { host_type: 'publisher', url_for_pdf: 'https://verlag.example/a.pdf', license: 'cc-by' },
+      oa_locations: [
+        { host_type: 'publisher', url_for_pdf: 'https://verlag.example/a.pdf', url_for_landing_page: 'https://verlag.example/a', license: 'cc-by' },
+        { host_type: 'repository', url_for_pdf: null, url_for_landing_page: 'https://repo.example/nur-seite' },
+        { host_type: 'repository', url_for_pdf: 'https://repo.example/a.pdf', url_for_landing_page: 'https://repo.example/a', license: null },
+        { host_type: 'repository', url_for_pdf: 'https://repo.example/a.pdf', license: null },
+      ],
+    })
+    expect(await dienste.unpaywall.status('10.1/x')).toEqual({
+      frei: true,
+      fundorte: [
+        { url: 'https://repo.example/a.pdf', art: 'repository', lizenz: null, seite: 'https://repo.example/a' },
+        { url: 'https://verlag.example/a.pdf', art: 'publisher', lizenz: 'cc-by', seite: 'https://verlag.example/a' },
+      ],
+    })
+  })
+
+  it('nimmt best_oa_location, wenn die Liste der Fundorte fehlt', async () => {
+    sonder = () => ({ doi: '10.1/x', is_oa: true, best_oa_location: { url_for_pdf: 'https://x.example/a.pdf', license: 'cc-by' } })
+    expect((await dienste.unpaywall.status('10.1/x')).fundorte).toEqual([
+      { url: 'https://x.example/a.pdf', art: 'publisher', lizenz: 'cc-by', seite: null },
+    ])
+  })
+
+  it('kennt ohne freien Zugang keinen Fundort', async () => {
+    sonder = () => ({ doi: '10.1/x', is_oa: false, best_oa_location: null, oa_locations: [] })
+    expect(await dienste.unpaywall.status('10.1/x')).toEqual({ frei: false, fundorte: [] })
+  })
+})
+
+describe('Europe PMC', () => {
+  let dienste
+  // Gekürzte echte Antwort (2026-11-16) für eine DOI mit freiem PDF.
+  const TREFFER = {
+    doi: '10.1371/JOURNAL.PMED.0040040',
+    pmcid: 'PMC1817752',
+    isOpenAccess: 'Y',
+    hasPDF: 'Y',
+    license: 'cc by',
+    fullTextUrlList: {
+      fullTextUrl: [
+        { availabilityCode: 'S', documentStyle: 'doi', site: 'DOI', url: 'https://doi.org/10.1371/journal.pmed.0040040' },
+        { availabilityCode: 'OA', documentStyle: 'html', site: 'Europe_PMC', url: 'https://europepmc.org/articles/PMC1817752' },
+        { availabilityCode: 'OA', documentStyle: 'pdf', site: 'Europe_PMC', url: 'https://europepmc.org/articles/PMC1817752?pdf=render' },
+      ],
+    },
+  }
+  beforeEach(async () => {
+    dienste = await import('../../app/src/recherche/dienste.mjs')
+  })
+
+  it('fragt nach der DOI und liefert das freie PDF als Fundort', async () => {
+    sonder = () => ({ resultList: { result: [TREFFER] } })
+    expect(await dienste.europepmc.fundort('10.1371/journal.pmed.0040040')).toEqual({
+      url: 'https://europepmc.org/articles/PMC1817752?pdf=render',
+      art: 'europepmc',
+      lizenz: 'cc by',
+      seite: null,
+    })
+    const url = new URL(abrufe.at(-1).url)
+    expect(url.pathname).toBe('/fake/europepmc/webservices/rest/search')
+    expect(Object.fromEntries(url.searchParams)).toEqual({ query: 'DOI:10.1371/journal.pmed.0040040', format: 'json', resultType: 'core' })
+  })
+
+  it('liefert null ohne Treffer, ohne freies PDF und für den Treffer einer anderen DOI', async () => {
+    sonder = () => ({ resultList: { result: [] } })
+    expect(await dienste.europepmc.fundort('10.1/a')).toBeNull()
+    const nurAbo = { ...TREFFER, doi: '10.1/b', fullTextUrlList: { fullTextUrl: [{ availabilityCode: 'S', documentStyle: 'pdf', url: 'https://verlag.example/b.pdf' }] } }
+    sonder = () => ({ resultList: { result: [nurAbo] } })
+    expect(await dienste.europepmc.fundort('10.1/b')).toBeNull()
+    sonder = () => ({ resultList: { result: [TREFFER] } })
+    expect(await dienste.europepmc.fundort('10.1/c')).toBeNull()
+  })
+})
+
+// Echter Fall: Semantic Scholar war bei 16 von 17 Anfragen gedrosselt, OpenAlex bei 7.
+describe('Wiederholung bei gedrosselten Diensten', () => {
+  const von = (ergebnis, dienst) => ergebnis.dienste.find(d => d.dienst === dienst)
+  const anzahl = dienst => abrufe.filter(a => a.dienst === dienst).length
+
+  it('fragt nach zweimal 429 mit Retry-After ein drittes Mal und nennt die Versuche', async () => {
+    stoerungen.s2 = { status: 429, retryAfter: 1, mal: 2 }
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'geantwortet', versuche: 3 })
+    expect(von(ergebnis, 'OpenAlex')).toEqual({ dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 1 })
+    expect(ergebnis.treffer.some(t => t.dienste.includes('Semantic Scholar'))).toBe(true)
+    expect(anzahl('s2')).toBe(3)
+    expect(Abruf.zeit.warten.mock.calls).toEqual([[1000], [1000]])
+  })
+
+  it('meldet nach drei Versuchen gedrosselt und liefert die Treffer der anderen', async () => {
+    stoerungen.s2 = { status: 429, retryAfter: 1 }
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'gedrosselt', versuche: 3 })
+    expect(ergebnis.fehler).toMatchObject([{ dienst: 's2', art: 'limit' }])
+    expect(ergebnis.treffer.length).toBeGreaterThan(0)
+    expect(anzahl('s2')).toBe(3)
+  })
+
+  it('fragt nach einem 503 ohne Retry-After nach 1 s erneut', async () => {
+    stoerungen.openalex = { status: 503, mal: 1 }
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'OpenAlex')).toEqual({ dienst: 'OpenAlex', antwort: 'geantwortet', versuche: 2 })
+    expect(Abruf.zeit.warten.mock.calls).toEqual([[1000]])
+  })
+
+  it('wartet ohne Retry-After 1 und 2 Sekunden', async () => {
+    stoerungen.s2 = { status: 429 }
+    await suchen('sleep memory')
+    expect(Abruf.zeit.warten.mock.calls).toEqual([[1000], [2000]])
+  })
+
+  it('wiederholt einen Netzfehler, aber keinen anderen Fehlerstatus', async () => {
+    stoerungen.s2 = { trennen: true, mal: 1 }
+    ausfall.add('openalex')
+    const ergebnis = await suchen('sleep memory')
+    expect(von(ergebnis, 'Semantic Scholar')).toMatchObject({ antwort: 'geantwortet', versuche: 2 })
+    expect(von(ergebnis, 'OpenAlex')).toEqual({ dienst: 'OpenAlex', antwort: 'nicht_erreichbar', versuche: 1 })
+  })
+
+  it('hört nach 20 Sekunden auf, auch wenn noch Versuche übrig wären', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      Abruf.zeit.warten.mockImplementation(async ms => vi.advanceTimersByTime(ms))
+      stoerungen.s2 = { status: 429, retryAfter: 30 }
+      const ergebnis = await suchen('sleep memory')
+      // Retry-After zählt höchstens 10 s: nach zwei Pausen sind die 20 s um.
+      expect(von(ergebnis, 'Semantic Scholar')).toMatchObject({ antwort: 'gedrosselt' })
+      const gewartet = Abruf.zeit.warten.mock.calls.reduce((summe, [ms]) => summe + ms, 0)
+      expect(gewartet).toBeLessThanOrEqual(20000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('zählt keine Versuche, wenn die Antwort aus dem Cache kommt', async () => {
+    await suchen('sleep memory')
+    const ergebnis = await suchen('sleep memory')
+    expect(ergebnis.dienste.map(d => d.versuche)).toEqual([0, 0, 0, 0])
+  })
+
+  it('verhält sich bei Zitationen genauso', async () => {
+    sonder = url => (url.includes('/works/doi:') ? { id: 'https://openalex.org/W1' } : null)
+    stoerungen.s2 = { status: 429, retryAfter: 1, mal: 2 }
+    const ergebnis = await Recherche.zitationen('10.1038/nrn2762', 'zitiert_von')
+    expect(von(ergebnis, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'geantwortet', versuche: 3 })
+  })
+
+  it('meldet bei Zitationen nach drei Versuchen gedrosselt', async () => {
+    sonder = url => (url.includes('/works/doi:') ? { id: 'https://openalex.org/W1' } : null)
+    stoerungen.s2 = { status: 429 }
+    const dauerhaft = await Recherche.zitationen('10.1371/journal.pone.0099999', 'zitiert')
+    expect(von(dauerhaft, 'Semantic Scholar')).toEqual({ dienst: 'Semantic Scholar', antwort: 'gedrosselt', versuche: 3 })
+    expect(von(dauerhaft, 'OpenAlex').antwort).toBe('geantwortet')
+  })
+})
+

@@ -121,7 +121,7 @@ describe('Quellenliste und Suche', () => {
     m.Quellen.liste.mockResolvedValue({ quellen: [q], gesamt: 1, seitengroesse: 100 })
     const { res } = await ausfuehren(C.quellenListe, req({ query: { seite: '2' } }))
     expect(m.Quellen.liste).toHaveBeenCalledWith(projekt, { seite: 2 })
-    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', autoren: [], jahr: null, fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, ocr: null, web: null })
+    expect(res.body.quellen[0]).toEqual({ id: q._id, dateiname: 'a.pdf', key: 'a', art: 'pdf', seitenzahl: 3, status: 'text', doi: '10.1/a', titel: 'Titel', autoren: [], jahr: null, fassung: '', versatz: 344, versatzQuelle: 'pagelabels', nurProjekt: false, lizenz: null, werkart: null, titelabgleich: null, ocr: null, web: null })
     expect(res.body).toMatchObject({ gesamt: 1, seitengroesse: 100 })
   })
 

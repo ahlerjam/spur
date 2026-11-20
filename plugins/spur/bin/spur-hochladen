@@ -5,10 +5,13 @@ set -u
 hilfe() {
   cat <<'TXT'
 Aufruf: spur-hochladen <link> <datei>... [--doi <doi>] [--titel <titel>]
+         [--autoren "Nachname, Vorname; …"] [--jahr <jahr>] [--art <art>] [--institution <name>] [--url <adresse>]
 
 Lädt jede Datei einzeln an den Upload-Link hoch (aus dem MCP-Werkzeug source_upload_link).
---doi und --titel gelten für alle Dateien des Aufrufs; Optionen dürfen vor oder nach den
-Dateien stehen. Je Datei eine Zeile:
+Die Optionen gelten für alle Dateien des Aufrufs und dürfen vor oder nach den Dateien stehen.
+Für Quellen ohne DOI (Abschlussarbeit, Report, Working Paper): --titel mit --autoren, --jahr,
+--art (thesis, report, working_paper, book, misc), --institution und --url; spur legt daraus den
+.bib-Eintrag an. Mit --doi kommen die Metadaten von der DOI. Je Datei eine Zeile:
   <datei>: Quelle <id>
   <datei>: schon vorhanden (Quelle <id>)
   <datei>: <grund>
@@ -19,12 +22,16 @@ TXT
 link=
 doi=
 titel=
+# Weitere Formularfelder für Quellen ohne DOI, je als „name=wert“.
+angaben=()
 dateien=()
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) hilfe; exit 0 ;;
     --doi) [ $# -ge 2 ] || { echo "--doi braucht einen Wert" >&2; exit 2; }; doi=$2; shift 2 ;;
     --titel) [ $# -ge 2 ] || { echo "--titel braucht einen Wert" >&2; exit 2; }; titel=$2; shift 2 ;;
+    --autoren|--jahr|--art|--institution|--url)
+      [ $# -ge 2 ] || { echo "$1 braucht einen Wert" >&2; exit 2; }; angaben+=("${1#--}=$2"); shift 2 ;;
     *)
       if [ -z "$link" ]; then link=$1; else dateien+=("$1"); fi
       shift ;;
@@ -56,6 +63,7 @@ for pfad in "${dateien[@]}"; do
   args=(-F "datei=@\"$q\"")
   [ -n "$doi" ] && args+=(--form-string "doi=$doi")
   [ -n "$titel" ] && args+=(--form-string "titel=$titel")
+  for angabe in ${angaben[@]+"${angaben[@]}"}; do args+=(--form-string "$angabe"); done
   : > "$antwort"
   if ! code=$(curl -sS -o "$antwort" -w '%{http_code}' "${args[@]}" "$link" 2>&1); then
     echo "$pfad: Upload fehlgeschlagen ($(printf '%s' "$code" | tail -n 1))"

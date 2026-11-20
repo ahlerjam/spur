@@ -50,6 +50,19 @@
   Interim: Hinweis über der Admin-Tabelle und im README.
   Options: so lassen | Textdokumente mitzählen (Docstore-Abfrage je Projekt, ändert die Grenze für alle)
 
-- D? (plan 20261116-spur-p16-tex) f1: Lauf halted. (1) Der Merge von `origin/agent` in `slice/run-20261116-spur-p16-tex` scheitert an `docs/mcp-contract.md` und `services/web/modules/spur/test/e2e/spur-e2e.js` (Plan p12 kam parallel dazu). Den Run-Branch nach dem Auflösen der Konflikte mergen (beide Seiten behalten). (2) f1 Schritt 5 braucht ein aktuelles Dev-Image.
+- D15 (plan 20261116-spur-p16-tex) f1: Lauf halted. (1) Der Merge von `origin/agent` in `slice/run-20261116-spur-p16-tex` scheitert an `docs/mcp-contract.md` und `services/web/modules/spur/test/e2e/spur-e2e.js` (Plan p12 kam parallel dazu). Den Run-Branch nach dem Auflösen der Konflikte mergen (beide Seiten behalten). (2) f1 Schritt 5 braucht ein aktuelles Dev-Image.
   Interim: f2 und f3 bestehen, f1 steht auf false; Run-Branch ist auf origin gepusht.
   Options: A (empfohlen) Konflikte lösen, nach dem Merge `Dev image` starten, `p16f1b` laufen lassen, f1 auf true setzen | B Workflow-Compile als Beleg für Schritt 5 annehmen
+
+- D11 (plan 20261116-spur-p12-quellen) f4: Soll die Oberfläche bei Quellen ohne DOI ein sichtbares Abzeichen „ohne DOI“ zeigen? `check_report` liefert `referenz: "ohne_doi"`, im Prüfbericht steht dafür kein Abzeichen.
+  Interim: nur das Feld, kein Abzeichen.
+  Options: A so lassen | B Abzeichen im Prüfbericht und im Quellen-Panel
+- D12 (plan 20261116-spur-p12-quellen) f1: Die Unpaywall-Feldnamen (`oa_locations`, `host_type`, `url_for_pdf`, `url_for_landing_page`, `license`) sind nur über die Doku einer Client-Bibliothek belegt, nicht an einer echten Antwort.
+  Interim: so gebaut, Tests laufen gegen den Fake.
+  Options: A (empfohlen) nach dem Merge einmal gegen eine echte Unpaywall-Antwort prüfen | B so lassen
+- D13 (plan 20261116-spur-p12-quellen) Abnahme: Drei Auffälligkeiten ohne Vorgabe in der Spec: `paper_exclude` für ein schon aufgenommenes Paper gelingt ohne Hinweis und bleibt wirkungslos; `search_log` liefert bei ungültigem `cursor` still die erste Seite (`paper_search` weist ihn ab); ein Upload ohne DOI nimmt einen 5000 Zeichen langen Titel an.
+  Interim: so gelassen, alle Features PASS.
+  Options: A (empfohlen) kleiner Nachbesserungsplan (Hinweis, Fehlercode, Titelgrenze) | B so lassen
+- D14 (plan 20261116-spur-p12-quellen) außerhalb des Plans: Im Editor bleibt der rote Punkt eines Claude-Laufs an einem Zitat stehen, auch wenn der Prüfbericht es nicht mehr markiert. Vorschlag des Builders dazu: Option `--abschluss` für `spur-hochladen`.
+  Interim: nicht angefasst.
+  Options: A eigener kleiner Plan | B ins Backlog

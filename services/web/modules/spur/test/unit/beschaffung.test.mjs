@@ -30,6 +30,7 @@ beforeEach(async () => {
     Aufnahme: {
       doiNormal: doi => doi.trim().toLowerCase(),
       metadaten: vi.fn(async doi => ({ meta: doi.startsWith('10.9999') ? { gefunden: false } : META })),
+      perDoi: vi.fn(),
     },
     QuellenManager: {
       alle: vi.fn(async pid => await quellen().find({ projectId: pid }).toArray()),
@@ -41,6 +42,7 @@ beforeEach(async () => {
     },
     ZitatManager: { bibSicherstellen: vi.fn(async () => 'smith2024') },
     PruefManager: { dokumente: vi.fn(async () => []) },
+    Suchprotokoll: { aufnahmeFehlerMerken: vi.fn(async () => {}) },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -49,6 +51,7 @@ beforeEach(async () => {
   vi.doMock('../../app/src/QuellenManager.mjs', () => m.QuellenManager)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.ZitatManager)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.PruefManager)
+  vi.doMock('../../app/src/recherche/Suchprotokoll.mjs', () => m.Suchprotokoll)
   Beschaffung = await import('../../app/src/recherche/Beschaffung.mjs')
 })
 
@@ -158,3 +161,72 @@ describe('Beschaffungsliste', () => {
     expect(fremd).toMatchObject({ status: 404, typ: 'beschaffung_fehlt' })
   })
 })
+
+describe('aufnehmenOderVormerken', () => {
+  const DOI = '10.5555/spur.bot.001'
+  const VERSUCHT = [{ url: 'https://verlag.example/a.pdf', host: 'verlag.example', art: 'publisher', ergebnis: '403' }]
+  const aufnehmen = () => Beschaffung.aufnehmenOderVormerken({ projectId, userId, doi: DOI })
+  const scheitert = (status, typ, zusatz) => m.Aufnahme.perDoi.mockRejectedValue(Object.assign(new Error(typ), { status, typ, zusatz }))
+  const eintraege = async () => (await Beschaffung.liste(projectId)).eintraege
+
+  it('gibt die Quelle zurück, wenn die Aufnahme gelingt, und legt nichts auf die Liste', async () => {
+    m.Aufnahme.perDoi.mockResolvedValue({ _id: 'q1', key: 'stein2023' })
+    expect(await aufnehmen()).toEqual({ _id: 'q1', key: 'stein2023' })
+    expect(m.Aufnahme.perDoi).toHaveBeenCalledWith({ projectId, userId, doi: DOI })
+    expect(await eintraege()).toEqual([])
+  })
+
+  it('setzt bei bot_schutz die DOI mit Grund und bester Adresse auf die Liste und meldet den Fehler weiter', async () => {
+    scheitert(502, 'bot_schutz', { versucht: VERSUCHT, adresse: 'https://verlag.example/artikel' })
+    const fehler = await fehlerVon(aufnehmen())
+    expect(fehler).toMatchObject({
+      status: 502,
+      typ: 'bot_schutz',
+      message: meldung('spur_fehler_bot_schutz_vorgemerkt'),
+      zusatz: { versucht: VERSUCHT, adresse: 'https://verlag.example/artikel' },
+    })
+    expect(await eintraege()).toMatchObject([{ doi: DOI, status: 'offen', grund: 'bot_schutz', adresse: 'https://verlag.example/artikel', meta: META, angelegtVon: userId }])
+  })
+
+  it('setzt bei nicht_frei die DOI mit Grund auf die Liste', async () => {
+    scheitert(409, 'nicht_frei')
+    expect(await fehlerVon(aufnehmen())).toMatchObject({ status: 409, typ: 'nicht_frei', message: meldung('spur_fehler_nicht_frei_vorgemerkt') })
+    expect(await eintraege()).toMatchObject([{ doi: DOI, grund: 'nicht_frei', adresse: null }])
+  })
+
+  it('legt beim zweiten Versuch keinen zweiten Eintrag an', async () => {
+    scheitert(502, 'bot_schutz', { versucht: VERSUCHT, adresse: 'https://verlag.example/artikel' })
+    await fehlerVon(aufnehmen())
+    await fehlerVon(aufnehmen())
+    expect(await eintraege()).toHaveLength(1)
+  })
+
+  it('ergänzt den Grund an einem Eintrag, der schon von Hand auf der Liste steht', async () => {
+    await hinzufuegen(DOI)
+    scheitert(409, 'nicht_frei')
+    await fehlerVon(aufnehmen())
+    expect(await eintraege()).toMatchObject([{ doi: DOI, grund: 'nicht_frei' }])
+  })
+
+  it('lässt die Liste bei pdf_fehlt und anderen Fehlern in Ruhe', async () => {
+    scheitert(502, 'pdf_fehlt', { versucht: VERSUCHT })
+    expect(await fehlerVon(aufnehmen())).toMatchObject({ typ: 'pdf_fehlt', zusatz: { versucht: VERSUCHT } })
+    expect(await eintraege()).toEqual([])
+  })
+
+  it('vermerkt pdf_fehlt im Suchprotokoll und meldet den Fehler samt versucht, auch wenn das Vermerken scheitert', async () => {
+    scheitert(502, 'pdf_fehlt', { versucht: VERSUCHT })
+    await fehlerVon(aufnehmen())
+    expect(m.Suchprotokoll.aufnahmeFehlerMerken).toHaveBeenCalledWith(projectId, DOI, 'pdf_fehlt')
+    m.Suchprotokoll.aufnahmeFehlerMerken.mockRejectedValue(new Error('Mongo weg'))
+    expect(await fehlerVon(aufnehmen())).toMatchObject({ status: 502, typ: 'pdf_fehlt', zusatz: { versucht: VERSUCHT } })
+  })
+
+  it('meldet den ursprünglichen Fehler, wenn der Eintrag nicht angelegt werden kann', async () => {
+    scheitert(409, 'nicht_frei')
+    m.Aufnahme.metadaten.mockRejectedValue(new Error('Crossref weg'))
+    expect(await fehlerVon(aufnehmen())).toMatchObject({ typ: 'nicht_frei', message: 'nicht_frei' })
+    expect(await eintraege()).toEqual([])
+  })
+})
+

@@ -16,6 +16,7 @@ import * as LaufManager from './schreiben/LaufManager.mjs'
 import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
 import * as Recherche from './recherche/Recherche.mjs'
+import * as Suchprotokoll from './recherche/Suchprotokoll.mjs'
 import * as Aufnahme from './recherche/Aufnahme.mjs'
 import * as Beschaffung from './recherche/Beschaffung.mjs'
 import * as Import from './recherche/Import.mjs'
@@ -57,6 +58,10 @@ function quelleFuerClient(q) {
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
     nurProjekt: q.nurProjekt === true,
+    lizenz: q.lizenz ?? null,
+    // Art des Werks bei Quellen ohne DOI (thesis, report, …); `art` ist der Dateityp.
+    werkart: q.meta?.art ?? null,
+    titelabgleich: q.titelabgleich ?? null,
     ocr: QuellenManager.ocrZustand(q),
     web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }
@@ -513,17 +518,21 @@ export const rechercheZitationen = mitProblemen(async (req, res) => {
 })
 
 export const suchprotokoll = mitProblemen(async (req, res) => {
-  res.json(await Recherche.protokoll(projektId(req), { seite: seiteAus(req.query.seite) }))
+  const [seite, prisma] = await Promise.all([
+    Suchprotokoll.liste(projektId(req), { ab: seiteAus(req.query.seite) * Suchprotokoll.SEITE }),
+    Suchprotokoll.prisma(projektId(req)),
+  ])
+  res.json({ ...seite, prisma })
 })
 
 export const suchprotokollExport = mitProblemen(async (req, res) => {
   res.attachment('suchprotokoll.csv').type('text/csv; charset=utf-8')
-  res.send(await Recherche.protokollCsv(projektId(req)))
+  res.send(await Suchprotokoll.alsCsv(projektId(req)))
 })
 
 export const perDoiAufnehmen = mitProblemen(async (req, res) => {
   const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
-  const quelle = await Aufnahme.perDoi({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
+  const quelle = await Beschaffung.aufnehmenOderVormerken({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
   res.status(201).json(quelleFuerClient(quelle))
 })
 
@@ -536,6 +545,9 @@ function beschaffungFuerClient(eintrag, vorlage) {
     jahr: eintrag.meta.jahr,
     status: eintrag.status,
     quelleId: eintrag.quelleId ?? null,
+    grund: eintrag.grund ?? null,
+    // Die Adresse stammt von Unpaywall: als Link nur mit http(s).
+    adresse: /^https?:\/\//i.test(eintrag.adresse ?? '') ? eintrag.adresse : null,
     link: Beschaffung.link(vorlage, eintrag.doi),
   }
 }
