@@ -5,6 +5,7 @@ import os from 'node:os'
 import Path from 'node:path'
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
 import ProjectEntityHandler from '../../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
+import { ORDNER } from '../kompilieren/texArchiv.mjs'
 import { ausschnittBild } from '../pdf.mjs'
 import { Problem } from '../probleme.mjs'
 import { anzahlEintraege, maxEintraege } from '../projektEintraege.mjs'
@@ -40,13 +41,15 @@ function pfadPruefen(pfad, feld, endungen) {
     typeof pfad === 'string' &&
     pfad.length <= MAX_PFAD &&
     pfad.split('/').every(a => ABSCHNITT.test(a) && a !== '..') &&
+    !pfad.startsWith(`${ORDNER}/`) &&
     endungen.includes(Path.extname(pfad).toLowerCase())
   if (!gueltig) throw eingabeUngueltig(feld)
 }
 
+// Dateien, Dokumente und Ordner (auch leere) ohne führenden Schrägstrich.
 async function vorhandenePfade(projectId) {
-  const { docs, files } = await ProjectEntityHandler.promises.getAllEntities(projectId)
-  return [...docs, ...files].map(e => e.path.replace(/^\//, ''))
+  const { docs, files, folders } = await ProjectEntityHandler.promises.getAllEntities(projectId)
+  return [...docs, ...files, ...folders].map(e => e.path.replace(/^\//, ''))
 }
 
 // Der oberste Ordner des Pfads, den es noch nicht gibt; „Lauf rückgängig“ entfernt ihn, wenn er danach leer ist.
@@ -54,7 +57,7 @@ function neuerOrdner(pfad, pfade) {
   const teile = pfad.split('/').slice(0, -1)
   for (let i = 1; i <= teile.length; i++) {
     const ordner = teile.slice(0, i).join('/')
-    if (!pfade.some(p => p.startsWith(`${ordner}/`))) return { ordner, neu: teile.length - i + 1 }
+    if (!pfade.some(p => p === ordner || p.startsWith(`${ordner}/`))) return { ordner, neu: teile.length - i + 1 }
   }
   return { ordner: null, neu: 0 }
 }

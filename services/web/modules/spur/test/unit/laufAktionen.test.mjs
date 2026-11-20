@@ -14,6 +14,7 @@ let spurUpdate
 let acceptChanges
 let emitToRoom
 let restPfade
+let restOrdner
 let geloeschtePfade
 let paketEntfernt
 let quelleGeloescht
@@ -46,8 +47,9 @@ beforeEach(async () => {
   }))
   vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => ({ paketEntfernt }))
   restPfade = []
+  restOrdner = ['/']
   vi.doMock('../../../../app/src/Features/Project/ProjectEntityHandler.mjs', () => ({
-    default: { promises: { getAllEntities: async () => ({ docs: [], files: restPfade.map(path => ({ path })) }) } },
+    default: { promises: { getAllEntities: async () => ({ docs: [], files: restPfade.map(path => ({ path })), folders: restOrdner.map(path => ({ path })) }) } },
   }))
   quelleGeloescht = vi.fn(async () => {})
   vi.doMock('../../app/src/QuellenManager.mjs', () => ({ loeschen: quelleGeloescht }))
@@ -396,6 +398,13 @@ describe('zuruecknehmen', () => {
 
     geloeschtePfade = []
     restPfade = ['/abbildungen/eigenes.png']
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf'])
+
+    // Auch ein leerer Unterordner, den die Person angelegt hat, bleibt.
+    geloeschtePfade = []
+    restPfade = []
+    restOrdner = ['/', '/abbildungen', '/abbildungen/skizzen']
     await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
     expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf'])
   })

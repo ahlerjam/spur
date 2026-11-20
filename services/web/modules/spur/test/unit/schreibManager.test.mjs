@@ -484,6 +484,13 @@ describe('docEdit mit alle_vorkommen (P15)', () => {
     expect(spurUpdate).not.toHaveBeenCalled()
   })
 
+  it('prüft gegen den Text, der wirklich entsteht, auch mit $ im neuen Text (Code-Review)', async () => {
+    docSetzen(KAPITEL, '\\enquote{A} \\autocite[3]{s} A')
+    await bearbeiten({ alt: 'A', neu: '$$A$$', alleVorkommen: true })
+    const [[, text]] = bereichPruefen.mock.calls
+    expect(text).toBe('\\enquote{$$A$$} \\autocite[3]{s} $$A$$')
+  })
+
   it('meldet Zahlen ohne Beleg einmal je Zahl', async () => {
     docSetzen(KAPITEL, 'A x. B x.')
     expect((await bearbeiten({ alt: 'x', neu: '12,5 Prozent', alleVorkommen: true })).zahlen_ohne_beleg).toEqual(['12,5'])

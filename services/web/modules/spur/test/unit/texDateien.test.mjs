@@ -107,6 +107,11 @@ describe('TexDateien.lesen', () => {
     expect(await fehlerVon(T.lesen({ projectId, name: 'fremd.sty' }))).toMatchObject({ status: 404, typ: 'tex_datei_nicht_gefunden' })
   })
 
+  it('meldet eine Datei, die kpsewhich nur noch aus ls-R kennt, als nicht gefunden', async () => {
+    kpsewhich.mockImplementation(() => Path.join(texRoot, 'texmf-dist', 'tex', 'latex', 'weg', 'weg.sty'))
+    expect(await fehlerVon(T.lesen({ projectId, name: 'weg.sty' }))).toMatchObject({ status: 404, typ: 'tex_datei_nicht_gefunden' })
+  })
+
   it('sucht nicht im Arbeitsordner des Servers', async () => {
     await T.lesen({ projectId, name: 'article.cls' })
     const [, optionen] = kpsewhich.mock.calls[0]

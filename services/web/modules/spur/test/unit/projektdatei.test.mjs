@@ -15,6 +15,7 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
 const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16])
 
 let ordner
+let projektOrdner
 let baum
 let lauf
 let eintraege
@@ -27,6 +28,7 @@ afterAll(async () => await fs.rm(ordner, { recursive: true, force: true }))
 
 beforeEach(async () => {
   baum = new Map()
+  projektOrdner = ['/']
   lauf = { _id: new ObjectId(), angelegt: [] }
   eintraege = 0
   vi.resetModules()
@@ -40,7 +42,7 @@ beforeEach(async () => {
   vi.doMock('../../../../app/src/Features/Project/ProjectEntityHandler.mjs', () => ({
     default: {
       promises: {
-        getAllEntities: async () => ({ docs: [{ path: '/main.tex' }], files: [...baum.keys()].map(path => ({ path })) }),
+        getAllEntities: async () => ({ docs: [{ path: '/main.tex' }], files: [...baum.keys()].map(path => ({ path })), folders: projektOrdner.map(path => ({ path })) }),
       },
     },
   }))
@@ -87,6 +89,16 @@ describe('anlegen', () => {
     await anlegen('abbildungen/a.png', PNG)
     await anlegen('abbildungen/b.jpg', JPG)
     expect(lauf.angelegt[1]).toEqual({ art: 'datei', pfad: 'abbildungen/b.jpg' })
+  })
+
+  it('verbucht einen vorhandenen leeren Ordner nicht als neu (Code-Review)', async () => {
+    projektOrdner = ['/', '/abbildungen']
+    await anlegen('abbildungen/a.png', PNG)
+    expect(lauf.angelegt).toEqual([{ art: 'datei', pfad: 'abbildungen/a.png' }])
+  })
+
+  it('legt nichts unter tex-pakete/ an, dort liegen Pakete aus tex_package_add', async () => {
+    expect(await fehlerVon(anlegen('tex-pakete/foo/a.png', PNG))).toMatchObject({ status: 422, typ: 'eingabe_ungueltig' })
   })
 
   it('lehnt einen vorhandenen Pfad mit konflikt ab', async () => {

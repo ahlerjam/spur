@@ -64,8 +64,9 @@ async function ausDerInstallation(name) {
     await fs.rm(leer, { recursive: true, force: true })
   }
   if (!gefunden) return null
-  const pfad = await fs.realpath(gefunden)
-  if (!(await wurzeln()).some(w => pfad.startsWith(`${w}/`))) return null
+  // Ein veraltetes ls-R kennt Dateien, die es nicht mehr gibt.
+  const pfad = await fs.realpath(gefunden).catch(() => null)
+  if (!pfad || !(await wurzeln()).some(w => pfad.startsWith(`${w}/`))) return null
   return { pfad, herkunft: 'installation', inhalt: (await fs.readFile(pfad)).subarray(0, MAX_BYTES).toString('utf8') }
 }
 

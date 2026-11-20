@@ -124,8 +124,8 @@ async function angelegtEntfernen(projectId, lauf, userId) {
   // Ordner, die erst der Lauf angelegt hat (etwa abbildungen/), nur wenn niemand etwas hineingelegt hat.
   const ordner = (lauf.angelegt ?? []).map(e => e.ordner).filter(Boolean)
   if (ordner.length) {
-    const { docs, files } = await ProjectEntityHandler.promises.getAllEntities(projectId)
-    const pfade = [...docs, ...files].map(e => e.path)
+    const { docs, files, folders } = await ProjectEntityHandler.promises.getAllEntities(projectId)
+    const pfade = [...docs, ...files, ...folders].map(e => e.path)
     for (const o of ordner) {
       if (!pfade.some(p => p.startsWith(`/${o}/`))) await pfadEntfernen(projectId, o, userId)
     }
