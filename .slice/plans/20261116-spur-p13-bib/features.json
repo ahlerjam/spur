@@ -48,7 +48,7 @@
         "Für eine Quelle, deren Namen mit Diakritika in den Metadaten („Müller“) und ohne im PDF („Muller“) stehen, lautet der Zustand `bestaetigt`",
         "Eine gescannte Quelle ohne Text bekommt keinen Abgleich und keinen Hinweis"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
