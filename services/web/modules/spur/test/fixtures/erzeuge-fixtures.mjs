@@ -127,6 +127,8 @@ einfach('bot001.pdf', 'Publisher walls around open articles', 'R. Stein', ['The 
 einfach('soil.pdf', 'Soil microbes in alpine meadows', 'B. Jones', ['Microbial communities differ with altitude.'])
 einfach('p12a.pdf', 'Slow-wave sleep and declarative recall in adults', 'A. Rivers', ['Recall of word pairs rose with the share of slow-wave sleep.'])
 einfach('p12b.pdf', 'Sleep deprivation and working memory in nurses', 'B. Lindqvist', ['After night shifts the nurses made more errors in the n-back task.'])
+// Volltext zur gedrosselten Crossref-DOI (P6). Seit P12 gleicht spur den Titel ab, ein fremdes PDF fiele durch.
+einfach('foods2022.pdf', 'Testwerk fuer gedrosseltes Crossref', 'F. Drossel', ['Households discard a share of the food they buy.'])
 einfach('report.pdf', 'AI at Work', 'J. Meyer, C. Okafor', ['Firms adopt generative tools unevenly across occupations.'])
 writeFileSync(
   join(here, 'deckblatt.pdf'),

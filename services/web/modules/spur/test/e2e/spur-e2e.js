@@ -855,7 +855,9 @@ async page => {
       const P3 = ['suggest']
       // P7: Pakete pro Projekt.
       const P7 = ['tex_package_add', 'source_upload_link']
-      const erwartet = [...P1, ...P2, ...P3, ...P7].sort()
+      // P12: Suchprotokoll und Ausschluss für PRISMA.
+      const P12 = ['search_log', 'paper_exclude']
+      const erwartet = [...P1, ...P2, ...P3, ...P7, ...P12].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
