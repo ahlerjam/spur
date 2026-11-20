@@ -35,7 +35,7 @@
         "Das Projekt kompiliert mit biblatex-apa ohne Warnung zu diesen Einträgen; im Literaturverzeichnis (über `page_image`) steht beim ersten Eintrag „arXiv“ und kein leerer Zeitschriftenname",
         "`bib_list` zeigt für beide Einträge keine Abweichung beim Eintragstyp"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f4",
