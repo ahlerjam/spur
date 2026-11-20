@@ -100,9 +100,10 @@ function belegAn(text, pos) {
   return { belege: belegLesen(m[1], werte, keys.text), bis: keys.pos }
 }
 
+// Die Paare stehen ohne Leerraum hintereinander; eine Klammer nach Leerraum ist schon Text.
 function mehrfachBeleg(text, befehl, pos) {
   const belege = []
-  for (;;) {
+  while (belege.length === 0 || text[pos] === '[' || text[pos] === '{') {
     const { werte, pos: nachOpts } = optionen(text, pos)
     const keys = argument(text, nachOpts)
     if (!keys) break

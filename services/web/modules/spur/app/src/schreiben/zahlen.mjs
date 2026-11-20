@@ -24,6 +24,8 @@ const EINSTELLUNGEN = new Set([
   'tikzset', 'tikzstyle', 'pgfplotsset', 'usetikzlibrary', 'geometry', 'hypersetup', 'captionsetup', 'setstretch',
   'linespread', 'rule', 'resizebox', 'scalebox', 'newlength', 'addtolength',
 ])
+// Bei diesen Befehlen sind nur die ersten Pflichtargumente Größen; das letzte ist Inhalt und wird weiter geprüft.
+const GROESSEN_ARGUMENTE = { resizebox: 2, scalebox: 1 }
 const SPALTEN = /^\{(?:tabularx?|array)\*?\}/
 const LAENGE = /(?<![\p{L}\d\\.,])\d+(?:[.,]\d+)?(?:(?:pt|mm|cm|in|em|ex|bp)(?![a-zA-Z])|\\(?:textwidth|linewidth|columnwidth|baselineskip)(?![a-zA-Z]))/gu
 const ZEICHENBEFEHL = /^[ \t]*\\(?:draw|node|path|fill|filldraw|coordinate|clip|addplot)\b.*$/gm
@@ -76,14 +78,16 @@ export function zahlenIn(text) {
   return dezimalzeichen(text).match(ZAHL) ?? []
 }
 
-// Ende der Argumente ab pos: [..], {..} und bei \tikzstyle das „=[..]“, beliebig verschachtelt.
-function argumenteEnde(text, pos) {
-  for (;;) {
+// Ende der Argumente ab pos: [..], {..} und bei \tikzstyle das „=[..]“, beliebig verschachtelt; höchstens
+// maxPflicht Argumente in geschweiften Klammern.
+function argumenteEnde(text, pos, maxPflicht = Infinity) {
+  for (let pflicht = 0; ; ) {
     let p = pos
     while (/\s/.test(text[p] ?? '')) p++
     if (text[p] === '=') p++
     while (/\s/.test(text[p] ?? '')) p++
     const zu = { '[': ']', '{': '}' }[text[p]]
+    if (zu === '}' && pflicht++ >= maxPflicht) return pos
     const ende = zu ? klammerEnde(text, p, text[p], zu) : -1
     if (ende < 0) return pos
     pos = ende + 1
@@ -98,7 +102,7 @@ function einstellungenEntfernen(text) {
     const nachName = m.index + m[0].length
     const spalten = m[1] === 'begin' && SPALTEN.exec(text.slice(nachName))
     if (!EINSTELLUNGEN.has(m[1]) && !spalten) continue
-    const ende = argumenteEnde(text, spalten ? nachName + spalten[0].length : nachName)
+    const ende = argumenteEnde(text, spalten ? nachName + spalten[0].length : nachName, GROESSEN_ARGUMENTE[m[1]])
     rest += `${text.slice(pos, m.index)} `
     pos = ende
   }

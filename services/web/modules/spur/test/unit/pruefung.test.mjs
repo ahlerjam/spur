@@ -382,6 +382,10 @@ describe('Zitiervarianten', () => {
     expect(belege(String.raw`\textcites[vgl.][5]{a}{b,c}`)).toEqual([['beleg', ['textcites:a:5', 'textcites:b:', 'textcites:c:']]])
   })
 
+  it('liest bei Mehrfachformen nur direkt anschließende Paare', () => {
+    expect(belege(String.raw`\parencites{a}{b} {\bfseries Text}`)).toEqual([['beleg', ['parencites:a:', 'parencites:b:']]])
+  })
+
   it('liest alle Keys eines Belegs', () => {
     expect(belege(String.raw`\parencite{smith2024,jones2023, fake2020}`)).toEqual([['beleg', ['parencite:smith2024:', 'parencite:jones2023:', 'parencite:fake2020:']]])
   })

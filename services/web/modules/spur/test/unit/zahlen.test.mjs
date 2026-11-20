@@ -223,6 +223,11 @@ Breite 0.45\linewidth, Abstand 1.5\baselineskip, 0.3\columnwidth, 12pt, 3.5mm, 2
     expect(performance.now() - start).toBeLessThan(500)
   })
 
+  it('prüft den Inhalt von \\resizebox und \\scalebox weiter, nur die Größen nicht', () => {
+    expect(zahlenOhneBeleg(String.raw`\resizebox{0.9\textwidth}{!}{Modell A & 87.3 \\}`)).toEqual(['87.3'])
+    expect(zahlenOhneBeleg(String.raw`\scalebox{0.75}[0.8]{Wert 412}`)).toEqual(['412'])
+  })
+
   it('meldet Zahlen im Fließtext und in Tabellenzellen weiter', () => {
     expect(zahlenOhneBeleg('Die Genauigkeit stieg um 12,5 Prozent auf 0,89.')).toEqual(['12,5', '0,89'])
     expect(zahlenOhneBeleg('Gruppe A & 75,7 \\\\')).toEqual(['75,7'])
