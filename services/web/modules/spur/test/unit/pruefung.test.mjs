@@ -302,6 +302,23 @@ describe('vorangestellter Beleg', () => {
     expect([zeilen[0].von, zeilen[0].bis]).toEqual([0, quelle.length])
   })
 
+  it('behält die Seite des vorangestellten Belegs, wenn der nachfolgende keine nennt', () => {
+    const quelle = String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{${SATZ}} \parencite{smith2024}`
+    expect(formen(zitateFinden(quelle))).toEqual([['enquote', SATZ, 'smith2024:S.~347']])
+  })
+
+  it('lässt ein \\textcite, das ein eigenes Zitat einleitet, nicht als Beleg des vorigen Zitats gelten', () => {
+    for (const trenner of ['\n', '. ', ' und ']) {
+      const quelle = String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{${SATZ}}${trenner}\textcite[S.~9]{jones2023} schreiben: \enquote{Erfunden.}`
+      expect(formen(zitateFinden(quelle))).toEqual([
+        ['enquote', SATZ, 'smith2024:S.~347'],
+        ['enquote', 'Erfunden.', 'jones2023:S.~9'],
+      ])
+    }
+    const nachgestellt = String.raw`\enquote{${SATZ}} \textcite[S.~347]{smith2024}. Danach mehr.`
+    expect(formen(zitateFinden(nachgestellt))).toEqual([['enquote', SATZ, 'smith2024:S.~347']])
+  })
+
   it('nimmt die Seite aus einem reinen (S.~x) nach dem Zitat', () => {
     const quelle = String.raw`\textcite{smith2024} schreiben: \enquote{${SATZ}} (S.~347).`
     const zeilen = zitateFinden(quelle)
@@ -327,6 +344,20 @@ describe('vorangestellter Beleg', () => {
       ['beleg', '', 'smith2024:S.~347'],
       ['enquote', SATZ, 'jones2023:S.~9'],
     ])
+  })
+
+  it('nimmt keinen Beleg aus dem nächsten Absatz', () => {
+    const quelle = String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{Erfunden.}` + '\n\n' + String.raw`\textcite[S.~347]{smith2024} zeigt das. \enquote{${SATZ}}`
+    expect(formen(zitateFinden(quelle))).toEqual([
+      ['enquote', 'Erfunden.', 'smith2024:S.~347'],
+      ['beleg', '', 'smith2024:S.~347'],
+    ])
+    expect(formen(zitateFinden(String.raw`\enquote{${SATZ}}` + '\n\n' + String.raw`\parencite[1]{a}`))).toEqual([['beleg', '', 'a:1']])
+  })
+
+  it('übersteht leere Keys vor und nach dem Zitat', () => {
+    const zeilen = zitateFinden(String.raw`\textcite{} schreiben \enquote{X} \textcite{} sagt \enquote{Y}`)
+    expect(zeilen.every(z => z.belege.length === 0)).toBe(true)
   })
 
   it('verknüpft nur mit Autor-im-Satz-Befehlen', () => {

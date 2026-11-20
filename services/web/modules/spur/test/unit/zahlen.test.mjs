@@ -217,6 +217,12 @@ Breite 0.45\linewidth, Abstand 1.5\baselineskip, 0.3\columnwidth, 12pt, 3.5mm, 2
     expect(zahlenOhneBeleg(text)).toEqual([])
   })
 
+  it('braucht für lange Ziffernfolgen in Zeichenbefehlen keine quadratische Zeit', () => {
+    const start = performance.now()
+    zahlenOhneBeleg(`\\draw (${'1'.repeat(50000)}`)
+    expect(performance.now() - start).toBeLessThan(500)
+  })
+
   it('meldet Zahlen im Fließtext und in Tabellenzellen weiter', () => {
     expect(zahlenOhneBeleg('Die Genauigkeit stieg um 12,5 Prozent auf 0,89.')).toEqual(['12,5', '0,89'])
     expect(zahlenOhneBeleg('Gruppe A & 75,7 \\\\')).toEqual(['75,7'])

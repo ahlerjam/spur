@@ -207,7 +207,8 @@ export async function bibBereichPruefen(projectId, docId, text, von, bis) {
   const funde = texte(docs)
     .flatMap(t => zitateFinden(t, kontext.makros))
     .filter(f => !f.ausgeblendet && f.belege.some(b => schluessel.has(b.key)))
-  return await fundeBewerten(funde, kontext)
+  // Eine Stelle mit mehreren Keys ergibt eine Zeile je Key; nur die geänderten Einträge zählen.
+  return (await fundeBewerten(funde, kontext)).filter(z => schluessel.has(z.key))
 }
 
 async function zeilenFuer(projectId, abschnittsListe, kontext, basis, nutzung) {

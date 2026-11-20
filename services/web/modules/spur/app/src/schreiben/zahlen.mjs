@@ -26,7 +26,7 @@ const EINSTELLUNGEN = new Set([
 const SPALTEN = /^\{(?:tabularx?|array)\*?\}/
 const LAENGE = /(?<![\p{L}\d\\.,])\d+(?:[.,]\d+)?(?:(?:pt|mm|cm|in|em|ex|bp)(?![a-zA-Z])|\\(?:textwidth|linewidth|columnwidth|baselineskip)(?![a-zA-Z]))/gu
 const ZEICHENBEFEHL = /^[ \t]*\\(?:draw|node|path|fill|filldraw|coordinate|clip|addplot)\b.*$/gm
-const KOORDINATE = /\(\s*[-+]?\d*[.,]?\d+\s*,\s*[-+]?\d*[.,]?\d+\s*\)/g
+const KOORDINATE = /\(\s*[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)\s*,\s*[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)\s*\)/g
 // siunitx: Werte bleiben als Text stehen, Optionen und Einheit fallen weg.
 const SIUNITX = /\\(num|qty|SI|SIrange|qtyrange|numrange)\s*(?:\[[^\]]*\])?\s*\{([^{}]*)\}(?:\s*\{([^{}]*)\})?(?:\s*\{([^{}]*)\})?/g
 const ZWEI_WERTE = new Set(['SIrange', 'qtyrange', 'numrange'])

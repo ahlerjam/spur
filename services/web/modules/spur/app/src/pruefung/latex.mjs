@@ -125,13 +125,14 @@ function seiteDanach(text, pos) {
 // Beleg geht vor; nennt er dieselben Keys, geht der vorangestellte in der Zeile auf.
 function mitVorangestelltem(zeilen, text, zitat) {
   const anker = zeilen.at(-1)
-  if (anker?.form !== 'beleg' || anker.ausgeblendet || !AUTOR_IM_SATZ.has(anker.belege[0].befehl)) return zitat
+  if (anker?.form !== 'beleg' || anker.ausgeblendet || !AUTOR_IM_SATZ.has(anker.belege[0]?.befehl)) return zitat
   const zwischen = text.slice(anker.bis, zitat.von)
   if (zwischen.length > ANKER_ABSTAND || SATZENDE.test(zwischen)) return zitat
   if (zitat.belege.length) {
     if (!anker.belege.every(a => zitat.belege.some(b => b.key === a.key))) return zitat
     zeilen.pop()
-    return { ...zitat, von: anker.von }
+    const seiteVorn = key => anker.belege.find(a => a.key === key)?.seite ?? ''
+    return { ...zitat, von: anker.von, belege: zitat.belege.map(b => ({ ...b, seite: b.seite || seiteVorn(b.key) })) }
   }
   zeilen.pop()
   const danach = anker.belege.some(b => !b.seite) && seiteDanach(text, zitat.bis)
@@ -143,10 +144,25 @@ function mitVorangestelltem(zeilen, text, zitat) {
   }
 }
 
+const ZITAT_BEGINN = /\\(?:enquote|textquote|blockquote)\b|„|\\begin\{quote\}/
+
+// Ein Autor-im-Satz-Befehl, auf den im selben Satz ein Zitat folgt, leitet dieses ein und belegt nicht das vorige.
+function leitetZitatEin(text, beleg) {
+  if (!AUTOR_IM_SATZ.has(beleg.belege[0]?.befehl)) return false
+  const rest = text.slice(beleg.bis, beleg.bis + ANKER_ABSTAND)
+  const ende = rest.search(SATZENDE)
+  return ZITAT_BEGINN.test(ende < 0 ? rest : rest.slice(0, ende))
+}
+
+const ABSATZ = /\n[ \t]*\n/
+
 function folgenderBeleg(text, pos) {
   let p = leerraumEnde(text, pos)
   if (/[.,;:]/.test(text[p] ?? '')) p = leerraumEnde(text, p + 1)
-  return belegAn(text, p)
+  // Ein Beleg im nächsten Absatz gehört nicht mehr zu diesem Zitat.
+  if (ABSATZ.test(text.slice(pos, p))) return null
+  const beleg = belegAn(text, p)
+  return beleg && !leitetZitatEin(text, beleg) ? beleg : null
 }
 
 function zeileMitZitat(form, zitat, von, bis, beleg) {

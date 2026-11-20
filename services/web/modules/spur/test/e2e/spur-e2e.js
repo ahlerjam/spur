@@ -709,7 +709,7 @@ async page => {
       await zeigt('hippocampus replays', 'Wortlaut: mit Trennungstoleranz')
       await zeigt('Sleep supports […] declarative memory.', 'Seite: stimmt')
       await zeigt('Memory traces', 'gefunden auf S. 347')
-      await zeigt('Naps improve', 'Seite nicht prüfbar')
+      await zeigt('Naps improve', 'PDF-Seite: stimmt')
       await zeigt('Naps improve', 'Zurückgezogen')
       ok(
         await zeile('Naps improve')
@@ -725,7 +725,7 @@ async page => {
       await zeigt('korrigiert', 'Korrektur vorhanden')
       await zeigt('Sleep supports […] declarative memory.', 'Keine Meldung in Crossref')
       await zeigt('unbekannt', 'DOI nicht registriert')
-      await zeigt('footfullcite', 'Nicht prüfbar')
+      await zeigt('meincite', 'Nicht prüfbar')
 
       await panelOeffnen('Quellen')
       await page.getByRole('button', { name: 'smith2024.pdf' }).click()
@@ -1141,7 +1141,7 @@ async page => {
     const ohneQuelle = await edit({ alt: 'Erster', neu: 'Erster \\enquote{Ein Satz.} \\autocite[1]{neuerkey2025}' })
     ok(ohneQuelle.inhalt.fehler === 'quelle_fehlt', `Ohne Quelle: ${JSON.stringify(ohneQuelle.inhalt)}`)
 
-    const unbekannt = await edit({ alt: 'Erster', neu: 'Erster \\footfullcite{smith2024}' })
+    const unbekannt = await edit({ alt: 'Erster', neu: 'Erster \\meincite{smith2024}' })
     ok(!unbekannt.fehler && unbekannt.inhalt.rot.length === 1, `Unbekannt: ${JSON.stringify(unbekannt.inhalt)}`)
     const { lauf } = (await werkzeug(token, 'run_status', { project_id: pid })).inhalt
     ok(lauf.rot.length >= 1, 'Lauf nicht rot')
@@ -1315,7 +1315,7 @@ async page => {
     ok((await lauf()).status === 'angenommen', 'Grüner Lauf nicht angenommen')
     ok(!(await changesVonClaude()).some(c => c.op.i?.includes(' eins')), 'Changes nach Automatik')
 
-    ok(!(await edit({ alt: 'Delta', neu: 'Delta \\footfullcite{x}' })).fehler, 'Roter Edit')
+    ok(!(await edit({ alt: 'Delta', neu: 'Delta \\meincite{x}' })).fehler, 'Roter Edit')
     await fertig('Roter Lauf')
     ok((await lauf()).status === 'fertig', 'Roter Lauf wurde angenommen')
     await karte().getByText('Bitte prüfen').waitFor({ timeout: 20000 })
@@ -5618,13 +5618,13 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await karte.getByText('Zahl ohne Beleg: 240, 90', { exact: true }).waitFor()
 
     // Rotes Zitat bleibt offen und steht oben unter „Bitte prüfen“; der Rest desselben Laufs ist angenommen.
-    const rot = await schreiben('Gamma Satz.', 'Gamma Satz. \\footfullcite{smith2024}')
+    const rot = await schreiben('Gamma Satz.', 'Gamma Satz. \\meincite{smith2024}')
     ok(rot.rot.length === 1, `Zitat nicht rot: ${JSON.stringify(rot)}`)
     await schreiben('Delta Satz.', 'Delta Satz ergänzt.')
     const zuPruefen = karte.locator('.spur-lauf-rot', { hasText: 'Bitte prüfen' })
-    await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'footfullcite' }).waitFor({ timeout: 10000 })
+    await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'meincite' }).waitFor({ timeout: 10000 })
     const reihenfolge = await karte.locator('.spur-lauf-aenderung .spur-nachricht-text').allInnerTexts()
-    ok(reihenfolge[0].includes('footfullcite'), `Rotes Zitat nicht oben: ${reihenfolge}`)
+    ok(reihenfolge[0].includes('meincite'), `Rotes Zitat nicht oben: ${reihenfolge}`)
     await karte.locator('.spur-lauf-automatisch', { hasText: 'ergänzt' }).waitFor()
 
     // Schalter aus: Neue Änderungen bleiben offen. Per Tastatur, ohne Sprung, mit Zustand.
@@ -5662,7 +5662,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     await fokusAuf(nichts, 'nach dem Annehmen')
     await page.keyboard.press('Enter')
     ok((await modal().count()) === 0, '„Nur rote Zitate offen“ öffnet den Dialog')
-    await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'footfullcite' }).waitFor()
+    await zuPruefen.locator('.spur-lauf-aenderung', { hasText: 'meincite' }).waitFor()
     ok((await karte.locator('.spur-lauf-aenderung', { hasText: 'Nachtrag' }).count()) === 0, 'Offenes nicht angenommen')
 
     // Lauf rückgängig nimmt auch automatisch Angenommenes zurück.
@@ -7780,7 +7780,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(ansicht.an(12)[0]?.meta.includes('Zitierform nicht erkannt'), `Ansicht Zeile 12: ${json(ansicht.an(12))}`)
 
     const summe = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'beleg_ohne_wortlaut', 'nicht_pruefbar'].reduce((s, k) => s + bericht.zaehlung[k], 0)
-    ok(summe === bericht.eintraege.length && summe === 13, `zaehlung ${json(bericht.zaehlung)}, ${bericht.eintraege.length} Zeilen`)
+    ok(summe === bericht.eintraege.length && summe === 12, `zaehlung ${json(bericht.zaehlung)}, ${bericht.eintraege.length} Zeilen`)
     const kopf = await page.locator('p.spur-zeile-meta', { hasText: KOPFZEILE_BERICHT }).innerText()
     ok(kopf.startsWith(`${alle.length} Stellen, ${bericht.zaehlung.markiert} markiert`) && alle.length === summe, `Kopfzeile „${kopf}“, ${alle.length} Zeilen`)
   }

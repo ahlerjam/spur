@@ -136,6 +136,16 @@ describe('bericht', () => {
     expect(zaehlung).toMatchObject({ beleg_ohne_wortlaut: 1, ohne_quelle: 2, markiert: 1 })
   })
 
+  it('meldet bei einer .bib-Änderung nur die Zeilen der geänderten Einträge, nicht die anderen Keys der Stelle (P14)', async () => {
+    const bib = `${BIB}@article{fake2020,\n  doi = {10.9999/nirgends.1}\n}\n`
+    projektDocs['/references.bib'] = doc(bib)
+    projektDocs['/main.tex'] = doc('\\parencite{smith2024,fake2020}', wurzelDoc)
+    const docs = await PruefManager.dokumente(projekt)
+    const bibDoc = docs.find(d => d.pfad === 'references.bib')
+    const zeilen = await PruefManager.bibBereichPruefen(projekt, bibDoc.docId, bib, 0, 10)
+    expect(zeilen.map(z => z.key)).toEqual(['smith2024'])
+  })
+
   it('verwendet geprüfte Abschnitte wieder und prüft nur geänderte neu', async () => {
     await PruefManager.bericht(projekt)
     expect((await PruefManager.bericht(projekt)).abschnitte).toEqual({ neu: 0, uebernommen: 2 })

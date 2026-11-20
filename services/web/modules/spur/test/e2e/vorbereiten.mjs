@@ -157,7 +157,7 @@ const BERICHT_MAIN = String.raw`\documentclass{article}
 \enquote{Naps improve every kind of memory equally.} \autocite[2]{retracted}
 \parencite{korrigiert}
 \parencite{unbekannt}
-\footfullcite{smith2024}
+\meincite{smith2024}
 \input{kapitel}
 \printbibliography
 \end{document}`
