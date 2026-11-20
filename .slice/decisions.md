@@ -66,3 +66,6 @@
 - D14 (plan 20261116-spur-p12-quellen) außerhalb des Plans: Im Editor bleibt der rote Punkt eines Claude-Laufs an einem Zitat stehen, auch wenn der Prüfbericht es nicht mehr markiert. Vorschlag des Builders dazu: Option `--abschluss` für `spur-hochladen`.
   Interim: nicht angefasst.
   Options: A eigener kleiner Plan | B ins Backlog
+- D15 (plan 20261116-spur-p16-tex) f1: Schritt 5 (eine APA-7-Arbeit kompiliert im Dev-Stack ohne Nachladen) braucht ein Dev-Image mit der neuen Paketliste. Das vorhandene Image ist älter; der E2E-Schritt `p16f1b` überspringt sich deshalb, f1 bleibt offen.
+  Interim: Als Teilstand gemergt (f2, f3 bestanden). Ersatzbeleg des Builders: Pakete der Liste in ein temporäres TEXMFHOME entpackt, APA-Arbeit und minted-Beispiel kompilieren zu PDFs.
+  Options: A (empfohlen) Workflow „Dev image“ starten, danach `p16f1b` laufen lassen und f1 auf bestanden setzen | B den Smoke-Schritt des Workflows als Beleg annehmen
