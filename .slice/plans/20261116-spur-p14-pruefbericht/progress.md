@@ -46,6 +46,8 @@ Nachgetragen: P14 baut keine neue Ansicht, sondern drei Abzeichen in die bestehe
 
 - Endstand (letzter Code-Commit `84ab2f1`, nach /simplify auf der letzten Änderung): `spur-dev test` grün (94,39 % Zeilen), Gesamtlauf E2E 119 ok, `p16f1b` übersprungen; sechs Ansichten um 20:33 UTC neu aufgenommen, ohne Überlauf.
 
+- /simplify auf der finalen Codeänderung `84ab2f1` (vier Prüfer): keine Befunde, keine Codeänderung. Damit gelten der Gesamtlauf und die Ansichten auf `84ab2f1` als letzter Stand.
+
 ## Vorschläge
 - Zitat-Beleg-Zuordnung als ein Nachlauf über die fertige Zeilenliste statt Vorwärtssuche je Zitat mit Korrekturen (Befund aus /simplify).
 - Satzende-Erkennung mit Abkürzungen („vgl.“, „Abb.“, „et al.“), damit ein vorangestelltes `\textcite` auch über solche Stellen hinweg verknüpft wird.
