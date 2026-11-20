@@ -42,7 +42,7 @@
         "Quelle `weber2018` (Buchauszug, 12 Seiten, keine PageLabels, keine DOI; jede Seite trägt unten allein die gedruckte Zahl 41 bis 52): Die Quellenansicht zeigt für PDF-Seite 1 die gedruckte Seite 41, der Unit-Test prüft `versatz: 40` und `versatzQuelle: \"seitentext\"`. Ein Zitat von PDF-Seite 3 mit `\\parencite[S.~43]{weber2018}` zeigt „Seite stimmt“ mit `seitenbasis: \"gedruckt\"` und dem Hinweis „Seitenzahl aus dem Seitentext erkannt“; `[S.~3]` zeigt „gefunden“ mit `gefundenAuf: \"43\"`",
         "Negativfall `klein2020` (10 Seiten, keine PageLabels; nur zwei Seiten tragen eine einzelne Zahl, zwei weitere tragen Zahlen mit anderem Versatz): `versatz` bleibt leer, ein Zitat von PDF-Seite 4 mit `[S.~4]` zeigt „PDF-Seite stimmt“ mit `seitenbasis: \"pdf\"`"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
