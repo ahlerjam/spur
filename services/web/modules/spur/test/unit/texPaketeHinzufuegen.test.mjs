@@ -337,13 +337,14 @@ describe('TexPakete.hinzufuegen mit datei', () => {
   })
 
   it('verlangt genau eins von paket und datei und einen sicheren Dateinamen', async () => {
+    // Als Funktionen: Ein schon gestarteter Aufruf scheiterte, bevor ihn jemand erwartet (unbehandelte Ablehnung).
     for (const aufruf of [
-      T.hinzufuegen({ projectId, menschId, botId }),
-      T.hinzufuegen({ projectId, menschId, botId, paket: 'spurtestfuenf', datei: 'spurtestfuenf.sty' }),
-      mitDatei('../x.sty'),
-      mitDatei('a b.sty'),
+      () => T.hinzufuegen({ projectId, menschId, botId }),
+      () => T.hinzufuegen({ projectId, menschId, botId, paket: 'spurtestfuenf', datei: 'spurtestfuenf.sty' }),
+      () => mitDatei('../x.sty'),
+      () => mitDatei('a b.sty'),
     ]) {
-      expect(await fehlerVon(aufruf)).toMatchObject({ code: 'eingabe_ungueltig' })
+      expect(await fehlerVon(aufruf())).toMatchObject({ code: 'eingabe_ungueltig' })
     }
     expect(abrufe).toEqual([])
   })
