@@ -70,6 +70,6 @@ Never work around a paywall or an access restriction: no shared accounts, no coo
 ## Figures and images
 
 - To understand a figure or table in a source, look at the page with `source_page_image` (`quelle_id`, `pdf_seite`).
-- A figure from a source goes into the project only with an open licence: `source_figure_add` with `ausschnitt` (shares 0–1 of the page, `y` from the top) and a `pfad` ending in `.png`. Put the returned `quellenangabe` into the caption. On `lizenz_fehlt`, redraw the figure (for example with TikZ) and label it "in Anlehnung an", or tell the person that permission from the rights holder is needed.
+- A figure from a source goes into the project only with an open licence: `source_figure_add` with `ausschnitt` (shares 0 to 1 of the page, `y` from the top) and a `pfad` ending in `.png`. Put the returned `quellenangabe` into the caption. On `lizenz_fehlt`, redraw the figure (for example with TikZ) and label it "in Anlehnung an", or tell the person that permission from the rights holder is needed.
 - The person's own images (PNG, JPEG, PDF up to 10 MB): call `file_upload_link`, then run `spur-hochladen <link> <file> --projektdatei abbildungen/<name>`. It prints `<file>: Datei <path>`; include the file with `\includegraphics`.
 
