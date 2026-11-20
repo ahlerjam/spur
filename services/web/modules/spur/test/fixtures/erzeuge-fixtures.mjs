@@ -243,3 +243,37 @@ Teilnehmerin: After three weeks I could no longer remember the routines.
 Interviewer: Did declarative memory come back on free days?
 `
 )
+// P14: Seitenangaben ohne PageLabels. gandhi2024 trägt auch im Text keine Seitenzahlen (Preprint), weber2018 unten
+// allein die gedruckte Zahl 41 bis 52, klein2020 nur vier einzelne Zahlen mit zwei verschiedenen Versätzen.
+const absatz = (thema, n) => [`${thema}, part ${String.fromCharCode(64 + n)}.`, 'The analysis follows the same protocol throughout.']
+writeFileSync(
+  join(here, 'gandhi2024.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 8 }, (_, i) =>
+      i === 5 ? ['Replay strengthens memory traces.', ...absatz('Replay', i + 1)] : absatz('Replay', i + 1)
+    ),
+    title: 'Replay in artificial neural networks',
+  })
+)
+writeFileSync(
+  join(here, 'weber2018.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 12 }, (_, i) => [
+      ...(i === 2 ? ['Bureaucracies codify routines in written rules.'] : []),
+      ...absatz('Administration', i + 1),
+      String(41 + i),
+    ]),
+    title: 'Verwaltung und Routinen',
+  })
+)
+writeFileSync(
+  join(here, 'klein2020.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 10 }, (_, i) => [
+      ...(i === 3 ? ['Small teams share knowledge informally.'] : []),
+      ...absatz('Teams', i + 1),
+      ...({ 1: ['12'], 2: ['13'], 5: ['100'], 6: ['101'] }[i] ?? []),
+    ]),
+    title: 'Teams and knowledge',
+  })
+)

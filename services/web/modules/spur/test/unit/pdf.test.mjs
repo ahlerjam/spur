@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
-import { ocrSeite, seitenBild, seitenTexte, textEbene, textEbeneAuswerten, tsvAuswerten, versatzAusLabels, vttSeiten } from '../../app/src/pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, textEbene, textEbeneAuswerten, tsvAuswerten, versatzAusLabels, versatzAusSeitentext, vttSeiten } from '../../app/src/pdf.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 
 const fixture = name => fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url))
@@ -38,6 +38,34 @@ describe('versatzAusLabels', () => {
 
   it('liefert nichts ohne PageLabels', async () => {
     expect(await versatzAusLabels(fixture('retracted.pdf'))).toBeNull()
+  })
+})
+
+describe('versatzAusSeitentext', () => {
+  const seite = (text, zahl, oben = false) => (oben ? `${zahl}\n${text}\n` : `${text}\nmehr Text\n  ${zahl}  \n\n`)
+
+  it('liest die gedruckte Seitenzahl allein in der ersten oder letzten Zeile', () => {
+    const texte = Array.from({ length: 12 }, (_, i) => seite(`Kapitel ${i}`, 41 + i, i % 2 === 0))
+    expect(versatzAusSeitentext(texte)).toBe(40)
+  })
+
+  it('braucht mindestens fünf Seiten mit demselben Versatz', () => {
+    const texte = Array.from({ length: 10 }, (_, i) => (i < 4 ? seite('x', 11 + i) : 'ohne Zahl\n'))
+    expect(versatzAusSeitentext(texte)).toBeNull()
+  })
+
+  it('braucht 80 % der erkannten Seiten', () => {
+    const texte = [...Array.from({ length: 6 }, (_, i) => seite('x', 11 + i)), ...Array.from({ length: 4 }, (_, i) => seite('x', 99 + i))]
+    expect(versatzAusSeitentext(texte)).toBeNull()
+    expect(versatzAusSeitentext([...texte.slice(0, 8).map((_, i) => seite('x', 11 + i)), ...texte.slice(8)])).toBe(10)
+  })
+
+  it('zählt weder römische Zahlen noch Zahlen im Satz und liest nur die ersten 30 Seiten', () => {
+    const roemisch = Array.from({ length: 8 }, (_, i) => seite('x', ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii'][i]))
+    expect(versatzAusSeitentext(roemisch)).toBeNull()
+    expect(versatzAusSeitentext(Array.from({ length: 8 }, (_, i) => `Text\nSeite ${i + 1} von 8\n`))).toBeNull()
+    const spaet = [...Array.from({ length: 30 }, () => 'leer\n'), ...Array.from({ length: 10 }, (_, i) => seite('x', 31 + i))]
+    expect(versatzAusSeitentext(spaet)).toBeNull()
   })
 })
 

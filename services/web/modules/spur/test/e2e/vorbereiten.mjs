@@ -576,7 +576,92 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   for (const name of ['E2E P13 Heft', 'E2E P13 Entities', 'E2E P13 Preprint', 'E2E P13 Autoren']) await neuAnlegen(a, name, { 'main.tex': P13_MAIN })
   await neuAnlegen(a, 'E2E P13 Upload', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E P13 Alt', { 'main.tex': P13_ALT_MAIN, 'references.bib': P13_ALT_BIB })
+  await p14Vorbereiten(a)
 }
+
+const P14_KOPF = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\usepackage{csquotes}
+\addbibresource{references.bib}
+\begin{document}
+`
+const P14_FUSS = String.raw`
+\printbibliography
+\end{document}`
+const P14_SATZ = 'Sleep supports the consolidation of declarative memory.'
+const P14_BIB = `@article{smith2024,
+  title = {Sleep and Memory},
+  doi = {10.5555/spur.2024.001}
+}
+@article{jones2023,
+  title = {Dynamic capabilities for digital transformation in public agencies},
+  doi = {10.5555/spur.heft.001}
+}
+@article{fake2020,
+  title = {Gibt es nirgends},
+  doi = {10.9999/nirgends.1}
+}
+@online{gandhi2024,
+  title = {Replay in artificial neural networks}
+}
+@book{weber2018,
+  title = {Verwaltung und Routinen}
+}
+@article{klein2020,
+  title = {Teams and knowledge}
+}
+`
+
+// P14: Prüfbericht ohne blinde Flecken. Jede Stelle steht auf einer eigenen Zeile (Zeilen 6, 8, 10, …).
+async function p14Vorbereiten(a) {
+  const mitSmith = async (name, zeilen) => {
+    const projekt = await neuAnlegen(a, name, { 'main.tex': P14_KOPF + zeilen.join('\n\n') + P14_FUSS, 'references.bib': P14_BIB })
+    await quelleAusFixture(projekt._id, a._id, 'smith2024.pdf')
+    return projekt
+  }
+  await mitSmith('E2E P14 Textcite', [String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{${P14_SATZ}}`])
+  await mitSmith('E2E P14 Textcite Fälle', [
+    String.raw`\Textcite[S.~347]{smith2024} schreiben: „${P14_SATZ}“`,
+    String.raw`\textcite{smith2024} schreiben: \enquote{${P14_SATZ}} \parencite[S.~347]{smith2024}`,
+    String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{Sleep invented the consolidation.}`,
+    String.raw`\textcite[S.~347]{smith2024} zeigt das. \enquote{${P14_SATZ}}`,
+    String.raw`\textcite[S.~347]{smith2024} zitieren \enquote{${P14_SATZ}} \parencite[S.~9]{jones2023}`,
+  ])
+  await mitSmith('E2E P14 Varianten', [
+    String.raw`Mehrere Studien stützen das \parencite{smith2024,jones2023,fake2020}.`,
+    String.raw`\Parencite{smith2024} \citeauthor{smith2024} \citeyear{smith2024} \citealp{smith2024} \parencites[12]{smith2024}[34]{jones2023}`,
+    String.raw`\enquote{${P14_SATZ}} \parencite[347]{jones2023,smith2024}`,
+    String.raw`\meincite{smith2024}`,
+  ])
+  const preprint = await mitSmith('E2E P14 Preprint', [
+    String.raw`\enquote{Replay strengthens memory traces.} \parencite[S.~6]{gandhi2024}`,
+    String.raw`\enquote{Replay strengthens memory traces.} \parencite[S.~9]{gandhi2024}`,
+    String.raw`\enquote{${P14_SATZ}} \parencite[347]{smith2024}`,
+    String.raw`\enquote{${P14_SATZ}} \parencite[3]{smith2024}`,
+    String.raw`\enquote{Bureaucracies codify routines in written rules.} \parencite[S.~43]{weber2018}`,
+    String.raw`\enquote{Bureaucracies codify routines in written rules.} \parencite[S.~3]{weber2018}`,
+    String.raw`\enquote{Small teams share knowledge informally.} \parencite[S.~4]{klein2020}`,
+  ])
+  for (const datei of ['gandhi2024.pdf', 'weber2018.pdf', 'klein2020.pdf']) await quelleAusFixture(preprint._id, a._id, datei)
+  await neuAnlegen(a, 'E2E P14 Grafik', { 'main.tex': P14_GRAFIK })
+}
+
+const P14_GRAFIK = String.raw`\documentclass{article}
+\usepackage{tikz}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\tikzset{box/.style={draw, minimum width=2.5cm, line width=0.4pt}}
+\begin{document}
+Einleitung.
+
+\begin{tikzpicture}
+  \node[draw] (a) at (0,0) {Start};
+  \draw[->] (a) -- (4.4,0);
+\end{tikzpicture}
+
+Schluss.
+\end{document}
+`
 
 const P13_MAIN = String.raw`\documentclass{article}
 \usepackage[style=apa,backend=biber]{biblatex}

@@ -14,7 +14,7 @@ import { anzahlEintraege, maxEintraege } from '../projektEintraege.mjs'
 import { jetzt, testSchalter } from '../schalter.mjs'
 import * as LaufManager from './LaufManager.mjs'
 import * as LaufAktionen from './LaufAktionen.mjs'
-import { zahlenIn, zahlenOhneBeleg } from './zahlen.mjs'
+import { lageImDokument, zahlenIn, zahlenOhneBeleg } from './zahlen.mjs'
 import { opsFuer } from './ops.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
 
@@ -250,8 +250,9 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu })
 
   // Werte gehören nach ergebnisse.tex; dort selbst ist jede Zahl gewollt, in .bib-Dateien stehen nur Metadaten.
   const ohnePruefung = istBib || /(^|\/)ergebnisse\.tex$/.test(doc.pfad)
-  const kandidaten = ohnePruefung ? [] : zahlenOhneBeleg(neu)
-  const zahlen = kandidaten.length ? zahlenOhneBeleg(neu, await ergebnisZahlen(projectId)) : []
+  const lage = lageImDokument(neuerText, start)
+  const kandidaten = ohnePruefung ? [] : zahlenOhneBeleg(neu, [], lage)
+  const zahlen = kandidaten.length ? zahlenOhneBeleg(neu, await ergebnisZahlen(projectId), lage) : []
   const op = opsFuer(start, alt, neu)
   const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
   let ergebnis = { doc_id: doc.docId, version, lauf_id: lauf._id, aenderung: false, rot, zahlen_ohne_beleg: zahlen }

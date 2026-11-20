@@ -33,6 +33,29 @@ export async function versatzAusLabels(pfad) {
   return (eintrag.label['/St'] ?? 1) - (eintrag.index + 1)
 }
 
+const SEITENZAHL = /^\d{1,5}$/
+const ERSTE_SEITEN = 30
+const MIN_SEITEN = 5
+const MIN_ANTEIL = 0.8
+
+// Rückfall für PDFs ohne PageLabels: eine arabische Zahl allein in der ersten oder letzten Zeile gilt als gedruckte
+// Seitenzahl. Den Versatz gibt es nur, wenn genug Seiten ihn übereinstimmend ergeben; ein falscher wäre schlimmer als
+// keiner, weil er still ein falsches „stimmt“ erzeugte.
+export function versatzAusSeitentext(texte) {
+  const haeufigkeit = new Map()
+  let erkannt = 0
+  for (const [i, text] of texte.slice(0, ERSTE_SEITEN).entries()) {
+    const zeilen = text.split('\n').map(z => z.trim()).filter(Boolean)
+    const zahl = [zeilen[0], zeilen.at(-1)].find(z => SEITENZAHL.test(z ?? ''))
+    if (!zahl) continue
+    erkannt++
+    const versatz = Number(zahl) - (i + 1)
+    haeufigkeit.set(versatz, (haeufigkeit.get(versatz) ?? 0) + 1)
+  }
+  const [versatz, anzahl] = [...haeufigkeit].sort((a, b) => b[1] - a[1])[0] ?? []
+  return anzahl >= MIN_SEITEN && anzahl >= MIN_ANTEIL * erkannt ? versatz : null
+}
+
 // Ohne Breite mit 110 dpi; mit Breite genau so viele Pixel breit (die Höhe folgt dem Seitenformat).
 export async function seitenBild(pfad, seite, ziel, breite = null) {
   const aufloesung = breite ? ['-scale-to-x', String(breite), '-scale-to-y', '-1'] : ['-r', '110']

@@ -12,8 +12,21 @@ const MATHE = [
 ]
 const KOMMENTAR = /(?<!\\)%.*$/gm
 const DEFINITION = /\\(?:re)?newcommand\*?\s*\{?\\\w+\}?(?:\[\d\])?\s*\{(?:[^{}]|\{[^{}]*\})*\}/g
-const GRAFIK =
-  /\\begin\{(tikzpicture|pgfpicture|axis|semilogxaxis|semilogyaxis|loglogaxis|polaraxis|ternaryaxis|groupplot)\}[\s\S]*?\\end\{\1\}/g
+const GRAFIK_UMGEBUNGEN = [
+  'tikzpicture', 'pgfpicture', 'axis', 'semilogxaxis', 'semilogyaxis', 'loglogaxis', 'polaraxis', 'ternaryaxis', 'groupplot',
+  'scope', 'tikzcd', 'circuitikz', 'forest', 'pgfonlayer',
+]
+const GRAFIK = new RegExp(`\\\\begin\\{(${GRAFIK_UMGEBUNGEN.join('|')})\\}[\\s\\S]*?\\\\end\\{\\1\\}`, 'g')
+const MATHE_UMGEBUNGEN = ['equation', 'align', 'gather', 'multline', 'eqnarray', 'math', 'displaymath']
+// Befehle, deren Argumente Einstellungen sind, keine Ergebnisse; die Argumente können verschachtelt sein.
+const EINSTELLUNGEN = new Set([
+  'tikzset', 'tikzstyle', 'pgfplotsset', 'usetikzlibrary', 'geometry', 'hypersetup', 'captionsetup', 'setstretch',
+  'linespread', 'rule', 'resizebox', 'scalebox', 'newlength', 'addtolength',
+])
+const SPALTEN = /^\{(?:tabularx?|array)\*?\}/
+const LAENGE = /(?<![\p{L}\d\\.,])\d+(?:[.,]\d+)?(?:(?:pt|mm|cm|in|em|ex|bp)(?![a-zA-Z])|\\(?:textwidth|linewidth|columnwidth|baselineskip)(?![a-zA-Z]))/gu
+const ZEICHENBEFEHL = /^[ \t]*\\(?:draw|node|path|fill|filldraw|coordinate|clip|addplot)\b.*$/gm
+const KOORDINATE = /\(\s*[-+]?\d*[.,]?\d+\s*,\s*[-+]?\d*[.,]?\d+\s*\)/g
 // siunitx: Werte bleiben als Text stehen, Optionen und Einheit fallen weg.
 const SIUNITX = /\\(num|qty|SI|SIrange|qtyrange|numrange)\s*(?:\[[^\]]*\])?\s*\{([^{}]*)\}(?:\s*\{([^{}]*)\})?(?:\s*\{([^{}]*)\})?/g
 const ZWEI_WERTE = new Set(['SIrange', 'qtyrange', 'numrange'])
@@ -62,12 +75,71 @@ export function zahlenIn(text) {
   return dezimalzeichen(text).match(ZAHL) ?? []
 }
 
+function klammerEnde(text, start, auf, zu) {
+  let tiefe = 0
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '\\') i++
+    else if (text[i] === auf) tiefe++
+    else if (text[i] === zu && --tiefe === 0) return i
+  }
+  return -1
+}
+
+// Ende der Argumente ab pos: [..], {..} und bei \tikzstyle das „=[..]“, beliebig verschachtelt.
+function argumenteEnde(text, pos) {
+  for (;;) {
+    let p = pos
+    while (/\s/.test(text[p] ?? '')) p++
+    if (text[p] === '=') p++
+    while (/\s/.test(text[p] ?? '')) p++
+    const zu = { '[': ']', '{': '}' }[text[p]]
+    const ende = zu ? klammerEnde(text, p, text[p], zu) : -1
+    if (ende < 0) return pos
+    pos = ende + 1
+  }
+}
+
+function einstellungenEntfernen(text) {
+  let rest = ''
+  let pos = 0
+  for (const m of text.matchAll(/\\([a-zA-Z]+)\*?/g)) {
+    if (m.index < pos) continue
+    const nachName = m.index + m[0].length
+    const spalten = m[1] === 'begin' && SPALTEN.exec(text.slice(nachName))
+    if (!EINSTELLUNGEN.has(m[1]) && !spalten) continue
+    const ende = argumenteEnde(text, spalten ? nachName + spalten[0].length : nachName)
+    rest += `${text.slice(pos, m.index)} `
+    pos = ende
+  }
+  return rest + text.slice(pos)
+}
+
+// Wo ein Stück im Dokument steht: 'grafik', 'praeambel', 'mathe' oder null (Fließtext).
+export function lageImDokument(dokument, von) {
+  const davor = dokument.slice(0, von).replace(KOMMENTAR, ' ')
+  const start = dokument.indexOf('\\begin{document}')
+  if (start >= 0 && von < start) return 'praeambel'
+  const offen = []
+  for (const m of davor.matchAll(/\\(begin|end)\s*\{([a-zA-Z]+)\*?\}/g)) {
+    const i = offen.lastIndexOf(m[2])
+    if (m[1] === 'begin') offen.push(m[2])
+    else if (i >= 0) offen.splice(i, 1)
+  }
+  if (offen.some(u => GRAFIK_UMGEBUNGEN.includes(u))) return 'grafik'
+  if (offen.some(u => MATHE_UMGEBUNGEN.includes(u))) return 'mathe'
+  return null
+}
+
 // belegt: Zahlen aus ergebnisse.tex. Sie gelten in Formeln und siunitx-Werten als belegt; im Fließtext soll statt
 // der getippten Zahl das Makro stehen, dort bleibt sie gemeldet.
-export function zahlenOhneBeleg(text, belegt = []) {
+// lage (lageImDokument): In Grafik und Präambel wird nichts gemeldet, in einer Mathe-Umgebung gilt die Formelregel.
+export function zahlenOhneBeleg(text, belegt = [], lage = null) {
+  if (lage === 'grafik' || lage === 'praeambel') return []
   const bekannt = new Set(belegt.map(vergleichbar))
   const unbelegt = zahlen => zahlen.filter(z => !bekannt.has(vergleichbar(z))).join(' ')
-  let rest = text.replace(KOMMENTAR, ' ').replace(DEFINITION, ' ').replace(GRAFIK, ' ')
+  let rest = einstellungenEntfernen(text.replace(KOMMENTAR, ' ')).replace(DEFINITION, ' ').replace(GRAFIK, ' ')
+  rest = rest.replace(ZEICHENBEFEHL, zeile => zeile.replace(KOORDINATE, ' ')).replace(LAENGE, ' ')
+  if (lage === 'mathe') return [...new Set(unbelegt(formelZahlen(rest)).split(' ').filter(Boolean))]
   rest = rest.replace(SIUNITX, (_, befehl, a, b) => ` ${unbelegt(zahlenIn(ZWEI_WERTE.has(befehl) ? `${a} ${b}` : a))} `)
   rest = rest.replace(FARBDEFINITION, ' ').replace(FARBE, ' ').replace(FARBMISCHUNG, ' ').replace(OPTIONAL, '$1 ')
   // Formeln an Ort und Stelle durch ihre meldenswerten Zahlen ersetzen, damit die Reihenfolge bleibt.

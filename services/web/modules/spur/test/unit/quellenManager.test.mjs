@@ -78,6 +78,21 @@ describe('aufnehmen', () => {
     expect((await Quellen.seite(quelle, 1)).label).toBeNull()
   })
 
+  it('liest den Versatz ohne PageLabels aus den Seitenzahlen im Seitentext (P14)', async () => {
+    const quelle = await aufnehmen('weber2018.pdf', 'weber2018.pdf')
+    expect(quelle).toMatchObject({ versatz: 40, versatzQuelle: 'seitentext', doi: null })
+    expect((await Quellen.seite(quelle, 1)).label).toBe('41')
+    expect((await Quellen.seite(quelle, 3)).label).toBe('43')
+  })
+
+  it('lässt den Versatz leer, wenn der Seitentext zu wenige oder widersprüchliche Zahlen hat (P14)', async () => {
+    for (const datei of ['klein2020.pdf', 'gandhi2024.pdf']) {
+      const quelle = await aufnehmen(datei, datei)
+      expect(quelle).toMatchObject({ versatz: null, versatzQuelle: null })
+      expect((await Quellen.seite(quelle, 2)).label).toBeNull()
+    }
+  })
+
   it('markiert einen Scan ohne Text als kein_text und fragt Crossref nicht', async () => {
     const quelle = await aufnehmen('scan.pdf', 'scan.pdf')
     expect(quelle).toMatchObject({ status: 'kein_text', doi: null, meta: null, seitenzahl: 2 })

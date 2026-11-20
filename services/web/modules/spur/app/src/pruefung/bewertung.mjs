@@ -13,17 +13,21 @@ function ocrWortlaut(wortlaut, quelle, zitiert, bestaetigt) {
   return belegt ? 'bestaetigt' : 'ocr_unbestaetigt'
 }
 
-function seitenStatus(beleg, quelle, gefunden, texte) {
+// Mit Versatz zählt die gedruckte Seite; ohne (Preprints, Scans ohne Seitenzahlen) die PDF-Seite.
+function seitenStatus(beleg, quelle, gefunden, seiten) {
   // Ein Schnappschuss hat keine Seiten, es gibt nichts zu prüfen.
   if (quelle.art === 'web') return { seite: null }
-  if (quelle.versatz == null) return { seite: 'nicht_pruefbar' }
+  const gedruckt = quelle.versatz != null
   const zitiert = seiteAusBeleg(beleg.seite)
-  if (gefunden.length === 0 || !zitiert) return { seite: 'nicht_pruefbar' }
-  const labels = gefunden.map(i => texte[i].label)
-  if (labels.includes(zitiert)) {
-    return { seite: quelle.versatzQuelle === 'bestaetigt' ? 'bestaetigt' : 'stimmt' }
+  if (gefunden.length === 0 || !zitiert || (!gedruckt && quelle.art === 'vtt')) return { seite: 'nicht_pruefbar' }
+  const basis = gedruckt
+    ? { seitenbasis: 'gedruckt', ...(quelle.versatzQuelle === 'seitentext' && { versatzQuelle: 'seitentext' }) }
+    : { seitenbasis: 'pdf' }
+  const nummern = gefunden.map(i => (gedruckt ? seiten[i].label : String(seiten[i].seite)))
+  if (nummern.includes(zitiert)) {
+    return { seite: quelle.versatzQuelle === 'bestaetigt' ? 'bestaetigt' : 'stimmt', ...basis }
   }
-  return { seite: 'gefunden', gefundenAuf: labels[0] }
+  return { seite: 'gefunden', gefundenAuf: nummern[0], ...basis }
 }
 
 export function quelleZu(key, bibEintraege, quellen) {
@@ -118,6 +122,20 @@ export function zeileBewerten(fund, kontext) {
     wortlaut: ocrWortlaut(wortlaut, quelle, zitiert, kontext.bestaetigt),
     ...seitenStatus(beleg, quelle, gefunden, seiten),
   }
+}
+
+const WORTLAUT_GEFUNDEN = ['exakt', 'trennung', 'bestaetigt', 'ocr_unbestaetigt']
+
+// Je Key eine Zeile. Mit Wortlaut gilt die Stelle als geprüft, wenn er in einer der Quellen steht; diese Zeile trägt
+// das Ergebnis, die übrigen Keys stehen ohne Wortlaut da. Steht er in keiner, trägt die erste Quelle den Befund.
+export function zeilenBewerten(fund, kontext) {
+  if (fund.belege.length <= 1) return [zeileBewerten(fund, kontext)]
+  const ohneWortlaut = beleg => zeileBewerten({ ...fund, roh: '', belege: [beleg] }, kontext)
+  if (!fund.roh) return fund.belege.map(ohneWortlaut)
+  const versuche = fund.belege.map(beleg => zeileBewerten({ ...fund, belege: [beleg] }, kontext))
+  let traeger = versuche.findIndex(z => WORTLAUT_GEFUNDEN.includes(z.wortlaut))
+  if (traeger < 0) traeger = Math.max(0, versuche.findIndex(z => z.quelleId))
+  return fund.belege.map((beleg, i) => (i === traeger ? versuche[i] : ohneWortlaut(beleg)))
 }
 
 export function istProblem(zeile) {

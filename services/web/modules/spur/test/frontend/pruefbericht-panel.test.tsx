@@ -158,6 +158,28 @@ describe('Prüfbericht-Panel', function () {
     expect(document.querySelectorAll('.spur-zeile')).to.have.length(6)
   })
 
+  it('nennt die Seitenbasis: PDF-Seite bei Preprints, Herkunft der gedruckten Seitenzahl (P14)', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, {
+      zeilen: [
+        { ...zeile('gruen', false), auszug: 'PDF stimmt', seite: 'stimmt', seitenbasis: 'pdf' },
+        { ...zeile('rot', true), auszug: 'PDF woanders', wortlaut: 'exakt', seite: 'gefunden', gefundenAuf: '6', seitenbasis: 'pdf' },
+        { ...zeile('text', false), auszug: 'Aus dem Text', seite: 'stimmt', seitenbasis: 'gedruckt', versatzQuelle: 'seitentext' },
+        { ...zeile('druck', true), auszug: 'Gedruckt', wortlaut: 'exakt', seite: 'gefunden', gefundenAuf: '347', seitenbasis: 'gedruckt' },
+      ],
+      zaehlung: { geprueft: 4, markiert: 2, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 },
+    })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    const badges = (auszug: string) =>
+      [...(screen.getByText(auszug).closest('.spur-zeile')?.querySelectorAll('.badge') ?? [])].map(b => b.textContent)
+    await screen.findByText('PDF stimmt')
+    expect(badges('PDF stimmt')).to.deep.equal(['Wortlaut: exakt', 'PDF-Seite: stimmt'])
+    expect(badges('PDF woanders')).to.deep.equal(['Wortlaut: exakt', 'Wortlaut auf PDF-Seite 6 gefunden'])
+    expect(badges('Aus dem Text')).to.deep.equal(['Wortlaut: exakt', 'Seite: stimmt', 'Seitenzahl aus dem Seitentext erkannt'])
+    expect(badges('Gedruckt')).to.deep.equal(['Wortlaut: exakt', 'gefunden auf S. 347'])
+  })
+
   it('lässt Status mit null Stellen in der Zählung weg', async function () {
     fetchMock.removeRoutes()
     fetchMock.get(BERICHT, { zeilen: [zeile('gruen', false)], zaehlung: { geprueft: 1, markiert: 0, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 } })

@@ -1,14 +1,21 @@
 import { parser } from '../../../../../frontend/js/features/source-editor/lezer-latex/latex.mjs'
 
+const grossUndKlein = namen => namen.flatMap(n => [n, n[0].toUpperCase() + n.slice(1)])
 const BELEG_BEFEHLE = new Set([
-  'cite',
-  'autocite',
-  'parencite',
-  'textcite',
-  'footcite',
-  'citep',
-  'citet',
+  ...grossUndKlein(['cite', 'autocite', 'parencite', 'textcite', 'footcite', 'citep', 'citet', 'smartcite', 'supercite']),
+  ...grossUndKlein(['citeauthor', 'nptextcite', 'citealp', 'citealt']),
+  'fullcite',
+  'footfullcite',
+  'citeyear',
+  'citeyearpar',
+  'citetitle',
 ])
+// Je Paar aus optionalen Argumenten und Key ein eigener Beleg.
+const MEHRFACH_BEFEHLE = new Set(grossUndKlein(['cites', 'parencites', 'textcites', 'autocites', 'footcites']))
+// Befehle, die den Autor in den Satz nehmen; ein Zitat danach im selben Satz gehört zu ihrem Beleg.
+const AUTOR_IM_SATZ = new Set(grossUndKlein(['textcite', 'citet', 'citeauthor', 'nptextcite']))
+const ANKER_ABSTAND = 300
+const SATZENDE = /[.!?]\s|\n[ \t]*\n/
 const NICHT_ZITATE = new Set(['nocite', 'bibliography', 'printbibliography'])
 const ZITAT_BEFEHLE = new Set(['enquote', 'textquote', 'textcquote', 'blockquote'])
 const MASKIERT = new Set(['Comment', 'VerbatimContent', 'LstInlineContent'])
@@ -84,11 +91,56 @@ const BELEG_MUSTER = /\\([a-zA-Z]+)\*?/y
 function belegAn(text, pos) {
   BELEG_MUSTER.lastIndex = pos
   const m = BELEG_MUSTER.exec(text)
-  if (!m || !BELEG_BEFEHLE.has(m[1])) return null
+  if (!m) return null
+  if (MEHRFACH_BEFEHLE.has(m[1])) return mehrfachBeleg(text, m[1], BELEG_MUSTER.lastIndex)
+  if (!BELEG_BEFEHLE.has(m[1])) return null
   const { werte, pos: nachOpts } = optionen(text, BELEG_MUSTER.lastIndex)
   const keys = argument(text, nachOpts)
   if (!keys) return null
   return { belege: belegLesen(m[1], werte, keys.text), bis: keys.pos }
+}
+
+function mehrfachBeleg(text, befehl, pos) {
+  const belege = []
+  for (;;) {
+    const { werte, pos: nachOpts } = optionen(text, pos)
+    const keys = argument(text, nachOpts)
+    if (!keys) break
+    belege.push(...belegLesen(befehl, werte, keys.text))
+    pos = keys.pos
+  }
+  return belege.length ? { belege, bis: pos } : null
+}
+
+// „Smith (2024, S. 3) schreibt: …“: Die Seite steht oft erst hinter dem Zitat.
+const SEITE_IN_KLAMMERN = /\s*\(((?:S\.|p\.|pp\.)?[\s~]*\d+(?:\s*[-–]+\s*\d+)?)\)/y
+
+function seiteDanach(text, pos) {
+  SEITE_IN_KLAMMERN.lastIndex = pos
+  const m = SEITE_IN_KLAMMERN.exec(text)
+  return m && { seite: m[1].trim(), bis: SEITE_IN_KLAMMERN.lastIndex }
+}
+
+// Verknüpft ein Zitat mit dem letzten Autor-im-Satz-Beleg davor, wenn er im selben Satz steht. Ein nachfolgender
+// Beleg geht vor; nennt er dieselben Keys, geht der vorangestellte in der Zeile auf.
+function mitVorangestelltem(zeilen, text, zitat) {
+  const anker = zeilen.at(-1)
+  if (anker?.form !== 'beleg' || anker.ausgeblendet || !AUTOR_IM_SATZ.has(anker.belege[0].befehl)) return zitat
+  const zwischen = text.slice(anker.bis, zitat.von)
+  if (zwischen.length > ANKER_ABSTAND || SATZENDE.test(zwischen)) return zitat
+  if (zitat.belege.length) {
+    if (!anker.belege.every(a => zitat.belege.some(b => b.key === a.key))) return zitat
+    zeilen.pop()
+    return { ...zitat, von: anker.von }
+  }
+  zeilen.pop()
+  const danach = anker.belege.some(b => !b.seite) && seiteDanach(text, zitat.bis)
+  return {
+    ...zitat,
+    von: anker.von,
+    bis: danach ? danach.bis : zitat.bis,
+    belege: anker.belege.map(b => ({ ...b, seite: b.seite || (danach?.seite ?? '') })),
+  }
 }
 
 function folgenderBeleg(text, pos) {
@@ -113,10 +165,7 @@ function zitatBefehl(text, name, start, pos) {
   if (name === 'enquote') {
     const inhalt = argument(text, pos)
     if (!inhalt) return null
-    const beleg = folgenderBeleg(text, inhalt.pos)
-    return beleg
-      ? zeileMitZitat('enquote', inhalt, start, inhalt.pos, beleg)
-      : { ende: inhalt.pos }
+    return zeileMitZitat('enquote', inhalt, start, inhalt.pos, folgenderBeleg(text, inhalt.pos))
   }
   if (name === 'textcquote') {
     const { werte, pos: nachOpts } = optionen(text, pos)
@@ -137,9 +186,8 @@ function zitatBefehl(text, name, start, pos) {
   const beleg = innen
     ? { belege: innen.belege, bis: inhalt.pos }
     : folgenderBeleg(text, inhalt.pos)
-  const zeile = zeileMitZitat(name, inhalt, start, inhalt.pos, beleg)
   // \textquote und \blockquote sind für Zitate gedacht: ohne Beleg nicht prüfbar statt unsichtbar.
-  return beleg ? zeile : { ...zeile, form: 'unbekannt', befehl: name }
+  return { ...zeileMitZitat(name, inhalt, start, inhalt.pos, beleg), ohneBelegUnbekannt: true }
 }
 
 function quoteUmgebung(text, start, pos) {
@@ -156,19 +204,14 @@ function quoteUmgebung(text, start, pos) {
     von: pos,
     bis: beleg ? pos + innen.index : inhaltBis,
   }
-  const nachher = beleg ? null : folgenderBeleg(text, bis)
-  if (!beleg && !nachher) return { ende: bis }
-  return zeileMitZitat('quote', zitat, start, bis, beleg ?? nachher)
+  return zeileMitZitat('quote', zitat, start, bis, beleg ?? folgenderBeleg(text, bis))
 }
 
 function anfuehrung(text, start) {
   const ende = text.indexOf('“', start + 1)
   if (ende < 0) return { ende: start + 1 }
   const zitat = { text: text.slice(start + 1, ende), von: start + 1, bis: ende }
-  const beleg = folgenderBeleg(text, ende + 1)
-  return beleg
-    ? zeileMitZitat('anfuehrung', zitat, start, ende + 1, beleg)
-    : { ende: ende + 1 }
+  return zeileMitZitat('anfuehrung', zitat, start, ende + 1, folgenderBeleg(text, ende + 1))
 }
 
 function unbekannteForm(text, name, start, pos) {
@@ -185,6 +228,12 @@ function unbekannteForm(text, name, start, pos) {
     belege: [],
     befehl: name,
   }
+}
+
+// Ein Zitat ohne Beleg: \textquote und \blockquote bleiben als nicht prüfbar sichtbar, sonst ist es nur Text.
+function ohneBelegBehandeln({ ohneBelegUnbekannt, ...zeile }) {
+  if (zeile.belege.length) return zeile
+  return ohneBelegUnbekannt ? { ...zeile, form: 'unbekannt', befehl: zeile.form } : { ende: zeile.bis }
 }
 
 const IST_UNBEKANNT = name =>
@@ -300,10 +349,10 @@ export function zitateFinden(quelltext, makros = KEINE_MAKROS) {
       treffer = zitatBefehl(text, name, start, pos)
     } else if (zitatMakros.has(name)) {
       treffer = zitatBefehl(text, 'enquote', start, pos)
-      if (treffer?.form) treffer.form = name
+      if (treffer) treffer.form = name
     } else if (name === 'begin' && text.startsWith('{quote}', pos)) {
       treffer = quoteUmgebung(text, start, pos + '{quote}'.length)
-    } else if (BELEG_BEFEHLE.has(name)) {
+    } else if (BELEG_BEFEHLE.has(name) || MEHRFACH_BEFEHLE.has(name)) {
       const beleg = belegAn(text, start)
       if (beleg) {
         treffer = {
@@ -320,6 +369,9 @@ export function zitateFinden(quelltext, makros = KEINE_MAKROS) {
       treffer = unbekannteForm(text, name, start, pos)
     }
     if (!treffer) continue
+    if (treffer.zitatVon !== undefined && treffer.form !== 'beleg' && treffer.form !== 'unbekannt') {
+      treffer = ohneBelegBehandeln(mitVorangestelltem(zeilen, text, treffer))
+    }
     if (treffer.form) {
       if (bereiche.some(b => treffer.von >= b.von && treffer.von < b.bis)) treffer.ausgeblendet = true
       zeilen.push(treffer)

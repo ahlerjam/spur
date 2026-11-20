@@ -10,7 +10,7 @@ import { Problem } from './probleme.mjs'
 import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, suchtreffer, vorschlaege } from './sammlungen.mjs'
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
-import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, titelFeld, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, titelFeld, versatzAusLabels, versatzAusSeitentext, vttSeiten } from './pdf.mjs'
 import { autorenAbgleich } from './recherche/autorenabgleich.mjs'
 import { titelabgleich } from './recherche/titelabgleich.mjs'
 import { abrufen } from './WebSchnappschuss.mjs'
@@ -39,8 +39,11 @@ function schluesselAus(dateiname) {
   )
 }
 
+const SPANNE = /^(\d+)\D+(\d+)$/
+const spanneBekannt = spanne => SPANNE.test(spanne ?? '')
+
 function versatzInSpanne(versatz, seitenzahl, spanne) {
-  const m = /^(\d+)\D+(\d+)$/.exec(spanne ?? '')
+  const m = SPANNE.exec(spanne ?? '')
   if (versatz == null || !m) return false
   return versatz + 1 >= Number(m[1]) && versatz + seitenzahl <= Number(m[2])
 }
@@ -58,19 +61,23 @@ async function pdfAuslesen(pfad) {
   const hatText = texte.some(t => t.trim())
   const doi = hatText ? DOI.exec(texte.slice(0, 2).join('\n'))?.[0] : null
   const meta = doi ? await Crossref.werk(doi) : null
-  const versatz = await versatzAusLabels(pfad).catch(() => null)
-  const belegt =
-    meta?.gefunden && versatzInSpanne(versatz, seiten.length, meta.seiten)
+  const { versatz, versatzQuelle } = await versatzBestimmen(pfad, texte, meta)
   // Vorspannseiten (römisch) ergäben Labels unter 1: dort lieber keine Seitenzahl.
-  for (const s of seiten) s.label = belegt && s.seite + versatz >= 1 ? String(s.seite + versatz) : null
-  return {
-    seiten,
-    hatText,
-    doi: doi ?? null,
-    meta,
-    versatz: belegt ? versatz : null,
-    versatzQuelle: belegt ? 'pagelabels' : null,
+  for (const s of seiten) s.label = versatz != null && s.seite + versatz >= 1 ? String(s.seite + versatz) : null
+  return { seiten, hatText, doi: doi ?? null, meta, versatz, versatzQuelle }
+}
+
+// PageLabels zählen nur, wenn Crossref die Seitenspanne bestätigt. Sonst gilt der Seitentext; kennt Crossref eine
+// Spanne, muss auch er dazu passen.
+async function versatzBestimmen(pfad, texte, meta) {
+  const spanne = meta?.gefunden ? meta.seiten : null
+  const ausLabels = await versatzAusLabels(pfad).catch(() => null)
+  if (spanne && versatzInSpanne(ausLabels, texte.length, spanne)) return { versatz: ausLabels, versatzQuelle: 'pagelabels' }
+  const ausText = versatzAusSeitentext(texte)
+  if (ausText != null && (!spanneBekannt(spanne) || versatzInSpanne(ausText, texte.length, spanne))) {
+    return { versatz: ausText, versatzQuelle: 'seitentext' }
   }
+  return { versatz: null, versatzQuelle: null }
 }
 
 async function vttAuslesen(pfad) {

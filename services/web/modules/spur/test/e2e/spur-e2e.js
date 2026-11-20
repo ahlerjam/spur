@@ -7685,6 +7685,178 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     ok(anteil > 0.002, `Seite 1 ohne Text (${anteil})`)
   }
 
+  // P14: Prüfbericht ohne blinde Flecken. Die Testprojekte haben je Stelle eine eigene Zeile (main.tex:6, :8, …).
+  const p14Bericht = async (token, name) => {
+    const pid = await projektId(token, name)
+    const { inhalt } = await werkzeug(token, 'check_report', { project_id: pid })
+    return { pid, ...inhalt, an: n => inhalt.eintraege.filter(z => z.zeile === n) }
+  }
+  const p14Zeilen = async () => {
+    await berichtFilter('Alle')
+    return await page.locator('.spur-gruppe .spur-zeile').evaluateAll(lis =>
+      lis.map(li => ({
+        ort: li.querySelector('.spur-zeile-link')?.textContent.trim(),
+        key: li.querySelector('.spur-zeile-key')?.textContent ?? null,
+        badges: [...li.querySelectorAll('.badge')].map(b => b.textContent.trim()),
+        rot: [...li.querySelectorAll('.badge.bg-danger')].map(b => b.textContent.trim()),
+        meta: [...li.querySelectorAll('p.spur-zeile-meta')].map(p => p.textContent.trim()),
+      }))
+    )
+  }
+  const p14BerichtOeffnen = async name => {
+    await projektOeffnen(name)
+    await panelOeffnen('Prüfbericht')
+    await page.getByRole('button', { name: 'Erneut prüfen' }).click()
+    await page.locator('p.spur-zeile-meta', { hasText: KOPFZEILE_BERICHT }).waitFor({ timeout: 30000 })
+    const zeilen = await p14Zeilen()
+    return { zeilen, an: n => zeilen.filter(z => z.ort === `main.tex:${n}`) }
+  }
+  const P14_SATZ = 'Sleep supports the consolidation of declarative memory.'
+
+  features.p14f1 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const einfach = await p14BerichtOeffnen('E2E P14 Textcite')
+    ok(einfach.zeilen.length === 1 && einfach.zeilen[0].ort === 'main.tex:6', `Eine Zeile erwartet: ${json(einfach.zeilen)}`)
+    for (const text of ['Wortlaut: exakt', 'Seite: stimmt']) ok(einfach.zeilen[0].badges.includes(text), `Ohne „${text}“: ${json(einfach.zeilen[0])}`)
+    const bericht = await p14Bericht(token, 'E2E P14 Textcite')
+    ok(bericht.eintraege.length === 1 && bericht.eintraege[0].status === 'geprueft', `check_report: ${json(bericht.eintraege)}`)
+    ok(bericht.zaehlung.geprueft === 1 && bericht.zaehlung.beleg_ohne_wortlaut === 0, `zaehlung: ${json(bericht.zaehlung)}`)
+
+    // Erfundener Wortlaut: derselbe Fehlercode wie bei \enquote{…} \parencite.
+    let nr = 0
+    const schreiben = neu =>
+      werkzeug(token, 'doc_edit', { project_id: bericht.pid, pfad: 'main.tex', alt: '\\printbibliography', neu: `${neu}\n\n\\printbibliography`, idempotenz_schluessel: `p14f1-${Date.now()}-${nr++}` })
+    const vorn = await schreiben('\\textcite[S.~347]{smith2024} schreiben: \\enquote{Sleep invented the consolidation.}')
+    const hinten = await schreiben('\\enquote{Sleep invented the consolidation.} \\parencite[S.~347]{smith2024}')
+    ok(hinten.fehler && hinten.inhalt.fehler === 'zitat_abweichend', `Nachgestellt: ${json(hinten.inhalt)}`)
+    ok(vorn.fehler && vorn.inhalt.fehler === hinten.inhalt.fehler, `Vorangestellt: ${json(vorn.inhalt)}`)
+
+    const faelle = await p14BerichtOeffnen('E2E P14 Textcite Fälle')
+    for (const n of [6, 8]) {
+      const z = faelle.an(n)
+      ok(z.length === 1 && z[0].badges.includes('Wortlaut: exakt') && z[0].badges.includes('Seite: stimmt'), `Zeile ${n}: ${json(z)}`)
+    }
+    const abweichend = faelle.an(10)
+    ok(abweichend.length === 1 && abweichend[0].rot.includes('Wortlaut: abweichend'), `Zeile 10: ${json(abweichend)}`)
+    await page.locator('.spur-marke-rot', { hasText: 'Sleep invented' }).first().waitFor({ timeout: 20000 })
+    const satzende = faelle.an(12)
+    ok(satzende.length === 1 && satzende[0].badges.includes('Beleg ohne Wortlaut'), `Zeile 12 (Satzende): ${json(satzende)}`)
+    const fremd = faelle.an(14)
+    ok(fremd.length === 2 && fremd.some(z => z.key === 'smith2024' && z.badges.includes('Beleg ohne Wortlaut')) && fremd.some(z => z.key === 'jones2023'), `Zeile 14: ${json(fremd)}`)
+
+    const daten = await p14Bericht(token, 'E2E P14 Textcite Fälle')
+    const [seiteDanach] = daten.an(8)
+    ok(seiteDanach.seitenangabe === 'S.~347' && seiteDanach.seite === 'stimmt' && seiteDanach.status === 'geprueft', `Zeile 8: ${json(seiteDanach)}`)
+    ok(daten.an(6)[0].form === 'anfuehrung' && daten.an(6)[0].status === 'geprueft', `Zeile 6: ${json(daten.an(6))}`)
+    ok(daten.an(14).find(z => z.key === 'jones2023')?.form === 'enquote', `Zeile 14: ${json(daten.an(14))}`)
+  }
+
+  features.p14f2 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const ansicht = await p14BerichtOeffnen('E2E P14 Varianten')
+    const mehrere = ansicht.an(6)
+    ok(json(mehrere.map(z => z.key)) === json(['smith2024', 'jones2023', 'fake2020']), `Zeile 6: ${json(mehrere)}`)
+    ok(mehrere[2].rot.includes('DOI nicht registriert'), `fake2020: ${json(mehrere[2])}`)
+    ok(mehrere[1].meta.includes('keine Quelle aufgenommen'), `jones2023: ${json(mehrere[1])}`)
+    await berichtFilter('Ohne Quelle')
+    const ohneQuelle = await page.locator('.spur-gruppe .spur-zeile').evaluateAll(lis => lis.map(li => li.querySelector('.spur-zeile-key')?.textContent))
+    ok(ohneQuelle.includes('jones2023') && ohneQuelle.includes('fake2020'), `Filter „Ohne Quelle“: ${json(ohneQuelle)}`)
+    const alle = await p14Zeilen()
+
+    const bericht = await p14Bericht(token, 'E2E P14 Varianten')
+    ok(json(bericht.an(6).map(z => [z.key, z.status])) === json([['smith2024', 'beleg_ohne_wortlaut'], ['jones2023', 'ohne_quelle'], ['fake2020', 'ohne_quelle']]), `check_report Zeile 6: ${json(bericht.an(6))}`)
+    ok(bericht.an(6)[2].referenz === 'nicht_gefunden' && bericht.an(6)[2].problem, `fake2020: ${json(bericht.an(6)[2])}`)
+    const varianten = bericht.an(8)
+    ok(json(varianten.map(z => [z.key, z.seitenangabe])) === json([['smith2024', ''], ['smith2024', ''], ['smith2024', ''], ['smith2024', ''], ['smith2024', '12'], ['jones2023', '34']]), `Zeile 8: ${json(varianten)}`)
+    ok(bericht.eintraege.filter(z => z.grund === 'zitierform_unbekannt').every(z => z.zeile === 12), `zitierform_unbekannt: ${json(bericht.eintraege.filter(z => z.grund === 'zitierform_unbekannt'))}`)
+    ok(json(bericht.an(10).map(z => [z.key, z.wortlaut])) === json([['jones2023', null], ['smith2024', 'exakt']]), `Zeile 10: ${json(bericht.an(10))}`)
+    ok(bericht.an(12).length === 1 && bericht.an(12)[0].grund === 'zitierform_unbekannt', `Zeile 12: ${json(bericht.an(12))}`)
+    ok(ansicht.an(12)[0]?.meta.includes('Zitierform nicht erkannt'), `Ansicht Zeile 12: ${json(ansicht.an(12))}`)
+
+    const summe = ['geprueft', 'ohne_quelle', 'ohne_seitenangabe', 'beleg_ohne_wortlaut', 'nicht_pruefbar'].reduce((s, k) => s + bericht.zaehlung[k], 0)
+    ok(summe === bericht.eintraege.length && summe === 13, `zaehlung ${json(bericht.zaehlung)}, ${bericht.eintraege.length} Zeilen`)
+    const kopf = await page.locator('p.spur-zeile-meta', { hasText: KOPFZEILE_BERICHT }).innerText()
+    ok(kopf.startsWith(`${alle.length} Stellen, ${bericht.zaehlung.markiert} markiert`) && alle.length === summe, `Kopfzeile „${kopf}“, ${alle.length} Zeilen`)
+  }
+
+  features.p14f3 = async () => {
+    await breite(1280)
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const ansicht = await p14BerichtOeffnen('E2E P14 Preprint')
+    const badges = n => ansicht.an(n)[0]?.badges ?? []
+    for (const [n, texte] of [
+      [6, ['Wortlaut: exakt', 'PDF-Seite: stimmt']],
+      [8, ['Wortlaut: exakt', 'Wortlaut auf PDF-Seite 6 gefunden']],
+      [14, ['Wortlaut: exakt', 'Seite: stimmt', 'Seitenzahl aus dem Seitentext erkannt']],
+      [18, ['Wortlaut: exakt', 'PDF-Seite: stimmt']],
+    ]) {
+      for (const text of texte) ok(badges(n).includes(text), `Zeile ${n} ohne „${text}“: ${json(badges(n))}`)
+    }
+
+    const bericht = await p14Bericht(token, 'E2E P14 Preprint')
+    const zeile = n => {
+      const [z] = bericht.an(n)
+      return { seite: z.seite, seitenbasis: z.seitenbasis, gefundenAuf: z.gefundenAuf ?? null, versatzQuelle: z.versatzQuelle ?? null, problem: z.problem }
+    }
+    const erwartet = {
+      6: { seite: 'stimmt', seitenbasis: 'pdf', gefundenAuf: null, versatzQuelle: null, problem: false },
+      8: { seite: 'gefunden', seitenbasis: 'pdf', gefundenAuf: '6', versatzQuelle: null, problem: true },
+      10: { seite: 'stimmt', seitenbasis: 'gedruckt', gefundenAuf: null, versatzQuelle: null, problem: false },
+      12: { seite: 'gefunden', seitenbasis: 'gedruckt', gefundenAuf: '347', versatzQuelle: null, problem: true },
+      14: { seite: 'stimmt', seitenbasis: 'gedruckt', gefundenAuf: null, versatzQuelle: 'seitentext', problem: false },
+      16: { seite: 'gefunden', seitenbasis: 'gedruckt', gefundenAuf: '43', versatzQuelle: 'seitentext', problem: true },
+      18: { seite: 'stimmt', seitenbasis: 'pdf', gefundenAuf: null, versatzQuelle: null, problem: false },
+    }
+    for (const [n, soll] of Object.entries(erwartet)) ok(json(zeile(Number(n))) === json(soll), `Zeile ${n}: ${json(zeile(Number(n)))}`)
+
+    await panelOeffnen('Quellen')
+    await page.getByRole('button', { name: 'weber2018.pdf' }).click()
+    await sichtbar('Seite 41 (PDF-Seite 1 von 12)')
+
+    const { daten } = await mcp(token, 'tools/list')
+    const beschreibung = daten.result.tools.find(w => w.name === 'check_report').description
+    ok(/seitenbasis/.test(beschreibung), `Beschreibung: ${beschreibung}`)
+    const vertrag = await repoDatei(`${FIXTURES}/../../../../../../docs/mcp-contract.md`)
+    ok(/`seitenbasis` says what a page was checked against/.test(vertrag), 'mcp-contract.md erklärt seitenbasis nicht')
+  }
+
+  features.p14f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const json = JSON.stringify
+    const pid = await projektId(token, 'E2E P14 Grafik')
+    let nr = 0
+    const schreiben = async (alt, neu) => {
+      const r = await werkzeug(token, 'doc_edit', { project_id: pid, pfad: 'main.tex', alt, neu, idempotenz_schluessel: `p14f4-${Date.now()}-${nr++}` })
+      ok(!r.fehler, `doc_edit ${neu}: ${json(r.inhalt)}`)
+      return json(r.inhalt.zahlen_ohne_beleg)
+    }
+    for (const [alt, neu, erwartet] of [
+      ['(4.4,0)', '(5.2,0.4)', []],
+      ['line width=0.4pt', 'line width=0.6pt', []],
+      ['\\begin{document}', '\\geometry{margin=2.5cm}\n\\captionsetup{font=small, skip=6pt}\n\\begin{document}', []],
+      [
+        'Schluss.',
+        '\\begin{tabularx}{\\textwidth}{p{0.3\\textwidth}X}\nA & B \\\\\n\\end{tabularx}\n\\includegraphics[width=0.8\\textwidth]{abb}\n\\vspace{0.5cm}\nSchluss.',
+        [],
+      ],
+      ['Schluss.', 'Die Genauigkeit stieg um 12,5 Prozent auf 0,89.\nSchluss.', ['12,5', '0,89']],
+      ['A & B \\\\', 'Gruppe A & 75,7 \\\\', ['75,7']],
+    ]) {
+      const zahlen = await schreiben(alt, neu)
+      ok(zahlen === json(erwartet), `${neu}: zahlen_ohne_beleg ${zahlen}, erwartet ${json(erwartet)}`)
+    }
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Grafik überarbeitet.' })
+  }
+
   // Jeder Lauf beginnt auf denselben Daten, auch nach einem früheren Lauf.
   const bereit = await page.request.post(`${BASE}/spur/dev/e2e/vorbereiten`, { timeout: 300000 })
   if (bereit.status() !== 204) return `vorbereiten FEHLER: ${bereit.status()} ${await bereit.text()}`

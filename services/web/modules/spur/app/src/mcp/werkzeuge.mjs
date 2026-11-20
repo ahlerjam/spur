@@ -227,7 +227,9 @@ export const WERKZEUGE = {
       'ohne_seitenangabe, beleg_ohne_wortlaut, nicht_pruefbar); jede nicht geprüfte Stelle nennt ihren grund. ' +
       'markiert zählt alle Stellen mit problem: true, auch ohne Quelle und nicht prüfbare, wie der Filter „Markiert“; ' +
       'beleg_ohne_wortlaut sind die Stellen, die eine Quelle nur zitieren, ohne ihren Wortlaut wiederzugeben. uebersprungen zählt Stellen in ausgeblendeten Bereichen ' +
-      '(leer definierte Makros, \\iffalse, Beamer-Notizen, Einstellung „Ausgeblendete Makros“).',
+      '(leer definierte Makros, \\iffalse, Beamer-Notizen, Einstellung „Ausgeblendete Makros“). Jeder Key einer Stelle ' +
+      'ist eine eigene Zeile. seitenbasis sagt, wogegen die Seite geprüft wurde: gedruckt (gedruckte Seitenzahl) oder ' +
+      'pdf (PDF-Seite, bei Quellen ohne erkannte gedruckte Seitenzahlen wie Preprints).',
     inputSchema: z.object({ project_id: id, cursor: z.string().optional() }),
     async ausfuehren({ project_id: pid, cursor }, { menschId }) {
       const projectId = await pruefeRecht(menschId, pid, LESEN)

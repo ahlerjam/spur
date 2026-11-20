@@ -16,6 +16,8 @@ export type Zeile = {
   wortlaut: string | null
   seite: string | null
   gefundenAuf?: string
+  seitenbasis?: 'gedruckt' | 'pdf'
+  versatzQuelle?: 'seitentext'
   referenz?: string
   registrierstelle?: string | null
   registrierstelleName?: string

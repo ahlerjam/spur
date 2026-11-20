@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { zahlenOhneBeleg } from '../../app/src/schreiben/zahlen.mjs'
+import { lageImDokument, zahlenOhneBeleg } from '../../app/src/schreiben/zahlen.mjs'
 
 describe('zahlenOhneBeleg', () => {
   it('findet frei getippte Zahlen im Fließtext', () => {
@@ -144,5 +144,82 @@ describe('Datum, Uhrzeit und Versionsnummern', () => {
       zahlenOhneBeleg('Die Erhebung fand am 12.11.2026 um 14:30 Uhr statt, ausgewertet mit Version 1.2.3 am 12. November 2026.')
     ).toEqual([])
     expect(zahlenOhneBeleg('Von 240 Befragten antworteten 37,5 Prozent am 12.11.2026.')).toEqual(['240', '37,5'])
+  })
+})
+
+describe('Grafiken und Einstellungen (P14)', () => {
+  const DOKUMENT = String.raw`\documentclass{article}
+\usepackage{tikz}
+\tikzset{box/.style={draw, minimum width=2.5cm, line width=0.4pt}}
+\begin{document}
+Text davor.
+\begin{figure}
+\begin{tikzpicture}
+  \node[draw] (a) at (0,0) {Start};
+  \draw[->] (a) -- (4.4,0);
+\end{tikzpicture}
+\end{figure}
+\begin{align}
+  y &= 2x
+\end{align}
+Text danach.
+\end{document}`
+  const an = teil => lageImDokument(DOKUMENT, DOKUMENT.indexOf(teil))
+
+  it('erkennt die Lage im Dokument', () => {
+    expect(an('(4.4,0)')).toBe('grafik')
+    expect(an('line width=0.4pt')).toBe('praeambel')
+    expect(an('y &= 2x')).toBe('mathe')
+    expect(an('Text davor')).toBeNull()
+    expect(an('Text danach')).toBeNull()
+    const kapitel = 'Kapitel ohne Präambel \\begin{scope} x'
+    expect(lageImDokument(kapitel, kapitel.indexOf(' x'))).toBe('grafik')
+  })
+
+  it('meldet die echten Fälle mitten in einer Grafik nicht', () => {
+    for (const teil of ['0.4', '4.4,0', '(5.2,0.4)', String.raw`\node at (2,1) {Gruppe 75,7};`]) {
+      expect(zahlenOhneBeleg(teil, [], 'grafik')).toEqual([])
+    }
+    expect(zahlenOhneBeleg('0.4')).toEqual(['0.4'])
+  })
+
+  it('meldet in der Präambel nichts', () => {
+    expect(zahlenOhneBeleg('line width=0.6pt, Faktor 12,5', [], 'praeambel')).toEqual([])
+  })
+
+  it('wendet in einer Mathe-Umgebung die Formelregel auf das ganze Stück an', () => {
+    expect(zahlenOhneBeleg('y &= 2x + 0.25 \\\\ z &= 412', [], 'mathe')).toEqual(['0.25', '412'])
+    expect(zahlenOhneBeleg('y &= 0.25', ['0.25'], 'mathe')).toEqual([])
+  })
+
+  it('lässt Einstellungsbefehle mit verschachtelten Argumenten aus', () => {
+    const text = String.raw`\tikzset{box/.style={draw, minimum width=2.5cm, line width=0.4pt}}
+\tikzstyle{alt}=[draw, inner sep=3.5]
+\pgfplotsset{compat=1.18, width=7.5}
+\usetikzlibrary{arrows.meta}
+\geometry{margin=2.5cm}
+\hypersetup{pdfstartview={XYZ null null 1.25}}
+\captionsetup{font=small, skip=6pt}
+\setstretch{1.15} \linespread{1.3}
+\rule{0.4}{1.2} \resizebox{0.9}{!}{x} \scalebox{0.75}{y}
+\newlength{\abstand} \addtolength{\abstand}{1.5}`
+    expect(zahlenOhneBeleg(text)).toEqual([])
+  })
+
+  it('lässt Spaltenangaben, Längen und Koordinaten in Zeichenbefehlen aus', () => {
+    const text = String.raw`\begin{tabularx}{\textwidth}{p{0.3\textwidth}X}
+\begin{tabular}{p{2.5cm}l} \begin{array}{p{1.5}c}
+\includegraphics[width=0.8\textwidth]{abb} \vspace{0.5cm}
+Breite 0.45\linewidth, Abstand 1.5\baselineskip, 0.3\columnwidth, 12pt, 3.5mm, 2em, 1ex, 10bp, 1in
+\draw (1.5,2.25) -- (3.75,0.5);
+  \fill (0.5,0.5) circle (2pt);
+\addplot coordinates {(1.5,412)};`
+    expect(zahlenOhneBeleg(text)).toEqual([])
+  })
+
+  it('meldet Zahlen im Fließtext und in Tabellenzellen weiter', () => {
+    expect(zahlenOhneBeleg('Die Genauigkeit stieg um 12,5 Prozent auf 0,89.')).toEqual(['12,5', '0,89'])
+    expect(zahlenOhneBeleg('Gruppe A & 75,7 \\\\')).toEqual(['75,7'])
+    expect(zahlenOhneBeleg('Die Pflanzen wuchsen 2,5 cm und (1,5, 2,5) Punkte.')).toEqual(['2,5', '1,5'])
   })
 })

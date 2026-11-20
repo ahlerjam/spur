@@ -113,6 +113,29 @@ describe('bericht', () => {
     expect(stand).toEqual(schalter.zeit)
   })
 
+  it('prüft ein Zitat mit vorangestelltem \\textcite als eine Zeile (P14)', async () => {
+    projektDocs['/main.tex'] = doc(
+      '\\textcite[S.~347]{smith2024} schreiben: \\enquote{Sleep supports the consolidation of declarative memory.}',
+      wurzelDoc
+    )
+    const { zeilen, zaehlung } = await PruefManager.bericht(projekt)
+    expect(zeilen.map(z => [z.key, z.wortlaut, z.seite, z.seitenbasis, z.status])).toEqual([['smith2024', 'exakt', 'stimmt', 'gedruckt', 'geprueft']])
+    expect(zaehlung).toMatchObject({ geprueft: 1, beleg_ohne_wortlaut: 0 })
+  })
+
+  it('prüft jeden Key einer Stelle mit eigener Zeile und eigener ID (P14)', async () => {
+    projektDocs['/references.bib'] = doc(`${BIB}@article{fake2020,\n  doi = {10.9999/nirgends.1}\n}\n@article{jones2023,\n  title = {Ohne Quelle}\n}\n`)
+    projektDocs['/main.tex'] = doc('Mehrere Studien stützen das \\parencite{smith2024,jones2023,fake2020}.', wurzelDoc)
+    const { zeilen, zaehlung } = await PruefManager.bericht(projekt)
+    expect(zeilen.map(z => [z.key, z.status, z.referenz, z.problem])).toEqual([
+      ['smith2024', 'beleg_ohne_wortlaut', 'gefunden', false],
+      ['jones2023', 'ohne_quelle', 'ohne_doi', false],
+      ['fake2020', 'ohne_quelle', 'nicht_gefunden', true],
+    ])
+    expect(new Set(zeilen.map(z => z.id)).size).toBe(3)
+    expect(zaehlung).toMatchObject({ beleg_ohne_wortlaut: 1, ohne_quelle: 2, markiert: 1 })
+  })
+
   it('verwendet geprüfte Abschnitte wieder und prüft nur geänderte neu', async () => {
     await PruefManager.bericht(projekt)
     expect((await PruefManager.bericht(projekt)).abschnitte).toEqual({ neu: 0, uebernommen: 2 })

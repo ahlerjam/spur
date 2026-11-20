@@ -139,6 +139,13 @@ describe('docEdit', () => {
     expect(ergebnis.zahlen_ohne_beleg).toEqual(['0,89'])
   })
 
+  it('meldet nichts für ein Stück mitten in einer Grafik oder in der Präambel (P14)', async () => {
+    docSetzen(KAPITEL, '\\usepackage{tikz}\n\\begin{document}\n\\begin{tikzpicture}\n\\draw[->] (a) -- (4.4,0);\n\\end{tikzpicture}\nZweiter Satz.\n\\end{document}')
+    expect((await bearbeiten({ alt: '(4.4,0)', neu: '(5.2,0.4)' })).zahlen_ohne_beleg).toEqual([])
+    expect((await bearbeiten({ alt: '\\usepackage{tikz}', neu: '\\usepackage{tikz}\n\\setlength{\\parskip}{0.5} 12,5', schluessel: 'schluessel-0002' })).zahlen_ohne_beleg).toEqual([])
+    expect((await bearbeiten({ neu: 'Gestiegen um 12,5 Prozent.', schluessel: 'schluessel-0003' })).zahlen_ohne_beleg).toEqual(['12,5'])
+  })
+
   it('prüft in .bib-Dateien keine Zahlen', async () => {
     const bib = new ObjectId()
     projektDateien.set('quellen.bib', bib)
