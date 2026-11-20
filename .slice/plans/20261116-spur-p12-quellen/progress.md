@@ -79,3 +79,8 @@
 
 ## Gesamtlauf nach der letzten Änderung (e4c8490a8d)
 - Alle 99 Schritte grün, in 19½ Minuten: f1–f15, p2f1–p2f10, p3f1–p3f5, p4f1–p4f4, p5f1–p5f8, p6f1–p6f11, p7f1–p7f14, p8f1–p8f11, p9f1–p9f12, p10f1–p10f7 mit p10f3b/c, p12f1–p12f5 und p12ansicht.
+
+## Englische Texte (humanizer, Durchgang je Schlüssel)
+- Behalten, ohne Muster aus Abschnitt A bis E (keine Kontrastfiguren, keine Schlusszeilen, keine Floskeln, keine Gedankenstriche): `spur_dienst_gedrosselt` „rate limited“, `spur_dienst_nicht_erreichbar`, `spur_fehler_bot_schutz` und `…_vorgemerkt`, `spur_fehler_eingabe_feld`, `spur_fehler_falsches_pdf`, `spur_fehler_nicht_frei_vorgemerkt`, `spur_fehler_pdf_url_laden`, `spur_fehler_treffer_nicht_gefunden`, `spur_grund_*`, `spur_hinweis_titel_abweichend`, `spur_im_browser_laden`, `spur_lizenz` („Licence“ wie im vorhandenen `spur_nur_projekt`), alle `spur_prisma_*`, `spur_protokoll_leer`, `spur_protokoll_seite`, `spur_versuche`, `spur_werkart_*`.
+- Geändert: `spur_fehler_eingabe_doi_oder_pdf_url` nennt das Feld in einem eigenen Satz („The field concerned is …“) statt in einer unerklärten Klammer.
+- Nachgereicht nach dem letzten Gesamtlauf: Tests für `zeit_abgelaufen`, das scheiternde Vermerken von `pdf_fehlt` und den Upload-Controller (`uploadLinkController.test.mjs`, vorher 0 % Abdeckung); `p12f5` prüft die Web-Route mit einem echten Konto ohne Zugriff auf genau 403. `/security-review` lief auf `661a28817e..HEAD`: kein Befund über der Schwelle.
