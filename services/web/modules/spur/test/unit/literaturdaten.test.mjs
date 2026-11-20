@@ -110,6 +110,11 @@ describe('bibEintrag (P13)', () => {
     expect(eintrag).not.toMatch(/amp;|<i>|&#/)
   })
 
+  it('lässt ungültige Zeichennummern auch im kursiven Titel weg', () => {
+    const meta = werkAuswerten({ title: ['<i>Foo</i> &#xD800;bar'], type: 'journal-article' })
+    expect(felder(bibEintrag('k', mitDoi('10.1/k', meta))).title).toBe('\\textit{Foo} bar')
+  })
+
   it('lässt ein maskiertes &lt;i&gt; als Text stehen', () => {
     const meta = werkAuswerten({ title: ['<i>Kursiv</i> und &lt;i&gt;wörtlich'], type: 'journal-article' })
     expect(felder(bibEintrag('k', mitDoi('10.1/k', meta))).title).toBe('\\textit{Kursiv} und <i>wörtlich')

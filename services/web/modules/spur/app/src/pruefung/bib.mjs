@@ -57,7 +57,7 @@ export const autorName = a => [a.family, a.given].filter(Boolean).join(', ')
 function htmlZuLatex(html) {
   return ohneTags(html, ['i', 'em'])
     .split(/(<\/?(?:i|em)>)/)
-    .map(teil => (/^<(i|em)>$/.test(teil) ? '\\textit{' : /^<\//.test(teil) ? '}' : latexSicher(textAus(teil))))
+    .map(teil => (/^<(i|em)>$/.test(teil) ? '\\textit{' : /^<\//.test(teil) ? '}' : latexSicher(textAus(teil).replace(/\uFFFD/g, ''))))
     .join('')
     .trim()
 }

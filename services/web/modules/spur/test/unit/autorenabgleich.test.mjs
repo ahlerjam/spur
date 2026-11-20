@@ -34,6 +34,12 @@ describe('autorenAbgleich', () => {
     expect(autorenAbgleich(autoren, 'The Sleep Consortium; A. van der Berg').zustand).toBe('aus_pdf')
   })
 
+  it('nimmt die Reihenfolge im Autorenblock, nicht ein früheres Vorkommen im Titel', () => {
+    const autoren = [{ family: 'Smith', given: 'Alice' }, { family: 'Jones', given: 'Bob' }]
+    expect(autorenAbgleich(autoren, 'The Jones hypothesis revisited\nAlice Smith, Bob Jones\nAbstract').zustand).toBe('bestaetigt')
+    expect(autorenAbgleich(autoren, 'The Smith effect\nBob Jones and Alice Smith').autoren.map(a => a.family)).toEqual(['Jones', 'Smith'])
+  })
+
   it('gleicht nichts ab ohne Autoren oder ohne Text', () => {
     expect(autorenAbgleich([], 'Text')).toBeNull()
     expect(autorenAbgleich(undefined, 'Text')).toBeNull()

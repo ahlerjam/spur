@@ -573,6 +573,7 @@ Object.assign(WERKZEUGE, {
       'curl -F datei=@paper.pdf [-F doi=…] [-F titel=…] <link> oder das Plugin-Skript spur-hochladen. ' +
       `Gilt ${UploadLink.GUELTIG_MINUTEN} Minuten für bis zu ${UploadLink.MAX_DATEIEN} Dateien. Die Quellen gehören zum Lauf. ` +
       'Jede Datei bekommt einen .bib-Eintrag: mit doi aus Crossref, sonst @misc mit metadaten: unvollstaendig und ' +
+      'titel als Titel (titel wirkt nur, wenn die DOI keine Metadaten liefert), dazu ' +
       'metadaten_hinweis (Grund, etwa DOI bei Crossref nicht gefunden).',
     inputSchema: z.object({ project_id: id }),
     async ausfuehren({ project_id: pid }, { menschId, botId }) {
