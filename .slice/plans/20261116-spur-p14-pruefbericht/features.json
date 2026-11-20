@@ -57,7 +57,7 @@
         "`doc_edit` schreibt in einer Tabellenzelle `Gruppe A & 75,7 \\\\`: `75,7` wird weiter gemeldet",
         "Die echten Fälle aus dem Kontext („0.4“, „4.4,0“ in einem Stück ohne `\\begin{tikzpicture}`) sind als Unit-Tests enthalten und melden nichts; alle bisherigen Tests der Zahlenprüfung bleiben grün"
       ],
-      "passes": false
+      "passes": true
     }
   ]
 }
