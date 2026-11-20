@@ -61,7 +61,7 @@
         "Ein Upload mit `--doi 10.9999/nirgends.1` (Crossref kennt sie nicht) legt die Quelle an, mit `@misc` und dem Hinweis `unvollstaendig`; die Ausgabe des Skripts nennt, dass die DOI nicht gefunden wurde",
         "Der Upload derselben Datei ein zweites Mal gibt `schon vorhanden (Quelle <id>)` aus und legt keinen zweiten Eintrag an"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
