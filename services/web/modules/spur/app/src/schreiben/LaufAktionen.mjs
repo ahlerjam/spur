@@ -132,11 +132,11 @@ async function angelegtEntfernen(projectId, lauf, userId) {
   }
   if (neueOrdner.size) {
     const { docs, files, folders } = await ProjectEntityHandler.promises.getAllEntities(projectId)
-    const pfade = new Set([...docs, ...files, ...folders].map(e => e.path))
+    let pfade = [...docs, ...files, ...folders].map(e => e.path)
     for (const o of [...neueOrdner].sort((a, b) => b.length - a.length)) {
-      if ([...pfade].some(p => p.startsWith(`/${o}/`))) continue
+      if (pfade.some(p => p.startsWith(`/${o}/`))) continue
       await pfadEntfernen(projectId, o, userId)
-      pfade.delete(`/${o}`)
+      pfade = pfade.filter(p => p !== `/${o}`)
     }
   }
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { angelegt: [] } })

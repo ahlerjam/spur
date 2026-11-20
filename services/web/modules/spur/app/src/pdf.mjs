@@ -79,11 +79,12 @@ export async function ausschnittBild(pfad, seite, ziel, { x, y, breite, hoehe },
   const groesse = await seitenGroesse(pfad, seite)
   const px = punkte => Math.round((punkte * dpi) / 72)
   // pdftocairo liest -W 0 und -H 0 als „bis zum Seitenrand“.
+  const mass = punkte => Math.max(1, px(punkte))
   const rechteck = [
     ['-x', px(x * groesse.breite)],
     ['-y', px(y * groesse.hoehe)],
-    ['-W', Math.max(1, px(breite * groesse.breite))],
-    ['-H', Math.max(1, px(hoehe * groesse.hoehe))],
+    ['-W', mass(breite * groesse.breite)],
+    ['-H', mass(hoehe * groesse.hoehe)],
   ].flatMap(([name, wert]) => [name, String(wert)])
   await ausfuehren('pdftocairo', ['-png', '-singlefile', '-r', String(dpi), ...rechteck, '-f', String(seite), '-l', String(seite), pfad, ziel], GRENZEN)
   return `${ziel}.png`

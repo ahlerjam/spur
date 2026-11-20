@@ -47,8 +47,15 @@
 
 ## Recipe changes
 - `spur-dev upstream web` nur bei heruntergefahrenem Stack (`spur-dev down`) laufen lassen; mit laufendem Stack und gleichzeitigem Build bricht vitest still ab.
+- Nachgeholt auf der formalen Plan-Basis `0ad7efe9e5..HEAD` (enthält P12–P14 und P16): /code-review medium. Behoben in P15-Code: verschachtelte neue Ordner (`abbildungen/kap1/`) blieben nach „Lauf rückgängig“ leer stehen, jetzt von innen nach außen entfernt; ein sehr schmaler Ausschnitt rundete auf `-W 0`, und pdftocairo renderte dann die Restseite, jetzt mindestens 1 px; die Bilddatei wird am Lauf vermerkt, bevor sie geschrieben wird. Gelassen (P15): Teilannahme bei `alle_vorkommen` zählt ganz als offen. Befunde in P12/P16-Code stehen unter Vorschläge.
+- /simplify (vier Prüfer) auf den Änderungen nach dem ersten Durchgang (`1ab2ed83e9..HEAD`): übernommen: Pfadliste ohne wiederholtes Kopieren, ein Helfer für Mindestmaße, Kommentar zu `split`/`join`. Nicht übernommen: gemeinsamer Pfad-Helfer (Vorschlag), Ordnerliste beim Schreiben statt beim Rückgängigmachen (Ordner aus `getAllEntities` vorher/nachher sind bei parallelen Schreibvorgängen genauso unscharf).
 
 ## Vorschläge
+- P16 `Kompilieren.mjs:69`: Der Compile-Job bleibt `laeuft`, bis die Zuordnung fehlender Pakete fertig ist (stand schon in P14).
+- P12 `werkzeuge.mjs` `paper_search`: Auf Seite 50 liefert `naechster_cursor` „51“, das wieder Seite 50 ergibt (stand schon in P14).
+- P14/P6 `zahlen.mjs`: Nach `\begin{tabular}{spec}` gelten alle direkt folgenden Klammergruppen als Argumente; `{12345}` in der ersten Zelle wird nicht gemeldet. Nur ein Pflichtargument für die Spaltenangabe zulassen.
+- P12 `Recherche.mjs:82`: Das Suchprotokoll vermerkt auch Anfragen, auf die kein Dienst geantwortet hat; im PRISMA-Protokoll erscheinen sie als durchgeführte Suchen.
+- P12 `Beschaffung.mjs:112`: `replaceAll('{doi}', …)` mit String-Ersatz liest `$&` als Muster; Funktionsform `() => …` verwenden.
 - Ein Helfer `projektPfade(projectId)` neben `projektEintraege.mjs` für die drei Stellen, die `getAllEntities` zu einer Pfadliste machen (TexPakete, Projektdatei, LaufAktionen), und ein `mitTempOrdner(prefix, fn)` für das wiederkehrende mkdtemp/rm.
 - `bereichPruefen` lädt Projekt und Kontext je Aufruf; bei `alle_vorkommen` mit vielen Treffern, die Zitate berühren, wären Dokumente und Kontext einmal zu laden.
 

@@ -267,6 +267,7 @@ async function bearbeiten({ projectId, botId, menschId, docId, pfad, alt, neu, a
   // Lage jeder Stelle im neuen Text: Davor stehende Stellen haben ihn schon um die Längendifferenz verschoben.
   const versatz = neu.length - alt.length
   const neueStellen = stellen.map((start, k) => start + k * versatz)
+  // split/join statt replaceAll: In LaTeX steht oft $$ oder $&, das replaceAll als Muster läse.
   const neuerText = alleVorkommen ? text.split(alt).join(neu) : text.slice(0, stellen[0]) + neu + text.slice(stellen[0] + alt.length)
   const istBib = /\.bib$/.test(doc.pfad)
   // Alle Prüfungen vor dem Schreiben: Schlägt eine Stelle fehl, wird nichts geschrieben.
