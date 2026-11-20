@@ -64,6 +64,8 @@ function quelleFuerClient(q) {
     // Art des Werks bei Quellen ohne DOI (thesis, report, …); `art` ist der Dateityp.
     werkart: q.meta?.art ?? null,
     titelabgleich: q.titelabgleich ?? null,
+    autorenabgleich: q.autoren ?? null,
+    metadaten: q.metadaten ?? null,
     ocr: QuellenManager.ocrZustand(q),
     web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }

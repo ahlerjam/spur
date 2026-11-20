@@ -572,7 +572,45 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await p8Vorbereiten(a)
   // P12: Ausweichwege, Bot-Schutz, Quellen ohne DOI und das Suchprotokoll.
   for (const name of ['E2E P12 Quellen', 'E2E P12 Status', 'E2E P12 Ohne DOI', 'E2E P12 Protokoll']) await neuAnlegen(a, name, { 'main.tex': LEER })
+  // P13: Literaturdaten. Die .bib legt spur beim ersten source_add an; \nocite{*} setzt jeden Eintrag ins Verzeichnis.
+  for (const name of ['E2E P13 Heft', 'E2E P13 Entities', 'E2E P13 Preprint', 'E2E P13 Autoren']) await neuAnlegen(a, name, { 'main.tex': P13_MAIN })
+  await neuAnlegen(a, 'E2E P13 Upload', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E P13 Alt', { 'main.tex': P13_ALT_MAIN, 'references.bib': P13_ALT_BIB })
 }
+
+const P13_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Hello
+\nocite{*}
+\printbibliography
+\end{document}`
+
+const P13_ALT_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Dynamische Fähigkeiten \autocite{alt2024}. Replay im Schlaf \autocite{replay2024}.
+\printbibliography
+\end{document}`
+
+// Von Hand, wie vor P13: ohne Band und Heft, mit dem Jahr der Online-Fassung; der arXiv-Eintrag als @article ohne journal.
+const P13_ALT_BIB = `@article{alt2024,
+  author = {Oldemeyer, Lena and Mikalef, Patrick},
+  title = {Dynamic capabilities for digital transformation in public agencies},
+  journal = {Government Information Quarterly},
+  year = {2024},
+  doi = {10.5555/spur.heft.001}
+}
+
+@article{replay2024,
+  author = {Gandhi, Kiran and Joshi, Mira},
+  title = {Sleep-like replay improves memory consolidation in artificial neural networks},
+  year = {2024},
+  doi = {10.48550/arXiv.2401.01234}
+}
+`
 
 const CARLITO = String.raw`\documentclass{article}
 \usepackage{carlito}

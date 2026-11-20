@@ -264,7 +264,11 @@ export const europepmc = {
 // Metadaten im Format von Crossref.werkAuswerten, damit .bib-Einträge gleich entstehen.
 export async function arxivMetadaten(id) {
   const [e] = (await arxivFeed(arxiv, { id_list: id })).eintraege
-  if (!e) return { gefunden: false }
+  return e ? arxivWerk(e) : { gefunden: false }
+}
+
+// arXiv nennt Namen ungeteilt; der letzte Teil gilt als Nachname. Die Reihenfolge prüft spur danach am PDF.
+export function arxivWerk(e) {
   return {
     gefunden: true,
     titel: e.titel,

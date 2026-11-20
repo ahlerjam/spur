@@ -11,6 +11,7 @@ import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, l
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
 import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, titelFeld, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { autorenAbgleich } from './recherche/autorenabgleich.mjs'
 import { titelabgleich } from './recherche/titelabgleich.mjs'
 import { abrufen } from './WebSchnappschuss.mjs'
 import { quelleGeaendert } from './live.mjs'
@@ -130,7 +131,8 @@ async function speichern(quelle, seitenListe, schreibeDatei) {
 
 // key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF. Mit vorgegebenem Titel
 // wird das PDF dagegen abgeglichen; titelStreng weist ein abweichendes PDF mit falsches_pdf ab. pdfUrl und hash
-// halten bei Quellen ohne DOI die Herkunft für die Dublettenprüfung fest.
+// halten bei Quellen ohne DOI die Herkunft für die Dublettenprüfung fest. ersatz sind Angaben für den Fall, dass weder
+// meta noch eine DOI im PDF Metadaten liefern; die Quelle trägt dann metadaten: 'unvollstaendig'.
 export async function aufnehmen(angaben) {
   pruefeDateityp(angaben.dateiname)
   // Vor dem Auslesen: eine zu große Datei wird abgewiesen, ehe Text und OCR Zeit kosten.
@@ -150,13 +152,19 @@ async function titelPruefen(titel, seiten, pfad) {
   return titelabgleich(titel, texte, await titelFeld(pfad).catch(() => null))
 }
 
-async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, lizenz = null, titelStreng = false, nurProjekt = false, pdfUrl, hash }) {
+async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, lizenz = null, titelStreng = false, nurProjekt = false, pdfUrl, hash, ersatz }) {
   const key = vorgabe ?? schluesselAus(dateiname)
   if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
   const endung = Path.extname(dateiname).toLowerCase()
   const inhalt = await AUSLESER[endung](tempPfad)
-  const abgleich = endung === '.pdf' && meta?.titel ? await titelPruefen(meta.titel, inhalt.seiten, tempPfad) : null
+  // Ersatzangaben gelten nur, wenn weder meta noch eine DOI im PDF (ohne vorgegebene DOI) Metadaten liefern.
+  const metadaten = ersatz && !meta && (doi || !inhalt.meta?.gefunden) ? 'unvollstaendig' : null
+  const werk = metadaten ? ersatz : (meta ?? inhalt.meta)
+  // Ersatzangaben (Titel aus dem PDF oder dem Dateinamen) gleicht spur nicht mit dem PDF ab.
+  const pruefen = endung === '.pdf' && !metadaten
+  const abgleich = pruefen && meta?.titel ? await titelPruefen(meta.titel, inhalt.seiten, tempPfad) : null
   if (titelStreng && abgleich === 'abweichend') throw new Problem(422, 'falsches_pdf', 'spur_fehler_falsches_pdf')
+  const autoren = pruefen && inhalt.hatText ? autorenAbgleich(werk?.autoren, inhalt.seiten[0]?.text) : null
   const quelle = {
     _id: new ObjectId(),
     projectId,
@@ -167,8 +175,10 @@ async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfa
     seitenzahl: inhalt.seiten.length,
     status: inhalt.hatText ? 'text' : 'kein_text',
     doi: doi ?? inhalt.doi,
-    meta: meta ?? inhalt.meta,
+    meta: autoren ? { ...werk, autoren: autoren.autoren } : werk,
     ...(abgleich && { titelabgleich: abgleich }),
+    ...(autoren && { autoren: autoren.zustand }),
+    ...(metadaten && { metadaten }),
     lizenz,
     nurProjekt,
     versatz: inhalt.versatz,

@@ -108,6 +108,12 @@ function QuellenZeile({
           <MaterialIcon type="warning" /> {t('spur_hinweis_titel_abweichend')}
         </p>
       )}
+      {quelle.autorenabgleich === 'abweichend' && (
+        <p className="spur-zeile-meta spur-zeile-warnung">
+          <MaterialIcon type="warning" /> {t('spur_hinweis_autoren_abweichend')}
+        </p>
+      )}
+      {quelle.metadaten === 'unvollstaendig' && <p className="spur-zeile-meta">{t('spur_metadaten_unvollstaendig')}</p>}
       {quelle.nurProjekt && <p className="spur-zeile-meta">{t('spur_nur_projekt')}</p>}
     </li>
   )

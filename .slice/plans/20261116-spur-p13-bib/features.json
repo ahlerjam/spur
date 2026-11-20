@@ -12,7 +12,7 @@
         "Für `10.5555/spur.enr.001` liefert der Fake `article-number: \"e0209899\"`, `volume: \"14\"`, `issue: \"1\"` und keine `page`: Der Eintrag hat `eid = {e0209899}` und kein Feld `pages`",
         "Das Projekt kompiliert mit `biblatex` im Stil `apa`; im PDF (über `page_image` der Seite mit dem Literaturverzeichnis) steht beim ersten Eintrag „35(2), 101–118“ und das Jahr 2025"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f2",
@@ -23,7 +23,7 @@
         "Das Projekt kompiliert ohne Fehler, und `sources_list` zeigt den Titel als Klartext mit „&“",
         "Ein Titel mit `{`, `}` oder `\\` aus Crossref bricht die `.bib` weiterhin nicht (bestehender Test bleibt grün)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f3",
@@ -35,7 +35,7 @@
         "Das Projekt kompiliert mit biblatex-apa ohne Warnung zu diesen Einträgen; im Literaturverzeichnis (über `page_image`) steht beim ersten Eintrag „arXiv“ und kein leerer Zeitschriftenname",
         "`bib_list` zeigt für beide Einträge keine Abweichung beim Eintragstyp"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f4",
@@ -48,7 +48,7 @@
         "Für eine Quelle, deren Namen mit Diakritika in den Metadaten („Müller“) und ohne im PDF („Muller“) stehen, lautet der Zustand `bestaetigt`",
         "Eine gescannte Quelle ohne Text bekommt keinen Abgleich und keinen Hinweis"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
@@ -61,7 +61,7 @@
         "Ein Upload mit `--doi 10.9999/nirgends.1` (Crossref kennt sie nicht) legt die Quelle an, mit `@misc` und dem Hinweis `unvollstaendig`; die Ausgabe des Skripts nennt, dass die DOI nicht gefunden wurde",
         "Der Upload derselben Datei ein zweites Mal gibt `schon vorhanden (Quelle <id>)` aus und legt keinen zweiten Eintrag an"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
@@ -75,7 +75,7 @@
         "Claude ergänzt die Felder mit `doc_edit`; danach liefert `bib_list` für `alt2024` `abweichungen: []` und das Abzeichen ist weg",
         "Ist der Crossref-Fake abgeschaltet, liefert `bib_list` `abweichungen: null` mit dem Grund `crossref_nicht_erreichbar`"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     }
   ]

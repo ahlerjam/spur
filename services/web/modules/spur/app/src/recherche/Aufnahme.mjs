@@ -11,14 +11,12 @@ import { Problem } from '../probleme.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as ZitatManager from '../ZitatManager.mjs'
 import * as PruefManager from '../pruefung/PruefManager.mjs'
-import { bibLesen, doiNormal as bibDoi } from '../pruefung/bib.mjs'
+import { ARXIV_DOI, bibLesen, doiNormal as bibDoi } from '../pruefung/bib.mjs'
 import { jetzt, paperApiBasis } from '../schalter.mjs'
 import { arxivMetadaten, europepmc, unpaywall } from './dienste.mjs'
 import { freierKey, keyVorschlag } from './keys.mjs'
 import { metadatenOhneDoi } from './ohneDoi.mjs'
 import { pauseMs, VERSUCHE } from './wiederholen.mjs'
-
-const ARXIV_DOI = /^10\.48550\/arxiv\.(.+)$/
 
 export const doiNormal = doi => bibDoi(doi)?.toLowerCase() ?? ''
 
@@ -160,7 +158,7 @@ function hostVon(url) {
 
 // Metadaten aus dem DOI-Register: Crossref, für arXiv-DOIs (DataCite) die arXiv-API.
 export async function metadaten(doi) {
-  const arxiv = ARXIV_DOI.exec(doi)?.[1]
+  const arxiv = ARXIV_DOI.test(doi) ? doi.replace(ARXIV_DOI, '') || null : null
   const meta = await Crossref.werk(doi)
   if (meta === null) {
     throw new Problem(502, 'dienst_fehlt', 'spur_fehler_crossref_nicht_erreichbar')

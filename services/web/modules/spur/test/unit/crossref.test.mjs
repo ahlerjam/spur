@@ -127,6 +127,14 @@ describe('werk', () => {
     expect(abrufe).toHaveLength(2)
   })
 
+  it('fragt ein gefundenes Werk neu ab, das vor P13 ohne Band und Heft in den Cache kam', async () => {
+    cache.set('10.5555/abc', { werk: { gefunden: true, titel: 'Alt', jahr: 2024 }, abgerufenAm: new Date() })
+    antworten(json({ message: { ...ANTWORT.message, volume: '35' } }))
+    expect((await Crossref.werk('10.5555/abc')).band).toBe('35')
+    expect(await Crossref.werk('10.5555/abc')).toMatchObject({ band: '35' })
+    expect(abrufe).toHaveLength(1)
+  })
+
   it('fragt nach einem Netzfehler 30 s lang nicht erneut, danach wieder', async () => {
     antworten(new Error('Netz weg'), json(ANTWORT))
     expect(await Crossref.werk('10.1/a')).toBeNull()
