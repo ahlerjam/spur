@@ -114,6 +114,39 @@ describe('aufnehmen', () => {
   })
 })
 
+describe('Titelabgleich beim Aufnehmen', () => {
+  const SCHLAF = { titel: 'Sleep and memory consolidation in adolescents' }
+  const mitTitel = (datei, meta, extra = {}) => aufnehmen(datei, datei, { meta, ...extra })
+
+  it('hält fest, dass der Titel der Metadaten im PDF steht', async () => {
+    expect((await mitTitel('oa004.pdf', SCHLAF, { lizenz: 'cc-by' }))).toMatchObject({ titelabgleich: 'passt', lizenz: 'cc-by' })
+  })
+
+  it('nimmt ein PDF mit anderem Titel auf und vermerkt die Abweichung', async () => {
+    expect((await mitTitel('soil.pdf', SCHLAF)).titelabgleich).toBe('abweichend')
+  })
+
+  it('weist ein PDF mit anderem Titel bei titelStreng ab und legt nichts an', async () => {
+    const fehler = await fehlerVon(mitTitel('soil.pdf', SCHLAF, { titelStreng: true }))
+    expect(fehler).toMatchObject({ status: 422, typ: 'falsches_pdf' })
+    expect(await datenbank.db.collection('spurSources').countDocuments()).toBe(0)
+  })
+
+  it('findet den Titel hinter einem Deckblatt auf Seite 2', async () => {
+    expect((await mitTitel('deckblatt.pdf', { titel: 'Napping and attention in shift workers' }, { titelStreng: true })).titelabgleich).toBe('passt')
+  })
+
+  it('kann einen Scan ohne Textebene nicht prüfen und nimmt ihn trotzdem auf', async () => {
+    expect((await mitTitel('scan.pdf', { titel: 'Scanned field notes on night shifts' }, { titelStreng: true })).titelabgleich).toBe('nicht_pruefbar')
+  })
+
+  it('gleicht ohne vorgegebenen Titel nichts ab', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf')
+    expect(quelle).not.toHaveProperty('titelabgleich')
+    expect(quelle.lizenz).toBeNull()
+  })
+})
+
 describe('Abfragen', () => {
   let smith
   let interview

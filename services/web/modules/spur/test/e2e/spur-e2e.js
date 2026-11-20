@@ -855,7 +855,9 @@ async page => {
       const P3 = ['suggest']
       // P7: Pakete pro Projekt.
       const P7 = ['tex_package_add', 'source_upload_link']
-      const erwartet = [...P1, ...P2, ...P3, ...P7].sort()
+      // P12: Suchprotokoll und Ausschluss für PRISMA.
+      const P12 = ['search_log', 'paper_exclude']
+      const erwartet = [...P1, ...P2, ...P3, ...P7, ...P12].sort()
       ok(JSON.stringify(namen) === JSON.stringify(erwartet), `Tools: ${namen}`)
       const rollen = (await werkzeug(token, 'project_list')).inhalt.eintraege.map(p => p.rolle)
       ok(rollen.length && rollen.every(r => ['read', 'review', 'write', 'owner'].includes(r)), `Rollen laut Vertrag: ${rollen}`)
@@ -1467,7 +1469,7 @@ async page => {
     await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
     const eintrag = page.locator('.spur-protokoll .spur-zeile', { hasText: 'sleep memory consolidation' }).filter({ hasText: 'OpenAlex' }).first()
     await eintrag.waitFor()
-    ok(/OpenAlex · \d+ Treffer · \d/.test(await eintrag.textContent()), `Protokolleintrag: ${await eintrag.textContent()}`)
+    ok(/Seite 1 · \d+ Treffer · .*OpenAlex: \d+ Treffer/.test(await eintrag.textContent()), `Protokolleintrag: ${await eintrag.textContent()}`)
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
@@ -1476,8 +1478,8 @@ async page => {
     ok(download.suggestedFilename() === 'suchprotokoll.csv', `Datei: ${download.suggestedFilename()}`)
     const csv = await (await page.request.get(download.url())).text()
     const zeilen = csv.trim().split('\n')
-    ok(zeilen[0] === 'Datum,Datenbank,Anfrage,Trefferzahl', `Kopf: ${zeilen[0]}`)
-    ok(zeilen.some(z => /^\d{4}-\d\d-\d\dT[^,]+,OpenAlex,sleep memory consolidation,\d+$/.test(z)), `CSV:\n${csv}`)
+    ok(zeilen[0].startsWith('Datum,Anfrage,Seite,Filter,arXiv: Status,arXiv: Treffer,OpenAlex: Status,OpenAlex: Treffer,'), `Kopf: ${zeilen[0]}`)
+    ok(zeilen.some(z => /^\d{4}-\d\d-\d\dT[^,]+,sleep memory consolidation,0,,geantwortet,\d+,geantwortet,\d+,/.test(z)), `CSV:\n${csv}`)
   }
 
   features.p2f3 = async () => {
@@ -3238,8 +3240,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
     }
     const backlog = await repoDatei(`${REPO}/docs/backlog.md`)
     const eintraege = backlog.split('\n').filter(z => z.startsWith('- ')).length
-    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei; vier Ideen aus
-    // dem Altprojekt academic-research (661a28817e).
+    // P5: 35 Einträge; danach drei Ideen für P10 und sechs Zurückstellungen aus P8; P9 erledigte drei; vier Ideen aus dem Altprojekt.
     ok(eintraege === 45, `Backlog hat ${eintraege} Einträge statt 45`)
     ok(/transformers/i.test(backlog) && /tesseract/i.test(backlog) && /lacks \d+ keys/.test(backlog), 'Backlog ohne Transformers, Tesseract oder fehlende Übersetzungen')
   }
@@ -6533,6 +6534,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     for (let versuch = 1; ; versuch++) {
       await page.getByRole('button', { name: KOMPILIEREN }).first().click()
       await hinweis.or(uebersprungen).waitFor({ state: 'attached', timeout: 120000 })
+      // Der Lauf beim Laden der Seite und der angestoßene können sich überholen; ein übersprungener Lauf ersetzt
+      // das Log dann gleich wieder. Der Hinweis zählt erst, wenn er stehen bleibt.
+      await page.waitForTimeout(3000)
       if (await hinweis.count()) break
       ok(versuch < 5, 'Kompilieren wurde fünfmal übersprungen')
       await page.waitForTimeout(10000)
@@ -6750,6 +6754,487 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     const nachher = await roteLage(pid)
     ok(nachher.rot.length === anzahl && nachher.normal.length === 0, `Danach rot ${nachher.rot.length}, normal ${nachher.normal.length}`)
     await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Geteilt.' })
+  }
+
+  // P12: Quellen beschaffen und Suche nachvollziehen.
+  const fakeAbrufe = async dienste =>
+    (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe
+      .filter(a => dienste.includes(a.dienst))
+      .map(a => a.pfad.split('/spur/dev/crossref')[1])
+  const quellenZeile = titel => page.locator('.spur-panel li.spur-zeile', { has: page.getByRole('button', { name: new RegExp(`^${titel}`) }) }).first()
+
+  features.p12f1 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Quellen')
+    await fakeSteuern({ cachesLeeren: true, protokollLeeren: true })
+    const aufnehmen = doi => werkzeug(token, 'source_add', { project_id: pid, doi })
+    const quellen = async () => (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    const fundort = (art, doi) => `/fundort/${art}/${doi}`
+
+    // Die Verlagsseite liefert „Just a moment…“ statt des PDFs: Das Repositorium kommt zuerst und reicht.
+    const eins = await aufnehmen('10.5555/spur.oa.001')
+    ok(!eins.fehler && eins.inhalt.key === 'lind2021', `oa.001: ${JSON.stringify(eins.inhalt)}`)
+    const erste = (await quellen()).find(q => q.doi === '10.5555/spur.oa.001')
+    ok(erste?.seiten === 2, `oa.001 in sources_list: ${JSON.stringify(erste)}`)
+    let abrufe = await fakeAbrufe(['fundort'])
+    const repo = abrufe.indexOf(fundort('repository', '10.5555/spur.oa.001'))
+    const verlag = abrufe.indexOf(fundort('publisher', '10.5555/spur.oa.001'))
+    ok(repo >= 0 && (verlag < 0 || verlag > repo), `Repositorium nicht vor dem Verlag: ${JSON.stringify(abrufe)}`)
+
+    // Unpaywall kennt nur die Verlagsseite (HTML), Europe PMC hat das PDF.
+    const zwei = await aufnehmen('10.5555/spur.oa.002')
+    ok(!zwei.fehler && zwei.inhalt.key === 'haddad2020', `oa.002: ${JSON.stringify(zwei.inhalt)}`)
+    abrufe = await fakeAbrufe(['fundort', 'europepmc'])
+    ok(abrufe.at(-1) === '/europepmc/articles/PMC9000002?pdf=render', `oa.002 nicht aus Europe PMC: ${JSON.stringify(abrufe)}`)
+
+    // Zweimal 503 mit Retry-After: 1, beim dritten Mal das PDF.
+    await fakeSteuern({ stoerungen: { fundort: { status: 503, retryAfter: 1, mal: 2 } }, protokollLeeren: true })
+    const start = Date.now()
+    const drei = await aufnehmen('10.5555/spur.oa.003')
+    const dauer = Date.now() - start
+    await fakeSteuern({})
+    ok(!drei.fehler && drei.inhalt.key === 'probst2022', `oa.003: ${JSON.stringify(drei.inhalt)}`)
+    ok((await fakeAbrufe(['fundort'])).length === 3 && dauer >= 2000 && dauer <= 15000, `oa.003: ${dauer} ms, Abrufe ${JSON.stringify(await fakeAbrufe(['fundort']))}`)
+
+    // Das Repositorium liefert ein anderes Werk, der Verlag das richtige.
+    await fakeSteuern({ protokollLeeren: true })
+    const vier = await aufnehmen('10.5555/spur.oa.004')
+    ok(!vier.fehler && vier.inhalt.titelabgleich === 'passt', `oa.004: ${JSON.stringify(vier.inhalt)}`)
+    const seite = await werkzeug(token, 'source_read', { project_id: pid, source_id: vier.inhalt.quelle_id, pdf_seite: 1 })
+    ok(seite.inhalt.text.includes('Sleep and memory consolidation in adolescents'), `oa.004 Seite 1: ${seite.inhalt.text}`)
+    ok((await quellen()).find(q => q.doi === '10.5555/spur.oa.004')?.titelabgleich === 'passt', 'oa.004: sources_list ohne titelabgleich „passt“')
+    abrufe = await fakeAbrufe(['fundort'])
+    ok(JSON.stringify(abrufe) === JSON.stringify([fundort('repository', '10.5555/spur.oa.004'), fundort('publisher', '10.5555/spur.oa.004')]), `oa.004 Abrufe: ${JSON.stringify(abrufe)}`)
+
+    // Der einzige Fundort liefert ein anderes Werk.
+    const fuenf = await aufnehmen('10.5555/spur.oa.005')
+    ok(fuenf.fehler && fuenf.inhalt.fehler === 'pdf_fehlt', `oa.005: ${JSON.stringify(fuenf.inhalt)}`)
+    ok(fuenf.inhalt.versucht?.length === 1 && fuenf.inhalt.versucht[0].ergebnis === 'falsches_pdf' && fuenf.inhalt.versucht[0].art === 'repository', `oa.005 versucht: ${JSON.stringify(fuenf.inhalt.versucht)}`)
+    ok(!(await quellen()).some(q => q.doi === '10.5555/spur.oa.005'), 'oa.005 wurde trotz falschem PDF aufgenommen')
+
+    // Per Einmal-Link entscheidet die Person: Das abweichende PDF wird aufgenommen, mit Hinweis.
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const falsch = await perLink(link.link, 'soil.pdf', { doi: '10.5555/spur.oa.005' })
+    ok(falsch.daten?.status === 'angelegt' && falsch.daten.titelabgleich === 'abweichend', `Upload soil.pdf: ${JSON.stringify(falsch)}`)
+    ok(falsch.daten.hinweis?.startsWith('Titel im PDF passt nicht zu den Metadaten'), `Hinweis: ${falsch.daten.hinweis}`)
+    const gelistet = (await quellen()).find(q => q.doi === '10.5555/spur.oa.005')
+    ok(gelistet?.titelabgleich === 'abweichend' && gelistet.hinweis?.startsWith('Titel im PDF passt nicht'), `sources_list: ${JSON.stringify(gelistet)}`)
+    const scan = await perLink(link.link, 'scan.pdf', { doi: '10.5555/spur.oa.007' })
+    ok(scan.daten?.status === 'angelegt' && scan.daten.titelabgleich === 'nicht_pruefbar' && !('hinweis' in scan.daten), `Upload scan.pdf: ${JSON.stringify(scan)}`)
+    const deckblatt = await perLink(link.link, 'deckblatt.pdf', { doi: '10.5555/spur.oa.006' })
+    ok(deckblatt.daten?.status === 'angelegt' && deckblatt.daten.titelabgleich === 'passt' && !('hinweis' in deckblatt.daten), `Upload deckblatt.pdf: ${JSON.stringify(deckblatt)}`)
+
+    await projektOeffnen('E2E P12 Quellen')
+    await panelOeffnen('Quellen')
+    for (const titel of ['Green open access in institutional repositories', 'Full text mirrors for biomedical literature', 'Rate limits on scholarly infrastructure']) {
+      await quellenZeile(titel).waitFor({ timeout: 20000 })
+    }
+    await quellenZeile('Green open access').getByText('Lizenz: CC BY', { exact: true }).waitFor()
+    await quellenZeile('Dream recall across the lifespan').getByText(/Titel im PDF passt nicht zu den Metadaten/).waitFor()
+    ok((await quellenZeile('Scanned field notes').getByText(/Titel im PDF/).count()) === 0, 'Hinweis am Scan, obwohl nicht prüfbar')
+    ok((await quellenZeile('Sleep and memory consolidation').getByText(/Titel im PDF/).count()) === 0, 'Hinweis an oa.004, obwohl der Titel passt')
+  }
+
+  features.p12f2 = async () => {
+    const BOT = '10.5555/spur.bot.001'
+    const ZU = '10.5555/spur.zu.001'
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Status')
+    // repoBytes ersetzt den Seiteninhalt: die Datei lesen, bevor das Projekt offen ist.
+    const pdf = { name: 'bot001.pdf', mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/bot001.pdf`) }
+    await fakeSteuern({ cachesLeeren: true })
+    const aufnehmen = doi => werkzeug(token, 'source_add', { project_id: pid, doi })
+    const liste = async () => (await jsonVon(`/spur/project/${pid}/beschaffung`)).eintraege
+
+    // Frei, aber beide Fundorte weisen den Server ab (HTML-Seite und 403); Europe PMC kennt die DOI nicht.
+    const bot = await aufnehmen(BOT)
+    ok(bot.fehler && bot.inhalt.fehler === 'bot_schutz', `bot.001: ${JSON.stringify(bot.inhalt)}`)
+    const versucht = bot.inhalt.versucht ?? []
+    ok(
+      versucht.length === 2 &&
+        versucht.every(v => v.host && v.url.includes(BOT)) &&
+        JSON.stringify(versucht.map(v => [v.art, v.ergebnis])) === JSON.stringify([['repository', 'html'], ['publisher', '403']]),
+      `bot.001 versucht: ${JSON.stringify(versucht)}`
+    )
+    ok(/frei verfügbar/.test(bot.inhalt.detail) && /Im Browser lässt es sich laden/.test(bot.inhalt.detail), `bot.001 Text: ${bot.inhalt.detail}`)
+    ok(/^https:\/\//.test(bot.inhalt.adresse), `bot.001 ohne Adresse für den Browser: ${JSON.stringify(bot.inhalt)}`)
+
+    const zu = await aufnehmen(ZU)
+    ok(zu.fehler && zu.inhalt.fehler === 'nicht_frei' && !('versucht' in zu.inhalt), `zu.001: ${JSON.stringify(zu.inhalt)}`)
+    const weg = await aufnehmen('10.5555/spur.weg.001')
+    ok(weg.fehler && weg.inhalt.fehler === 'pdf_fehlt' && weg.inhalt.versucht?.[0]?.ergebnis === '404', `weg.001: ${JSON.stringify(weg.inhalt)}`)
+
+    // Ein zweiter Versuch legt keinen zweiten Eintrag an; pdf_fehlt kommt nicht auf die Liste.
+    ok((await aufnehmen(BOT)).inhalt.fehler === 'bot_schutz', 'bot.001 beim zweiten Mal anders')
+    const eintraege = await liste()
+    ok(
+      JSON.stringify(eintraege.map(e => [e.doi, e.grund, e.status]).sort()) === JSON.stringify([[BOT, 'bot_schutz', 'offen'], [ZU, 'nicht_frei', 'offen']]),
+      `Beschaffungsliste: ${JSON.stringify(eintraege)}`
+    )
+
+    await projektOeffnen('E2E P12 Status')
+    // Dieselben Fehler über die Web-Route, mit den HTTP-Status des Vertrags.
+    const web = async doi => await seitenPost(`/spur/project/${pid}/recherche/aufnehmen`, { doi })
+    const webBot = await web(BOT)
+    ok(webBot.status === 502 && webBot.daten.type === 'urn:spur:problem:bot_schutz' && webBot.daten.versucht.length === 2, `Web bot.001: ${JSON.stringify(webBot)}`)
+    const webZu = await web(ZU)
+    ok(webZu.status === 409 && webZu.daten.type === 'urn:spur:problem:nicht_frei', `Web zu.001: ${JSON.stringify(webZu)}`)
+    const webWeg = await web('10.5555/spur.weg.001')
+    ok(webWeg.status === 502 && webWeg.daten.type === 'urn:spur:problem:pdf_fehlt', `Web weg.001: ${JSON.stringify(webWeg)}`)
+    ok((await liste()).length === 2, 'Die Web-Route hat weitere Einträge angelegt')
+
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Beschaffung' }).click()
+    const zeile = titel => page.locator('.spur-panel li.spur-paper', { hasText: titel })
+    const blockiert = zeile('Publisher walls around open articles')
+    await blockiert.getByText('Frei, Download blockiert', { exact: true }).waitFor({ timeout: 20000 })
+    const link = blockiert.getByRole('link', { name: 'Im Browser herunterladen' })
+    ok((await link.getAttribute('href')) === bot.inhalt.adresse, `Link zur besten Adresse: ${await link.getAttribute('href')}`)
+    const schranke = zeile('Subscription journals and their readers')
+    await schranke.getByText('Nicht frei verfügbar', { exact: true }).waitFor()
+    ok((await schranke.getByRole('link', { name: 'Im Browser herunterladen' }).count()) === 0, 'Browser-Link an einem Paper hinter der Bezahlschranke')
+    ok((await blockiert.getByText('Nicht frei verfügbar').count()) === 0 && (await schranke.getByText('Frei, Download blockiert').count()) === 0, 'Abzeichen vertauscht')
+
+    // Das im Browser geholte PDF kommt per Einmal-Link mit der DOI: Der Eintrag ist erledigt, die Quelle da.
+    const { inhalt: einmal } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const hoch = await perLink(einmal.link, pdf, { doi: BOT })
+    const eintrag = (await liste()).find(e => e.doi === BOT)
+    ok(hoch.daten?.status === 'angelegt' && hoch.daten.beschaffung_id === eintrag.id && hoch.daten.titelabgleich === 'passt', `Upload bot001.pdf: ${JSON.stringify(hoch)}`)
+    ok(eintrag.status === 'beschafft' && eintrag.quelleId === hoch.daten.quelle_id, `Eintrag nach dem Upload: ${JSON.stringify(eintrag)}`)
+    const quellen = (await werkzeug(token, 'sources_list', { project_id: pid })).inhalt.eintraege
+    ok(quellen.some(q => q.doi === BOT && q.id === hoch.daten.quelle_id), `Quelle fehlt: ${JSON.stringify(quellen)}`)
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    await page.getByRole('tab', { name: 'Beschaffung' }).click()
+    await zeile('Publisher walls around open articles').getByText('Beschafft', { exact: true }).waitFor({ timeout: 20000 })
+    ok((await zeile('Publisher walls around open articles').getByText('Frei, Download blockiert').count()) === 0, 'Abzeichen am erledigten Eintrag')
+  }
+
+  features.p12f3 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Status')
+    const von = (inhalt, dienst) => inhalt.dienste.find(d => d.dienst === dienst)
+    const zeiten = async dienst => (await (await page.request.get(`${FAKE}/_protokoll`)).json()).abrufe.filter(a => a.dienst === dienst).map(a => a.zeit)
+    // Jeder Aufruf fragt die Dienste wirklich (kein Cache) und beginnt mit einem leeren Fake-Protokoll.
+    const mitStoerung = async (stoerungen, aufruf) => {
+      await fakeSteuern({ stoerungen, cachesLeeren: true, protokollLeeren: true })
+      const start = Date.now()
+      try {
+        const { fehler, inhalt } = await aufruf()
+        ok(!fehler, `Werkzeugfehler: ${JSON.stringify(inhalt)}`)
+        return { inhalt, dauer: Date.now() - start }
+      } finally {
+        await fakeSteuern({})
+      }
+    }
+    const suche = () => werkzeug(token, 'paper_search', { project_id: pid, anfrage: 'sleep memory consolidation' })
+    const zitationen = () => werkzeug(token, 'paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert_von' })
+    const ZWEIMAL = { s2: { status: 429, retryAfter: 1, mal: 2 } }
+    const DAUERHAFT = { s2: { status: 429, retryAfter: 1 } }
+    const EINMAL_503 = { openalex: { status: 503, mal: 1 } }
+
+    for (const [name, aufruf] of [['paper_search', suche], ['paper_citations', zitationen]]) {
+      // Zweimal 429 mit Retry-After: 1, danach normal.
+      const erholt = await mitStoerung(ZWEIMAL, aufruf)
+      const s2 = von(erholt.inhalt, 'Semantic Scholar')
+      ok(s2.antwort === 'geantwortet' && s2.versuche === 3, `${name}, zweimal 429: ${JSON.stringify(erholt.inhalt.dienste)}`)
+      ok(erholt.inhalt.treffer.some(t => t.dienste.includes('Semantic Scholar')), `${name}: keine Treffer von Semantic Scholar`)
+      ok((await zeiten('s2')).length === 3, `${name}: Semantic Scholar wurde ${(await zeiten('s2')).length}-mal gefragt`)
+
+      // Dauerhaft 429: nach drei Versuchen gedrosselt, die anderen Dienste liefern.
+      const zu = await mitStoerung(DAUERHAFT, aufruf)
+      const gedrosselt = von(zu.inhalt, 'Semantic Scholar')
+      ok(gedrosselt.antwort === 'gedrosselt' && gedrosselt.versuche === 3 && zu.dauer <= 20000, `${name}, dauerhaft 429 (${zu.dauer} ms): ${JSON.stringify(zu.inhalt.dienste)}`)
+      ok(zu.inhalt.treffer.length > 0 && zu.inhalt.treffer.every(t => !t.dienste.includes('Semantic Scholar')), `${name}: Treffer der anderen Dienste fehlen`)
+      ok(von(zu.inhalt, 'OpenAlex').antwort === 'geantwortet', `${name}: OpenAlex ${JSON.stringify(zu.inhalt.dienste)}`)
+
+      // Ein 503 ohne Retry-After: nach etwa 1 s erneut gefragt.
+      const kurz = await mitStoerung(EINMAL_503, aufruf)
+      const openalex = von(kurz.inhalt, 'OpenAlex')
+      ok(openalex.antwort === 'geantwortet' && openalex.versuche === 2, `${name}, einmal 503: ${JSON.stringify(kurz.inhalt.dienste)}`)
+      const [erster, zweiter] = await zeiten('openalex')
+      ok(zweiter - erster >= 900 && zweiter - erster <= 3000, `${name}: OpenAlex nach ${zweiter - erster} ms erneut gefragt`)
+    }
+  }
+
+  features.p12f4 = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Ohne DOI')
+    const bericht = { name: 'report.pdf', mimeType: 'application/pdf', buffer: await repoBytes(`${FIXTURES}/report.pdf`) }
+    await fakeSteuern({ cachesLeeren: true, protokollLeeren: true })
+    // Der Fake läuft im Stack des Servers; von dort aus ist seine Adresse die aus dev-schalter.json.
+    const THESIS = 'http://127.0.0.1/spur/dev/crossref/thesis/tampere.pdf'
+    const metadaten = {
+      titel: 'Generative AI adoption in a large enterprise',
+      autoren: [{ family: 'Virtanen', given: 'Aino' }],
+      jahr: 2024,
+      art: 'thesis',
+      abschluss: "Master's thesis",
+      institution: 'Tampere University',
+    }
+    const aufnehmen = args => werkzeug(token, 'source_add', { project_id: pid, ...args })
+    const bib = async () => (await werkzeug(token, 'doc_read', { project_id: pid, pfad: 'references.bib' })).inhalt.text
+
+    // Eingaben, die nichts abrufen dürfen.
+    const beide = await aufnehmen({ doi: '10.5555/spur.oa.001', pdf_url: THESIS, metadaten })
+    ok(beide.fehler && beide.inhalt.fehler === 'eingabe_ungueltig' && beide.inhalt.feld === 'pdf_url' && /doi und pdf_url/.test(beide.inhalt.detail), `doi und pdf_url: ${JSON.stringify(beide.inhalt)}`)
+    const keines = await aufnehmen({ metadaten })
+    ok(keines.fehler && keines.inhalt.fehler === 'eingabe_ungueltig' && keines.inhalt.feld === 'doi', `weder doi noch pdf_url: ${JSON.stringify(keines.inhalt)}`)
+    const ohneTitel = await aufnehmen({ pdf_url: THESIS, metadaten: { ...metadaten, titel: undefined } })
+    ok(ohneTitel.fehler && ohneTitel.inhalt.fehler === 'eingabe_ungueltig' && ohneTitel.inhalt.feld === 'metadaten.titel' && ohneTitel.inhalt.detail.includes('metadaten.titel'), `ohne Titel: ${JSON.stringify(ohneTitel.inhalt)}`)
+    for (const adresse of ['http://trepo.example/thesis.pdf', 'http://localhost/spur/dev/crossref/thesis/tampere.pdf', 'https://127.0.0.1/spur/dev/crossref/thesis/tampere.pdf', 'https://10.0.0.5/thesis.pdf']) {
+      const r = await aufnehmen({ pdf_url: adresse, metadaten })
+      ok(r.fehler && r.inhalt.fehler === 'pdf_fehlt' && r.inhalt.versucht?.[0]?.ergebnis === 'gesperrt', `${adresse}: ${JSON.stringify(r.inhalt)}`)
+    }
+    ok((await fakeAbrufe(['thesis'])).length === 0, `Der Server hat trotzdem abgerufen: ${JSON.stringify(await fakeAbrufe(['thesis']))}`)
+
+    const thesis = await aufnehmen({ pdf_url: THESIS, metadaten })
+    ok(!thesis.fehler && thesis.inhalt.key === 'virtanen2024' && thesis.inhalt.titelabgleich === 'passt', `Abschlussarbeit: ${JSON.stringify(thesis.inhalt)}`)
+    const heute = new Date().toISOString().slice(0, 10)
+    const eintrag = (await bib()).split(/\n(?=@)/).find(b => b.startsWith('@thesis{virtanen2024,')) ?? ''
+    for (const zeile of [
+      'author = {Virtanen, Aino}',
+      'title = {Generative AI adoption in a large enterprise}',
+      'year = {2024}',
+      "type = {Master's thesis}",
+      'institution = {Tampere University}',
+      `url = {${THESIS}}`,
+      `urldate = {${heute}}`,
+    ]) {
+      ok(eintrag.includes(`  ${zeile}`), `.bib ohne „${zeile}“: ${eintrag || (await bib())}`)
+    }
+    const nochmal = await aufnehmen({ pdf_url: THESIS, metadaten })
+    ok(nochmal.fehler && nochmal.inhalt.fehler === 'quelle_vorhanden', `Zweites source_add: ${JSON.stringify(nochmal.inhalt)}`)
+    ok((await fakeAbrufe(['thesis'])).length === 1, 'Die Adresse wurde für die Dublette erneut abgerufen')
+
+    // spur-hochladen schickt dieselben Formularfelder (tools/tests/plugin-skripte.test.mjs prüft das Skript).
+    const { inhalt: link } = await werkzeug(token, 'source_upload_link', { project_id: pid })
+    const hoch = await perLink(link.link, bericht, { titel: 'AI at Work', autoren: 'Meyer, Jana; Okafor, Chidi', jahr: '2023', art: 'report', institution: 'OECD' })
+    ok(hoch.daten?.status === 'angelegt' && /^[0-9a-f]{24}$/.test(hoch.daten.quelle_id) && hoch.daten.key === 'meyer2023', `Upload report.pdf: ${JSON.stringify(hoch)}`)
+    const report = (await bib()).split(/\n(?=@)/).find(b => b.startsWith('@report{meyer2023,')) ?? ''
+    ok(report.includes('  author = {Meyer, Jana and Okafor, Chidi}') && report.includes('  institution = {OECD}'), `@report: ${report || (await bib())}`)
+    const doppelt = await perLink(link.link, bericht, { titel: 'AI at Work', autoren: 'Meyer, Jana; Okafor, Chidi', jahr: '2023', art: 'report' })
+    ok(doppelt.daten?.status === 'vorhanden' && doppelt.daten.quelle_id === hoch.daten.quelle_id, `report.pdf noch einmal: ${JSON.stringify(doppelt)}`)
+
+    // Ein wörtliches Zitat von Seite 12 der Abschlussarbeit.
+    const edit = await werkzeug(token, 'doc_edit', {
+      project_id: pid,
+      pfad: 'main.tex',
+      alt: 'Hello',
+      neu: String.raw`\enquote{Employees used the assistant mainly for drafting and summarising.} \textcite[12]{virtanen2024}`,
+      idempotenz_schluessel: `p12f4-${Date.now()}`,
+    })
+    ok(!edit.fehler, `doc_edit: ${JSON.stringify(edit.inhalt)}`)
+    const stelleImBericht = async () => (await werkzeug(token, 'check_report', { project_id: pid })).inhalt.eintraege.find(z => z.key === 'virtanen2024')
+    const pruefung = await stelleImBericht()
+    ok(pruefung?.wortlaut === 'exakt' && pruefung.referenz === 'ohne_doi' && pruefung.seitenangabe === '12', `check_report: ${JSON.stringify(pruefung)}`)
+    await werkzeug(token, 'run_finish', { project_id: pid, zusammenfassung: 'Zitat ergänzt.' })
+
+    await projektOeffnen('E2E P12 Ohne DOI')
+    // Das PDF hat keine gedruckten Seitenzahlen in den PageLabels: Wie bei jeder solchen Quelle bestätigt die Person,
+    // dass PDF-Seite und gedruckte Seite übereinstimmen. Danach ist an der Stelle nichts mehr markiert.
+    const bestaetigt = await page.evaluate(async url => {
+      const r = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Csrf-Token': document.querySelector('meta[name="ol-csrfToken"]').content },
+        body: JSON.stringify({ versatz: 0 }),
+      })
+      return r.status
+    }, `${BASE}/spur/project/${pid}/quellen/${thesis.inhalt.quelle_id}`)
+    ok(bestaetigt === 200, `Seitenzahl bestätigen: ${bestaetigt}`)
+    const geprueft = await stelleImBericht()
+    ok(geprueft.wortlaut === 'exakt' && geprueft.referenz === 'ohne_doi' && geprueft.problem !== true, `Nach der Bestätigung: ${JSON.stringify(geprueft)}`)
+    await panelOeffnen('Quellen')
+    await quellenZeile('Generative AI adoption in a large enterprise').getByText('A. Virtanen · 2024 · Abschlussarbeit', { exact: true }).waitFor({ timeout: 20000 })
+    await quellenZeile('AI at Work').getByText('J. Meyer, C. Okafor · 2023 · Report', { exact: true }).waitFor()
+    await panelOeffnen('Prüfbericht')
+    const stelle = page.locator('.spur-panel .spur-zeile', { hasText: 'Employees used the assistant' }).first()
+    await stelle.getByText('Wortlaut: exakt', { exact: true }).waitFor({ timeout: 30000 })
+    ok((await stelle.locator('.badge.bg-danger, .text-danger').count()) === 0, 'Die Stelle ohne DOI ist rot markiert')
+  }
+
+  features.p12f5 = async () => {
+    const D = k => `10.5555/spur.p12.${k}`
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    const pid = await projektId(token, 'E2E P12 Protokoll')
+    const leer = await projektId(token, 'E2E P12 Quellen')
+    // „sleep memory“: OpenAlex liefert 3 Treffer, Semantic Scholar 2 (einer mit derselben DOI), auf Seite 2 folgen 2;
+    // „slow-wave sleep“: 2 Treffer, einer davon schon bekannt.
+    await fakeSteuern({
+      cachesLeeren: true,
+      suchen: {
+        'sleep memory': { openalex: [[D('a'), D('b'), D('c')], [D('e'), D('f')]], s2: [[D('c'), D('d')]] },
+        'slow-wave sleep': { openalex: [[D('g'), D('a')]] },
+      },
+    })
+    const tool = async (name, args) => {
+      const r = await werkzeug(token, name, { project_id: pid, ...args })
+      ok(!r.fehler, `${name} ${JSON.stringify(args)}: ${JSON.stringify(r.inhalt)}`)
+      return r.inhalt
+    }
+    const gleich = (ist, soll, was) => ok(JSON.stringify(ist) === JSON.stringify(soll), `${was}: ${JSON.stringify(ist)} statt ${JSON.stringify(soll)}`)
+    try {
+      const erste = await tool('paper_search', { anfrage: 'sleep memory' })
+      gleich(erste.treffer.map(t => t.doi).sort(), [D('a'), D('b'), D('c'), D('d')], 'Erste Seite')
+      ok(erste.naechster_cursor === '1', `Kein cursor für die zweite Seite: ${JSON.stringify(erste.naechster_cursor)}`)
+      const zweite = await tool('paper_search', { anfrage: 'sleep memory', cursor: erste.naechster_cursor })
+      gleich(zweite.treffer.map(t => t.doi).sort(), [D('e'), D('f')], 'Zweite Seite')
+      const andere = await tool('paper_search', { anfrage: 'slow-wave sleep' })
+      gleich(andere.treffer.map(t => t.doi).sort(), [D('a'), D('g')], 'Zweite Suche')
+
+      let log = await tool('search_log', {})
+      gleich(log.eintraege.map(e => [e.anfrage, e.seite, e.treffer]), [['sleep memory', 0, 5], ['sleep memory', 1, 2], ['slow-wave sleep', 0, 2]], 'Anfragen')
+      ok(log.eintraege.every((e, i) => i === 0 || new Date(e.zeit) >= new Date(log.eintraege[i - 1].zeit)), 'Anfragen nicht in zeitlicher Folge')
+      const dienste = e => Object.fromEntries(e.dienste.map(d => [d.dienst, [d.status, d.treffer]]))
+      gleich(dienste(log.eintraege[0]), { arXiv: ['geantwortet', 0], OpenAlex: ['geantwortet', 3], Crossref: ['geantwortet', 0], 'Semantic Scholar': ['geantwortet', 2] }, 'Dienste der ersten Anfrage')
+      gleich([log.prisma.identifiziert, log.prisma.dubletten, log.prisma.gesichtet], [9, 2, 7], 'identifiziert, dubletten, gesichtet')
+      gleich(log.prisma.identifiziert_nach_dienst, { OpenAlex: 7, 'Semantic Scholar': 2 }, 'identifiziert_nach_dienst')
+      ok(log.prisma.identifiziert - log.prisma.dubletten === log.prisma.gesichtet && log.prisma.offen === 7, `Gleichung: ${JSON.stringify(log.prisma)}`)
+      ok(log.naechster_cursor === null, `naechster_cursor: ${log.naechster_cursor}`)
+
+      // Zwei aufnehmen, drei ausschließen, eines ist nicht frei.
+      for (const k of ['a', 'b']) await tool('source_add', { doi: D(k) })
+      await tool('paper_exclude', { doi: D('c'), grund: 'falsche Population' })
+      await tool('paper_exclude', { doi: D('d'), grund: 'falsche Population' })
+      await tool('paper_exclude', { doi: D('e'), grund: 'falsche Population' })
+      const nichtFrei = await werkzeug(token, 'source_add', { project_id: pid, doi: D('f') })
+      ok(nichtFrei.fehler && nichtFrei.inhalt.fehler === 'nicht_frei', `p12.f: ${JSON.stringify(nichtFrei.inhalt)}`)
+      // Ein zweites paper_exclude ersetzt den Grund, statt doppelt zu zählen.
+      const ersetzt = await tool('paper_exclude', { doi: D('e'), grund: 'kein empirischer Beitrag' })
+      gleich(ersetzt, { doi: D('e'), titel: 'A commentary on sleep research methods', grund: 'kein empirischer Beitrag' }, 'paper_exclude')
+      const fremd = await werkzeug(token, 'paper_exclude', { project_id: pid, doi: '10.5555/spur.oa.001', grund: 'nie gesucht' })
+      ok(fremd.fehler && fremd.inhalt.fehler === 'treffer_nicht_gefunden', `Unbekannte DOI: ${JSON.stringify(fremd.inhalt)}`)
+
+      log = await tool('search_log', {})
+      gleich(
+        [log.prisma.aufgenommen, log.prisma.ausgeschlossen, log.prisma.nicht_beschaffbar, log.prisma.offen],
+        [2, { gesamt: 3, nach_grund: { 'falsche Population': 2, 'kein empirischer Beitrag': 1 } }, { nicht_frei: 1 }, 1],
+        'Entscheidungen'
+      )
+      gleich([log.prisma.identifiziert, log.prisma.dubletten, log.prisma.gesichtet], [9, 2, 7], 'Summen nach den Entscheidungen')
+    } finally {
+      await fakeSteuern({})
+    }
+
+    // Ohne Zugriff auf das Projekt: weder lesen noch ausschließen.
+    for (const [name, args] of [['search_log', {}], ['paper_exclude', { doi: D('g'), grund: 'x' }]]) {
+      const ohne = await werkzeug('spur_e2e_p3a', name, { project_id: pid, ...args })
+      ok(ohne.fehler && ohne.inhalt.fehler === 'keine_rechte', `${name} ohne Zugriff: ${JSON.stringify(ohne.inhalt)}`)
+    }
+
+    // Beschreibungen und Vertrag erklären Felder und Gleichung.
+    const { daten } = await mcp(token, 'tools/list')
+    const beschreibung = name => daten.result.tools.find(w => w.name === name)?.description ?? ''
+    ok(/identifiziert − dubletten = gesichtet/.test(beschreibung('search_log')) && /nicht_beschaffbar/.test(beschreibung('search_log')), `search_log: ${beschreibung('search_log')}`)
+    ok(/grund/.test(beschreibung('paper_exclude')) && /treffer_nicht_gefunden/.test(beschreibung('paper_exclude')), `paper_exclude: ${beschreibung('paper_exclude')}`)
+    const vertrag = await repoDatei(`${FIXTURES}/../../../../../../docs/mcp-contract.md`)
+    for (const text of ['`search_log`', '`paper_exclude`', 'identifiziert − dubletten = gesichtet', '`prisma.nicht_beschaffbar`', '`treffer_nicht_gefunden`', '`bot_schutz`', '`titelabgleich`', '`versuche`']) {
+      ok(vertrag.includes(text), `docs/mcp-contract.md ohne ${text}`)
+    }
+
+    await projektOeffnen('E2E P12 Protokoll')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    const protokoll = page.locator('.spur-panel')
+    await protokoll.getByText('9 identifiziert, 2 Dubletten, 7 gesichtet, 2 aufgenommen, 3 ausgeschlossen, 1 nicht beschaffbar, 1 offen', { exact: true }).waitFor({ timeout: 20000 })
+    await protokoll.getByText('Ausgeschlossen nach Grund: falsche Population (2), kein empirischer Beitrag (1)', { exact: true }).waitFor()
+    const zeilen = await protokoll.locator('.spur-protokoll > li').allInnerTexts()
+    ok(zeilen.length === 3, `Anfragen im Browser: ${zeilen.length}`)
+    // Im Browser stehen die neuesten zuerst.
+    ok(/^slow-wave sleep\s+Seite 1 · 2 Treffer · 1 Dublette ·/.test(zeilen[0]) && /OpenAlex: 2 Treffer/.test(zeilen[0]), `Dritte Anfrage: ${zeilen[0]}`)
+    ok(/^sleep memory\s+Seite 2 · 2 Treffer · 0 Dubletten ·/.test(zeilen[1]), `Zweite Anfrage: ${zeilen[1]}`)
+    ok(/^sleep memory\s+Seite 1 · 5 Treffer · 1 Dublette ·/.test(zeilen[2]) && /OpenAlex: 3 Treffer/.test(zeilen[2]) && /Semantic Scholar: 2 Treffer/.test(zeilen[2]), `Erste Anfrage: ${zeilen[2]}`)
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: 'Protokoll exportieren' }).click(),
+    ])
+    const csv = (await (await page.request.get(download.url())).text()).trim().split('\n')
+    ok(csv[0] === 'Datum,Anfrage,Seite,Filter,arXiv: Status,arXiv: Treffer,OpenAlex: Status,OpenAlex: Treffer,Crossref: Status,Crossref: Treffer,Semantic Scholar: Status,Semantic Scholar: Treffer,Treffer,Dubletten', `CSV-Kopf: ${csv[0]}`)
+    ok(/^\d{4}-\d\d-\d\dT[^,]+,sleep memory,0,,geantwortet,0,geantwortet,3,geantwortet,0,geantwortet,2,5,1$/.test(csv[3]), `CSV, erste Anfrage: ${csv[3]}`)
+    ok(/,sleep memory,1,,geantwortet,0,geantwortet,2,geantwortet,0,geantwortet,0,2,0$/.test(csv[2]), `CSV, zweite Anfrage: ${csv[2]}`)
+    gleich(
+      csv.slice(4),
+      [
+        'Summe: identifiziert,9',
+        'Summe: Dubletten,2',
+        'Summe: gesichtet,7',
+        'Summe: aufgenommen,2',
+        'Summe: ausgeschlossen,3',
+        'Summe: ausgeschlossen (falsche Population),2',
+        'Summe: ausgeschlossen (kein empirischer Beitrag),1',
+        'Summe: nicht beschaffbar,1',
+        'Summe: nicht beschaffbar (nicht frei verfügbar),1',
+        'Summe: offen,1',
+      ],
+      'CSV-Summen'
+    )
+
+    // Ein Projekt ohne Suche.
+    const ohneSuche = await werkzeug(token, 'search_log', { project_id: leer })
+    gleich([ohneSuche.inhalt.eintraege, ohneSuche.inhalt.prisma.identifiziert], [[], 0], 'Leeres Protokoll')
+    await projektOeffnen('E2E P12 Quellen')
+    await panelOeffnen('Recherche')
+    await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+    await page.locator('.spur-panel').getByText(/^Noch keine Suche/).waitFor({ timeout: 20000 })
+    ok((await page.locator('.spur-prisma').count()) === 0, 'Summenzeile in einem Projekt ohne Suche')
+
+    // Ein angemeldetes Konto ohne Zugriff auf das Projekt bekommt auch über die Web-Route kein Protokoll.
+    await anmelden('e2e-p3a@example.org')
+    for (const pfad of ['protokoll', 'protokoll.csv']) {
+      const r = await page.request.get(`${BASE}/spur/project/${pid}/recherche/${pfad}`, { headers: { Accept: 'application/json' }, maxRedirects: 0 })
+      ok(r.status() === 403, `Web-Route ${pfad} ohne Zugriff: ${r.status()}`)
+    }
+  }
+
+  // P12: Die neuen Ansichten bei 360 und 1280 px, hell und dunkel: kein Überlauf, Kontrast mindestens 4,5:1.
+  // Läuft nach p12f1 und p12f5, deren Daten die Ansichten füllen.
+  features.p12ansicht = async () => {
+    await anmelden('e2e-a@example.org')
+    const token = await neuesToken()
+    // Neben dem Eintrag „nicht frei“ aus p12f5 ein offener Eintrag mit blockiertem Download, damit beide Abzeichen stehen.
+    const pid = await projektId(token, 'E2E P12 Protokoll')
+    await fakeSteuern({ cachesLeeren: true })
+    const bot = await werkzeug(token, 'source_add', { project_id: pid, doi: '10.5555/spur.bot.001' })
+    ok(bot.inhalt.fehler === 'bot_schutz', `bot.001: ${JSON.stringify(bot.inhalt)}`)
+    const pruefen = async (wo, bereich) => {
+      for (const px of [360, 1280]) {
+        await breite(px)
+        await bereich.first().waitFor({ timeout: 20000 })
+        // Knöpfe blenden ihre Farbe beim Freischalten über; gemessen wird erst der ruhende Zustand.
+        await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'), null, { timeout: 5000 }).catch(() => {})
+        const panel = page.locator('.spur-panel').first()
+        ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1), `${wo} läuft über bei ${px} px`)
+        const schlecht = await unlesbar(panel)
+        ok(schlecht.length === 0, `${wo} bei ${px} px schlecht lesbar: ${schlecht.join(' | ')}`)
+        await ohneSeitlichesRollen(`${wo} ${px} px`)
+      }
+      await breite(1280)
+    }
+    for (const thema of ['', 'light-']) {
+      const design = thema ? 'hell' : 'dunkel'
+      await mitDesign(thema, async () => {
+        await projektOeffnen('E2E P12 Quellen')
+        await panelOeffnen('Quellen')
+        await pruefen(`Quellen-Panel ${design}`, page.getByText(/Titel im PDF passt nicht zu den Metadaten/))
+        await panelOeffnen('Recherche')
+        await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+        await pruefen(`Leeres Suchprotokoll ${design}`, page.locator('.spur-panel').getByText(/^Noch keine Suche/))
+        await projektOeffnen('E2E P12 Protokoll')
+        await panelOeffnen('Recherche')
+        await page.getByRole('tab', { name: 'Suchprotokoll' }).click()
+        await pruefen(`Suchprotokoll ${design}`, page.locator('.spur-prisma'))
+        await page.getByRole('tab', { name: 'Beschaffung' }).click()
+        const liste = page.locator('.spur-panel')
+        await liste.getByText('Frei, Download blockiert', { exact: true }).waitFor({ timeout: 20000 })
+        await liste.getByText('Nicht frei verfügbar', { exact: true }).waitFor()
+        await pruefen(`Beschaffung ${design}`, liste.getByRole('link', { name: 'Im Browser herunterladen' }))
+      })
+    }
   }
 
   // Anteil dunkler Pixel einer Seite aus page_image; eine leere Seite hat fast keine.

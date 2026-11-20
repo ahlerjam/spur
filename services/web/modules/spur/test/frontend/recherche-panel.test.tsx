@@ -134,14 +134,52 @@ describe('Recherche-Panel', function () {
 
   it('listet das Suchprotokoll und bietet den Export an', async function () {
     fetchMock.get(PROTOKOLL, {
-      eintraege: [{ datum: '2026-11-08T10:00:00.000Z', dienst: 'OpenAlex', anfrage: 'sleep', treffer: 25 }],
-      gesamt: 1,
+      eintraege: [
+        {
+          zeit: '2026-11-16T10:05:00.000Z',
+          anfrage: 'slow-wave sleep',
+          seite: 1,
+          filter: null,
+          dienste: [
+            { dienst: 'OpenAlex', status: 'geantwortet', treffer: 2, versuche: 1 },
+            { dienst: 'Semantic Scholar', status: 'gedrosselt', treffer: 0, versuche: 3 },
+            { dienst: 'Crossref', status: 'nicht_erreichbar', treffer: 0, versuche: 1 },
+          ],
+          treffer: 2,
+          dubletten: 1,
+        },
+        // Ein Eintrag von vor P12: je Dienst gespeichert, ohne Dubletten.
+        { zeit: '2026-11-08T10:00:00.000Z', anfrage: 'sleep', seite: 0, filter: null, dienste: [{ dienst: 'OpenAlex', status: 'geantwortet', treffer: 25 }], treffer: 25, dubletten: null },
+      ],
+      gesamt: 2,
       weiter: false,
+      prisma: {
+        identifiziert: 9,
+        identifiziert_nach_dienst: { OpenAlex: 7, 'Semantic Scholar': 2 },
+        dubletten: 2,
+        gesichtet: 7,
+        aufgenommen: 2,
+        ausgeschlossen: { gesamt: 3, nach_grund: { 'falsche Population': 2, 'kein empirischer Beitrag': 1 } },
+        nicht_beschaffbar: { nicht_frei: 1 },
+        offen: 1,
+      },
     })
     render(<RecherchePanel />, { wrapper: EditorProviders })
     fireEvent.click(screen.getByRole('tab', { name: 'Suchprotokoll' }))
-    await screen.findByText('sleep')
-    screen.getByText('OpenAlex · 25 Treffer ·', { exact: false })
+    // Die Teile der Summenzeile stehen in eigenen Elementen, damit Zahl und Begriff nicht auseinanderbrechen.
+    const summe = await screen.findByText((_, el) => el?.classList.contains('spur-prisma-zeile') ?? false)
+    expect(summe.textContent).to.equal('9 identifiziert, 2 Dubletten, 7 gesichtet, 2 aufgenommen, 3 ausgeschlossen, 1 nicht beschaffbar, 1 offen')
+    screen.getByText('Ausgeschlossen nach Grund: falsche Population (2), kein empirischer Beitrag (1)')
+    screen.getByText('Nicht beschaffbar: nicht frei verfügbar (1)')
+    const neu = screen.getByText('slow-wave sleep').closest('li')!
+    expect(neu.textContent).to.contain('Seite 2 · 2 Treffer · 1 Dublette ·')
+    expect(neu.textContent).to.contain('OpenAlex: 2 Treffer')
+    expect(neu.textContent).to.contain('Semantic Scholar: gedrosselt · 3 Versuche')
+    expect(neu.textContent).to.contain('Crossref: nicht erreichbar')
+    const alt = screen.getByText('sleep').closest('li')!
+    expect(alt.textContent).to.contain('Seite 1 · 25 Treffer ·')
+    expect(alt.textContent).not.to.contain('Dublette')
+    expect(alt.textContent).to.contain('OpenAlex: 25 Treffer')
     const link = screen.getByRole('link', { name: 'Protokoll exportieren' })
     expect(link.getAttribute('href')).to.match(/\/recherche\/protokoll\.csv$/)
   })
@@ -150,7 +188,7 @@ describe('Recherche-Panel', function () {
     fetchMock.get(PROTOKOLL, { eintraege: [], gesamt: 0, weiter: false })
     render(<RecherchePanel />, { wrapper: EditorProviders })
     fireEvent.click(screen.getByRole('tab', { name: 'Suchprotokoll' }))
-    await screen.findByText('Noch keine Suchen protokolliert')
+    await screen.findByText('Noch keine Suche', { exact: false })
   })
 
   it('nimmt einen freien Treffer auf und meldet eine Dublette als „Bereits vorhanden“', async function () {

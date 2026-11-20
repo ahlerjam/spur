@@ -15,6 +15,9 @@ export type Quelle = {
   fassung: string
   versatz: number | null
   nurProjekt?: boolean
+  lizenz?: string | null
+  werkart?: 'thesis' | 'report' | 'working_paper' | 'book' | 'misc' | null
+  titelabgleich?: 'passt' | 'abweichend' | 'nicht_pruefbar' | null
   versatzQuelle: 'pagelabels' | 'bestaetigt' | null
   ocr: {
     status: 'laeuft' | 'fertig' | 'fehler' | 'abgebrochen'

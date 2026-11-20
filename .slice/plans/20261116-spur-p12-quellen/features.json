@@ -14,7 +14,7 @@
         "Dasselbe falsche PDF per Einmal-Link mit `--doi 10.5555/spur.oa.005` hochgeladen: Die Quelle entsteht mit `titelabgleich: \"abweichend\"`; die Antwort und das Quellen-Panel zeigen „Titel im PDF passt nicht zu den Metadaten“",
         "Ein PDF ohne Textebene (reiner Scan) mit richtiger DOI hochgeladen: `titelabgleich: \"nicht_pruefbar\"`, kein Hinweis; ein richtiges PDF mit vorangestelltem Deckblatt des Repositoriums (Titel erst auf Seite 2) ergibt `passt`"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
@@ -29,7 +29,7 @@
         "Ein zweites `source_add` mit `10.5555/spur.bot.001` legt keinen zweiten Eintrag auf der Liste an",
         "Nach einem Upload über `spur-hochladen <link> datei.pdf --doi 10.5555/spur.bot.001` ist der Eintrag auf der Liste erledigt und die Quelle vorhanden"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
@@ -42,7 +42,7 @@
         "Antwortet OpenAlex einmal mit 503 ohne `Retry-After`, wird nach etwa 1 s erneut gefragt und der Dienst steht als `geantwortet`",
         "`paper_citations` verhält sich bei denselben Störungen genauso"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f4",
@@ -58,7 +58,7 @@
         "`spur-hochladen <link> report.pdf --titel \"AI at Work\" --autoren \"Meyer, Jana; Okafor, Chidi\" --jahr 2023 --art report --institution \"OECD\"` gibt `Quelle <id>` aus; die `.bib` hat danach einen Eintrag `@report{meyer2023,` mit beiden Autoren in dieser Reihenfolge",
         "Im Quellen-Panel stehen beide Quellen mit Titel, Autoren und der Art („Abschlussarbeit“, „Report“)"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     },
     {
@@ -75,7 +75,7 @@
         "Ein Konto ohne Zugriff auf das Projekt bekommt von `search_log` 403",
         "Die Werkzeugbeschreibungen von `search_log` und `paper_exclude` und `docs/mcp-contract.md` erklären die Felder und die Gleichung"
       ],
-      "passes": false,
+      "passes": true,
       "ui": true
     }
   ]

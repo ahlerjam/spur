@@ -817,6 +817,15 @@ $spur-sm: 575.98px;
   }
 }
 
+.spur-zeile-warnung {
+  color: var(--content-warning-themed);
+
+  .material-symbols {
+    font-size: 1.1em;
+    vertical-align: text-bottom;
+  }
+}
+
 .spur-lauf-hinweis {
   margin: var(--spacing-03) 0 0;
   color: var(--content-warning-themed);
@@ -972,10 +981,49 @@ $spur-sm: 575.98px;
   }
 }
 
+.spur-prisma {
+  padding: var(--spacing-03) 0;
+  border-bottom: 1px solid var(--border-divider-themed);
+}
+
+.spur-prisma-zeile {
+  margin: 0 0 var(--spacing-02);
+  font-weight: 600;
+}
+
+// Zahl und Begriff einer Summe brechen nicht auseinander.
+.spur-prisma-teil {
+  white-space: nowrap;
+}
+
+// Die Dienste einer Anfrage als eine fließende Zeile statt vier gleicher Zeilen; umbrochen wird nur zwischen Diensten.
+.spur-protokoll-dienste {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.35em;
+  margin: var(--spacing-01) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-02);
+  color: var(--content-secondary-themed);
+
+  li {
+    white-space: nowrap;
+  }
+
+  li + li::before {
+    content: '· ';
+  }
+}
+
+// Untereinander, falls es zwei Links gibt (im Browser laden, in der Bibliothek holen).
 .spur-bibliothek-link {
-  display: inline-block;
+  display: block;
+  width: fit-content;
   margin-top: var(--spacing-02);
   font-size: var(--font-size-02);
+  // Wie bei .spur-paper-doi: im dunklen Panel die Linkfarbe des Editors.
+  color: var(--link-ui-themed);
 }
 
 .spur-import-teil + .spur-import-teil {

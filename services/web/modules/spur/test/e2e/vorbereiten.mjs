@@ -27,6 +27,7 @@ import {
   drossel,
   paperCache,
   suchprotokoll,
+  suchtreffer,
   vorschlaege,
   workflows,
 } from '../../app/src/sammlungen.mjs'
@@ -460,7 +461,7 @@ Text davor.
 Platzhalter.
 \end{document}`,
   })
-  for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll]) {
+  for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll, suchtreffer]) {
     await (await sammlung()).deleteMany({})
   }
   await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))
@@ -569,6 +570,8 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await neuAnlegen(a, 'E2E P6 Zahlen', { 'main.tex': LEER, 'quellen.bib': '@article{p6,\n  title = {Zahlen}\n}\n' })
   await grenzenVorbereiten()
   await p8Vorbereiten(a)
+  // P12: Ausweichwege, Bot-Schutz, Quellen ohne DOI und das Suchprotokoll.
+  for (const name of ['E2E P12 Quellen', 'E2E P12 Status', 'E2E P12 Ohne DOI', 'E2E P12 Protokoll']) await neuAnlegen(a, name, { 'main.tex': LEER })
 }
 
 const CARLITO = String.raw`\documentclass{article}
