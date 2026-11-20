@@ -86,6 +86,15 @@ describe('anlegen', () => {
     expect(lauf.angelegt).toEqual([{ art: 'datei', pfad: 'abbildungen/diagramm.png', ordner: 'abbildungen' }])
   })
 
+  it('merkt die Datei am Lauf vor dem Schreiben, damit „Lauf rückgängig“ sie auch nach einem Fehler findet', async () => {
+    const reihenfolge = []
+    const { default: EditorController } = await import('../../../../app/src/Features/Editor/EditorController.mjs')
+    EditorController.promises.upsertFileWithPath.mockImplementationOnce(async () => reihenfolge.push('schreiben'))
+    lauf.angelegt = { push: () => reihenfolge.push('merken') }
+    await anlegen('a.png', PNG)
+    expect(reihenfolge).toEqual(['merken', 'schreiben'])
+  })
+
   it('verbucht einen vorhandenen Ordner nicht', async () => {
     await anlegen('abbildungen/a.png', PNG)
     await anlegen('abbildungen/b.jpg', JPG)

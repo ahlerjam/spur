@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
-import { ocrSeite, seitenBild, seitenTexte, textEbene, textEbeneAuswerten, tsvAuswerten, versatzAusLabels, versatzAusSeitentext, vttSeiten } from '../../app/src/pdf.mjs'
+import { ausschnittBild, ocrSeite, seitenBild, seitenTexte, textEbene, textEbeneAuswerten, tsvAuswerten, versatzAusLabels, versatzAusSeitentext, vttSeiten } from '../../app/src/pdf.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 
 const fixture = name => fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url))
@@ -91,6 +91,14 @@ describe('seitenBild', () => {
     const [breite, hoehe] = [png.readUInt32BE(16), png.readUInt32BE(20)]
     expect(hoehe).toBe(1600)
     expect(breite).toBeLessThan(1600)
+  })
+})
+
+describe('ausschnittBild', () => {
+  it('rendert auch einen sehr schmalen Ausschnitt mindestens 1 px breit, nie die Restseite', async () => {
+    const { readFileSync } = await import('node:fs')
+    const png = readFileSync(await ausschnittBild(fixture('smith2024.pdf'), 4, join(ordner, 'schmal'), { x: 0.1, y: 0.1, breite: 0.0001, hoehe: 0.5 }))
+    expect(png.readUInt32BE(16)).toBe(1)
   })
 })
 

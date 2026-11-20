@@ -74,14 +74,16 @@ async function ablegen({ projectId, menschId, botId, pfad, datei, groesse, pfade
   if (danach > maxEintraege()) {
     throw new Problem(422, 'projekt_zu_viele_dateien', 'spur_fehler_projektdatei_zu_viele', { anzahl: danach, grenze: maxEintraege() })
   }
+  // Erst am Lauf vermerken, dann schreiben: Eine Datei ohne Lauf nähme „Lauf rückgängig“ nie zurück; ein Eintrag
+  // ohne Datei übergeht es.
+  const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
+  await LaufManager.angelegtMerken(lauf, [{ art: 'datei', pfad, ...(ordner && { ordner }) }])
   const freigeben = await Speicher.reservieren(projectId, groesse)
   try {
     await EditorController.promises.upsertFileWithPath(projectId, `/${pfad}`, datei, null, 'spur', menschId)
   } finally {
     await freigeben()
   }
-  const lauf = await LaufManager.laufFuerSchreiben(projectId, botId)
-  await LaufManager.angelegtMerken(lauf, [{ art: 'datei', pfad, ...(ordner && { ordner }) }])
   return { pfad }
 }
 

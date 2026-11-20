@@ -121,13 +121,22 @@ async function angelegtEntfernen(projectId, lauf, userId) {
     await pfadEntfernen(projectId, eintrag.pfad, userId)
     if (eintrag.paket) await paketEntfernt(projectId, eintrag.paket)
   }
-  // Ordner, die erst der Lauf angelegt hat (etwa abbildungen/), nur wenn niemand etwas hineingelegt hat.
-  const ordner = (lauf.angelegt ?? []).map(e => e.ordner).filter(Boolean)
-  if (ordner.length) {
+  // Ordner, die erst der Lauf angelegt hat (etwa abbildungen/kap1/), von innen nach außen und nur, wenn niemand
+  // etwas hineingelegt hat. `ordner` ist der oberste neue Ordner, die darunter liegen auf dem Weg zur Datei.
+  const neueOrdner = new Set()
+  for (const { pfad, ordner } of lauf.angelegt ?? []) {
+    if (!ordner) continue
+    for (let o = pfad.slice(0, pfad.lastIndexOf('/')); o.length >= ordner.length; o = o.slice(0, Math.max(0, o.lastIndexOf('/')))) {
+      neueOrdner.add(o)
+    }
+  }
+  if (neueOrdner.size) {
     const { docs, files, folders } = await ProjectEntityHandler.promises.getAllEntities(projectId)
-    const pfade = [...docs, ...files, ...folders].map(e => e.path)
-    for (const o of ordner) {
-      if (!pfade.some(p => p.startsWith(`/${o}/`))) await pfadEntfernen(projectId, o, userId)
+    const pfade = new Set([...docs, ...files, ...folders].map(e => e.path))
+    for (const o of [...neueOrdner].sort((a, b) => b.length - a.length)) {
+      if ([...pfade].some(p => p.startsWith(`/${o}/`))) continue
+      await pfadEntfernen(projectId, o, userId)
+      pfade.delete(`/${o}`)
     }
   }
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { angelegt: [] } })

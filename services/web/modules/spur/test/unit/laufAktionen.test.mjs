@@ -409,6 +409,14 @@ describe('zuruecknehmen', () => {
     expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf'])
   })
 
+  it('entfernt auch verschachtelte neue Ordner, von innen nach außen (Code-Review)', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'owner' })
+    restOrdner = ['/', '/abbildungen', '/abbildungen/kap1']
+    const angelegt = [{ art: 'datei', pfad: 'abbildungen/kap1/bild.png', ordner: 'abbildungen' }]
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/kap1/bild.png', '/abbildungen/kap1', '/abbildungen'])
+  })
+
   it('übergeht schon gelöschte Dateien', async () => {
     recht.vergeben(anna, projekt, { stufe: 'owner' })
     vi.resetModules()
