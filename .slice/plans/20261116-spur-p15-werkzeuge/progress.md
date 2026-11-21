@@ -49,6 +49,8 @@
 - Nachtrag nach der Zielprüfung: Die Stand-Zeile der Laufkarte erscheint nur noch, wenn etwas automatisch angenommen ist oder offen steht. Vorher zeigte ein zurückgenommener Lauf „0 automatisch angenommen, 0 offen“ (Taste-Befund, Frontend-Test zuerst).
 - Endstand (letzter Code-Commit `fd2dffe`): `spur-dev upstream web` mit heruntergefahrenem Stack: bestanden 6414, fehlgeschlagen 173, bekannt 173, neu 0. `spur-dev upstream frontend`: 1805 bestanden, 14 bekannt, 1 neu in `share-project-modal.test.tsx` (Overleaf-Code, von P15 nicht berührt); einzeln wiederholt 53 bestanden, 0 neu, also flaky. Gesamtlauf E2E 126 von 126 ok.
 - Ansichten auf `fd2dffe`, je 1280 und 360 px, alle ohne Überlauf und ohne Konsolenfehler: Laufkarte mit offenem Lauf (angelegte Abbildung, „0 automatisch angenommen, 1 offen“), angenommener Lauf aus f5 („2 automatisch angenommen, 0 offen“), zurückgenommener Massenersatz aus f4 (ohne Stand-Zeile, alle 12 `blue!20` wieder im Text).
+- Vollständige Frontend-Suite auf `fd2dffe` wiederholt: bestanden 1806, fehlgeschlagen 14, bekannt 14, neu 0 (der vorherige Treffer in `share-project-modal.test.tsx` war flaky).
+- Ansichten: P15 ändert im Browser nur die Laufkarte (Stand-Zeile, angelegte Bilddateien in der vorhandenen Liste). Alle übrigen P15-Änderungen sind MCP-Werkzeuge ohne Oberfläche; die drei Kartenzustände oben decken die Ansichten des Plans ab.
 
 ## Recipe changes
 - `spur-dev upstream web` nur bei heruntergefahrenem Stack (`spur-dev down`) laufen lassen; mit laufendem Stack und gleichzeitigem Build bricht vitest still ab.
