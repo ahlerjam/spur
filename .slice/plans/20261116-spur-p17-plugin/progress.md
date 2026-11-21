@@ -40,6 +40,8 @@
 - Erster Gesamtlauf (je Feature ein frischer Browser): `p8f11` rot, weil der Vertragstest nach `/simplify` `werkzeuge.mjs` nicht mehr nannte; behoben (`634e9f439d`). `p12ansicht` und `p13ansicht` rot, weil sie auf Daten früherer Schritte ihres Plans bauen und das Startskript vor jedem Feature zurücksetzte; zusammen in einem Browser 13 von 13 ok.
 - Letzter Gesamtlauf nach der letzten Änderung (`634e9f439d`), je Plan in einem Browser mit einem Zurücksetzen vorab, 22 min: 122 von 125 ok, alle acht `p17f*` ok. Rot nur `p4f1` und `p7f1` (öffnen einen zweiten Browser-Kontext, den Chromium im Single-Process-Modus nicht anlegen kann; das Startskript gibt jetzt jedem weiteren Kontext eine eigene Instanz, danach beide ok) und `p6f10` (prüft Links auf github.com und andere Seiten; die Sandbox löst keine fremden Namen auf). Keiner der drei berührt Code von P17; in P16 liefen sie mit dem Playwright-MCP grün.
 
+- Schlusslauf nach der letzten Änderung (`0f5563bd92`), je Plan in einem Browser, jeder weitere Browser-Kontext als eigene Instanz, 22 min: 124 von 125 ok, alle acht `p17f*` ok, auch `p4f1` und `p7f1`. Rot nur `p6f10`: Er prüft Links der README auf github.com, jira.mongodb.org und caddyserver.com, und die Sandbox löst fremde Namen nicht auf (`getaddrinfo ENOTFOUND`). P17 ändert diese Links nicht.
+
 ## Needs decision
 - f1: Die Einstellungsseite „Claude verbinden“ (`claude-verbinden.tsx`) zeigt drei Schritte ohne die Marketplaces `cflow` und `claude-plugins-official`. Mit den neuen Abhängigkeiten lädt das Plugin nach diesen Schritten nicht (Doku: plugins/dependencies).
   Interim: README nennt die zwei Marketplaces vor spur; die Seite bleibt unverändert (Ansicht außerhalb des Plans).
