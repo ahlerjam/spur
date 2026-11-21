@@ -602,6 +602,8 @@ async function p15Vorbereiten(a) {
   await quelleAusFixture(stand._id, a._id, 'smith2024.pdf')
   await neuAnlegen(a, 'E2E P15 Nur Antwort', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E P15 TeX', { 'main.tex': LEER })
+  // P17: Die E2E schreibt die Beispiele aus dem Skill spur-abbildungen hinein und kompiliert sie.
+  await neuAnlegen(a, 'E2E P17 Abbildungen', { 'main.tex': LEER })
   const b = await konto('e2e-p15b@example.org')
   const fremd = await neuAnlegen(b, 'E2E P15 Fremd', { 'main.tex': LEER })
   await quelleAusFixture(fremd._id, b._id, 'smith2024.pdf')

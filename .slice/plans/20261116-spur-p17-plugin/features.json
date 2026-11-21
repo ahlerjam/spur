@@ -10,7 +10,7 @@
         "Die README beschreibt die Installation in dieser Reihenfolge: `claude plugin marketplace add ahlerjam/cflow`, Marketplace der offiziellen Plugins, Marketplace von spur, `claude plugin install spur@spur`; dazu den Satz, dass ohne die beiden Marketplaces das Plugin nicht lädt, und wie man das an `claude plugin list` erkennt",
         "Die README enthält die Checkliste „Nach der Installation prüfen“ mit sieben Schritten für die Handprüfung (Abhängigkeiten sichtbar, Agenten sichtbar, Hook hält `run_finish` auf, Kette läuft durch, Humanizer läuft, Abbildungsregeln greifen, Browser-Download)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f2",

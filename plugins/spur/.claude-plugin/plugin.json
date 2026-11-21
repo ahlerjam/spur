@@ -1,7 +1,24 @@
 {
   "name": "spur",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Verbindet Claude Code mit einer spur-Installation: Quellen lesen, Zitate prüfen, Aufträge aus dem Browser annehmen.",
+  "author": {
+    "name": "ahlerjam"
+  },
+  "dependencies": [
+    {
+      "name": "humanizer",
+      "marketplace": "cflow"
+    },
+    {
+      "name": "humanizer-de",
+      "marketplace": "cflow"
+    },
+    {
+      "name": "playwright",
+      "marketplace": "claude-plugins-official"
+    }
+  ],
   "userConfig": {
     "server_url": {
       "type": "string",

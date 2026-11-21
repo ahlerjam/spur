@@ -63,6 +63,14 @@ jobs:
       - name: Unit-Tests
         if: ${{ needs.changes.outputs.test != 'leicht' }}
         run: spur-dev test
+      # Repo-Prüfungen, Plugin-Skripte und Hooks; dazu das Manifest, die Agenten, Skills und Hooks mit Claude Codes eigener Prüfung.
+      - name: Plugin prüfen
+        if: ${{ needs.changes.outputs.test != 'leicht' }}
+        run: |
+          node --test tools/tests/*.test.mjs
+          npm install -g --no-audit --no-fund @anthropic-ai/claude-code@2.1.330
+          claude plugin validate plugins/spur --strict
+          claude plugin validate . --strict
       - name: Playwright einrichten
         if: ${{ needs.changes.outputs.test != 'leicht' }}
         working-directory: ${{ runner.temp }}
