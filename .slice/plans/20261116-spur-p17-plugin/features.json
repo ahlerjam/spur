@@ -35,7 +35,7 @@
         "Der Hauptskill `spur` sagt: Die Hauptsession gibt dem Prüfer weder die Auswertung noch ihre eigene Einschätzung mit; bei mehr als 15 Quellen zwei Prüfer mit geteilter Quellenliste; jede `abweichend`- und `nicht_gefunden`-Stelle wird korrigiert oder in der Zusammenfassung begründet offen gelassen",
         "Der Test prüft, dass `gegenpruefung` kein schreibendes Werkzeug und kein Werkzeug zum Starten von Agenten in `tools` hat"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f4",
