@@ -51,6 +51,14 @@ before(async () => {
         if (doi === '10.1234/fake.zu') {
           return json(res, 200, { best_oa_location: null, oa_locations: [] })
         }
+        // P17: Adressen aus der Antwort sind fremde Daten: kein file://, keine curl-Muster wie [1-3].
+        if (doi === '10.1234/fake.datei') {
+          writeFileSync(join(arbeit, 'geheim.pdf'), PDF)
+          return json(res, 200, { oa_locations: [{ host_type: 'repository', url_for_pdf: `file://${join(arbeit, 'geheim.pdf')}` }] })
+        }
+        if (doi === '10.1234/fake.muster') {
+          return json(res, 200, { oa_locations: [{ host_type: 'repository', url_for_pdf: `${basis}/verlag/[1-3].pdf` }] })
+        }
         // P17: Der Verlag liefert HTML (Bot-Schutz), das Repositorium das PDF; Unpaywall nennt den Verlag zuerst.
         if (doi === '10.1234/fake.repo') {
           const verlag = { host_type: 'publisher', url_for_pdf: `${basis}/verlag/seite.html`, license: null }
@@ -218,6 +226,15 @@ test('spur-pdf-holen holt das PDF aus Europe PMC, wenn Unpaywall keinen Fundort 
   assert.equal(r.status, 0, r.stderr)
   assert.equal(r.stdout, 'ziel/10.1234_fake.pmc.pdf\n')
   assert.ok(anfragen.includes('GET /pmc/c.pdf'), anfragen.join(', '))
+})
+
+test('spur-pdf-holen lädt keine file://-Adressen und wertet keine curl-Muster aus (P17)', async () => {
+  const datei = await laufAsync('spur-pdf-holen', ['10.1234/fake.datei', 'ziel'])
+  assert.notEqual(datei.status, 0)
+  assert.deepEqual(readdirSync(join(arbeit, 'ziel')), [])
+  const muster = await laufAsync('spur-pdf-holen', ['10.1234/fake.muster', 'ziel'])
+  assert.notEqual(muster.status, 0)
+  assert.deepEqual(anfragen.filter(a => a.startsWith('GET /verlag/')), ['GET /verlag/[1-3].pdf'])
 })
 
 test('spur-pdf-holen fragt Europe PMC mit vollständig kodierter DOI (P17)', async () => {

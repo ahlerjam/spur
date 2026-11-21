@@ -47,11 +47,14 @@ datei="${ziel%/}/$name.pdf"
 tmp=$(mktemp "${ziel%/}/.spur-pdf.XXXXXX") || { echo "Keine temporäre Datei im Zielordner" >&2; exit 1; }
 trap 'rm -f "$tmp"' EXIT
 
+# Adressen kommen aus fremden Antworten: nur http(s), auch bei Weiterleitungen, keine curl-Muster wie [1-9] oder {a,b}.
+netz=(-sS -f -g --proto '=https,http' --proto-redir '=https,http' --connect-timeout 20 -A "spur-pdf-holen")
+
 # Gibt 0 zurück, wenn die Datei geladen wurde und mit %PDF- beginnt.
 # Setzt $fehler auf "keine PDF-Datei" bzw. die Ursache des Abbruchs.
 laden() {
   fehler=
-  if ! curl -sSL -f --connect-timeout 20 --max-time 120 -A "spur-pdf-holen" -o "$tmp" -- "$1" 2>/dev/null; then
+  if ! curl "${netz[@]}" -L --max-time 120 --max-filesize 52428800 -o "$tmp" -- "$1" 2>/dev/null; then
     fehler="Download fehlgeschlagen"
     return 1
   fi
@@ -111,13 +114,13 @@ versuchen() {
 }
 
 # Unpaywall: alle freien Fundorte, Repositorien zuerst, denn Verlagsseiten weisen Skripte öfter ab.
-if antwort=$(curl -sS -f --max-time 60 -A "spur-pdf-holen" "$unpaywall/v2/$doi_url?email=$mail" 2>/dev/null); then
+if antwort=$(curl "${netz[@]}" --max-time 60 "$unpaywall/v2/$doi_url?email=$mail" 2>/dev/null); then
   versuchen "$(printf '%s' "$antwort" | werte url_for_pdf '"host_type": *"repository"')"
   versuchen "$(printf '%s' "$antwort" | werte url_for_pdf)"
 fi
 # Danach Europe PMC: das offene PDF aus der Volltextliste zur DOI.
 # Die DOI in Anführungszeichen: Klammern, ; oder < in einer DOI sind sonst Suchsyntax.
-if antwort=$(curl -sS -f -G --max-time 60 -A "spur-pdf-holen" --data-urlencode "query=DOI:\"$doi\"" \
+if antwort=$(curl "${netz[@]}" -G --max-time 60 --data-urlencode "query=DOI:\"$doi\"" \
     --data-urlencode format=json --data-urlencode resultType=core "$europepmc/webservices/rest/search" 2>/dev/null); then
   versuchen "$(printf '%s' "$antwort" | werte url '"availabilityCode": *"OA"' '"documentStyle": *"pdf"')"
 fi
