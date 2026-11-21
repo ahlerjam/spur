@@ -31,10 +31,19 @@
 - E2E im Lauf: Kein Playwright-MCP im Lauf, Chromium startet in der Sandbox nur mit `--single-process` und stürzt in langen Läufen ab. Ein Startskript (nicht im Repo) startet deshalb je Feature einen frischen Browser; die Suite setzt die Daten vor jedem Feature selbst zurück.
 - `mwe` (Beispielbilder) fehlt im Image; `p17f5` ersetzt in den Teilabbildungen `\includegraphics` durch graue TikZ-Rechtecke, Ausrichtung und Höhe bleiben die aus dem Skill.
 
+- Overleafs web-Suite (`spur-dev upstream web`, Stack vorher heruntergefahren, danach wieder hochgefahren): bestanden 6417, fehlgeschlagen 173, bekannt 173, neu 0.
+- `spur-dev test`: grün, 94,6 % Zeilen. `node --test tools/tests/*.test.mjs`: 122 grün. `claude plugin validate plugins/spur --strict` und `claude plugin validate . --strict`: „Validation passed“.
+- Erster Gesamtlauf (je Feature ein frischer Browser): `p8f11` rot, weil der Vertragstest nach `/simplify` `werkzeuge.mjs` nicht mehr nannte; behoben (`634e9f439d`). `p12ansicht` und `p13ansicht` rot, weil sie auf Daten früherer Schritte ihres Plans bauen und das Startskript vor jedem Feature zurücksetzte; zusammen in einem Browser 13 von 13 ok.
+- Letzter Gesamtlauf nach der letzten Änderung (`634e9f439d`), je Plan in einem Browser mit einem Zurücksetzen vorab, 22 min: 122 von 125 ok, alle acht `p17f*` ok. Rot nur `p4f1` und `p7f1` (öffnen einen zweiten Browser-Kontext, den Chromium im Single-Process-Modus nicht anlegen kann; nachgestellt mit einem leeren Kontext auf `/status`) und `p6f10` (prüft Links auf github.com und andere Seiten; die Sandbox löst keine fremden Namen auf). Keiner der drei berührt Code von P17; in P16 liefen sie mit dem Playwright-MCP grün.
+
 ## Needs decision
 - f1: Die Einstellungsseite „Claude verbinden“ (`claude-verbinden.tsx`) zeigt drei Schritte ohne die Marketplaces `cflow` und `claude-plugins-official`. Mit den neuen Abhängigkeiten lädt das Plugin nach diesen Schritten nicht (Doku: plugins/dependencies).
   Interim: README nennt die zwei Marketplaces vor spur; die Seite bleibt unverändert (Ansicht außerhalb des Plans).
   Options: A (empfohlen) Schritt 1 der Seite um die zwei `marketplace add`-Befehle ergänzen, Texte de/en | B Abhängigkeiten nur empfehlen (nicht in `plugin.json`), Seite bleibt
+
+## Recipe changes
+- Ohne Playwright-MCP im Lauf: Chromium startet in der Seatbelt-Sandbox nur mit `--single-process --no-zygote --no-sandbox --disable-gpu` und kann dann keinen zweiten Browser-Kontext öffnen (`p4f1`, `p7f1`). Ein Startskript (nicht im Repo) lädt `spur-e2e.js` wie `run.mjs`, mit diesen Optionen, je Plan in einem Browser. Für einen vollständigen Lauf braucht der Builder das Playwright-MCP oder einen Browser außerhalb der Sandbox.
+- `spur-dev` nur als alleinstehender Aufruf: Mit Umleitung (`> datei`) meldet es „Docker läuft nicht“.
 
 ## Vorschläge
 - Kein MCP-Werkzeug listet die Beschaffungsliste; der Skill `spur-pdf-holen` nimmt die `bot_schutz`-Fälle aus den Antworten von `source_add` oder fragt die Person. Ein lesendes `acquisition_list` (paginiert) würde das schließen.
