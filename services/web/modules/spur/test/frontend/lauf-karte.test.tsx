@@ -98,10 +98,10 @@ describe('Lauf-Karte', function () {
     expect(screen.getByText('2 automatisch angenommen, 1 offen')).to.exist
   })
 
-  it('zeigt den Stand nicht, solange der Lauf nichts geändert hat', function () {
+  it('zeigt den Stand nicht, wenn nichts automatisch angenommen ist und nichts offen steht', function () {
     render(
       <LaufKarte
-        lauf={{ ...lauf, aenderungen: 0, stand: { gesamt: 0, automatisch_angenommen: 0, offen: 0, rot: 0 } }}
+        lauf={{ ...lauf, status: 'zurueckgenommen', aenderungen: 12, stand: { gesamt: 12, automatisch_angenommen: 0, offen: 0, rot: 0 } }}
         aenderungen={[]}
         neuLaden={async () => {}}
       />,

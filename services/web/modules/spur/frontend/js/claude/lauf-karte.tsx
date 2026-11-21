@@ -152,7 +152,7 @@ export default function LaufKarte({
           <p className="spur-zeile-meta">
             {t('spur_lauf_umfang', { dateien: lauf.dateien, anzahl: lauf.aenderungen })}
           </p>
-          {lauf.stand && lauf.stand.gesamt > 0 && (
+          {lauf.stand && lauf.stand.automatisch_angenommen + lauf.stand.offen > 0 && (
             <p className="spur-zeile-meta spur-lauf-stand">
               {t('spur_lauf_stand', { automatisch: lauf.stand.automatisch_angenommen, offen: lauf.stand.offen })}
             </p>
