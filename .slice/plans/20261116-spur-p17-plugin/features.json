@@ -50,7 +50,7 @@
         "Der Skill `spur-endpruefung` listet die Prüfungen am Quelltext einzeln: doppelt maskierte Zitierbefehle (`\\textbackslash{}cite` und Varianten), `cleveref` vor `hyperref`, `biblatex` zusammen mit `natbib`, `\\label` in `figure` oder `table` ohne Verweis, Reihenfolge der Abbildungen und Tabellen gegen die erste Nennung; je Befund Datei und Zeile, Labels von Abschnitten und Gleichungen ausdrücklich ausgenommen",
         "Der Hauptskill `spur` nennt die Obergrenze: je Stufe höchstens eine Nachprüfung durch einen frischen Agenten, nur für die korrigierten Stellen; keine dritte Runde; Verbleibendes steht mit Ort und Grund unter „offen“ in der Zusammenfassung. Die nummerierte Kette enthält die beiden Nachprüfungen als eingeklammerte Schritte"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f5",
