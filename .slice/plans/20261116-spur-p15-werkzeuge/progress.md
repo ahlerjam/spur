@@ -44,6 +44,8 @@
 - Gesamtlauf E2E nach der letzten Änderung (Commit `ffd97b3`): 126 von 126 ok (f1 … p15f6), kein Feature übersprungen. Davor war `p5f8` rot, weil Vertrag und Plugin-Skill „0–1“ mit Gedankenstrich schrieben; behoben.
 - Unit-Gate: `spur-dev test` grün (94,68 % Zeilen), `node --test tools/tests/*.test.mjs` 82 grün.
 - Ansicht (taste): P15 baut keine neue Ansicht, nur eine Zeile in der bestehenden Laufkarte („0 automatisch angenommen, 1 offen“) in deren Meta-Stil (`spur-zeile-meta`, keine neue Farbe, keine neue Schrift); die Karte listet angelegte Bilddateien wie TeX-Pakete. Screenshots bei 1280 und 360 px (Projekt „E2E P15 Abbildungen“ mit neuem Lauf: Ausschnitt aus offen2023 plus offene Änderung mit `\includegraphics` und der fertigen Quellenangabe; das PDF zeigt die Abbildung mit Bildunterschrift „Aus offen2023, S. 3, Lizenz CC BY.“). Kein horizontales Rollen (`scrollWidth` = Fensterbreite), keine Tells aus der Liste. Bewusst nicht: keine eigene Farbe für automatisch angenommen; die Zahl steht in Worten, die Karte trägt schon zwei Abzeichen.
+- Sicherheitsprüfung auf der formalen Plan-Basis `0ad7efe9e5..HEAD` (Unteragent, Server-Code, CI, Image): keine Befunde mit hoher Konfidenz.
+- Endstand (letzter Code-Commit `ddd2cfe`): `spur-dev test` grün (94,6 % Zeilen), `node --test tools/tests/*.test.mjs` 82 grün, Gesamtlauf E2E 126 von 126 ok. Die Screenshots (Laufkarte, 360 und 1280 px) bleiben gültig, `lauf-karte.tsx` hat sich danach nicht geändert.
 
 ## Recipe changes
 - `spur-dev upstream web` nur bei heruntergefahrenem Stack (`spur-dev down`) laufen lassen; mit laufendem Stack und gleichzeitigem Build bricht vitest still ab.
