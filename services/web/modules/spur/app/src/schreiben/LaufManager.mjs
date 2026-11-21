@@ -48,14 +48,20 @@ export async function laufFuerSchreiben(projectId, botId) {
   }
 }
 
-export async function aenderungMerken(lauf, { docId, rot, zahlen = [] }) {
-  const neu = { ...(rot.length && { rot: { $each: rot } }), ...(zahlen.length && { zahlen: { $each: zahlen } }) }
+// anzahl: Ersetzungen eines doc_edit mit alle_vorkommen zählen einzeln. seed: Anfang der IDs seiner Changes; damit
+// zählt laufStand, was davon angenommen ist und was offen.
+export async function aenderungMerken(lauf, { docId, rot, zahlen = [], anzahl = 1, seed }) {
+  const neu = {
+    ...(rot.length && { rot: { $each: rot } }),
+    ...(zahlen.length && { zahlen: { $each: zahlen } }),
+    ...(seed && { bearbeitungen: { seed, anzahl, rot: rot.length > 0 } }),
+  }
   await (await laeufe()).updateOne(
     { _id: lauf._id },
     {
       ...(Object.keys(neu).length ? { $push: neu } : {}),
       $addToSet: { docs: docId },
-      $inc: { aenderungen: 1 },
+      $inc: { aenderungen: anzahl },
     }
   )
 }

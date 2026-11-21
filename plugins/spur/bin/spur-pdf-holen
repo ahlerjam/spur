@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
-# Lädt ein PDF aus legalen freien Quellen (Unpaywall, arXiv). Gibt nur den Dateipfad aus.
+# Lädt ein PDF aus legalen freien Quellen (arXiv, Unpaywall, Europe PMC). Gibt nur den Dateipfad aus.
 set -u
 
 hilfe() {
   cat <<'TXT'
 Aufruf: spur-pdf-holen <DOI> [ziel]
 
-Lädt ein frei verfügbares PDF (Unpaywall, bei arXiv-DOIs direkt arXiv) in den Ordner
-[ziel] (Standard: .) und gibt den Pfad der Datei aus.
+Lädt ein frei verfügbares PDF in den Ordner [ziel] (Standard: .) und gibt den Pfad der
+Datei aus. Bei arXiv-DOIs zuerst arXiv, dann alle freien Fundorte aus Unpaywall
+(Repositorien vor Verlagsseiten), zuletzt Europe PMC.
+
+Exit 0: PDF geladen. Exit 1: keine freie Version gefunden oder Download fehlgeschlagen.
+Exit 2: Aufruf falsch oder keine Mail. Exit 3: keine PDF-Datei, eine Adresse lieferte eine
+Webseite statt des PDFs (oft Bot-Schutz); dann hilft der Browser (Skill spur-pdf-holen).
 
 Umgebung:
   UNPAYWALL_EMAIL        Mail für die Unpaywall-API (sonst git config user.email)
   SPUR_UNPAYWALL_BASE    Standard https://api.unpaywall.org
   SPUR_ARXIV_BASE        Standard https://arxiv.org
+  SPUR_EUROPEPMC_BASE    Standard https://www.ebi.ac.uk/europepmc
 TXT
 }
 
@@ -25,8 +31,10 @@ doi=$1
 ziel=${2:-.}
 unpaywall=${SPUR_UNPAYWALL_BASE:-https://api.unpaywall.org}
 arxiv=${SPUR_ARXIV_BASE:-https://arxiv.org}
+europepmc=${SPUR_EUROPEPMC_BASE:-https://www.ebi.ac.uk/europepmc}
 unpaywall=${unpaywall%/}
 arxiv=${arxiv%/}
+europepmc=${europepmc%/}
 
 doi=${doi#https://doi.org/}
 doi=${doi#http://doi.org/}
@@ -39,11 +47,14 @@ datei="${ziel%/}/$name.pdf"
 tmp=$(mktemp "${ziel%/}/.spur-pdf.XXXXXX") || { echo "Keine temporäre Datei im Zielordner" >&2; exit 1; }
 trap 'rm -f "$tmp"' EXIT
 
+# Adressen kommen aus fremden Antworten: nur http(s), auch bei Weiterleitungen, keine curl-Muster wie [1-9] oder {a,b}.
+netz=(-sS -f -g --proto '=https,http' --proto-redir '=https,http' --connect-timeout 20 -A "spur-pdf-holen")
+
 # Gibt 0 zurück, wenn die Datei geladen wurde und mit %PDF- beginnt.
 # Setzt $fehler auf "keine PDF-Datei" bzw. die Ursache des Abbruchs.
 laden() {
   fehler=
-  if ! curl -sSL -f --max-time 120 -A "spur-pdf-holen" -o "$tmp" -- "$1" 2>/dev/null; then
+  if ! curl "${netz[@]}" -L --max-time 120 --max-filesize 52428800 -o "$tmp" -- "$1" 2>/dev/null; then
     fehler="Download fehlgeschlagen"
     return 1
   fi
@@ -75,24 +86,52 @@ if [ -z "$mail" ]; then
 fi
 
 # Nur Zeichen kodieren, die in einem Pfad oder einer Query stören
-doi_url=$(printf '%s' "$doi" | sed 's/%/%25/g; s/ /%20/g; s/?/%3F/g; s/#/%23/g')
-if ! antwort=$(curl -sS -f --max-time 60 -A "spur-pdf-holen" "$unpaywall/v2/$doi_url?email=$mail" 2>/dev/null); then
-  echo "keine freie Version gefunden (Unpaywall kennt die DOI nicht oder antwortet nicht)" >&2
-  exit 1
+doi_url=$(printf '%s' "$doi" | sed 's/%/%25/g; s/ /%20/g; s/?/%3F/g; s/#/%23/g; s/&/%26/g')
+
+# Werte von <feld> aus den flachen JSON-Objekten {…} auf stdin, die jedes weitere Muster enthalten.
+werte() {
+  local feld=$1 objekte muster
+  shift
+  objekte=$(tr -d '\n' | grep -oE '\{[^{}]*\}')
+  for muster in "$@"; do objekte=$(printf '%s\n' "$objekte" | grep -E "$muster"); done
+  printf '%s\n' "$objekte" | grep -oE "\"$feld\": *\"[^\"]*\"" | sed -E "s/^\"$feld\": *\"//; s/\"\$//" | sed 's/\\u0026/\&/g; s#\\/#/#g'
+}
+
+# Versucht jede Adresse der Liste (eine je Zeile, Dubletten nur einmal) und endet beim ersten PDF.
+gesehen=$'\n'
+html=0
+gruende=
+versuchen() {
+  local url
+  while IFS= read -r url; do
+    [ -n "$url" ] || continue
+    case "$gesehen" in *$'\n'"$url"$'\n'*) continue ;; esac
+    gesehen+="$url"$'\n'
+    laden "$url" && fertig
+    [ "$fehler" = "keine PDF-Datei" ] && html=1
+    gruende+="  $fehler: $url"$'\n'
+  done <<< "$1"
+}
+
+# Unpaywall: alle freien Fundorte, Repositorien zuerst, denn Verlagsseiten weisen Skripte öfter ab.
+if antwort=$(curl "${netz[@]}" --max-time 60 "$unpaywall/v2/$doi_url?email=$mail" 2>/dev/null); then
+  versuchen "$(printf '%s' "$antwort" | werte url_for_pdf '"host_type": *"repository"')"
+  versuchen "$(printf '%s' "$antwort" | werte url_for_pdf)"
 fi
-flach=$(printf '%s' "$antwort" | tr -d '\n')
-best=$(printf '%s' "$flach" | grep -o '"best_oa_location": *{[^}]*}' | head -n 1)
-url=
-for quelle in "$best" "$flach"; do
-  url=$(printf '%s' "$quelle" | grep -o '"url_for_pdf": *"[^"]*"' | head -n 1 | sed 's/^"url_for_pdf": *"//; s/"$//')
-  [ -n "$url" ] && break
-done
-url=$(printf '%s' "$url" | sed 's/\\u0026/\&/g; s#\\/#/#g')
-if [ -z "$url" ]; then
+# Danach Europe PMC: das offene PDF aus der Volltextliste zur DOI.
+# Die DOI in Anführungszeichen: Klammern, ; oder < in einer DOI sind sonst Suchsyntax.
+if antwort=$(curl "${netz[@]}" -G --max-time 60 --data-urlencode "query=DOI:\"$doi\"" \
+    --data-urlencode format=json --data-urlencode resultType=core "$europepmc/webservices/rest/search" 2>/dev/null); then
+  versuchen "$(printf '%s' "$antwort" | werte url '"availabilityCode": *"OA"' '"documentStyle": *"pdf"')"
+fi
+
+if [ -z "$gruende" ]; then
   echo "keine freie Version gefunden" >&2
   exit 1
 fi
-
-laden "$url" && fertig
-echo "${fehler:-Download fehlgeschlagen}: $url" >&2
+if [ "$html" = 1 ]; then
+  printf 'keine PDF-Datei: die freien Adressen liefern eine Webseite statt des PDFs (oft Bot-Schutz).\n%s' "$gruende" >&2
+  exit 3
+fi
+printf 'Download fehlgeschlagen:\n%s' "$gruende" >&2
 exit 1

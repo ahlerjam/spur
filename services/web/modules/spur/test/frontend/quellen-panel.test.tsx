@@ -164,6 +164,56 @@ describe('Quellen-Panel', function () {
     screen.getByText('ohne.pdf')
   })
 
+  it('zeigt die Lizenz und warnt, wenn der Titel im PDF nicht zu den Metadaten passt', async function () {
+    fetchMock.get(QUELLEN, {
+      quellen: [
+        quelle('lind2021', { titel: 'Green open access', lizenz: 'cc-by', titelabgleich: 'passt' }),
+        quelle('abel2018', { titel: 'Dream recall', lizenz: 'cc by-nc', titelabgleich: 'abweichend' }),
+        quelle('scan', { titelabgleich: 'nicht_pruefbar' }),
+      ],
+      gesamt: 3,
+    })
+    zeigen()
+    const zeile = async (name: string) => (await screen.findByRole('button', { name: new RegExp(name) })).closest('li')!
+    expect((await zeile('Green open access')).textContent).to.contain('Lizenz: CC BY')
+    expect((await zeile('Green open access')).textContent).not.to.contain('Titel im PDF')
+    expect((await zeile('Dream recall')).textContent).to.contain('Lizenz: CC BY NC')
+    expect((await zeile('Dream recall')).textContent).to.contain('Titel im PDF passt nicht zu den Metadaten')
+    expect((await zeile('scan.pdf')).textContent).not.to.match(/Titel im PDF|Lizenz/)
+  })
+
+  it('warnt nur bei Autoren, die im PDF fehlen, und nennt unvollständige Metadaten (P13)', async function () {
+    fetchMock.get(QUELLEN, {
+      quellen: [
+        quelle('joshi2024', { titel: 'Replay order', autorenabgleich: 'aus_pdf' }),
+        quelle('gandhi2024', { titel: 'Offline consolidation', autorenabgleich: 'abweichend' }),
+        quelle('notizen', { titel: 'Field notes 2023', metadaten: 'unvollstaendig' }),
+      ],
+      gesamt: 3,
+    })
+    zeigen()
+    const zeile = async (name: string) => (await screen.findByRole('button', { name: new RegExp(name) })).closest('li')!
+    expect((await zeile('Replay order')).textContent).not.to.match(/Autoren im PDF|Metadaten/)
+    expect((await zeile('Offline consolidation')).textContent).to.contain('Autoren im PDF nicht gefunden – bitte prüfen')
+    expect((await zeile('Field notes 2023')).textContent).to.contain('Metadaten unvollständig')
+    expect((await zeile('Field notes 2023')).textContent).not.to.contain('Autoren im PDF')
+  })
+
+  it('nennt bei Quellen ohne DOI die Art des Werks neben Autoren und Jahr', async function () {
+    fetchMock.get(QUELLEN, {
+      quellen: [
+        quelle('virtanen2024', { titel: 'Generative AI adoption', autoren: ['A. Virtanen'], jahr: 2024, werkart: 'thesis' }),
+        quelle('meyer2023', { titel: 'AI at Work', autoren: ['J. Meyer', 'C. Okafor'], jahr: 2023, werkart: 'report' }),
+        quelle('notiz', { titel: 'Notiz', autoren: [], jahr: null, werkart: 'misc' }),
+      ],
+      gesamt: 3,
+    })
+    zeigen()
+    await screen.findByText('A. Virtanen · 2024 · Abschlussarbeit')
+    await screen.findByText('J. Meyer, C. Okafor · 2023 · Report')
+    expect(screen.queryByText(/spur_werkart|Sonstiges/)).to.equal(null)
+  })
+
   it('lädt weitere Quellen nach und nennt den Stand', async function () {
     fetchMock.get(QUELLEN, { quellen: [quelle('a')], gesamt: 3 })
     fetchMock.get(QUELLEN_SEITE_2, { quellen: [quelle('b')], gesamt: 3 })

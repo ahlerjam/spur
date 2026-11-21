@@ -16,6 +16,7 @@ import * as LaufManager from './schreiben/LaufManager.mjs'
 import AuthorizationManager from '../../../../app/src/Features/Authorization/AuthorizationManager.mjs'
 import { Problem, mitProblemen } from './probleme.mjs'
 import * as Recherche from './recherche/Recherche.mjs'
+import * as Suchprotokoll from './recherche/Suchprotokoll.mjs'
 import * as Aufnahme from './recherche/Aufnahme.mjs'
 import * as Beschaffung from './recherche/Beschaffung.mjs'
 import * as Import from './recherche/Import.mjs'
@@ -23,6 +24,8 @@ import * as Literatur from './literatur/Literatur.mjs'
 import * as Offenlegung from './offenlegung/Offenlegung.mjs'
 import * as Semantik from './semantik/Semantik.mjs'
 import * as Workflows from './workflows/Workflows.mjs'
+import * as TexPakete from './kompilieren/TexPakete.mjs'
+import { dateiNameGueltig } from './kompilieren/texArchiv.mjs'
 
 // Bricht der Browser ab, darf das den Prozess nicht beenden.
 async function dateiSenden(pfad, res) {
@@ -57,6 +60,12 @@ function quelleFuerClient(q) {
     versatz: q.versatz,
     versatzQuelle: q.versatzQuelle,
     nurProjekt: q.nurProjekt === true,
+    lizenz: q.lizenz ?? null,
+    // Art des Werks bei Quellen ohne DOI (thesis, report, …); `art` ist der Dateityp.
+    werkart: q.meta?.art ?? null,
+    titelabgleich: q.titelabgleich ?? null,
+    autorenabgleich: q.autoren ?? null,
+    metadaten: q.metadaten ?? null,
     ocr: QuellenManager.ocrZustand(q),
     web: q.web ? { url: q.web.url, abgerufenAm: q.web.abgerufenAm } : null,
   }
@@ -384,6 +393,19 @@ async function laeufeDaten(req, bot, vor) {
   }
 }
 
+// Für den Log-Bereich im Editor: Der Browser liest die fehlenden Dateien aus dem Log, der Server kennt die Pakete.
+export const fehlendePakete = mitProblemen(async (req, res) => {
+  const dateien = [req.query.datei ?? []].flat().filter(datei => typeof datei === 'string')
+  if (dateien.length > 20) throw new Problem(400, 'eingabe_ungueltig', 'spur_fehler_tex_dateien_viele', { anzahl: 20 })
+  // Eigene Dateien mit Pfad (kapitel/a.tex) gehören zu keinem Paket; sie stehen ohne Nachschlagen da.
+  const gefunden = await TexPakete.fehlendePakete(dateien.filter(dateiNameGueltig))
+  res.json({
+    fehlende_pakete: dateien.map(
+      datei => gefunden.find(e => e.datei === datei) ?? { datei, paket: null, im_image: false }
+    ),
+  })
+})
+
 export const claudeStatus = mitProblemen(async (req, res) => {
   const bot = await botDesNutzers(req)
   const [{ nachrichten, aeltere }, verbunden, automatik, offen, laeufe] = await Promise.all([
@@ -513,17 +535,21 @@ export const rechercheZitationen = mitProblemen(async (req, res) => {
 })
 
 export const suchprotokoll = mitProblemen(async (req, res) => {
-  res.json(await Recherche.protokoll(projektId(req), { seite: seiteAus(req.query.seite) }))
+  const [seite, prisma] = await Promise.all([
+    Suchprotokoll.liste(projektId(req), { ab: seiteAus(req.query.seite) * Suchprotokoll.SEITE }),
+    Suchprotokoll.prisma(projektId(req)),
+  ])
+  res.json({ ...seite, prisma })
 })
 
 export const suchprotokollExport = mitProblemen(async (req, res) => {
   res.attachment('suchprotokoll.csv').type('text/csv; charset=utf-8')
-  res.send(await Recherche.protokollCsv(projektId(req)))
+  res.send(await Suchprotokoll.alsCsv(projektId(req)))
 })
 
 export const perDoiAufnehmen = mitProblemen(async (req, res) => {
   const doi = Recherche.doiPruefen(String(req.body?.doi ?? ''))
-  const quelle = await Aufnahme.perDoi({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
+  const quelle = await Beschaffung.aufnehmenOderVormerken({ projectId: projektId(req), userId: new ObjectId(nutzerId(req)), doi })
   res.status(201).json(quelleFuerClient(quelle))
 })
 
@@ -536,6 +562,9 @@ function beschaffungFuerClient(eintrag, vorlage) {
     jahr: eintrag.meta.jahr,
     status: eintrag.status,
     quelleId: eintrag.quelleId ?? null,
+    grund: eintrag.grund ?? null,
+    // Die Adresse stammt von Unpaywall: als Link nur mit http(s).
+    adresse: /^https?:\/\//i.test(eintrag.adresse ?? '') ? eintrag.adresse : null,
     link: Beschaffung.link(vorlage, eintrag.doi),
   }
 }

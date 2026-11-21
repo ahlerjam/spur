@@ -41,7 +41,7 @@ describe('zitateFinden', () => {
   })
 
   it('meldet fremde Formen als unbekannt und übergeht reine Anführungen', () => {
-    const zeilen = zitateFinden(String.raw`\footfullcite{a} \foreignquote{de}{X} \enquote{nur so}`)
+    const zeilen = zitateFinden(String.raw`\meincite{a} \foreignquote{de}{X} \enquote{nur so}`)
     expect(zeilen.map(z => z.form)).toEqual(['unbekannt', 'unbekannt'])
   })
 
@@ -270,5 +270,127 @@ describe('Beamer-Notizen', () => {
 
   it('zählt es mit show notes', () => {
     expect(keys(`\\documentclass{beamer}\n\\setbeameroption{show notes}\n${RUMPF}`)).toEqual(['notiz'])
+  })
+})
+
+describe('vorangestellter Beleg', () => {
+  const SATZ = 'Sleep supports the consolidation of declarative memory.'
+  const formen = zeilen => zeilen.map(z => [z.form, z.roh, z.belege.map(b => `${b.key}:${b.seite}`).join(',')])
+
+  it.each([
+    [String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{${SATZ}}`, 'enquote'],
+    [String.raw`\Textcite[S.~347]{smith2024} schreiben: „${SATZ}“`, 'anfuehrung'],
+    [String.raw`\citet[S.~347]{smith2024} schreiben \textquote{${SATZ}}`, 'textquote'],
+    [String.raw`\citeauthor[S.~347]{smith2024} schreibt \enquote{${SATZ}}`, 'enquote'],
+    [String.raw`\nptextcite[S.~347]{smith2024} schreibt \enquote{${SATZ}}`, 'enquote'],
+  ])('verknüpft %s zu einer Zeile', (quelle, form) => {
+    const zeilen = zitateFinden(quelle)
+    expect(formen(zeilen)).toEqual([[form, SATZ, 'smith2024:S.~347']])
+    expect(zeilen[0].von).toBe(0)
+    expect(quelle.slice(zeilen[0].zitatVon, zeilen[0].zitatBis)).toBe(SATZ)
+  })
+
+  it('der echte Fall: \\textcite vor \\enquote ist kein Beleg ohne Wortlaut', () => {
+    const quelle = String.raw`\textcite[S.~4]{oldemeyer2025} beschreiben dies als \enquote{eine Daueraufgabe}.`
+    expect(formen(zitateFinden(quelle))).toEqual([['enquote', 'eine Daueraufgabe', 'oldemeyer2025:S.~4']])
+  })
+
+  it('nimmt die Seite aus einem nachfolgenden Beleg mit demselben Key', () => {
+    const quelle = String.raw`\textcite{smith2024} schreiben: \enquote{${SATZ}} \parencite[S.~347]{smith2024}`
+    const zeilen = zitateFinden(quelle)
+    expect(formen(zeilen)).toEqual([['enquote', SATZ, 'smith2024:S.~347']])
+    expect([zeilen[0].von, zeilen[0].bis]).toEqual([0, quelle.length])
+  })
+
+  it('behält die Seite des vorangestellten Belegs, wenn der nachfolgende keine nennt', () => {
+    const quelle = String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{${SATZ}} \parencite{smith2024}`
+    expect(formen(zitateFinden(quelle))).toEqual([['enquote', SATZ, 'smith2024:S.~347']])
+  })
+
+  it('lässt ein \\textcite, das ein eigenes Zitat einleitet, nicht als Beleg des vorigen Zitats gelten', () => {
+    for (const trenner of ['\n', '. ', ' und ']) {
+      const quelle = String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{${SATZ}}${trenner}\textcite[S.~9]{jones2023} schreiben: \enquote{Erfunden.}`
+      expect(formen(zitateFinden(quelle))).toEqual([
+        ['enquote', SATZ, 'smith2024:S.~347'],
+        ['enquote', 'Erfunden.', 'jones2023:S.~9'],
+      ])
+    }
+    const nachgestellt = String.raw`\enquote{${SATZ}} \textcite[S.~347]{smith2024}. Danach mehr.`
+    expect(formen(zitateFinden(nachgestellt))).toEqual([['enquote', SATZ, 'smith2024:S.~347']])
+  })
+
+  it('nimmt die Seite aus einem reinen (S.~x) nach dem Zitat', () => {
+    const quelle = String.raw`\textcite{smith2024} schreiben: \enquote{${SATZ}} (S.~347).`
+    const zeilen = zitateFinden(quelle)
+    expect(formen(zeilen)).toEqual([['enquote', SATZ, 'smith2024:S.~347']])
+    expect(quelle.slice(zeilen[0].von, zeilen[0].bis)).toBe(quelle.slice(0, -1))
+  })
+
+  it('verknüpft nicht über ein Satzende oder einen Absatz hinweg', () => {
+    for (const trenner of ['zeigt das. ', 'zeigt das!\n', 'zeigt das\n\n']) {
+      const quelle = String.raw`\textcite[S.~347]{smith2024} ${trenner}\enquote{${SATZ}}`
+      expect(formen(zitateFinden(quelle))).toEqual([['beleg', '', 'smith2024:S.~347']])
+    }
+  })
+
+  it('verknüpft nicht über mehr als 300 Zeichen', () => {
+    const quelle = String.raw`\textcite[S.~347]{smith2024} ${'und '.repeat(80)}\enquote{${SATZ}}`
+    expect(formen(zitateFinden(quelle))).toEqual([['beleg', '', 'smith2024:S.~347']])
+  })
+
+  it('lässt einen nachfolgenden Beleg mit anderem Key gelten', () => {
+    const quelle = String.raw`\textcite[S.~347]{smith2024} zitieren \enquote{${SATZ}} \parencite[S.~9]{jones2023}`
+    expect(formen(zitateFinden(quelle))).toEqual([
+      ['beleg', '', 'smith2024:S.~347'],
+      ['enquote', SATZ, 'jones2023:S.~9'],
+    ])
+  })
+
+  it('nimmt keinen Beleg aus dem nächsten Absatz', () => {
+    const quelle = String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{Erfunden.}` + '\n\n' + String.raw`\textcite[S.~347]{smith2024} zeigt das. \enquote{${SATZ}}`
+    expect(formen(zitateFinden(quelle))).toEqual([
+      ['enquote', 'Erfunden.', 'smith2024:S.~347'],
+      ['beleg', '', 'smith2024:S.~347'],
+    ])
+    expect(formen(zitateFinden(String.raw`\enquote{${SATZ}}` + '\n\n' + String.raw`\parencite[1]{a}`))).toEqual([['beleg', '', 'a:1']])
+  })
+
+  it('übersteht leere Keys vor und nach dem Zitat', () => {
+    const zeilen = zitateFinden(String.raw`\textcite{} schreiben \enquote{X} \textcite{} sagt \enquote{Y}`)
+    expect(zeilen.every(z => z.belege.length === 0)).toBe(true)
+  })
+
+  it('verknüpft nur mit Autor-im-Satz-Befehlen', () => {
+    const quelle = String.raw`\parencite[S.~347]{smith2024} \enquote{${SATZ}}`
+    expect(formen(zitateFinden(quelle))).toEqual([['beleg', '', 'smith2024:S.~347']])
+  })
+})
+
+describe('Zitiervarianten', () => {
+  const belege = quelle => zitateFinden(quelle).map(z => [z.form, z.belege.map(b => `${b.befehl}:${b.key}:${b.seite}`)])
+
+  it.each(['Parencite', 'Textcite', 'Autocite', 'Cite', 'Citet', 'Citep', 'citeauthor', 'citeyear', 'citeyearpar', 'citetitle', 'citealp', 'citealt', 'smartcite', 'supercite', 'fullcite', 'footfullcite', 'nptextcite'])(
+    'erkennt \\%s als Beleg',
+    befehl => {
+      expect(belege(`\\${befehl}[S.~3]{smith2024}`)).toEqual([['beleg', [`${befehl}:smith2024:S.~3`]]])
+      expect(belege(`\\${befehl}*{smith2024}`)).toEqual([['beleg', [`${befehl}:smith2024:`]]])
+    }
+  )
+
+  it('liest Mehrfachformen als je eigenen Beleg mit Seite', () => {
+    expect(belege(String.raw`\parencites[12]{smith2024}[34]{jones2023}.`)).toEqual([['beleg', ['parencites:smith2024:12', 'parencites:jones2023:34']]])
+    expect(belege(String.raw`\textcites[vgl.][5]{a}{b,c}`)).toEqual([['beleg', ['textcites:a:5', 'textcites:b:', 'textcites:c:']]])
+  })
+
+  it('liest bei Mehrfachformen nur direkt anschließende Paare', () => {
+    expect(belege(String.raw`\parencites{a}{b} {\bfseries Text}`)).toEqual([['beleg', ['parencites:a:', 'parencites:b:']]])
+  })
+
+  it('liest alle Keys eines Belegs', () => {
+    expect(belege(String.raw`\parencite{smith2024,jones2023, fake2020}`)).toEqual([['beleg', ['parencite:smith2024:', 'parencite:jones2023:', 'parencite:fake2020:']]])
+  })
+
+  it('lässt unbekannte Befehle und \\nocite wie bisher', () => {
+    expect(zitateFinden(String.raw`\meincite{smith2024} \nocite{*}`).map(z => [z.form, z.befehl])).toEqual([['unbekannt', 'meincite']])
   })
 })

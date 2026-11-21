@@ -45,10 +45,10 @@ function antwortVon(ergebnis) {
   return { content: [{ type: 'text', text: JSON.stringify(ergebnis) }] }
 }
 
-function fehlerVon(code, detail) {
+function fehlerVon(code, detail, zusatz) {
   return {
     isError: true,
-    content: [{ type: 'text', text: JSON.stringify({ fehler: code, detail }) }],
+    content: [{ type: 'text', text: JSON.stringify({ ...zusatz, fehler: code, detail }) }],
   }
 }
 
@@ -67,7 +67,7 @@ function serverBauen({ authInfo }) {
           return antwortVon(await werkzeug.ausfuehren(args, kontext, ctx))
         } catch (error) {
           if (error instanceof WerkzeugFehler) return fehlerVon(error.code, error.message)
-          if (error instanceof Problem) return fehlerVon(error.typ, error.message)
+          if (error instanceof Problem) return fehlerVon(error.typ, error.message, error.zusatz)
           // Die ID steht in der Antwort und im Log; Inhalte und Tokens kommen nicht ins Log.
           const fehlerId = randomBytes(4).toString('hex')
           logger.error(

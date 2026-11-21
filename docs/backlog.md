@@ -27,6 +27,10 @@ Deferred, not discarded. Check here before new plans.
 - Audio and video transcription
 - Literature alerts, systematic review
 - Script execution on the server
+- arXiv LaTeX source as a second text layer for sources with an arXiv ID: PDF extraction often breaks formulas, the e-print endpoint delivers them exactly. Read the archive in memory only and cap member count and size (idea from the old `academic-research` plugin, `scripts/arxiv_latex.py`)
+- PRISMA flow diagram rendered from the numbers of `search_log` (P12), as TikZ in the project, so the figures in the diagram cannot drift from the log
+- Duplicates beyond P12 (normalized DOI, or exact title and year): fuzzy title match (about 0.85 similarity) to pair a preprint with its published version under different DOIs, shown as a suggestion and never merged silently
+- Layout checks on the server as part of `check_report` instead of the plugin skill `spur-endpruefung` (P17): doubly escaped citation commands, `cleveref` before `hyperref`, `biblatex` with `natbib`, float labels without a reference, float order against first mention
 
 ## Tests
 - Overleaf's Cypress tests (`server-ce/test`) in the dev stack and in CI
@@ -39,7 +43,6 @@ Deferred, not discarded. Check here before new plans.
 - Check `https://doi.org/doiRA/…` and `https://api.datacite.org/dois/…` against the real hosts (answer format, slash in the path); the tests use fakes
 - Retractions for DataCite DOIs; DataCite does not report them today
 - A DataCite DOI that `doi.org` knows but `api.datacite.org` answers with 404 shows "nicht prüfbar" on every report; decide on a cached state such as "registered, metadata missing"
-- `tex_package_add`: try the second mirror on a 404 as well, in case the image's mirror lacks a package that mirror.ctan.org has
 - Semantic search over Postgres with pgvector, if brute force is no longer enough
 - Short-lived tokens with OAuth
 - Rate limits for web page capture and comments; OCR limit per project and page cap
@@ -61,6 +64,6 @@ Deferred, not discarded. Check here before new plans.
 - Overleaf's German language file still lacks 1182 keys that the English one has (`services/web/locales/de.json` against `en.json`); P9 added about 200 for the menu bar, rail, review panel, PDF area, editor settings, project list and account menu, P10 added the chat, word count, command palette, editor alerts, log hints and theme names. What is left is mostly source-editor tooltips, group management, subscription and upgrade texts
 
 ## Ideas for P10 (owner, 2026-11-12)
-- Claim check: also check paraphrased statements against the source. For every sentence with a citation, find the passage in the source and show "supported (p. 347)", "passage not found" or "source says something else", with a jump to the passage. Always show the passage found, never a verdict without evidence, because a language model judges this and can be wrong. Extends the "paraphrases" switch under Proactivity.
+- Claim check: in Claude Code the plugin agent `spur:gegenpruefung` (P17) now checks every paraphrased statement against the source and returns "gedeckt", "abweichend", "nicht_gefunden" or "nicht_pruefbar" with the passage found. Still open for the browser: show these verdicts per citation in the check report with a jump to the passage, so people without Claude Code see them too; always show the passage, never a verdict without evidence, because a language model judges this and can be wrong. Extends the "paraphrases" switch under Proactivity.
 - Claude without a terminal: the connector for claude.ai, desktop and mobile instead of the start command in the terminal. Biggest hurdle for people who do not use Claude Code. Needs OAuth and a publicly reachable server; a plan of its own because it concerns operations and security. Same item as "Connector" under Claude integration.
 - Click a citation in the PDF: a click on a citation in the compiled PDF opens the source on the right page with the passage highlighted. Makes the check visible to readers and supervisors. Related: "Also highlight markings in the page text of the source preview" under Interface.

@@ -1,17 +1,11 @@
 // node --test tools/tests/mcp-vertrag.test.mjs
-// docs/mcp-contract.md nennt genau die Werkzeuge, die der MCP-Server anbietet.
+// docs/mcp-contract.md nennt genau die Werkzeuge, die der MCP-Server anbietet (werkzeuge.mjs, gelesen über werkzeuge-im-code.mjs).
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
+import { werkzeugeImCode } from './werkzeuge-im-code.mjs'
 
 const lesen = pfad => readFileSync(new URL(`../../${pfad}`, import.meta.url), 'utf8')
-
-// Die Werkzeuge stehen in werkzeuge.mjs als Schlüssel `  name: {` des Objekts WERKZEUGE.
-function werkzeugeImCode() {
-  const quelle = lesen('services/web/modules/spur/app/src/mcp/werkzeuge.mjs')
-  const block = quelle.slice(quelle.indexOf('export const WERKZEUGE = {'))
-  return new Set([...block.matchAll(/^ {2}([a-z_]+): \{$/gm)].map(m => m[1]))
-}
 
 // Im Vertrag: die erste Spalte der Tabelle unter „## Tools“.
 function werkzeugeImVertrag() {

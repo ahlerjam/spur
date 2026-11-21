@@ -33,7 +33,8 @@ export const BIB = `@article{smith2024,
   doi = {10.5555/spur.2024.001}
 }`
 
-export async function quelleAusFixture(projectId, userId, dateiname) {
+// extra: weitere Angaben zur Quelle wie beim Aufnehmen per DOI, etwa die Lizenz.
+export async function quelleAusFixture(projectId, userId, dateiname, extra = {}) {
   const tempPfad = Path.join(tmpdir(), `${randomUUID()}-${dateiname}`)
   await copyFile(Path.join(FIXTURES, dateiname), tempPfad)
   const { size } = await stat(tempPfad)
@@ -43,6 +44,7 @@ export async function quelleAusFixture(projectId, userId, dateiname) {
     dateiname,
     tempPfad,
     groesse: size,
+    ...extra,
   })
 }
 

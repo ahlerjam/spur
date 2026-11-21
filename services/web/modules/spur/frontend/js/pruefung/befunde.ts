@@ -18,12 +18,14 @@ export function befunde(zeile: Zeile, t: TFunction) {
 
   if (zeile.status === 'beleg_ohne_wortlaut') add(t('spur_beleg_ohne_wortlaut'), 'info')
 
-  if (zeile.seite === 'stimmt') add(t('spur_seite_stimmt'), 'success')
+  const pdf = zeile.seitenbasis === 'pdf'
+  if (zeile.seite === 'stimmt') add(t(pdf ? 'spur_pdf_seite_stimmt' : 'spur_seite_stimmt'), 'success')
   if (zeile.seite === 'bestaetigt') add(t('spur_seite_bestaetigt'), 'success')
   if (zeile.seite === 'nicht_pruefbar') add(t('spur_seite_nicht_pruefbar'), 'warning')
   if (zeile.seite === 'gefunden') {
-    add(t('spur_gefunden_auf', { seite: zeile.gefundenAuf }), 'warning')
+    add(t(pdf ? 'spur_gefunden_auf_pdf' : 'spur_gefunden_auf', { seite: zeile.gefundenAuf }), 'warning')
   }
+  if (zeile.versatzQuelle === 'seitentext') add(t('spur_seitenzahl_aus_seitentext'), 'info')
 
   if (zeile.referenz === 'nicht_gefunden') add(t('spur_referenz_nicht_gefunden'), 'danger')
   // Ein Ausfall bei Crossref oder der Registrierstelle ist kein Befund über die Arbeit: neutral, nicht als Fehler.

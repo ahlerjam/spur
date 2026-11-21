@@ -16,6 +16,19 @@ describe('problemSenden', () => {
       detail: meldung('spur_fehler_zitat_text', { max: 2000 }),
     })
   })
+
+  it('hängt Zusatzfelder an, ohne die Kernfelder zu überschreiben', () => {
+    const res = new Antwort()
+    const zusatz = { versucht: [{ ergebnis: '403' }], type: 'x', status: 200, title: 'x', detail: 'x' }
+    problemSenden(res, new Problem(502, 'pdf_fehlt', 'spur_fehler_volltext_laden', undefined, zusatz))
+    expect(res.body).toEqual({
+      type: 'urn:spur:problem:pdf_fehlt',
+      title: 'pdf_fehlt',
+      status: 502,
+      detail: meldung('spur_fehler_volltext_laden'),
+      versucht: [{ ergebnis: '403' }],
+    })
+  })
 })
 
 describe('mitProblemen', () => {

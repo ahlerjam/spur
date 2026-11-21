@@ -7,10 +7,12 @@ import logger from '@overleaf/logger'
 import Settings from '@overleaf/settings'
 import { db, ObjectId } from '../../../../app/src/infrastructure/mongodb.mjs'
 import { Problem } from './probleme.mjs'
-import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, vorschlaege } from './sammlungen.mjs'
+import { bearbeitungen, beschaffungen, einstellungen, ereignisse, jobs, klone, laeufe, matrixSpalten, matrixZellen, nachrichten, notizen, pruefCache, quellen, quellenSeiten, quotes, suchprotokoll, suchtreffer, vorschlaege } from './sammlungen.mjs'
 import { IST_DEV, jetzt } from './schalter.mjs'
 import * as Crossref from './Crossref.mjs'
-import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, versatzAusLabels, vttSeiten } from './pdf.mjs'
+import { ocrSeite, seitenBild, seitenTexte, textEbene as pdfTextEbene, titelFeld, versatzAusLabels, versatzAusSeitentext, vttSeiten } from './pdf.mjs'
+import { autorenAbgleich } from './recherche/autorenabgleich.mjs'
+import { titelabgleich } from './recherche/titelabgleich.mjs'
 import { abrufen } from './WebSchnappschuss.mjs'
 import { quelleGeaendert } from './live.mjs'
 import * as Speicher from './Speicher.mjs'
@@ -37,8 +39,11 @@ function schluesselAus(dateiname) {
   )
 }
 
+const SPANNE = /^(\d+)\D+(\d+)$/
+const spanneBekannt = spanne => SPANNE.test(spanne ?? '')
+
 function versatzInSpanne(versatz, seitenzahl, spanne) {
-  const m = /^(\d+)\D+(\d+)$/.exec(spanne ?? '')
+  const m = SPANNE.exec(spanne ?? '')
   if (versatz == null || !m) return false
   return versatz + 1 >= Number(m[1]) && versatz + seitenzahl <= Number(m[2])
 }
@@ -56,19 +61,23 @@ async function pdfAuslesen(pfad) {
   const hatText = texte.some(t => t.trim())
   const doi = hatText ? DOI.exec(texte.slice(0, 2).join('\n'))?.[0] : null
   const meta = doi ? await Crossref.werk(doi) : null
-  const versatz = await versatzAusLabels(pfad).catch(() => null)
-  const belegt =
-    meta?.gefunden && versatzInSpanne(versatz, seiten.length, meta.seiten)
+  const { versatz, versatzQuelle } = await versatzBestimmen(pfad, texte, meta)
   // Vorspannseiten (römisch) ergäben Labels unter 1: dort lieber keine Seitenzahl.
-  for (const s of seiten) s.label = belegt && s.seite + versatz >= 1 ? String(s.seite + versatz) : null
-  return {
-    seiten,
-    hatText,
-    doi: doi ?? null,
-    meta,
-    versatz: belegt ? versatz : null,
-    versatzQuelle: belegt ? 'pagelabels' : null,
+  for (const s of seiten) s.label = versatz != null && s.seite + versatz >= 1 ? String(s.seite + versatz) : null
+  return { seiten, hatText, doi: doi ?? null, meta, versatz, versatzQuelle }
+}
+
+// PageLabels zählen nur, wenn Crossref die Seitenspanne bestätigt. Sonst gilt der Seitentext; kennt Crossref eine
+// Spanne, muss auch er dazu passen.
+async function versatzBestimmen(pfad, texte, meta) {
+  const spanne = meta?.gefunden ? meta.seiten : null
+  const ausLabels = await versatzAusLabels(pfad).catch(() => null)
+  if (versatzInSpanne(ausLabels, texte.length, spanne)) return { versatz: ausLabels, versatzQuelle: 'pagelabels' }
+  const ausText = versatzAusSeitentext(texte)
+  if (ausText != null && (!spanneBekannt(spanne) || versatzInSpanne(ausText, texte.length, spanne))) {
+    return { versatz: ausText, versatzQuelle: 'seitentext' }
   }
+  return { versatz: null, versatzQuelle: null }
 }
 
 async function vttAuslesen(pfad) {
@@ -127,7 +136,10 @@ async function speichern(quelle, seitenListe, schreibeDatei) {
   return quelle
 }
 
-// key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF.
+// key, doi und meta gibt die Aufnahme per DOI vor; sonst stammen sie aus Dateiname und PDF. Mit vorgegebenem Titel
+// wird das PDF dagegen abgeglichen; titelStreng weist ein abweichendes PDF mit falsches_pdf ab. pdfUrl und hash
+// halten bei Quellen ohne DOI die Herkunft für die Dublettenprüfung fest. ersatz sind Angaben für den Fall, dass weder
+// meta noch eine DOI im PDF Metadaten liefern; die Quelle trägt dann metadaten: 'unvollstaendig'.
 export async function aufnehmen(angaben) {
   pruefeDateityp(angaben.dateiname)
   // Vor dem Auslesen: eine zu große Datei wird abgewiesen, ehe Text und OCR Zeit kosten.
@@ -139,27 +151,49 @@ export async function aufnehmen(angaben) {
   }
 }
 
-async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, nurProjekt = false }) {
+// Das Titelfeld des PDFs braucht einen eigenen pdfinfo-Lauf: nur fragen, wenn der Text der ersten Seiten nicht reicht.
+async function titelPruefen(titel, seiten, pfad) {
+  const texte = seiten.map(s => s.text)
+  const ergebnis = titelabgleich(titel, texte, null)
+  if (ergebnis !== 'abweichend') return ergebnis
+  return titelabgleich(titel, texte, await titelFeld(pfad).catch(() => null))
+}
+
+async function aufnehmenOhneReservierung({ projectId, userId, dateiname, tempPfad, groesse, key: vorgabe, doi, meta, lizenz = null, titelStreng = false, nurProjekt = false, pdfUrl, hash, ersatz }) {
   const key = vorgabe ?? schluesselAus(dateiname)
   if (await (await quellen()).findOne({ projectId, key })) throw vorhandenFehler(dateiname)
-  const inhalt = await AUSLESER[Path.extname(dateiname).toLowerCase()](tempPfad)
+  const endung = Path.extname(dateiname).toLowerCase()
+  const inhalt = await AUSLESER[endung](tempPfad)
+  // Ersatzangaben gelten nur, wenn weder meta noch eine DOI im PDF (ohne vorgegebene DOI) Metadaten liefern.
+  const metadaten = ersatz && !meta && (doi || !inhalt.meta?.gefunden) ? 'unvollstaendig' : null
+  const werk = metadaten ? ersatz : (meta ?? inhalt.meta)
+  // Ersatzangaben (Titel aus dem PDF oder dem Dateinamen) gleicht spur nicht mit dem PDF ab.
+  const pruefen = endung === '.pdf' && !metadaten
+  const abgleich = pruefen && meta?.titel ? await titelPruefen(meta.titel, inhalt.seiten, tempPfad) : null
+  if (titelStreng && abgleich === 'abweichend') throw new Problem(422, 'falsches_pdf', 'spur_fehler_falsches_pdf')
+  const autoren = pruefen && inhalt.hatText ? autorenAbgleich(werk?.autoren, inhalt.seiten[0]?.text) : null
   const quelle = {
     _id: new ObjectId(),
     projectId,
     dateiname,
     key,
     groesse,
-    art: Path.extname(dateiname).slice(1).toLowerCase(),
+    art: endung.slice(1),
     seitenzahl: inhalt.seiten.length,
     status: inhalt.hatText ? 'text' : 'kein_text',
     doi: doi ?? inhalt.doi,
-    meta: meta ?? inhalt.meta,
+    meta: autoren ? { ...werk, autoren: autoren.autoren } : werk,
+    ...(abgleich && { titelabgleich: abgleich }),
+    ...(autoren && { autoren: autoren.zustand }),
+    ...(metadaten && { metadaten }),
+    lizenz,
     nurProjekt,
     versatz: inhalt.versatz,
     versatzQuelle: inhalt.versatzQuelle,
     fassung: '',
     angelegtVon: userId,
     angelegtAm: jetzt(),
+    ...(pdfUrl && { pdfUrl, hash }),
   }
   return await speichern(quelle, inhalt.seiten, ziel => fs.copyFile(tempPfad, ziel))
 }
@@ -391,14 +425,36 @@ export async function seite(quelle, nummer) {
 }
 
 export async function bild(quelle, nummer, breite = null) {
-  const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}${breite ? `-w${breite}` : ''}`)
+  return await gerendert(quelle, nummer, { breite })
+}
+
+async function gerendert(quelle, nummer, groesse) {
+  const zusatz = groesse.breite ? `-w${groesse.breite}` : groesse.kante ? `-k${groesse.kante}` : ''
+  const ziel = Path.join(Path.dirname(dateiPfad(quelle)), `${quelle._id}-${nummer}${zusatz}`)
   const pfad = `${ziel}.png`
   try {
     await fs.access(pfad)
     return pfad
   } catch {
-    return await seitenBild(dateiPfad(quelle), nummer, ziel, breite)
+    return await seitenBild(dateiPfad(quelle), nummer, ziel, groesse)
   }
+}
+
+const KANTE_CLAUDE = 1600
+
+// Für Seitenbilder und Ausschnitte: nur PDF-Quellen haben Seiten.
+export function seitePruefen(quelle, nummer) {
+  if (quelle.art !== 'pdf') throw new Problem(409, 'quelle_ohne_seiten', 'spur_fehler_quelle_ohne_seiten')
+  if (nummer > quelle.seitenzahl) {
+    const seiten = quelle.seitenzahl
+    throw new Problem(404, 'seite_nicht_gefunden', 'spur_fehler_seite_nicht_gefunden', { seite: nummer, seiten }, { seiten })
+  }
+}
+
+// Seitenbild für source_page_image: groß genug für Abbildungen, klein genug für ein Modell.
+export async function seitenBildFuerClaude(quelle, nummer) {
+  seitePruefen(quelle, nummer)
+  return await fs.readFile(await gerendert(quelle, nummer, { kante: KANTE_CLAUDE }))
 }
 
 // Lage der Zeilen über dem Seitenbild; erkannter Text (OCR) hat keine Lage.
@@ -514,6 +570,7 @@ export async function projektAufraeumen(projectId) {
     (await bearbeitungen()).deleteMany({ projectId: id }),
     (await einstellungen()).deleteMany({ projectId: id }),
     (await suchprotokoll()).deleteMany({ projectId: id }),
+    (await suchtreffer()).deleteMany({ projectId: id }),
     (await beschaffungen()).deleteMany({ projectId: id }),
     (await notizen()).deleteMany({ projectId: id }),
     (await matrixSpalten()).deleteOne({ _id: id }),

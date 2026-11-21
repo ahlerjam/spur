@@ -86,6 +86,30 @@ describe('Lauf-Karte', function () {
     expect(screen.getByText('Zahl ohne Beleg: 412')).to.exist
   })
 
+  it('zeigt, wie viele Änderungen automatisch angenommen sind und wie viele offen stehen (P15)', function () {
+    render(
+      <LaufKarte
+        lauf={{ ...lauf, aenderungen: 3, stand: { gesamt: 3, automatisch_angenommen: 2, offen: 1, rot: 1 } }}
+        aenderungen={aenderungen}
+        neuLaden={async () => {}}
+      />,
+      { wrapper: mitRolle('owner') }
+    )
+    expect(screen.getByText('2 automatisch angenommen, 1 offen')).to.exist
+  })
+
+  it('zeigt den Stand nicht, wenn nichts automatisch angenommen ist und nichts offen steht', function () {
+    render(
+      <LaufKarte
+        lauf={{ ...lauf, status: 'zurueckgenommen', aenderungen: 12, stand: { gesamt: 12, automatisch_angenommen: 0, offen: 0, rot: 0 } }}
+        aenderungen={[]}
+        neuLaden={async () => {}}
+      />,
+      { wrapper: mitRolle('owner') }
+    )
+    expect(screen.queryByText(/automatisch angenommen,/)).to.not.exist
+  })
+
   it('zeigt ohne Zahlen keine Warnung', function () {
     zeigen('owner')
     expect(screen.queryByText(/^Zahl ohne Beleg/)).to.not.exist

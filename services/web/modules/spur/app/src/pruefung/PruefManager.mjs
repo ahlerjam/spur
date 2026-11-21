@@ -9,7 +9,7 @@ import { Problem } from '../probleme.mjs'
 import { einstellungen, pruefCache, quotes } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
 import { bibLesen } from './bib.mjs'
-import { istProblem, quelleZu, STELLEN_STATUS, stelleEinordnen, zeileBewerten } from './bewertung.mjs'
+import { istProblem, quelleZu, STELLEN_STATUS, stelleEinordnen, zeilenBewerten } from './bewertung.mjs'
 import { makrosErkennen, makrosWirksam, zitateFinden } from './latex.mjs'
 
 const CROSSREF_PARALLEL = 5
@@ -141,8 +141,12 @@ async function kontextLaden(projectId, docs, weitererText = null) {
   return { bibEintraege, quellen, werke, bestaetigt, makros, seitenJeQuelle: new Map() }
 }
 
+// Steigt, wenn sich die Bewertung ändert; gespeicherte Abschnitte gelten dann nicht mehr.
+const PRUEFLOGIK = 2
+
 function stempel(kontext) {
   return JSON.stringify({
+    logik: PRUEFLOGIK,
     tag: jetzt().toISOString().slice(0, 10),
     bib: [...kontext.bibEintraege.values()],
     werke: [...kontext.werke.entries()]
@@ -156,9 +160,8 @@ function stempel(kontext) {
 
 async function fundeBewerten(funde, kontext) {
   const fehlend = new Set()
-  for (const fund of funde) {
-    const key = fund.belege[0]?.key
-    const quelle = key && quelleZu(key, kontext.bibEintraege, kontext.quellen)
+  for (const { key } of funde.flatMap(f => f.belege)) {
+    const quelle = quelleZu(key, kontext.bibEintraege, kontext.quellen)
     if (quelle && !kontext.seitenJeQuelle.has(String(quelle._id))) fehlend.add(quelle._id)
   }
   if (fehlend.size) {
@@ -167,7 +170,7 @@ async function fundeBewerten(funde, kontext) {
       kontext.seitenJeQuelle.set(String(id), geladen.get(String(id)) ?? [])
     }
   }
-  return funde.map(fund => zeileBewerten(fund, kontext))
+  return funde.flatMap(fund => zeilenBewerten(fund, kontext))
 }
 
 async function abschnittBewerten(abschnitt, kontext) {
@@ -204,7 +207,8 @@ export async function bibBereichPruefen(projectId, docId, text, von, bis) {
   const funde = texte(docs)
     .flatMap(t => zitateFinden(t, kontext.makros))
     .filter(f => !f.ausgeblendet && f.belege.some(b => schluessel.has(b.key)))
-  return await fundeBewerten(funde, kontext)
+  // Eine Stelle mit mehreren Keys ergibt eine Zeile je Key; nur die geänderten Einträge zählen.
+  return (await fundeBewerten(funde, kontext)).filter(z => schluessel.has(z.key))
 }
 
 async function zeilenFuer(projectId, abschnittsListe, kontext, basis, nutzung) {
@@ -263,7 +267,8 @@ export async function bericht(projectId) {
         const von = z.von + abschnitt.von
         zeilen.push({
           ...z,
-          id: hash(doc.docId, String(von)).slice(0, 12),
+          // Die Keys einer Stelle teilen die Position.
+          id: hash(doc.docId, String(von), z.key ?? '').slice(0, 12),
           docId: doc.docId,
           pfad: doc.pfad,
           von,

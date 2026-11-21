@@ -13,7 +13,7 @@ import Settings from '@overleaf/settings'
 import { fetchNothing } from '@overleaf/fetch-utils'
 import { projektAnlegen } from '../../scripts/lib/projekt-anlegen.mjs'
 import { ablageFreigeben, demoAnlegen, quelleAusFixture } from '../../scripts/seed.mjs'
-import { projektAufraeumen } from '../../app/src/QuellenManager.mjs'
+import { projektAufraeumen, webAufnehmen } from '../../app/src/QuellenManager.mjs'
 import * as TexPakete from '../../app/src/kompilieren/TexPakete.mjs'
 import { grenzen, speicher as speicherSammlung } from '../../app/src/sammlungen.mjs'
 import {
@@ -27,6 +27,7 @@ import {
   drossel,
   paperCache,
   suchprotokoll,
+  suchtreffer,
   vorschlaege,
   workflows,
 } from '../../app/src/sammlungen.mjs'
@@ -156,7 +157,7 @@ const BERICHT_MAIN = String.raw`\documentclass{article}
 \enquote{Naps improve every kind of memory equally.} \autocite[2]{retracted}
 \parencite{korrigiert}
 \parencite{unbekannt}
-\footfullcite{smith2024}
+\meincite{smith2024}
 \input{kapitel}
 \printbibliography
 \end{document}`
@@ -421,6 +422,28 @@ Text davor.
 \end{document}
 `,
   })
+  // P16: nur Pakete, die schon vor P16 im Image waren.
+  await neuAnlegen(a, 'E2E TeX Basis', {
+    'main.tex': String.raw`\documentclass{article}
+\usepackage[ngerman]{babel}
+\usepackage{csquotes}
+\usepackage{siunitx}
+\begin{document}
+\section{Messung}
+\enquote{Silbentrennung} klappt: Die Probe wog \qty{12.5}{\gram} bei \qty{21}{\degreeCelsius}.
+\end{document}
+`,
+  })
+  // P16: zwei Pakete, die nur der TeX-Live-Fake kennt; LaTeX bricht am ersten ab.
+  await neuAnlegen(a, 'E2E Fehlende Pakete', {
+    'main.tex': String.raw`\documentclass{beamer}
+\usepackage{spurdemo}
+\usetheme{focus}
+\begin{document}
+\begin{frame}{Pakete}\spurdemo\end{frame}
+\end{document}
+`,
+  })
   await TexPakete.drosselZuruecksetzen(a._id)
   await neuAnlegen(a, 'E2E Hochladen', { 'main.tex': LEER })
   await neuAnlegen(a, 'E2E Hochladen B', { 'main.tex': LEER })
@@ -438,7 +461,7 @@ Text davor.
 Platzhalter.
 \end{document}`,
   })
-  for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll]) {
+  for (const sammlung of [ereignisse, herzschlaege, nachrichten, drossel, paperCache, suchprotokoll, suchtreffer]) {
     await (await sammlung()).deleteMany({})
   }
   await testToken(a, 'spur_e2e_fake', new Date(Date.now() + 24 * 3600 * 1000))
@@ -547,7 +570,171 @@ ${['A', 'B', 'C', 'D'].map(x => `@book{ohne${x},\n  title = {Ohne Quelle ${x}}\n
   await neuAnlegen(a, 'E2E P6 Zahlen', { 'main.tex': LEER, 'quellen.bib': '@article{p6,\n  title = {Zahlen}\n}\n' })
   await grenzenVorbereiten()
   await p8Vorbereiten(a)
+  // P12: Ausweichwege, Bot-Schutz, Quellen ohne DOI und das Suchprotokoll.
+  for (const name of ['E2E P12 Quellen', 'E2E P12 Status', 'E2E P12 Ohne DOI', 'E2E P12 Protokoll']) await neuAnlegen(a, name, { 'main.tex': LEER })
+  // P13: Literaturdaten. Die .bib legt spur beim ersten source_add an; \nocite{*} setzt jeden Eintrag ins Verzeichnis.
+  for (const name of ['E2E P13 Heft', 'E2E P13 Entities', 'E2E P13 Preprint', 'E2E P13 Autoren']) await neuAnlegen(a, name, { 'main.tex': P13_MAIN })
+  await neuAnlegen(a, 'E2E P13 Upload', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E P13 Alt', { 'main.tex': P13_ALT_MAIN, 'references.bib': P13_ALT_BIB })
+  await p14Vorbereiten(a)
+  await p15Vorbereiten(a)
 }
+
+const P15_ABBILDUNGEN = String.raw`\documentclass{article}
+\usepackage{graphicx}
+\begin{document}
+Abbildungen.
+\end{document}`
+
+// P15: Werkzeuge. lang2024 hat auf PDF-Seite 2 9.500 Zeichen.
+async function p15Vorbereiten(a) {
+  const quellen = await neuAnlegen(a, 'E2E P15 Quellen', { 'main.tex': LEER })
+  await quelleAusFixture(quellen._id, a._id, 'lang2024.pdf')
+  await quelleAusFixture(quellen._id, a._id, 'smith2024.pdf')
+  await webAufnehmen({ projectId: quellen._id, userId: a._id, url: 'http://127.0.0.1/spur/dev/web/testseite' })
+  const abbildungen = await neuAnlegen(a, 'E2E P15 Abbildungen', { 'main.tex': P15_ABBILDUNGEN })
+  for (const [datei, lizenz] of [['offen2023.pdf', 'cc-by'], ['verlag2022.pdf', null], ['nd2021.pdf', 'cc-by-nd']]) {
+    await quelleAusFixture(abbildungen._id, a._id, datei, { lizenz })
+  }
+  const ersetzen = await neuAnlegen(a, 'E2E P15 Ersetzen', { 'main.tex': P15_ERSETZEN, 'references.bib': P14_BIB, 'viele.tex': 'x '.repeat(501) })
+  await quelleAusFixture(ersetzen._id, a._id, 'smith2024.pdf')
+  const stand = await neuAnlegen(a, 'E2E P15 Lauf', { 'main.tex': `${P14_KOPF}Alpha.\n\nBeta.\n\nGamma.\n${P14_FUSS}`, 'references.bib': P14_BIB })
+  await quelleAusFixture(stand._id, a._id, 'smith2024.pdf')
+  await neuAnlegen(a, 'E2E P15 Nur Antwort', { 'main.tex': LEER })
+  await neuAnlegen(a, 'E2E P15 TeX', { 'main.tex': LEER })
+  // P17: Die E2E schreibt die Beispiele aus dem Skill spur-abbildungen hinein und kompiliert sie.
+  await neuAnlegen(a, 'E2E P17 Abbildungen', { 'main.tex': LEER })
+  const b = await konto('e2e-p15b@example.org')
+  const fremd = await neuAnlegen(b, 'E2E P15 Fremd', { 'main.tex': LEER })
+  await quelleAusFixture(fremd._id, b._id, 'smith2024.pdf')
+}
+
+const P14_KOPF = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\usepackage{csquotes}
+\addbibresource{references.bib}
+\begin{document}
+`
+const P14_FUSS = String.raw`
+\printbibliography
+\end{document}`
+const P14_SATZ = 'Sleep supports the consolidation of declarative memory.'
+const P14_BIB = `@article{smith2024,
+  title = {Sleep and Memory},
+  doi = {10.5555/spur.2024.001}
+}
+@article{jones2023,
+  title = {Dynamic capabilities for digital transformation in public agencies},
+  doi = {10.5555/spur.heft.001}
+}
+@article{fake2020,
+  title = {Gibt es nirgends},
+  doi = {10.9999/nirgends.1}
+}
+@online{gandhi2024,
+  title = {Replay in artificial neural networks}
+}
+@book{weber2018,
+  title = {Verwaltung und Routinen}
+}
+@article{klein2020,
+  title = {Teams and knowledge}
+}
+`
+
+// Zwölfmal fill=blue!20 in drei Grafiken, dazu ein Zitat aus smith2024.
+const P15_KNOTEN = n => Array.from({ length: 4 }, (_, i) => `  \\node[draw, fill=blue!20] (k${n}${i}) at (${i * 2},0) {${n}.${i}};`).join('\n')
+const P15_ERSETZEN = `${P14_KOPF}Sleep and memory are linked.
+
+\\enquote{${P14_SATZ}} \\parencite[347]{smith2024}
+
+${[1, 2, 3].map(n => `\\begin{tikzpicture}\n${P15_KNOTEN(n)}\n\\end{tikzpicture}`).join('\n\n')}
+${P14_FUSS}`
+
+// P14: Prüfbericht ohne blinde Flecken. Jede Stelle steht auf einer eigenen Zeile (Zeilen 6, 8, 10, …).
+async function p14Vorbereiten(a) {
+  const mitSmith = async (name, zeilen) => {
+    const projekt = await neuAnlegen(a, name, { 'main.tex': P14_KOPF + zeilen.join('\n\n') + P14_FUSS, 'references.bib': P14_BIB })
+    await quelleAusFixture(projekt._id, a._id, 'smith2024.pdf')
+    return projekt
+  }
+  await mitSmith('E2E P14 Textcite', [String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{${P14_SATZ}}`])
+  await mitSmith('E2E P14 Textcite Fälle', [
+    String.raw`\Textcite[S.~347]{smith2024} schreiben: „${P14_SATZ}“`,
+    String.raw`\textcite{smith2024} schreiben: \enquote{${P14_SATZ}} \parencite[S.~347]{smith2024}`,
+    String.raw`\textcite[S.~347]{smith2024} schreiben: \enquote{Sleep invented the consolidation.}`,
+    String.raw`\textcite[S.~347]{smith2024} zeigt das. \enquote{${P14_SATZ}}`,
+    String.raw`\textcite[S.~347]{smith2024} zitieren \enquote{${P14_SATZ}} \parencite[S.~9]{jones2023}`,
+  ])
+  await mitSmith('E2E P14 Varianten', [
+    String.raw`Mehrere Studien stützen das \parencite{smith2024,jones2023,fake2020}.`,
+    String.raw`\Parencite{smith2024} \citeauthor{smith2024} \citeyear{smith2024} \citealp{smith2024} \parencites[12]{smith2024}[34]{jones2023}`,
+    String.raw`\enquote{${P14_SATZ}} \parencite[347]{jones2023,smith2024}`,
+    String.raw`\meincite{smith2024}`,
+  ])
+  const preprint = await mitSmith('E2E P14 Preprint', [
+    String.raw`\enquote{Replay strengthens memory traces.} \parencite[S.~6]{gandhi2024}`,
+    String.raw`\enquote{Replay strengthens memory traces.} \parencite[S.~9]{gandhi2024}`,
+    String.raw`\enquote{${P14_SATZ}} \parencite[347]{smith2024}`,
+    String.raw`\enquote{${P14_SATZ}} \parencite[3]{smith2024}`,
+    String.raw`\enquote{Bureaucracies codify routines in written rules.} \parencite[S.~43]{weber2018}`,
+    String.raw`\enquote{Bureaucracies codify routines in written rules.} \parencite[S.~3]{weber2018}`,
+    String.raw`\enquote{Small teams share knowledge informally.} \parencite[S.~4]{klein2020}`,
+  ])
+  for (const datei of ['gandhi2024.pdf', 'weber2018.pdf', 'klein2020.pdf']) await quelleAusFixture(preprint._id, a._id, datei)
+  await neuAnlegen(a, 'E2E P14 Grafik', { 'main.tex': P14_GRAFIK })
+}
+
+const P14_GRAFIK = String.raw`\documentclass{article}
+\usepackage{tikz}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\tikzset{box/.style={draw, minimum width=2.5cm, line width=0.4pt}}
+\begin{document}
+Einleitung.
+
+\begin{tikzpicture}
+  \node[draw] (a) at (0,0) {Start};
+  \draw[->] (a) -- (4.4,0);
+\end{tikzpicture}
+
+Schluss.
+\end{document}
+`
+
+const P13_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Hello
+\nocite{*}
+\printbibliography
+\end{document}`
+
+const P13_ALT_MAIN = String.raw`\documentclass{article}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{references.bib}
+\begin{document}
+Dynamische Fähigkeiten \autocite{alt2024}. Replay im Schlaf \autocite{replay2024}.
+\printbibliography
+\end{document}`
+
+// Von Hand, wie vor P13: ohne Band und Heft, mit dem Jahr der Online-Fassung; der arXiv-Eintrag als @article ohne journal.
+const P13_ALT_BIB = `@article{alt2024,
+  author = {Oldemeyer, Lena and Mikalef, Patrick},
+  title = {Dynamic capabilities for digital transformation in public agencies},
+  journal = {Government Information Quarterly},
+  year = {2024},
+  doi = {10.5555/spur.heft.001}
+}
+
+@article{replay2024,
+  author = {Gandhi, Kiran and Joshi, Mira},
+  title = {Sleep-like replay improves memory consolidation in artificial neural networks},
+  year = {2024},
+  doi = {10.48550/arXiv.2401.01234}
+}
+`
 
 const CARLITO = String.raw`\documentclass{article}
 \usepackage{carlito}

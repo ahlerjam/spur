@@ -73,29 +73,100 @@ RUN mkdir /install-tl-unx \
     \
 &&  $(find /usr/local/texlive -name tlmgr) path add \
 &&  tlmgr install --repository ${TEXLIVE_MIRROR} \
-      latexmk \
-      texcount \
-      synctex \
-      etoolbox \
-      xetex \
-      biblatex \
-      biber \
-      biblatex-apa \
-      csquotes \
-      natbib \
-      beamer \
-      latexdiff \
+      acronym \
+      algorithmicx \
+      algorithms \
+      apa7 \
+      apacite \
       babel-german \
-      hyphen-german \
-      mhchem \
+      beamer \
+      beamertheme-metropolis \
+      biber \
+      biblatex \
+      biblatex-apa \
+      bigfoot \
+      booktabs \
+      caption \
+      catchfile \
       chemformula \
       chemgreek \
-      xfrac \
-      siunitx \
-      translations \
-      beamertheme-metropolis \
+      cleveref \
+      csquotes \
+      datatool \
+      draftwatermark \
+      endfloat \
+      enumitem \
+      etoolbox \
+      everypage \
+      everysel \
+      everyshi \
+      fancyvrb \
+      finstrut \
+      float \
+      fontspec \
+      footmisc \
+      fp \
+      fvextra \
+      glossaries \
+      hyphen-german \
+      index \
+      koma-script \
+      latex2pydata \
+      latexdiff \
+      latexmk \
+      lineno \
+      listings \
+      logreq \
+      ltabptch \
+      makecell \
+      mathtools \
+      mfirstuc \
+      mhchem \
+      microtype \
+      minted \
+      multirow \
+      natbib \
+      ncctools \
+      newfloat \
+      parskip \
+      pdflscape \
+      pgf \
       pgfopts \
+      pgfplots \
+      placeins \
+      ragged2e \
+      relsize \
+      scalerel \
+      setspace \
+      siunitx \
+      sttools \
+      substr \
+      synctex \
+      texcount \
+      textcase \
+      threeparttable \
+      titlesec \
+      todonotes \
+      tracklang \
+      translations \
+      translator \
+      txfonts \
+      type1cm \
+      upquote \
+      wrapfig \
+      xcolor \
+      xetex \
+      xfor \
+      xfrac \
+      xkeyval \
+      xpatch \
+      xstring \
+      xurl \
 &&  tlmgr path add \
+# minted setzt Code über latexminted (aus dem Paket minted, braucht Python 3.8+). TeX Live führt es auch mit
+# eingeschränktem Shell-Escape aus; docs/adr/0007-minted-ohne-shell-escape.md.
+&&  latexminted --version \
+&&  python3 -c 'import sys; print(sys.version); sys.exit(sys.version_info < (3, 8))' \
 &&  rm -rf /install-tl-unx
 
 

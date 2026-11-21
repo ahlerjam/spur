@@ -1,0 +1,61 @@
+% Übliche APA-7-Abschlussarbeit: muss im Image ohne tex_package_add kompilieren (Workflow „Dev image“, Smoke).
+\documentclass[man]{apa7}
+\usepackage[ngerman]{babel}
+\usepackage{csquotes}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{literatur.bib}
+\usepackage{booktabs}
+\usepackage{threeparttable}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{lineno}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage[ngerman]{cleveref}
+
+\title{Lernzeit und Prüfungserfolg}
+\shorttitle{Lernzeit}
+\authorsnames{Alex Muster}
+\authorsaffiliations{Universität Musterstadt}
+\abstract{Die Arbeit prüft, ob mehr Lernzeit mit besseren Noten einhergeht.}
+\keywords{Lernzeit, Prüfung}
+
+\begin{document}
+\maketitle
+\linenumbers
+
+\section{Einleitung}
+Lernzeit gilt als wichtiger Faktor \parencite{muster2024}. \Cref{tab:noten} und \cref{abb:noten} fassen die Daten zusammen.
+
+\begin{table}[H]
+\caption{Mittlere Note nach Lernzeit}
+\label{tab:noten}
+\begin{threeparttable}
+\begin{tabular}{lrr}
+\toprule
+Lernzeit & $n$ & Note \\
+\midrule
+unter 5 Stunden & 12 & 2,8 \\
+5 Stunden und mehr & 15 & 2,1 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\item \textit{Anmerkung.} Noten von 1 (sehr gut) bis 5 (ungenügend).
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{figure}[H]
+\caption{Mittlere Note nach Lernzeit}
+\label{abb:noten}
+\begin{tikzpicture}
+\begin{axis}[ybar, symbolic x coords={unter 5 h, ab 5 h}, xtick=data, ymin=0, ylabel={Note}]
+\addplot coordinates {(unter 5 h, 2.8) (ab 5 h, 2.1)};
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+
+\printbibliography
+\end{document}

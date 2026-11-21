@@ -84,6 +84,22 @@ describe('Lauf weiterführen', () => {
     expect(gespeichert).toMatchObject({ aenderungen: 2, docs: [doc], rot: [{ grund: 'nicht_pruefbar', auszug: 'X' }] })
   })
 
+  it('aenderungMerken zählt bei alle_vorkommen jede Ersetzung (P15)', async () => {
+    const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
+    await LaufManager.aenderungMerken(lauf, { docId: new ObjectId(), rot: [], anzahl: 12 })
+    expect((await LaufManager.offenerLauf(projekt, bot)).aenderungen).toBe(12)
+  })
+
+  it('aenderungMerken merkt jede Bearbeitung mit Kennung, Anzahl und Rot (P15)', async () => {
+    const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
+    await LaufManager.aenderungMerken(lauf, { docId: new ObjectId(), rot: [], seed: 'a'.repeat(18) })
+    await LaufManager.aenderungMerken(lauf, { docId: new ObjectId(), rot: [{ grund: 'nicht_pruefbar', auszug: 'X' }], seed: 'b'.repeat(18), anzahl: 2 })
+    expect((await LaufManager.offenerLauf(projekt, bot)).bearbeitungen).toEqual([
+      { seed: 'a'.repeat(18), anzahl: 1, rot: false },
+      { seed: 'b'.repeat(18), anzahl: 2, rot: true },
+    ])
+  })
+
   it('aenderungMerken sammelt Zahlen ohne Beleg für die Lauf-Karte', async () => {
     const lauf = await LaufManager.laufFuerSchreiben(projekt, bot)
     await LaufManager.aenderungMerken(lauf, { docId: new ObjectId(), rot: [], zahlen: [{ zahl: '412', pfad: 'main.tex' }] })

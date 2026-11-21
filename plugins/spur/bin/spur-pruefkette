@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Stand der Prüfkette und Abschalten für die laufende Session; die Logik liegt beim Hook.
+set -u
+
+case "${1:-}" in
+  -h|--help|"")
+    cat <<'TXT'
+Aufruf: spur-pruefkette stand
+       spur-pruefkette aus "<grund>"
+
+stand  zeigt, ob in dieser Session Text geändert wurde und welche Stufen der Prüfkette
+       (Gegenprüfung, Endprüfung, Humanizer, check_report) vor run_finish noch fehlen.
+aus    schaltet die Sperre vor run_finish für diese Session ab. Nur, wenn die Person es in
+       dieser Session ausdrücklich verlangt; der Grund gehört in die Zusammenfassung.
+
+Die Session setzt der SessionStart-Hook des Plugins (SPUR_PRUEFKETTE_SESSION, SPUR_PRUEFKETTE_DATA).
+Exit 2 ohne Grund, ohne Session oder bei unbekanntem Befehl.
+TXT
+    [ -n "${1:-}" ] && exit 0 || exit 2 ;;
+esac
+
+hier=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+exec bash "$hier/../hooks/pruefkette" befehl "$@"

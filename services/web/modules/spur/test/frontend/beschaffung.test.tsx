@@ -44,6 +44,34 @@ describe('Beschaffungsliste', function () {
     await screen.findByText('Die Beschaffungsliste ist leer.', { exact: false })
   })
 
+  it('nennt den Grund im Abzeichen und verlinkt bei blockiertem Download die Adresse für den Browser', async function () {
+    fetchMock.get(
+      LISTE,
+      liste(
+        [
+          { ...OFFEN, id: 'b1', titel: 'Blockiert', grund: 'bot_schutz', adresse: 'https://verlag.example/artikel' },
+          { ...OFFEN, id: 'b2', titel: 'Bezahlschranke', grund: 'nicht_frei', adresse: null },
+          { ...OFFEN, id: 'b3', titel: 'Von Hand', grund: null, adresse: null },
+          { ...OFFEN, id: 'b4', titel: 'Erledigt', status: 'beschafft', grund: 'bot_schutz', adresse: 'https://verlag.example/b4' },
+        ],
+        3,
+        1
+      )
+    )
+    zeigen()
+    const zeile = async (titel: string) => (await screen.findByText(titel)).closest('li')!
+    const blockiert = await zeile('Blockiert')
+    expect(blockiert.textContent).to.contain('Frei, Download blockiert')
+    const link = blockiert.querySelector('a[href="https://verlag.example/artikel"]')!
+    expect(link.textContent).to.equal('Im Browser herunterladen')
+    expect(link.getAttribute('rel')).to.contain('noopener')
+    const schranke = await zeile('Bezahlschranke')
+    expect(schranke.textContent).to.contain('Nicht frei verfügbar')
+    expect(schranke.textContent).not.to.contain('Im Browser herunterladen')
+    expect((await zeile('Von Hand')).textContent).not.to.match(/blockiert|Nicht frei/)
+    expect((await zeile('Erledigt')).textContent).not.to.match(/blockiert|Im Browser/)
+  })
+
   it('zeigt offene und beschaffte Einträge mit Bibliothekslink', async function () {
     fetchMock.get(LISTE, liste([OFFEN, { ...OFFEN, id: 'b2', titel: 'Zweites', status: 'beschafft' }], 1, 1))
     zeigen()
