@@ -95,7 +95,7 @@
         "Der Hauptskill erklärt die Sperre in vier Sätzen: wann sie greift, wie man den Stand sieht, dass `spur-pruefkette aus` nur auf ausdrücklichen Wunsch der Person in dieser Session erlaubt ist und dass der Grund in die Zusammenfassung gehört",
         "Eine Nachprüfung ändert die Sperre nicht: Nach `doc_edit` auf `main.tex`, zweimal `SubagentStop` mit `agent_type: \"spur:gegenpruefung\"`, zweimal mit `spur:endpruefung`, dem Humanizer-Skill und `check_report` lässt der Hook `run_finish` durch; fehlt in dieser Folge die Endprüfung, nennt die Begründung nur Endprüfung, Humanizer und `check_report`"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f8",
