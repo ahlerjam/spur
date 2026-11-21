@@ -83,6 +83,12 @@ describe('laufStand', () => {
     expect(laufStand(l, offen([id(S1, 1), id(S1, 2), id(S2, 1)])).aenderungen).toEqual({ gesamt: 2, automatisch_angenommen: 0, offen: 2, rot: 0 })
   })
 
+  it('zählt fremde Changes in einem Lauf mit Bearbeitungen nicht als weitere offene Änderung', () => {
+    // Echter Fall: Ein Massenersatz über Track Changes einer früheren Rücknahme ergab „13 offen“ bei 12 Änderungen.
+    const l = { status: 'offen', aenderungen: 12, bearbeitungen: [{ seed: S1, anzahl: 12, rot: false }], angenommen: [] }
+    expect(laufStand(l, offen([id(S1, 1), id(S2, 1)])).aenderungen).toEqual({ gesamt: 12, automatisch_angenommen: 0, offen: 12, rot: 0 })
+  })
+
   it('sagt nach „Lauf rückgängig“, dass nichts mehr im Text steht', () => {
     const { hinweis } = laufStand(lauf({ status: 'zurueckgenommen' }), [])
     expect(hinweis).toBe(meldung('spur_lauf_hinweis_zurueckgenommen'))

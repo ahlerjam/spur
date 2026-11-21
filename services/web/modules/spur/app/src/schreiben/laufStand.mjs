@@ -36,8 +36,7 @@ export function laufStand(lauf, liste) {
     else if (vonHand.has(b.seed)) angenommenVonHand += b.anzahl
   }
   // Läufe von vor P15 kennen ihre Bearbeitungen nicht: Jeder offene Seed zählt als eine.
-  const bekannt = new Set(bearbeitungen.map(b => b.seed))
-  stand.offen += [...offeneSeeds].filter(s => !bekannt.has(s)).length
+  if (!lauf?.bearbeitungen) stand.offen += offeneSeeds.size
   return { aenderungen: stand, hinweis: hinweisFuer(lauf, stand, { angenommenVonHand, offenRot }) }
 }
 
