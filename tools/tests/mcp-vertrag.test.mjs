@@ -1,5 +1,5 @@
 // node --test tools/tests/mcp-vertrag.test.mjs
-// docs/mcp-contract.md nennt genau die Werkzeuge, die der MCP-Server anbietet.
+// docs/mcp-contract.md nennt genau die Werkzeuge, die der MCP-Server anbietet (werkzeuge.mjs, gelesen über werkzeuge-im-code.mjs).
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
