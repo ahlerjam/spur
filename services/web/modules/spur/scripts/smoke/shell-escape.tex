@@ -1,0 +1,6 @@
+% Darf keinen Befehl ausführen: Das Image kompiliert mit eingeschränktem Shell-Escape (Workflow „Dev image“).
+\documentclass{article}
+\begin{document}
+\immediate\write18{touch /tmp/spur-shell-test}
+Kein Shell-Escape.
+\end{document}

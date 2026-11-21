@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ObjectId, schalterAttrappe, testDatenbank } from './hilfen/datenbank.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
-import { STANDARD } from '../../app/src/workflows/standardtexte.mjs'
+import { PRUEFKETTE, STANDARD } from '../../app/src/workflows/standardtexte.mjs'
 import { meldung } from '../../app/src/meldungen.mjs'
 
 let datenbank
@@ -60,6 +60,23 @@ describe('Workflows', () => {
       expect(text).toMatch(teil)
     }
     expect(text.match(/^[1-5]\. /gm)).toHaveLength(5)
+  })
+
+  it('P17: alle vier Workflows enden mit demselben Absatz zur Prüfkette', () => {
+    const namen = ['literaturueberblick', 'methodenteil', 'folien', 'quellen_sammeln']
+    for (const name of namen) {
+      expect(STANDARD[name].text.endsWith(`\n\n${PRUEFKETTE}`)).toBe(true)
+    }
+    for (const teil of ['spur:gegenpruefung', 'spur:endpruefung', 'humanizer', 'check_report', 'run_finish', 'empfiehlt']) {
+      expect(PRUEFKETTE).toContain(teil)
+    }
+  })
+
+  it('P17: Quellen sammeln nennt search_log, paper_exclude und bot_schutz', () => {
+    const text = STANDARD.quellen_sammeln.text
+    for (const teil of ['search_log', 'paper_exclude', 'bot_schutz', 'spur-pdf-holen', 'nie schätzen oder runden']) {
+      expect(text).toContain(teil)
+    }
   })
 
   it('Quellen sammeln: Anzahl 20 ohne Angabe, „max“ ohne Obergrenze in Etappen', async () => {

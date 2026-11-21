@@ -1050,7 +1050,9 @@ module.exports = {
     sourceEditorComponents: [],
     pdfLogEntryHeaderActionComponents: [],
     pdfLogEntryComponents: [],
-    pdfLogEntriesComponents: [],
+    pdfLogEntriesComponents: [
+      Path.resolve(__dirname, '../modules/spur/frontend/js/kompilieren/fehlende-pakete.tsx'),
+    ],
     pdfPreviewPromotions: [],
     diagnosticActions: [],
     sourceEditorCompletionSources: [],

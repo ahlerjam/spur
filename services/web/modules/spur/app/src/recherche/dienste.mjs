@@ -1,3 +1,4 @@
+import _ from 'lodash'
 import { parseStringPromise } from 'xml2js'
 import { Problem } from '../probleme.mjs'
 import { paperApiBasis, umgebung } from '../schalter.mjs'
@@ -12,6 +13,7 @@ const ECHT = {
   s2: 'https://api.semanticscholar.org',
   crossref: 'https://api.crossref.org',
   unpaywall: 'https://api.unpaywall.org',
+  europepmc: 'https://www.ebi.ac.uk/europepmc',
 }
 
 // Mit Paper-Fake liegt Crossref wie in P1 direkt unter der Basis, die übrigen Dienste darunter.
@@ -215,7 +217,8 @@ export const unpaywall = {
   name: 'unpaywall',
   anzeige: 'Unpaywall',
   abstandMs: 100,
-  // Ergebnis: { frei, pdf, lizenz } oder null, wenn Unpaywall die DOI nicht kennt.
+  // Ergebnis: { frei, fundorte } oder null, wenn Unpaywall die DOI nicht kennt. fundorte sind alle freien
+  // PDF-Adressen ({ url, art, lizenz, seite }), Repositorien zuerst: Verlagsseiten weisen Server öfter ab.
   async status(doi) {
     // Unpaywall verlangt eine Kontaktadresse; die von Crossref taugt auch dafür.
     const email = umgebung('UNPAYWALL_EMAIL') || umgebung('CROSSREF_MAILTO')
@@ -224,15 +227,48 @@ export const unpaywall = {
     url.searchParams.set('email', email)
     const daten = await abrufen(this, url.toString(), { cacheSchluessel: `unpaywall:${doi}` })
     if (!daten) return null
-    const ort = daten.best_oa_location
-    return { frei: daten.is_oa === true, pdf: ort?.url_for_pdf ?? null, lizenz: ort?.license ?? null }
+    const orte = daten.oa_locations ?? [daten.best_oa_location]
+    const fundorte = _.uniqBy(
+      orte
+        .filter(ort => ort?.url_for_pdf)
+        .map(ort => ({
+          url: ort.url_for_pdf,
+          art: ort.host_type === 'repository' ? 'repository' : 'publisher',
+          lizenz: ort.license ?? null,
+          seite: ort.url_for_landing_page ?? null,
+        })),
+      'url'
+    )
+    return { frei: daten.is_oa === true, fundorte: _.sortBy(fundorte, ort => (ort.art === 'repository' ? 0 : 1)) }
+  },
+}
+
+export const europepmc = {
+  name: 'europepmc',
+  anzeige: 'Europe PMC',
+  abstandMs: 150,
+  // Freies PDF zur DOI als Fundort ({ url, art, lizenz, seite }) oder null.
+  async fundort(doi) {
+    const url = new URL(`${basis('europepmc')}/webservices/rest/search`)
+    url.searchParams.set('query', `DOI:${doi}`)
+    url.searchParams.set('format', 'json')
+    url.searchParams.set('resultType', 'core')
+    const daten = await abrufen(this, url.toString(), { cacheSchluessel: `europepmc:${doi}` })
+    const werk = (daten?.resultList?.result ?? []).find(r => r.doi?.toLowerCase() === doi)
+    const pdf = (werk?.fullTextUrlList?.fullTextUrl ?? []).find(u => u.availabilityCode === 'OA' && u.documentStyle === 'pdf')
+    if (!pdf?.url) return null
+    return { url: pdf.url, art: 'europepmc', lizenz: werk.license ?? null, seite: null }
   },
 }
 
 // Metadaten im Format von Crossref.werkAuswerten, damit .bib-Einträge gleich entstehen.
 export async function arxivMetadaten(id) {
   const [e] = (await arxivFeed(arxiv, { id_list: id })).eintraege
-  if (!e) return { gefunden: false }
+  return e ? arxivWerk(e) : { gefunden: false }
+}
+
+// arXiv nennt Namen ungeteilt; der letzte Teil gilt als Nachname. Die Reihenfolge prüft spur danach am PDF.
+export function arxivWerk(e) {
   return {
     gefunden: true,
     titel: e.titel,

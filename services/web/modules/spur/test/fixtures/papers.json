@@ -1,7 +1,7 @@
 {
   "werke": [
-    {"doi": "10.5555/spur.foodwaste", "openalex": "W3000000001", "s2": "f00d0a57e1", "arxiv": "2402.05555", "titel": "Food waste in private households: a cohort study", "abstract": "Households throw away a large share of the food they buy.", "autoren": [["Mara", "Kuehn"]], "jahr": 2023, "journal": "Waste Management", "seiten": "1-12", "frei": false, "dienste": ["arxiv", "openalex", "crossref", "s2"], "zitiertVon": [], "zitiert": []},
-    {"doi": "10.3390/foods11223570", "titel": "Testwerk für gedrosseltes Crossref", "autoren": [["Fixture", "Drossel"]], "jahr": 2022, "journal": "Foods", "seiten": "3570", "frei": true, "pdf": "keller2014.pdf", "lizenz": "cc-by", "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.foodwaste", "openalex": "W3000000001", "s2": "f00d0a57e1", "arxiv": "2402.05554", "titel": "Food waste in private households: a cohort study", "abstract": "Households throw away a large share of the food they buy.", "autoren": [["Mara", "Kuehn"]], "jahr": 2023, "journal": "Waste Management", "seiten": "1-12", "frei": false, "dienste": ["arxiv", "openalex", "crossref", "s2"], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.3390/foods11223570", "titel": "Testwerk für gedrosseltes Crossref", "autoren": [["Fixture", "Drossel"]], "jahr": 2022, "journal": "Foods", "seiten": "3570", "frei": true, "pdf": "foods2022.pdf", "lizenz": "cc-by", "dienste": [], "zitiertVon": [], "zitiert": []},
     {
       "doi": "10.1038/nrn2762",
       "openalex": "W2101234567",
@@ -40,7 +40,7 @@
       "s2": "c3d4e5f6a7",
       "titel": "Sleep-like replay improves memory consolidation in artificial neural networks",
       "abstract": "We add an offline replay phase modelled on sleep to artificial neural networks and show that it reduces catastrophic forgetting.",
-      "autoren": [["Alice", "Smith"], ["Ben", "Lee"]],
+      "autoren": [["Kiran", "Gandhi"], ["Mira", "Joshi"]],
       "jahr": 2024,
       "journal": "arXiv",
       "frei": true,
@@ -62,7 +62,33 @@
       "dienste": ["openalex", "crossref"],
       "zitiertVon": [],
       "zitiert": ["10.1038/nrn2762"]
-    }
+    },
+    {"doi": "10.5555/spur.oa.001", "titel": "Green open access in institutional repositories", "autoren": [["Nora", "Lind"]], "jahr": 2021, "journal": "Learned Publishing", "seiten": "1-9", "frei": true, "fundorte": [{"art": "publisher", "liefert": "html", "lizenz": "cc-by"}, {"art": "repository", "liefert": "oa001.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.002", "titel": "Full text mirrors for biomedical literature", "autoren": [["Omar", "Haddad"]], "jahr": 2020, "journal": "Journal of Biomedical Informatics", "seiten": "10-19", "frei": true, "fundorte": [{"art": "publisher", "liefert": "html", "lizenz": null}], "europepmc": {"pmcid": "PMC9000002", "pdf": "oa002.pdf", "lizenz": "cc by"}, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.003", "titel": "Rate limits on scholarly infrastructure", "autoren": [["Ines", "Probst"]], "jahr": 2022, "journal": "Quantitative Science Studies", "seiten": "20-31", "frei": true, "fundorte": [{"art": "repository", "liefert": "oa003.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.004", "titel": "Sleep and memory consolidation in adolescents", "autoren": [["Tara", "Novak"]], "jahr": 2019, "journal": "Journal of Adolescence", "seiten": "40-52", "frei": true, "fundorte": [{"art": "repository", "liefert": "soil.pdf", "lizenz": "cc-by"}, {"art": "publisher", "liefert": "oa004.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.005", "titel": "Dream recall across the lifespan", "autoren": [["Jon", "Abel"]], "jahr": 2018, "journal": "Dreaming", "seiten": "5-17", "frei": true, "fundorte": [{"art": "repository", "liefert": "soil.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.006", "titel": "Napping and attention in shift workers", "autoren": [["Lea", "Brandt"]], "jahr": 2017, "journal": "Chronobiology International", "seiten": "60-71", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.oa.007", "titel": "Scanned field notes on night shifts", "autoren": [["Kim", "Arnold"]], "jahr": 2016, "journal": "Field Methods", "seiten": "3-8", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.bot.001", "titel": "Publisher walls around open articles", "autoren": [["Rosa", "Stein"]], "jahr": 2023, "journal": "Insights", "seiten": "1-8", "frei": true, "fundorte": [{"art": "publisher", "liefert": 403, "lizenz": "cc-by", "seite": "https://publisher.example/articles/spur.bot.001"}, {"art": "repository", "liefert": "html", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.zu.001", "titel": "Subscription journals and their readers", "autoren": [["Paul", "Winter"]], "jahr": 2015, "journal": "Serials Review", "seiten": "12-20", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.weg.001", "titel": "Link rot in open archives", "autoren": [["Mia", "Kranz"]], "jahr": 2014, "journal": "D-Lib Magazine", "seiten": "1-6", "frei": true, "fundorte": [{"art": "repository", "liefert": 404, "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.p12.a", "titel": "Slow-wave sleep and declarative recall in adults", "autoren": [["Ada", "Rivers"]], "jahr": 2020, "journal": "Sleep", "seiten": "1-10", "frei": true, "fundorte": [{"art": "repository", "liefert": "p12a.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.p12.b", "titel": "Sleep deprivation and working memory in nurses", "autoren": [["Bo", "Lindqvist"]], "jahr": 2021, "journal": "Sleep", "seiten": "1-10", "frei": true, "fundorte": [{"art": "repository", "liefert": "p12b.pdf", "lizenz": "cc-by"}], "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.p12.c", "titel": "Memory reactivation during daytime naps", "autoren": [["Cem", "Aydin"]], "jahr": 2019, "journal": "Sleep", "seiten": "1-10", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.p12.d", "titel": "Sleep and memory in older adults", "autoren": [["Dana", "Okoye"]], "jahr": 2018, "journal": "Sleep", "seiten": "1-10", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.p12.e", "titel": "A commentary on sleep research methods", "autoren": [["Eli", "Marchetti"]], "jahr": 2022, "journal": "Sleep", "seiten": "1-10", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.p12.f", "titel": "Sleep spindles and motor learning", "autoren": [["Fay", "Hoffmann"]], "jahr": 2017, "journal": "Sleep", "seiten": "1-10", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.p12.g", "titel": "Slow oscillations in deep sleep", "autoren": [["Gus", "Petrov"]], "jahr": 2023, "journal": "Sleep", "seiten": "1-10", "frei": false, "dienste": [], "nurDoi": true, "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.heft.001", "titel": "Dynamic capabilities for digital transformation in public agencies", "autoren": [["Lena", "Oldemeyer"],["Patrick", "Mikalef"]], "jahr": 2025, "frei": true, "pdf": "mikalef.pdf", "lizenz": "cc-by", "nurDoi": true, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.heft.002", "titel": "Ethics as a service: a pragmatic operationalisation of AI ethics", "autoren": [["Jessica", "Morley"]], "jahr": 2021, "frei": true, "pdf": "morley2021.pdf", "lizenz": "cc-by", "nurDoi": true, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.kap.001", "titel": "Circadian rhythms in shift work", "autoren": [["Hanna", "Berg"]], "jahr": 2019, "frei": true, "pdf": "berg2019.pdf", "lizenz": "cc-by", "nurDoi": true, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.enr.001", "titel": "Napping habits of university students", "autoren": [["Tomas", "Reyes"]], "jahr": 2019, "frei": true, "pdf": "reyes2019.pdf", "lizenz": "cc-by", "nurDoi": true, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.ent.001", "titel": "Artificial intelligence & firm performance: A review of H2O – 50% more", "autoren": [["Ida", "Asplund"]], "jahr": 2023, "frei": true, "pdf": "asplund2023.pdf", "lizenz": "cc-by", "nurDoi": true, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.5555/spur.pre.001", "titel": "Mind wandering during online lectures", "autoren": [["Sofia", "Lindgren"]], "jahr": 2022, "frei": true, "pdf": "lindgren2022.pdf", "lizenz": "cc-by", "nurDoi": true, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.48550/arxiv.2402.05555", "arxiv": "2402.05555", "titel": "Replay order in hippocampal place cell sequences", "autoren": [["Kiran", "Gandhi"],["Mira", "Joshi"]], "jahr": 2024, "frei": true, "pdf": "arxiv2402.05555.pdf", "lizenz": null, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.48550/arxiv.2402.06666", "arxiv": "2402.06666", "titel": "Offline consolidation in recurrent networks", "autoren": [["Kiran", "Gandhi"],["Mira", "Joshi"]], "jahr": 2024, "frei": true, "pdf": "arxiv2402.06666.pdf", "lizenz": null, "dienste": [], "zitiertVon": [], "zitiert": []},
+    {"doi": "10.48550/arxiv.2402.07777", "arxiv": "2402.07777", "titel": "Spindle coupling across cortical regions", "autoren": [["Jonas", "Müller"],["Ana", "Silva"]], "jahr": 2024, "frei": true, "pdf": "arxiv2402.07777.pdf", "lizenz": null, "dienste": [], "zitiertVon": [], "zitiert": []}
   ],
   "serie": {
     "anzahl": 24,

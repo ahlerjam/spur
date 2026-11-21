@@ -11,6 +11,8 @@ import { meldung } from '../meldungen.mjs'
 import { seitenBild as bildRendern, seitenzahl } from '../pdf.mjs'
 import { jobs } from '../sammlungen.mjs'
 import { jetzt } from '../schalter.mjs'
+import { fehlendeDateien } from './fehlendeDateien.mjs'
+import { fehlendePakete } from './TexPakete.mjs'
 
 const MAX_FEHLER = 20
 const MAX_LOG = 4000
@@ -53,20 +55,25 @@ export async function starten({ projectId, menschId, botId }) {
   // Der Compile läuft im Hintergrund weiter; job_status fragt den Stand ab.
   CompileManager.promises
     .compile(projectId, menschId, { isAutoCompile: false })
-    .then(ergebnis =>
-      sammlung.updateOne(
+    .then(async ergebnis => {
+      const build = { projectId, menschId, buildId: ergebnis.buildId ?? null, clsiServerId: ergebnis.clsiServerId ?? null }
+      await sammlung.updateOne(
         { _id: job._id },
         {
           $set: {
             status: 'fertig',
             fertigAm: jetzt(),
-            ergebnis: { compile: ergebnis.status, dateien: (ergebnis.outputFiles ?? []).map(f => f.path) },
-            buildId: ergebnis.buildId ?? null,
-            clsiServerId: ergebnis.clsiServerId ?? null,
+            ergebnis: {
+              compile: ergebnis.status,
+              dateien: (ergebnis.outputFiles ?? []).map(f => f.path),
+              fehlende_pakete: await paketeDesBuilds(build),
+            },
+            buildId: build.buildId,
+            clsiServerId: build.clsiServerId,
           },
         }
       )
-    )
+    })
     .catch(error => {
       logger.warn({ err: error, projectId }, 'spur: Compile fehlgeschlagen')
       return sammlung.updateOne(
@@ -105,10 +112,33 @@ async function ausgabe({ projectId, menschId, buildId, clsiServerId }, datei) {
   return Buffer.from(await antwort.arrayBuffer())
 }
 
+// Ein fehlendes Log macht den Compile nicht kaputt: Dann sind keine fehlenden Pakete bekannt.
+async function paketeDesBuilds(build) {
+  if (!build.buildId) return []
+  try {
+    return await fehlendePakete(fehlendeDateien((await ausgabe(build, 'output.log')).toString('utf8')))
+  } catch (error) {
+    logger.warn({ err: error, projectId: build.projectId }, 'spur: fehlende Pakete nicht ermittelt')
+    return []
+  }
+}
+
+// Jobs von vor P16 haben keine Liste; eine Liste aus einem Ausfall des Spiegels gilt nicht weiter.
+async function gespeicherteOderNeue(gespeichert, text) {
+  if (gespeichert && !gespeichert.some(e => e.grund)) return gespeichert
+  return await fehlendePakete(fehlendeDateien(text))
+}
+
 export async function log({ projectId, botId }) {
   const job = await letzterCompile(projectId, botId)
   const text = (await ausgabe(job, 'output.log')).toString('utf8')
-  return { job_id: job._id, compile: job.ergebnis.compile, fehler: fehlerAusLog(text), ende: text.slice(-MAX_LOG) }
+  return {
+    job_id: job._id,
+    compile: job.ergebnis.compile,
+    fehler: fehlerAusLog(text),
+    fehlende_pakete: await gespeicherteOderNeue(job.ergebnis.fehlende_pakete, text),
+    ende: text.slice(-MAX_LOG),
+  }
 }
 
 // Für Compiles per Knopf im Editor: Build-ID und Server kommen aus deren Antwort.

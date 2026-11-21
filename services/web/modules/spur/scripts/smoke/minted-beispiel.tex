@@ -1,0 +1,11 @@
+% Code-Listings mit minted: muss im Image ohne -shell-escape kompilieren (latexminted ist in TeX Live vertrauenswürdig).
+\documentclass{article}
+\usepackage{minted}
+\begin{document}
+\begin{minted}{python}
+def mittel(xs): return sum(xs)/len(xs)
+\end{minted}
+\begin{minted}{r}
+mittel <- function(xs) sum(xs) / length(xs)
+\end{minted}
+\end{document}

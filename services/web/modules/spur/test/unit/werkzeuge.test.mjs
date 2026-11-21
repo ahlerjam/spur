@@ -13,6 +13,7 @@ const admin = new ObjectId()
 const bot = new ObjectId()
 const projekt = String(new ObjectId())
 const kontext = { menschId: anna, botId: bot }
+const STAND = { aenderungen: { gesamt: 3, automatisch_angenommen: 2, offen: 1, rot: 1 }, hinweis: 'Zwei Änderungen stehen bereits im Text.' }
 
 beforeAll(async () => {
   datenbank = await testDatenbank()
@@ -24,7 +25,7 @@ beforeEach(async () => {
   recht = berechtigung()
   m = {
     PruefManager: { dokumente: vi.fn(async () => []), bericht: vi.fn() },
-    QuellenManager: { alle: vi.fn(async () => []), suchen: vi.fn(), holen: vi.fn(), seite: vi.fn() },
+    QuellenManager: { alle: vi.fn(async () => []), suchen: vi.fn(), holen: vi.fn(), seite: vi.fn(), seitenBildFuerClaude: vi.fn(async () => Buffer.from('PNG')) },
     ZitatManager: { markieren: vi.fn() },
     SchreibManager: { docEdit: vi.fn(async () => ({ aenderung: true })), docCreate: vi.fn(async () => ({ aenderung: true })) },
     LaufManager: {
@@ -33,7 +34,7 @@ beforeEach(async () => {
       beenden: vi.fn(async () => {}),
       laufFuerClient: vi.fn(l => l && { id: l._id, status: l.status }),
     },
-    LaufAktionen: { nachLaufende: vi.fn(async () => {}) },
+    LaufAktionen: { nachLaufende: vi.fn(async () => {}), stand: vi.fn(async () => STAND) },
     Inbox: {
       warteAufEreignis: vi.fn(),
       seit: vi.fn(),
@@ -42,7 +43,10 @@ beforeEach(async () => {
       antwortSpeichern: vi.fn(async () => ({ _id: 'n1' })),
     },
     Crossref: { pruefen: vi.fn() },
-    Beschaffung: { hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })) },
+    Beschaffung: {
+      hinzufuegen: vi.fn(async () => ({ _id: 'b1', doi: '10.1/x', meta: { titel: 'T' }, status: 'offen' })),
+      aufnehmenOderVormerken: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })),
+    },
     Literatur: { vorschlagen: vi.fn(async () => ({ quelle_id: 'q', spalte: 'Methode' })) },
     Kompilieren: {
       starten: vi.fn(async () => ({ job_id: 'j1', status: 'laeuft' })),
@@ -51,15 +55,28 @@ beforeEach(async () => {
       status: vi.fn(),
     },
     TexPakete: { hinzufuegen: vi.fn(async () => ({ paket: 'xfrac', dateien: [], fehlende_abhaengigkeiten: [] })) },
-    Aufnahme: { perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })) },
+    TexDateien: { lesen: vi.fn(async ({ name }) => ({ name, pfad: '/tex/article.cls', zeilen: 3, text: 'x' })) },
+    UploadLink: { GUELTIG_MINUTEN: 15, MAX_DATEIEN: 50, MAX_PROJEKTDATEIEN: 20, erzeugen: vi.fn(async () => ({ link: 'https://x/spur/hochladen/t' })) },
+    Projektdatei: { abbildungAusQuelle: vi.fn(async ({ pfad }) => ({ pfad, lizenz: 'cc-by', quellenangabe: 'Aus \\textcite{offen2023}, S. 3, Lizenz CC BY.' })) },
+    Aufnahme: {
+      perDoi: vi.fn(async () => ({ _id: 'q1', key: 'keller2014', dateiname: 'keller2014.pdf', doi: '10.1/x' })),
+      perUrl: vi.fn(async () => ({ _id: 'q2', key: 'virtanen2024', dateiname: 'virtanen2024.pdf', doi: null, titelabgleich: 'passt' })),
+    },
     Erwaehnung: { imThreadAntworten: vi.fn(async () => ({ nachricht_id: 'm1' })) },
     Vorschlaege: { ARTEN: ['compile_fehler', 'belegloses_argument'], vorschlagen: vi.fn(async () => ({ vorschlag_id: 'v1' })) },
     Recherche: { doiPruefen: d => d.toLowerCase(), suchen: vi.fn(async () => ({ treffer: [], fehler: [] })), zitationen: vi.fn(async () => ({ treffer: [] })) },
+    Suchprotokoll: {
+      SEITE: 50,
+      liste: vi.fn(async () => ({ eintraege: [{ anfrage: 'sleep', seite: 0 }], gesamt: 1, weiter: false })),
+      prisma: vi.fn(async () => ({ identifiziert: 9, dubletten: 2, gesichtet: 7 })),
+      ausschliessen: vi.fn(async ({ doi, grund }) => ({ doi, titel: 'T', grund })),
+    },
   }
   vi.resetModules()
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
   recht.anmelden(vi)
   vi.doMock('../../app/src/pruefung/PruefManager.mjs', () => m.PruefManager)
+  vi.doMock('../../app/src/recherche/Suchprotokoll.mjs', () => m.Suchprotokoll)
   vi.doMock('../../app/src/QuellenManager.mjs', () => m.QuellenManager)
   vi.doMock('../../app/src/ZitatManager.mjs', () => m.ZitatManager)
   vi.doMock('../../app/src/schreiben/SchreibManager.mjs', () => m.SchreibManager)
@@ -71,6 +88,9 @@ beforeEach(async () => {
   vi.doMock('../../app/src/recherche/Aufnahme.mjs', () => m.Aufnahme)
   vi.doMock('../../app/src/kompilieren/Kompilieren.mjs', () => m.Kompilieren)
   vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => m.TexPakete)
+  vi.doMock('../../app/src/hochladen/UploadLink.mjs', () => m.UploadLink)
+  vi.doMock('../../app/src/kompilieren/TexDateien.mjs', () => m.TexDateien)
+  vi.doMock('../../app/src/hochladen/Projektdatei.mjs', () => m.Projektdatei)
   vi.doMock('../../app/src/literatur/Literatur.mjs', () => m.Literatur)
   vi.doMock('../../app/src/recherche/Beschaffung.mjs', () => m.Beschaffung)
   vi.doMock('../../app/src/erwaehnung/Erwaehnung.mjs', () => m.Erwaehnung)
@@ -95,9 +115,12 @@ describe('Rechte der Werkzeuge', () => {
     ['suggest', { art: 'compile_fehler', titel: 'Fehler in Zeile 4', text: 'x' }],
     ['run_status', {}],
     ['paper_search', { anfrage: 'sleep' }],
+    ['search_log', {}],
     ['compile', {}],
     ['compile_log', {}],
     ['page_image', { seite: 1 }],
+    ['source_page_image', { quelle_id: 'q', pdf_seite: 1 }],
+    ['tex_file_read', { name: 'article.cls' }],
   ]
 
   it.each(alleLesen)('%s verweigert Nutzern ohne Zugriff mit keine_rechte', async (name, args) => {
@@ -234,14 +257,37 @@ describe('Lesen im Projekt', () => {
     expect(await fehlerVon(aufruf('doc_read', { project_id: projekt, pfad: 'nope.tex' }))).toMatchObject({ code: 'doc_fehlt' })
   })
 
-  it('sources_list zeigt Status ohne Text', async () => {
+  it('sources_list zeigt Status und Titel ohne Text', async () => {
     m.QuellenManager.alle.mockResolvedValue([
-      { _id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', seitenzahl: 8, status: 'text', fassung: '', meta: { geheim: 1 } },
+      { _id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', seitenzahl: 8, status: 'text', fassung: '', meta: { titel: 'A & B', geheim: 1 } },
     ])
     expect(await aufruf('sources_list', { project_id: projekt })).toEqual({
-      eintraege: [{ id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', seiten: 8, status: 'text', fassung: '' }],
+      eintraege: [{ id: 'q1', dateiname: 'a.pdf', key: 'a', doi: '10.1/a', titel: 'A & B', seiten: 8, status: 'text', fassung: '' }],
       naechster_cursor: null,
     })
+  })
+
+  it('sources_list nennt den Titelabgleich und warnt bei einem abweichenden PDF', async () => {
+    const quelle = (id, titelabgleich) => ({ _id: id, dateiname: `${id}.pdf`, key: id, doi: null, seitenzahl: 2, status: 'text', fassung: '', titelabgleich })
+    m.QuellenManager.alle.mockResolvedValue([quelle('a', 'passt'), quelle('b', 'abweichend'), quelle('c', 'nicht_pruefbar')])
+    const { eintraege } = await aufruf('sources_list', { project_id: projekt })
+    expect(eintraege.map(e => [e.titelabgleich, e.hinweis])).toEqual([
+      ['passt', undefined],
+      ['abweichend', meldung('spur_hinweis_titel_abweichend')],
+      ['nicht_pruefbar', undefined],
+    ])
+  })
+
+  it('sources_list nennt Autorenabgleich und unvollständige Metadaten; nur abweichend ist ein Hinweis (P13)', async () => {
+    const quelle = (id, felder) => ({ _id: id, dateiname: `${id}.pdf`, key: id, doi: null, seitenzahl: 2, status: 'text', fassung: '', ...felder })
+    m.QuellenManager.alle.mockResolvedValue([quelle('a', { autoren: 'aus_pdf' }), quelle('b', { autoren: 'abweichend' }), quelle('c', { metadaten: 'unvollstaendig' }), quelle('d')])
+    const { eintraege } = await aufruf('sources_list', { project_id: projekt })
+    expect(eintraege.map(e => [e.autoren, e.autoren_hinweis, e.metadaten])).toEqual([
+      ['aus_pdf', undefined, undefined],
+      ['abweichend', meldung('spur_hinweis_autoren_abweichend'), undefined],
+      [undefined, undefined, 'unvollstaendig'],
+      [undefined, undefined, undefined],
+    ])
   })
 
   it('source_search nennt gedruckte Seite, PDF-Seite und Position, keinen Absatz', async () => {
@@ -265,9 +311,52 @@ describe('Lesen im Projekt', () => {
       quelle_id: 'q1',
       seite: 3,
       text: 'abcd',
+      ab_zeichen: 0,
+      bis_zeichen: 4,
+      zeichen_gesamt: 10,
       gekuerzt: true,
     })
     expect((await aufruf('source_read', { project_id: projekt, source_id: 'q1', pdf_seite: 3 })).gekuerzt).toBe(false)
+  })
+
+  describe('source_read ab einer Stelle', () => {
+    // Echter Fall: Treffer von source_search an Position 4858 und 6037 lagen hinter Zeichen 4000.
+    const text = `${'x'.repeat(6037)}The effect persisted after twelve weeks.${'y'.repeat(9500 - 6037 - 40)}`
+    const lesen = args => aufruf('source_read', { project_id: projekt, source_id: 'q1', pdf_seite: 2, ...args })
+    beforeEach(() => {
+      m.QuellenManager.holen.mockResolvedValue({ _id: 'q1' })
+      m.QuellenManager.seite.mockResolvedValue({ seite: 2, label: null, text })
+    })
+
+    it('liest ab ab_zeichen bis zum Seitenende', async () => {
+      const r = await lesen({ ab_zeichen: 6000 })
+      expect(r.text).toContain('The effect persisted after twelve weeks.')
+      expect(r).toMatchObject({ ab_zeichen: 6000, bis_zeichen: 9500, zeichen_gesamt: 9500, gekuerzt: false })
+    })
+
+    it('liest ab 4858 höchstens 4000 Zeichen', async () => {
+      expect(await lesen({ ab_zeichen: 4858 })).toMatchObject({ ab_zeichen: 4858, bis_zeichen: 8858, gekuerzt: true })
+    })
+
+    it('liefert ohne ab_zeichen die ersten 4000 Zeichen und die Gesamtzahl', async () => {
+      const r = await lesen({})
+      expect(r.text).toHaveLength(4000)
+      expect(r).toMatchObject({ ab_zeichen: 0, bis_zeichen: 4000, zeichen_gesamt: 9500, gekuerzt: true })
+    })
+
+    it('liefert hinter dem Seitenende leeren Text statt eines Fehlers', async () => {
+      expect(await lesen({ ab_zeichen: 20000 })).toMatchObject({ text: '', zeichen_gesamt: 9500, gekuerzt: false })
+    })
+
+    it('lehnt negatives ab_zeichen mit eingabe_ungueltig ab', async () => {
+      const fehler = await fehlerVon(lesen({ ab_zeichen: -1 }))
+      expect(fehler).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'ab_zeichen' } })
+      expect(WERKZEUGE.source_read.inputSchema.safeParse({ project_id: projekt, source_id: projekt, pdf_seite: 2, ab_zeichen: -1 }).success).toBe(true)
+    })
+
+    it('sagt in der Beschreibung, wie man weiterliest', () => {
+      expect(WERKZEUGE.source_read.description).toMatch(/bis_zeichen.*als nächstes ab_zeichen/)
+    })
   })
 
   it('check_report liefert Zeilen seitenweise samt Statistik', async () => {
@@ -278,16 +367,16 @@ describe('Lesen im Projekt', () => {
     expect(ergebnis).not.toHaveProperty('abschnitte')
   })
 
-  it('bib_list nennt den Status der DOI je Eintrag', async () => {
+  it('bib_list nennt den Status der DOI und die Abweichungen von Crossref je Eintrag', async () => {
     m.Crossref.pruefen.mockImplementation(async doi =>
-      ({ '10.1/a': { gefunden: true, retraction: 'zurueckgezogen' }, '10.1/c': { gefunden: false }, '10.1/d': null })[doi]
+      ({ '10.1/a': { gefunden: true, registrierstelle: 'crossref', retraction: 'zurueckgezogen', band: '7' }, '10.1/c': { gefunden: false }, '10.1/d': null })[doi]
     )
     const { eintraege } = await aufruf('bib_list', { project_id: projekt })
     expect(eintraege).toEqual([
-      { key: 'a', doi: '10.1/a', referenz: 'gefunden', retraction: 'zurueckgezogen' },
-      { key: 'b', doi: null, referenz: 'ohne_doi', retraction: null },
-      { key: 'c', doi: '10.1/c', referenz: 'nicht_gefunden', retraction: null },
-      { key: 'd', doi: '10.1/d', referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null },
+      { key: 'a', doi: '10.1/a', referenz: 'gefunden', registrierstelle: 'crossref', retraction: 'zurueckgezogen', abweichungen: [{ feld: 'volume', eintrag: null, erwartet: '7' }] },
+      { key: 'b', doi: null, referenz: 'ohne_doi', retraction: null, abweichungen: null, abweichungen_grund: 'ohne_doi' },
+      { key: 'c', doi: '10.1/c', referenz: 'nicht_gefunden', retraction: null, abweichungen: null, abweichungen_grund: 'nicht_bei_crossref' },
+      { key: 'd', doi: '10.1/d', referenz: 'nicht_pruefbar', grund: 'crossref_nicht_erreichbar', retraction: null, abweichungen: null, abweichungen_grund: 'crossref_nicht_erreichbar' },
     ])
   })
 })
@@ -311,7 +400,10 @@ describe('Schreiben', () => {
       alt: 'x',
       neu: 'y',
       schluessel: 'schluessel-0001',
+      alleVorkommen: false,
     })
+    await aufruf('doc_edit', { project_id: projekt, pfad: 'a.tex', alt: 'x', neu: 'y', alle_vorkommen: true, idempotenz_schluessel: 'schluessel-0002' })
+    expect(m.SchreibManager.docEdit).toHaveBeenLastCalledWith(expect.objectContaining({ alleVorkommen: true }))
   })
 
   it('doc_create reicht Pfad und Inhalt weiter', async () => {
@@ -344,15 +436,16 @@ describe('Schreiben', () => {
     expect(m.SchreibManager.docEdit).not.toHaveBeenCalled()
   })
 
-  it('run_status zeigt den letzten Lauf', async () => {
-    expect(await aufruf('run_status', { project_id: projekt })).toEqual({ lauf: { id: 'l1', status: 'offen' } })
+  it('run_status zeigt den letzten Lauf mit seinem Stand', async () => {
+    expect(await aufruf('run_status', { project_id: projekt })).toEqual({ lauf: { id: 'l1', status: 'offen' }, ...STAND })
+    expect(m.LaufAktionen.stand).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1', status: 'offen' })
   })
 
   it('run_finish beendet den offenen Lauf und stößt die Automatik an', async () => {
     const ergebnis = await aufruf('run_finish', { project_id: projekt, zusammenfassung: 'Geglättet.' })
     expect(m.LaufManager.beenden).toHaveBeenCalledWith({ _id: 'l1' }, 'Geglättet.')
     expect(m.LaufAktionen.nachLaufende).toHaveBeenCalledWith(new ObjectId(projekt), { _id: 'l1' })
-    expect(ergebnis).toEqual({ lauf: { id: 'l1', status: 'offen' } })
+    expect(ergebnis).toEqual({ lauf: { id: 'l1', status: 'offen' }, ...STAND })
   })
 
   it('run_finish meldet kein_lauf, wenn keiner offen ist', async () => {
@@ -429,6 +522,40 @@ describe('Recherche', () => {
     })
   })
 
+  it('paper_search nimmt den cursor der nächsten Seite und nennt den folgenden', async () => {
+    m.Recherche.suchen.mockImplementation(async ({ seite }) => ({ seite, treffer: [], fehler: [], weiter: seite === 0 }))
+    const erste = await aufruf('paper_search', { project_id: projekt, anfrage: 'sleep' })
+    expect(erste.naechster_cursor).toBe('1')
+    const zweite = await aufruf('paper_search', { project_id: projekt, anfrage: 'sleep', cursor: erste.naechster_cursor })
+    expect(m.Recherche.suchen).toHaveBeenLastCalledWith(expect.objectContaining({ seite: 1 }))
+    expect(zweite.naechster_cursor).toBeNull()
+  })
+
+  it('search_log liefert die Anfragen in zeitlicher Folge, die PRISMA-Summen und blättert mit cursor', async () => {
+    mitStufe('readOnly')
+    expect(await aufruf('search_log', { project_id: projekt })).toEqual({
+      eintraege: [{ anfrage: 'sleep', seite: 0 }],
+      naechster_cursor: null,
+      prisma: { identifiziert: 9, dubletten: 2, gesichtet: 7 },
+    })
+    expect(m.Suchprotokoll.liste).toHaveBeenCalledWith(new ObjectId(projekt), { ab: 0, aufsteigend: true })
+    m.Suchprotokoll.liste.mockResolvedValue({ eintraege: [], gesamt: 120, weiter: true })
+    expect((await aufruf('search_log', { project_id: projekt, cursor: '50' })).naechster_cursor).toBe('100')
+    expect(m.Suchprotokoll.liste).toHaveBeenLastCalledWith(new ObjectId(projekt), { ab: 50, aufsteigend: true })
+  })
+
+  it('paper_exclude verlangt Schreibrechte und schließt per DOI oder Titel mit Grund aus', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('paper_exclude', { project_id: projekt, doi: '10.1/X', grund: 'falsche Population' }))).toMatchObject({ code: 'keine_rechte' })
+    expect(m.Suchprotokoll.ausschliessen).not.toHaveBeenCalled()
+    mitStufe('owner')
+    expect(await aufruf('paper_exclude', { project_id: projekt, doi: '10.1/X', grund: 'falsche Population' })).toEqual({ doi: '10.1/x', titel: 'T', grund: 'falsche Population' })
+    expect(m.Suchprotokoll.ausschliessen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x', titel: undefined, grund: 'falsche Population' })
+    await aufruf('paper_exclude', { project_id: projekt, titel: 'Ohne DOI', grund: 'Abschlussarbeit' })
+    expect(m.Suchprotokoll.ausschliessen).toHaveBeenLastCalledWith(expect.objectContaining({ doi: undefined, titel: 'Ohne DOI' }))
+    expect(await fehlerVon(aufruf('paper_exclude', { project_id: projekt, grund: 'x' }))).toMatchObject({ typ: 'eingabe_ungueltig', zusatz: { feld: 'doi' } })
+  })
+
   it('paper_citations reicht DOI und Richtung weiter', async () => {
     await aufruf('paper_citations', { doi: '10.1038/nrn2762', richtung: 'zitiert' })
     expect(m.Recherche.zitationen).toHaveBeenCalledWith('10.1038/nrn2762', 'zitiert')
@@ -444,7 +571,35 @@ describe('Recherche', () => {
       dateiname: 'keller2014.pdf',
       doi: '10.1/x',
     })
-    expect(m.Aufnahme.perDoi).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
+    expect(m.Beschaffung.aufnehmenOderVormerken).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, doi: '10.1/x' })
+  })
+
+  it('source_add nimmt eine Quelle ohne DOI per pdf_url mit Metadaten auf', async () => {
+    mitStufe('readOnly')
+    const metadaten = { titel: 'Generative AI adoption in a large enterprise', autoren: [{ family: 'Virtanen', given: 'Aino' }], jahr: 2024, art: 'thesis' }
+    const eingabe = { project_id: projekt, pdf_url: 'https://trepo.example/thesis.pdf', metadaten }
+    expect(await fehlerVon(aufruf('source_add', eingabe))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('owner')
+    expect(await aufruf('source_add', eingabe)).toEqual({ quelle_id: 'q2', key: 'virtanen2024', dateiname: 'virtanen2024.pdf', doi: null, titelabgleich: 'passt' })
+    expect(m.Aufnahme.perUrl).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), userId: anna, pdfUrl: 'https://trepo.example/thesis.pdf', metadaten })
+    expect(m.Beschaffung.aufnehmenOderVormerken).not.toHaveBeenCalled()
+  })
+
+  it('source_add verlangt genau eines von doi und pdf_url und nennt das Feld', async () => {
+    mitStufe('owner')
+    const beide = await fehlerVon(aufruf('source_add', { project_id: projekt, doi: '10.1/x', pdf_url: 'https://trepo.example/thesis.pdf' }))
+    expect(beide).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'pdf_url' } })
+    expect(beide.message).toBe(meldung('spur_fehler_eingabe_doi_oder_pdf_url', { feld: 'pdf_url' }))
+    const keines = await fehlerVon(aufruf('source_add', { project_id: projekt }))
+    expect(keines).toMatchObject({ status: 422, typ: 'eingabe_ungueltig', zusatz: { feld: 'doi' } })
+    expect(m.Aufnahme.perUrl).not.toHaveBeenCalled()
+    expect(m.Beschaffung.aufnehmenOderVormerken).not.toHaveBeenCalled()
+  })
+
+  it('source_add nennt nach einer Aufnahme das Ergebnis des Titelabgleichs', async () => {
+    mitStufe('owner')
+    m.Beschaffung.aufnehmenOderVormerken.mockResolvedValue({ _id: 'q1', key: 'k', dateiname: 'k.pdf', doi: '10.1/x', titelabgleich: 'passt' })
+    expect(await aufruf('source_add', { project_id: projekt, doi: '10.1/X' })).toMatchObject({ titelabgleich: 'passt' })
   })
 
   it('acquisition_add verlangt Schreibrechte und setzt die DOI auf die Liste', async () => {
@@ -470,6 +625,15 @@ describe('Recherche', () => {
     expect(m.Literatur.vorschlagen).toHaveBeenCalledWith(new ObjectId(projekt), { quelleId: quelle, spalte: 'Methode', text: 'x', botId: bot })
   })
 
+  it('source_page_image liefert die Quellseite als MCP-Bild', async () => {
+    m.QuellenManager.holen.mockResolvedValue({ _id: 'q1' })
+    expect(await aufruf('source_page_image', { project_id: projekt, quelle_id: 'q1', pdf_seite: 4 })).toEqual({
+      content: [{ type: 'image', data: Buffer.from('PNG').toString('base64'), mimeType: 'image/png' }],
+    })
+    expect(m.QuellenManager.holen).toHaveBeenCalledWith(new ObjectId(projekt), 'q1')
+    expect(m.QuellenManager.seitenBildFuerClaude).toHaveBeenCalledWith({ _id: 'q1' }, 4)
+  })
+
   it('compile startet als Person und Bot, page_image liefert ein PNG als MCP-Bild', async () => {
     mitStufe('readOnly')
     expect(await aufruf('compile', { project_id: projekt })).toEqual({ job_id: 'j1', status: 'laeuft' })
@@ -485,5 +649,45 @@ describe('Recherche', () => {
     mitStufe('readAndWrite')
     await aufruf('tex_package_add', { project_id: projekt, paket: 'xfrac' })
     expect(m.TexPakete.hinzufuegen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: 'xfrac' })
+  })
+
+  it('tex_package_add reicht datei statt paket weiter, auch nur mit Schreibrecht', async () => {
+    mitStufe('readOnly')
+    expect(await fehlerVon(aufruf('tex_package_add', { project_id: projekt, datei: 'booktabs.sty' }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    await aufruf('tex_package_add', { project_id: projekt, datei: 'booktabs.sty' })
+    expect(m.TexPakete.hinzufuegen).toHaveBeenLastCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, paket: undefined, datei: 'booktabs.sty' })
+  })
+
+  it('file_upload_link verlangt Schreibrecht und erzeugt einen Link für Projektdateien', async () => {
+    mitStufe('review')
+    expect(await fehlerVon(aufruf('file_upload_link', { project_id: projekt }))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('readAndWrite')
+    expect(await aufruf('file_upload_link', { project_id: projekt })).toEqual({ link: 'https://x/spur/hochladen/t' })
+    expect(m.UploadLink.erzeugen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), menschId: anna, botId: bot, art: 'datei' })
+    expect(WERKZEUGE.file_upload_link.description).toMatch(/--projektdatei/)
+  })
+
+  it('source_figure_add verlangt Schreibrecht und reicht Quelle, Seite, Ausschnitt und Pfad weiter', async () => {
+    const args = { project_id: projekt, quelle_id: 'q1', pdf_seite: 3, ausschnitt: { x: 0.1, y: 0.2, breite: 0.8, hoehe: 0.4 }, pfad: 'abbildungen/offen2023-abb2.png' }
+    mitStufe('review')
+    expect(await fehlerVon(aufruf('source_figure_add', args))).toMatchObject({ code: 'keine_rechte' })
+    mitStufe('owner')
+    m.QuellenManager.holen.mockResolvedValue({ _id: 'q1', key: 'offen2023' })
+    expect(await aufruf('source_figure_add', args)).toMatchObject({ pfad: 'abbildungen/offen2023-abb2.png', lizenz: 'cc-by' })
+    expect(m.Projektdatei.abbildungAusQuelle).toHaveBeenCalledWith({
+      projectId: new ObjectId(projekt), menschId: anna, botId: bot, quelle: { _id: 'q1', key: 'offen2023' }, seite: 3, ausschnitt: args.ausschnitt, pfad: args.pfad,
+    })
+    // Ausschnitt und Pfad prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feld ergibt.
+    expect(WERKZEUGE.source_figure_add.inputSchema.safeParse({ ...args, quelle_id: projekt, ausschnitt: { x: 0, y: 0, breite: 0, hoehe: 2 }, pfad: 'a.jpg' }).success).toBe(true)
+  })
+
+  it('tex_file_read liest mit Leserecht und reicht Projekt, Name und Zeile weiter', async () => {
+    mitStufe('readOnly')
+    expect(await aufruf('tex_file_read', { project_id: projekt, name: 'article.cls', ab_zeile: 200 })).toMatchObject({ name: 'article.cls' })
+    expect(m.TexDateien.lesen).toHaveBeenCalledWith({ projectId: new ObjectId(projekt), name: 'article.cls', abZeile: 200 })
+    // Den Namen prüft spur selbst, damit ein Fehler eingabe_ungueltig mit dem Feld ergibt.
+    expect(WERKZEUGE.tex_file_read.inputSchema.safeParse({ project_id: projekt, name: '../../etc/passwd' }).success).toBe(true)
+    expect(WERKZEUGE.tex_file_read.description).toMatch(/tex_package_add/)
   })
 })

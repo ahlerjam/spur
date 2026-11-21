@@ -11,7 +11,7 @@ import MaterialIcon from '@/shared/components/material-icon'
 import Notification from '@/shared/components/notification'
 import { befunde } from './befunde'
 import PruefEinstellungen from './pruef-einstellungen'
-import { pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, type StellenStatus, Zeile } from './pruef-store'
+import { type Abweichung, pruefen, pruefenWennNoetig, pruefStore, STELLEN_STATUS, type StellenStatus, Zeile } from './pruef-store'
 
 const FILTER = {
   alle: () => true,
@@ -57,6 +57,29 @@ function Zeitpunkt({ am }: { am: number | null }) {
   return <p className="spur-zeile-meta spur-zeitpunkt">{t('spur_zuletzt_geprueft', { zeit })}</p>
 }
 
+// Ein Hinweis, kein Befund: neutral wie die anderen Hinweise, aufklappbar zu den Feldern mit beiden Werten.
+function Literaturdaten({ id, abweichungen }: { id: string; abweichungen: Abweichung[] }) {
+  const { t } = useTranslation()
+  const [offen, setOffen] = useState(false)
+  const listeId = `spur-abweichungen-${id}`
+  const feldname = (a: Abweichung) => (a.feld === 'eintragstyp' ? t('spur_abweichung_eintragstyp') : a.feld)
+  const wert = (a: Abweichung, w: string | null) => (w === null ? t('spur_abweichung_fehlt') : a.feld === 'eintragstyp' ? `@${w}` : w)
+  return (
+    <>
+      <OLBadge as="button" type="button" bg="info" className="spur-badge-knopf" aria-expanded={offen} aria-controls={listeId} onClick={() => setOffen(!offen)}>
+        {t('spur_literaturdaten_unvollstaendig')} <MaterialIcon type={offen ? 'expand_less' : 'expand_more'} />
+      </OLBadge>
+      {offen && (
+        <ul className="spur-abweichungen" id={listeId}>
+          {abweichungen.map(a => (
+            <li key={a.feld}>{t('spur_abweichung', { feld: feldname(a), eintrag: wert(a, a.eintrag), erwartet: wert(a, a.erwartet) })}</li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+}
+
 function BerichtZeile({ zeile }: { zeile: Zeile }) {
   const { t } = useTranslation()
   const { openDocWithId } = useEditorManagerContext()
@@ -86,6 +109,7 @@ function BerichtZeile({ zeile }: { zeile: Zeile }) {
             {b.text}
           </OLBadge>
         ))}
+        {zeile.abweichungen?.length ? <Literaturdaten id={zeile.id} abweichungen={zeile.abweichungen} /> : null}
       </div>
     </li>
   )

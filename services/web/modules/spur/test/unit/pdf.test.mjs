@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
-import { ocrSeite, seitenBild, seitenTexte, textEbene, textEbeneAuswerten, tsvAuswerten, versatzAusLabels, vttSeiten } from '../../app/src/pdf.mjs'
+import { ausschnittBild, ocrSeite, seitenBild, seitenTexte, textEbene, textEbeneAuswerten, tsvAuswerten, versatzAusLabels, versatzAusSeitentext, vttSeiten } from '../../app/src/pdf.mjs'
 import { fehlerVon } from './hilfen/fehler.mjs'
 
 const fixture = name => fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url))
@@ -41,6 +41,34 @@ describe('versatzAusLabels', () => {
   })
 })
 
+describe('versatzAusSeitentext', () => {
+  const seite = (text, zahl, oben = false) => (oben ? `${zahl}\n${text}\n` : `${text}\nmehr Text\n  ${zahl}  \n\n`)
+
+  it('liest die gedruckte Seitenzahl allein in der ersten oder letzten Zeile', () => {
+    const texte = Array.from({ length: 12 }, (_, i) => seite(`Kapitel ${i}`, 41 + i, i % 2 === 0))
+    expect(versatzAusSeitentext(texte)).toBe(40)
+  })
+
+  it('braucht mindestens fünf Seiten mit demselben Versatz', () => {
+    const texte = Array.from({ length: 10 }, (_, i) => (i < 4 ? seite('x', 11 + i) : 'ohne Zahl\n'))
+    expect(versatzAusSeitentext(texte)).toBeNull()
+  })
+
+  it('braucht 80 % der erkannten Seiten', () => {
+    const texte = [...Array.from({ length: 6 }, (_, i) => seite('x', 11 + i)), ...Array.from({ length: 4 }, (_, i) => seite('x', 99 + i))]
+    expect(versatzAusSeitentext(texte)).toBeNull()
+    expect(versatzAusSeitentext([...texte.slice(0, 8).map((_, i) => seite('x', 11 + i)), ...texte.slice(8)])).toBe(10)
+  })
+
+  it('zählt weder römische Zahlen noch Zahlen im Satz und liest nur die ersten 30 Seiten', () => {
+    const roemisch = Array.from({ length: 8 }, (_, i) => seite('x', ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii'][i]))
+    expect(versatzAusSeitentext(roemisch)).toBeNull()
+    expect(versatzAusSeitentext(Array.from({ length: 8 }, (_, i) => `Text\nSeite ${i + 1} von 8\n`))).toBeNull()
+    const spaet = [...Array.from({ length: 30 }, () => 'leer\n'), ...Array.from({ length: 10 }, (_, i) => seite('x', 31 + i))]
+    expect(versatzAusSeitentext(spaet)).toBeNull()
+  })
+})
+
 describe('seitenBild', () => {
   it('schreibt die Seite als PNG neben das Ziel', async () => {
     const ziel = join(ordner, 'seite-3')
@@ -52,9 +80,25 @@ describe('seitenBild', () => {
 
   it('rendert auf eine vorgegebene Breite in Pixeln', async () => {
     const { readFileSync } = await import('node:fs')
-    const pfad = await seitenBild(fixture('smith2024.pdf'), 1, join(ordner, 'seite-1-breit'), 1400)
+    const pfad = await seitenBild(fixture('smith2024.pdf'), 1, join(ordner, 'seite-1-breit'), { breite: 1400 })
     // PNG: Breite steht ab Byte 16 im IHDR-Block.
     expect(readFileSync(pfad).readUInt32BE(16)).toBe(1400)
+  })
+
+  it('begrenzt die längste Kante, bei Hochformat also die Höhe', async () => {
+    const { readFileSync } = await import('node:fs')
+    const png = readFileSync(await seitenBild(fixture('smith2024.pdf'), 4, join(ordner, 'seite-4-kante'), { kante: 1600 }))
+    const [breite, hoehe] = [png.readUInt32BE(16), png.readUInt32BE(20)]
+    expect(hoehe).toBe(1600)
+    expect(breite).toBeLessThan(1600)
+  })
+})
+
+describe('ausschnittBild', () => {
+  it('rendert auch einen sehr schmalen Ausschnitt mindestens 1 px breit, nie die Restseite', async () => {
+    const { readFileSync } = await import('node:fs')
+    const png = readFileSync(await ausschnittBild(fixture('smith2024.pdf'), 4, join(ordner, 'schmal'), { x: 0.1, y: 0.1, breite: 0.0001, hoehe: 0.5 }))
+    expect(png.readUInt32BE(16)).toBe(1)
   })
 })
 

@@ -1,5 +1,8 @@
 import { anfrage, projektPfad } from '../api'
 
+// Ein Feld des .bib-Eintrags, das laut Crossref fehlt oder anders ist (eintrag null: fehlt).
+export type Abweichung = { feld: string; eintrag: string | null; erwartet: string }
+
 export type Zeile = {
   id: string
   docId: string
@@ -13,10 +16,13 @@ export type Zeile = {
   wortlaut: string | null
   seite: string | null
   gefundenAuf?: string
+  seitenbasis?: 'gedruckt' | 'pdf'
+  versatzQuelle?: 'seitentext'
   referenz?: string
   registrierstelle?: string | null
   registrierstelleName?: string
   retraction?: string | null
+  abweichungen?: Abweichung[]
   problem: boolean
   status: StellenStatus
   grund: string | null
