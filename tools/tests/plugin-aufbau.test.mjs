@@ -3,15 +3,14 @@
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
+import { werkzeugeImCode } from './werkzeuge-im-code.mjs'
 
 const lesen = pfad => readFileSync(new URL(`../../${pfad}`, import.meta.url), 'utf8')
 const json = pfad => JSON.parse(lesen(pfad))
 const PLUGIN = 'plugins/spur'
 const MCP = 'mcp__plugin_spur_spur__'
 
-// Die Werkzeuge stehen in werkzeuge.mjs als Schlüssel `  name: {` des Objekts WERKZEUGE (wie mcp-vertrag.test.mjs).
-const quelle = lesen('services/web/modules/spur/app/src/mcp/werkzeuge.mjs')
-const WERKZEUGE = new Set([...quelle.slice(quelle.indexOf('export const WERKZEUGE = {')).matchAll(/^ {2}([a-z_]+): \{$/gm)].map(m => m[1]))
+const WERKZEUGE = werkzeugeImCode()
 const PRAEFIXE = new Set([...WERKZEUGE].map(n => n.split('_')[0]))
 // Ereignistypen von wait_for_event sehen aus wie Werkzeuge.
 const KEIN_WERKZEUG = new Set(['suggest_trigger'])

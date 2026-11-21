@@ -7532,11 +7532,17 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     }
   }
 
-  // Anteil dunkler Pixel einer Seite aus page_image; eine leere Seite hat fast keine.
-  async function dunkleSeite(token, pid, seite) {
+  // PNG einer Seite aus page_image, base64.
+  async function seitenBild(token, pid, seite) {
     const { daten } = await mcp(token, 'tools/call', { name: 'page_image', arguments: { project_id: pid, seite } })
     const [inhalt] = daten.result.content
-    ok(!daten.result.isError && inhalt.mimeType === 'image/png', `page_image: ${JSON.stringify(daten.result).slice(0, 300)}`)
+    ok(!daten.result.isError && inhalt.mimeType === 'image/png', `page_image ${seite}: ${JSON.stringify(daten.result).slice(0, 300)}`)
+    return inhalt.data
+  }
+
+  // Anteil dunkler Pixel einer Seite aus page_image; eine leere Seite hat fast keine.
+  async function dunkleSeite(token, pid, seite) {
+    const png = await seitenBild(token, pid, seite)
     return await page.evaluate(async png => {
       const bild = new Image()
       bild.src = `data:image/png;base64,${png}`
@@ -7550,7 +7556,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       let dunkel = 0
       for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] < 384) dunkel++
       return dunkel / (bild.width * bild.height)
-    }, inhalt.data)
+    }, png)
   }
 
   // Paketliste des Images (tlmgr install in server-ce/Dockerfile-base) und der Schritt im Workflow `Dev image`.
@@ -8247,11 +8253,9 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
 
   // Farbe, Ausdehnung und Oberkanten einer page_image-Seite; speichert sie mit SPUR_BILDER zum Ansehen.
   async function p17Seite(token, pid, seite, name) {
-    const { daten } = await mcp(token, 'tools/call', { name: 'page_image', arguments: { project_id: pid, seite } })
-    const [inhalt] = daten.result.content
-    ok(!daten.result.isError && inhalt.mimeType === 'image/png', `page_image ${seite}: ${JSON.stringify(daten.result).slice(0, 300)}`)
+    const png = await seitenBild(token, pid, seite)
     if (globalThis.SPUR_BILDER) {
-      await page.setContent(`<body style="margin:0"><img src="data:image/png;base64,${inhalt.data}"></body>`)
+      await page.setContent(`<body style="margin:0"><img src="data:image/png;base64,${png}"></body>`)
       await page.locator('img').screenshot({ path: `${globalThis.SPUR_BILDER}/p17f5-${name}.png` })
     }
     return await page.evaluate(async png => {
@@ -8267,19 +8271,17 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
       let bunt = 0
       // Oberste Zeile mit Grau (fill=black!30) je Hälfte; die Teilabbildungen stehen links und rechts.
       const oben = [Infinity, Infinity]
-      for (let y = 0; y < bild.height; y++) {
-        for (let x = 0; x < bild.width; x++) {
-          const i = (y * bild.width + x) * 4
-          const [r, g, b] = [data[i], data[i + 1], data[i + 2]]
-          if (Math.max(r, g, b) - Math.min(r, g, b) > 40) bunt++
-          if (r > 150 && r < 210 && Math.abs(r - g) < 6 && Math.abs(g - b) < 6) {
-            const haelfte = x < bild.width / 2 ? 0 : 1
-            oben[haelfte] = Math.min(oben[haelfte], y)
-          }
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2]
+        if (Math.max(r, g, b) - Math.min(r, g, b) > 40) bunt++
+        if (r > 150 && r < 210 && Math.abs(r - g) < 6 && Math.abs(g - b) < 6) {
+          const pixel = i / 4
+          const haelfte = pixel % bild.width < bild.width / 2 ? 0 : 1
+          oben[haelfte] = Math.min(oben[haelfte], Math.floor(pixel / bild.width))
         }
       }
       return { bunt, oben, hoehe: bild.height }
-    }, inhalt.data)
+    }, png)
   }
 
   features.p17f5 = async () => {
