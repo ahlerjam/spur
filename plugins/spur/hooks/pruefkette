@@ -122,6 +122,10 @@ hook() {
     exit 0
   fi
 
+  # Ein gescheiterter Aufruf hat nichts geändert und nichts geprüft.
+  local fehler='(^|[^\\])"isError" *: *true'
+  [ "$ereignis" = PostToolUse ] && [[ $eingabe =~ $fehler ]] && exit 0
+
   # Erst entscheiden, ob das Ereignis zählt; nur dann Datenordner, Sperre und Zustand.
   local stufe=
   case "$ereignis:$werkzeug" in
@@ -143,8 +147,6 @@ hook() {
         endpruefung) stufe=end ;;
       esac ;;
     PostToolUse:${MCP}run_finish)
-      local fehler='(^|[^\\])"isError" *: *true'
-      [[ $eingabe =~ $fehler ]] && exit 0
       ordner_fuer "${CLAUDE_PLUGIN_DATA:-}" "$session" || exit 0
       rm -f "$datei"
       exit 0 ;;

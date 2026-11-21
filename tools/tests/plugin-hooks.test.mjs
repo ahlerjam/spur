@@ -211,6 +211,14 @@ test('ein gescheitertes run_finish behält den Zustand', () => {
   nenntGenau(finish(), STUFEN)
 })
 
+test('gescheiterte Aufrufe von doc_edit und check_report zählen nicht', () => {
+  const fehler = { isError: true, content: [{ type: 'text', text: '{"fehler":"konflikt"}' }] }
+  folge({ ...docEdit({ pfad: 'main.tex' }), tool_response: fehler })
+  assert.equal(finish(), null)
+  folge(docEdit({ pfad: 'main.tex' }), agentStop('spur:gegenpruefung'), agentStop('spur:endpruefung'), skill(HUMANIZER), { ...checkReport(), tool_response: fehler })
+  nenntGenau(finish(), ['check_report'])
+})
+
 test('eine Nachprüfung ändert die Sperre nicht', () => {
   folge(docEdit({ pfad: 'main.tex' }), agentStop('spur:gegenpruefung'), docEdit({ pfad: 'main.tex' }), agentStop('spur:gegenpruefung'))
   folge(agentStop('spur:endpruefung'), docEdit({ pfad: 'main.tex' }), agentStop('spur:endpruefung'), skill(HUMANIZER), checkReport())

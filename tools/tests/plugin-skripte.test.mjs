@@ -65,13 +65,13 @@ before(async () => {
         return json(res, 404, { error: true })
       }
       if (url.pathname === '/europepmc/webservices/rest/search') {
-        const doi = url.searchParams.get('query')?.replace(/^DOI:/, '')
-        if (doi === '10.1234/fake.pmc' || doi === '10.1234/fake.allehtml') {
+        const doi = /^DOI:"(.*)"$/.exec(url.searchParams.get('query') ?? '')?.[1]
+        if (doi === '10.1234/fake.pmc' || doi === '10.1234/fake.allehtml' || doi === '10.1002/(SICI)fake&x;2-I') {
           return json(res, 200, {
             hitCount: 1,
             resultList: { result: [{ doi, pmcid: 'PMC123', fullTextUrlList: { fullTextUrl: [
               { availability: 'Open access', availabilityCode: 'OA', documentStyle: 'html', site: 'Europe_PMC', url: `${basis}/pmc/seite.html` },
-              { availability: 'Open access', availabilityCode: 'OA', documentStyle: 'pdf', site: 'Europe_PMC', url: doi === '10.1234/fake.pmc' ? `${basis}/pmc/c.pdf` : `${basis}/pmc/seite.html` },
+              { availability: 'Open access', availabilityCode: 'OA', documentStyle: 'pdf', site: 'Europe_PMC', url: doi !== '10.1234/fake.allehtml' ? `${basis}/pmc/c.pdf` : `${basis}/pmc/seite.html` },
             ] } }] },
           })
         }
@@ -217,6 +217,12 @@ test('spur-pdf-holen holt das PDF aus Europe PMC, wenn Unpaywall keinen Fundort 
   const r = await laufAsync('spur-pdf-holen', ['10.1234/fake.pmc', 'ziel'])
   assert.equal(r.status, 0, r.stderr)
   assert.equal(r.stdout, 'ziel/10.1234_fake.pmc.pdf\n')
+  assert.ok(anfragen.includes('GET /pmc/c.pdf'), anfragen.join(', '))
+})
+
+test('spur-pdf-holen fragt Europe PMC mit vollständig kodierter DOI (P17)', async () => {
+  const r = await laufAsync('spur-pdf-holen', ['10.1002/(SICI)fake&x;2-I', 'ziel'])
+  assert.equal(r.status, 0, r.stderr)
   assert.ok(anfragen.includes('GET /pmc/c.pdf'), anfragen.join(', '))
 })
 

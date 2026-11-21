@@ -116,7 +116,9 @@ if antwort=$(curl -sS -f --max-time 60 -A "spur-pdf-holen" "$unpaywall/v2/$doi_u
   versuchen "$(printf '%s' "$antwort" | werte url_for_pdf)"
 fi
 # Danach Europe PMC: das offene PDF aus der Volltextliste zur DOI.
-if antwort=$(curl -sS -f --max-time 60 -A "spur-pdf-holen" "$europepmc/webservices/rest/search?query=DOI:$doi_url&format=json&resultType=core" 2>/dev/null); then
+# Die DOI in Anführungszeichen: Klammern, ; oder < in einer DOI sind sonst Suchsyntax.
+if antwort=$(curl -sS -f -G --max-time 60 -A "spur-pdf-holen" --data-urlencode "query=DOI:\"$doi\"" \
+    --data-urlencode format=json --data-urlencode resultType=core "$europepmc/webservices/rest/search" 2>/dev/null); then
   versuchen "$(printf '%s' "$antwort" | werte url '"availabilityCode": *"OA"' '"documentStyle": *"pdf"')"
 fi
 
