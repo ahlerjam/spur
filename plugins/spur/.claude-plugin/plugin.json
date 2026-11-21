@@ -5,6 +5,7 @@
   "author": {
     "name": "ahlerjam"
   },
+  "privacyPolicyUrl": "https://github.com/ahlerjam/spur#claude-and-your-data",
   "dependencies": [
     {
       "name": "humanizer",

@@ -8243,7 +8243,7 @@ Das Volumen war $V = 0{,}89\,\mathrm{L}$, die Ausbeute \qty{75.7}{\percent}, die
     for (const [name, args] of [['literaturueberblick', {}], ['methodenteil', {}], ['folien', {}], ['quellen_sammeln', { thema: 'Schlaf' }]]) {
       const { daten } = await mcp(token, 'prompts/get', { name, arguments: args })
       const text = daten?.result?.messages?.[0]?.content?.text ?? ''
-      const absatz = text.split('\n\n').find(a => a.startsWith('Prüfkette, wenn du Text geändert hast, vor dem Aufruf von run_finish')) ?? ''
+      const absatz = text.split('\n\n').find(a => a.startsWith('Hast du Text geändert, folgt vor run_finish eine Prüfkette')) ?? ''
       enthaelt(absatz, ['spur:gegenpruefung', 'spur:endpruefung', 'humanizer', 'check_report und run_finish', 'empfiehlt'], `prompts/get ${name}`)
       absaetze.push(absatz)
       if (name === 'quellen_sammeln') enthaelt(text, ['search_log', 'paper_exclude', 'bot_schutz', 'spur-pdf-holen'], 'quellen_sammeln')
