@@ -20,6 +20,7 @@ One `wait_for_event` call waits up to 100 seconds, so Claude Code never moves it
 2. `ereignis: null` means no job came in. Call `wait_for_event` again right away.
 3. `abgeloest: true` means a newer call of yours is already waiting. Do nothing; do not call again from here.
 4. A job comes as `ereignis`. Do the job, then call `wait_for_event` again.
+5. A task the person types into the terminal interrupts the waiting. Do it, then call `wait_for_event` again; do not end the turn without a waiting call.
 
 Each answer carries a `cursor`. If you think you missed something, `events_since` with that cursor returns newer events; without a cursor it returns the newest ones. Events you read there do not arrive again through `wait_for_event`.
 

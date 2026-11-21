@@ -516,7 +516,7 @@
   "spur_speicher_neu_berechnen_fuer": "Recalculate storage of \"__name__\"",
   "spur_speicher_von": "__stand__ GB of __grenze__ GB",
   "spur_standard": "Default",
-  "spur_start_prompt": "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again.",
+  "spur_start_prompt": "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again. If the person gives you a task here in the terminal, finish it, then call wait_for_event again as well.",
   "spur_status": "Status",
   "spur_stelle_bestaetigt": "Passage confirmed",
   "spur_stellen_beleg_ohne_wortlaut": "__count__ citation without quote",

@@ -2822,7 +2822,7 @@ Slow-wave sleep stabilisiert Gedächtnisspuren.
   ]
   const SCHREIBWERKZEUGE = ['quote_mark', 'doc_edit', 'doc_create', 'reply', 'run_finish', 'wait_for_event']
   const START_WERKZEUGE = `claude --allowedTools "${SCHREIBWERKZEUGE.map(w => `mcp__plugin_spur_spur__${w}`).join(' ')}"`
-  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur. Bei ereignis: null rufst du es sofort erneut auf, bei abgeloest tust du nichts; einen Auftrag erledigst du und rufst danach wait_for_event erneut auf."`
+  const START = `${START_WERKZEUGE} -- "Warte mit wait_for_event auf Aufträge aus spur. Bei ereignis: null rufst du es sofort erneut auf, bei abgeloest tust du nichts; einen Auftrag erledigst du und rufst danach wait_for_event erneut auf. Gibt dir die Person hier im Terminal direkt eine Aufgabe, erledigst du sie und rufst danach ebenfalls wait_for_event erneut auf."`
   const START_EN = `${START_WERKZEUGE} -- "Use wait_for_event to wait for tasks from spur. On ereignis: null call it again right away, on abgeloest do nothing; finish a task, then call wait_for_event again."`
 
   // Kein Kasten ist breiter als sein Container, kein Befehl wird abgeschnitten.
