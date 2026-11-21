@@ -2,7 +2,7 @@
 
 ## Stand
 - f1 bis f8 bestehen (`p17f1` … `p17f8`), Commits `slice: f1` … `slice: f8`.
-- Ansichten: P17 ändert keine Oberfläche (Type cli, api; alle Features ohne Screens). Die Aufnahmen bei 360 und 1280 px entfallen deshalb; geprüft habe ich stattdessen die Seitenbilder der Abbildungsbeispiele aus `p17f5` (siehe Abschluss).
+- Ansichten: P17 baut keine neue Oberfläche (Type cli, api). Sichtbar wird die Änderung nur in der Workflow-Verwaltung `/spur/admin/workflows`, deren Textfelder jetzt mit dem Absatz zur Prüfkette enden. Aufnahmen als `e2e-admin` bei 1280 und 360 px: Absatz am Ende des Felds „Literaturüberblick“ lesbar, kein seitliches Rollen (`scrollWidth` = `clientWidth`, 1280/1280 und 360/360), keine Konsolenfehler; Layout und Stil sind die der bestehenden Ansicht aus P3. Dazu die Seitenbilder der Abbildungsbeispiele aus `p17f5` (siehe Abschluss).
 
 ## Abschluss
 - Basis: Der Elter von `slice: plan 20261116-spur-p17-plugin` (`e3ed56e5f9`) liegt vor P12 bis P16; `<base>..HEAD` umfasst 194 Dateien. `/simplify`, `/code-review` und die Sicherheitsprüfung laufen deshalb wie in P13 über den P17-Diff ab dem Startcommit des Laufs, `fd9a97ec64..HEAD`.
@@ -40,7 +40,7 @@
 - Erster Gesamtlauf (je Feature ein frischer Browser): `p8f11` rot, weil der Vertragstest nach `/simplify` `werkzeuge.mjs` nicht mehr nannte; behoben (`634e9f439d`). `p12ansicht` und `p13ansicht` rot, weil sie auf Daten früherer Schritte ihres Plans bauen und das Startskript vor jedem Feature zurücksetzte; zusammen in einem Browser 13 von 13 ok.
 - Letzter Gesamtlauf nach der letzten Änderung (`634e9f439d`), je Plan in einem Browser mit einem Zurücksetzen vorab, 22 min: 122 von 125 ok, alle acht `p17f*` ok. Rot nur `p4f1` und `p7f1` (öffnen einen zweiten Browser-Kontext, den Chromium im Single-Process-Modus nicht anlegen kann; das Startskript gibt jetzt jedem weiteren Kontext eine eigene Instanz, danach beide ok) und `p6f10` (prüft Links auf github.com und andere Seiten; die Sandbox löst keine fremden Namen auf). Keiner der drei berührt Code von P17; in P16 liefen sie mit dem Playwright-MCP grün.
 
-- Schlusslauf nach der letzten Änderung (`0f5563bd92`), je Plan in einem Browser, jeder weitere Browser-Kontext als eigene Instanz, 22 min: 124 von 125 ok, alle acht `p17f*` ok, auch `p4f1` und `p7f1`. Rot nur `p6f10`: Er prüft Links der README auf github.com, jira.mongodb.org und caddyserver.com, und die Sandbox löst fremde Namen nicht auf (`getaddrinfo ENOTFOUND`). P17 ändert diese Links nicht.
+- Schlusslauf nach der letzten Änderung (`0f5563bd92`), je Plan in einem Browser, jeder weitere Browser-Kontext als eigene Instanz, 22 min: 124 von 125 ok, alle acht `p17f*` ok, auch `p4f1` und `p7f1`. Rot nur `p6f10`: Er prüft die externen Links der README. Über den Filter-Proxy der Sandbox (im Startskript an Chromium übergeben) ist github.com erreichbar; jira.mongodb.org, caddyserver.com und www.overleaf.com sperrt die Sandbox-Richtlinie („host is not on the allow list“), und `allowed_domains` darf sie in dieser Sitzung nicht erweitern. P17 ändert diese Links nicht; in P16 war `p6f10` mit Netz grün.
 
 ## Needs decision
 - f1: Die Einstellungsseite „Claude verbinden“ (`claude-verbinden.tsx`) zeigt drei Schritte ohne die Marketplaces `cflow` und `claude-plugins-official`. Mit den neuen Abhängigkeiten lädt das Plugin nach diesen Schritten nicht (Doku: plugins/dependencies).
