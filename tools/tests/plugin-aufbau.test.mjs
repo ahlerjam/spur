@@ -52,7 +52,7 @@ function genannteWerkzeuge(text) {
 const unbekannteWerkzeuge = text => genannteWerkzeuge(text).filter(n => !WERKZEUGE.has(n))
 
 const AGENTEN = Object.fromEntries(readdirSync(`${PLUGIN}/agents`).map(d => [d.replace(/\.md$/, ''), lesen(`${PLUGIN}/agents/${d}`)]))
-const SKILLS = Object.fromEntries(readdirSync(`${PLUGIN}/skills`).map(d => [d, lesen(`${PLUGIN}/skills/${d}/SKILL.md`)]))
+const SKILLS = Object.fromEntries(readdirSync(`${PLUGIN}/skills`).filter(d => !d.startsWith('.')).map(d => [d, lesen(`${PLUGIN}/skills/${d}/SKILL.md`)]))
 const werkzeugeVon = agent => frontmatter(AGENTEN[agent]).tools.split(',').map(s => s.trim())
 const SCHREIBEND = ['doc_edit', 'doc_create', 'run_finish', 'quote_mark', 'reply', 'suggest', 'source_add', 'acquisition_add', 'paper_exclude', 'matrix_suggest', 'tex_package_add', 'source_figure_add', 'source_upload_link', 'file_upload_link']
 
