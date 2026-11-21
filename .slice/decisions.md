@@ -76,3 +76,12 @@
 - D17 (plan 20261116-spur-p14-pruefbericht) Abnahme: Die Kopfzeile des Prüfberichts nennt „ohne Quelle“ zweimal (markiert und nicht markiert), etwa „1 ohne Quelle, 1 nicht prüfbar, 3 ohne Quelle“.
   Interim: so gelassen.
   Options: A (empfohlen) Zusatz „davon nicht markiert“ im Nachbesserungsplan | B so lassen
+- D18 (plan 20261116-spur-p15-werkzeuge) f5: Soll eine Zahl ohne Beleg eine Änderung rot machen, sodass sie nie automatisch angenommen wird?
+  Interim: Wie bisher bleibt nur ein Zitat-Prüfbefund rot; Zahlen ohne Beleg werden gemeldet und trotzdem automatisch angenommen.
+  Options: A (empfohlen) so lassen, Zahlen bleiben ein Hinweis | B Zahlen ohne Beleg wie rote Zitate nie automatisch annehmen
+- D19 (plan 20261116-spur-p15-werkzeuge) Abnahme: Die Laufkarte zeigt beim 12-fachen Ersatz im Kopf „24 offen“ (Track Changes einzeln, Löschung plus Einfügung) und in der neuen Zeile „0 automatisch angenommen, 12 offen“. Dazu drei kleine Punkte: `tex_file_read` nennt bei `gekuerzt: true` kein `bis_zeile`; `source_read` liefert hinter dem Textende `bis_zeichen` größer als `zeichen_gesamt`; der Fehlertext bei ungültigem Upload-Link nennt `source_upload_link`, auch wenn der Link von `file_upload_link` stammt (nicht nachgeprüft, der Builder nennt die Meldung als angepasst).
+  Interim: so gelassen, alle Features PASS.
+  Options: A (empfohlen) in den Nachbesserungsplan nach P17 | B so lassen
+- D20 (plan 20261116-spur-p15-werkzeuge) Prüfung des ganzen Diffs: Der Builder nennt weitere mögliche Fehler in älterem Code, nicht angefasst und nicht nachgeprüft: `paper_search` liefert auf Seite 50 `naechster_cursor` „51“, das wieder Seite 50 ergibt; `zahlen.mjs` wertet nach `\begin{tabular}{spec}` alle folgenden Klammergruppen als Argumente (`{12345}` in der ersten Zelle wird nicht gemeldet); `Recherche.mjs:82` vermerkt im Suchprotokoll auch Anfragen, auf die kein Dienst geantwortet hat; `Beschaffung.mjs:112` nutzt `replaceAll('{doi}', …)` mit String-Ersatz (`$&` in einer DOI würde als Muster gelesen); `Kompilieren.mjs:69` wie in D16.
+  Interim: nicht geändert.
+  Options: A (empfohlen) zusammen mit D16 in den Nachbesserungsplan nach P17, je Punkt zuerst ein roter Test | B einzeln prüfen und ins Backlog
