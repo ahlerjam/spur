@@ -22,7 +22,7 @@
         "Der Test prüft: Jedes im Agenten und im Skill genannte Werkzeug existiert in `mcp/werkzeuge.mjs`; `doc_edit`, `doc_create` und `run_finish` stehen nicht in `tools`; benennt man im Skill ein Werkzeug um, wird der Test rot",
         "Der Hauptskill `spur` sagt, wann die Auswertung startet: bevor aus einer Quelle zum ersten Mal zitiert oder paraphrasiert wird, und bei mehr als acht Quellen mit mehreren Agenten parallel"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f3",
