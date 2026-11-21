@@ -65,7 +65,7 @@
         "Der Skill enthält die fünf weiteren Regeln einzeln und prüfbar: eine Abbildung, eine Aussage; Bildunterschrift ohne Fließtext verständlich, mit erklärten Abkürzungen und Einheiten; Abbildung, Bildunterschrift und Text stimmen überein; Reihenfolge im Quelltext wie die erste Nennung; Teilabbildungen oben ausgerichtet und gleich hoch (`subcaption`, `[t]`). Er nennt `andrehuang/academic-writing-agents` (MIT) als Quelle dieser Regeln",
         "Der Builder kompiliert im Dev-Stack ein Beispiel mit zwei Teilabbildungen verschiedener Höhe, einmal mit `[b]` und einmal mit `[t]` und fester Höhe, und sieht beide mit `page_image` an: Im zweiten liegen die Oberkanten auf einer Linie"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f6",
