@@ -1,10 +1,13 @@
 {
-  "state": "queued",
+  "state": "running",
   "builderModel": "opus",
   "dependsOn": [
     "20261116-spur-p13-bib",
     "20261116-spur-p15-werkzeuge",
     "20261116-spur-p16-tex"
   ],
-  "builderAdvisor": "opus"
+  "builderAdvisor": "opus",
+  "runBranch": "slice/run-20261116-spur-p17-plugin",
+  "sessionId": "6ff89524-7ca8-4f1e-8e81-04781facecb1",
+  "started": "2026-11-21T02:15:00Z"
 }
