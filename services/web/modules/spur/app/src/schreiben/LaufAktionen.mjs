@@ -2,6 +2,7 @@ import { promiseMapWithLimit } from '@overleaf/promise-utils'
 import EditorController from '../../../../../app/src/Features/Editor/EditorController.mjs'
 import EditorRealTimeController from '../../../../../app/src/Features/Editor/EditorRealTimeController.mjs'
 import DocumentUpdaterHandler from '../../../../../app/src/Features/DocumentUpdater/DocumentUpdaterHandler.mjs'
+import ProjectEntityHandler from '../../../../../app/src/Features/Project/ProjectEntityHandler.mjs'
 import ProjectLocator from '../../../../../app/src/Features/Project/ProjectLocator.mjs'
 import Errors from '../../../../../app/src/Features/Errors/Errors.js'
 import { ObjectId } from '../../../../../app/src/infrastructure/mongodb.mjs'
@@ -9,6 +10,7 @@ import { Problem } from '../probleme.mjs'
 import { einstellungen, laeufe, quellen } from '../sammlungen.mjs'
 import * as QuellenManager from '../QuellenManager.mjs'
 import * as LaufManager from './LaufManager.mjs'
+import { laufStand, seedVon } from './laufStand.mjs'
 import { spurUpdate } from './spurUpdate.mjs'
 import { rolleFuerClaude } from '../rechte.mjs'
 import { heutigePosition, kontextUm, umkehrOps } from './ops.mjs'
@@ -116,14 +118,36 @@ async function angelegtEntfernen(projectId, lauf, userId) {
       if (quelle) await QuellenManager.loeschen(quelle)
       continue
     }
-    try {
-      await EditorController.promises.deleteEntityWithPath(projectId, `/${eintrag.pfad}`, 'spur', userId)
-    } catch (error) {
-      if (!(error instanceof Errors.NotFoundError)) throw error
-    }
+    await pfadEntfernen(projectId, eintrag.pfad, userId)
     if (eintrag.paket) await paketEntfernt(projectId, eintrag.paket)
   }
+  // Ordner, die erst der Lauf angelegt hat (etwa abbildungen/kap1/), von innen nach außen und nur, wenn niemand
+  // etwas hineingelegt hat. `ordner` ist der oberste neue Ordner, die darunter liegen auf dem Weg zur Datei.
+  const neueOrdner = new Set()
+  for (const { pfad, ordner } of lauf.angelegt ?? []) {
+    if (!ordner) continue
+    for (let o = pfad.slice(0, pfad.lastIndexOf('/')); o.length >= ordner.length; o = o.slice(0, Math.max(0, o.lastIndexOf('/')))) {
+      neueOrdner.add(o)
+    }
+  }
+  if (neueOrdner.size) {
+    const { docs, files, folders } = await ProjectEntityHandler.promises.getAllEntities(projectId)
+    let pfade = [...docs, ...files, ...folders].map(e => e.path)
+    for (const o of [...neueOrdner].sort((a, b) => b.length - a.length)) {
+      if (pfade.some(p => p.startsWith(`/${o}/`))) continue
+      await pfadEntfernen(projectId, o, userId)
+      pfade = pfade.filter(p => p !== `/${o}`)
+    }
+  }
   await (await laeufe()).updateOne({ _id: lauf._id }, { $set: { angelegt: [] } })
+}
+
+async function pfadEntfernen(projectId, pfad, userId) {
+  try {
+    await EditorController.promises.deleteEntityWithPath(projectId, `/${pfad}`, 'spur', userId)
+  } catch (error) {
+    if (!(error instanceof Errors.NotFoundError)) throw error
+  }
 }
 
 // `roteMit`: Rote Zitate nimmt nur an, wer es ausdrücklich verlangt (rote_mit); sonst bleiben sie offen, auch wenn
@@ -159,6 +183,7 @@ export async function annehmen(
         op: c.op,
         ...kontextUm(d.text, c.op),
         stapel,
+        seed: seedVon(c.id),
         ...(automatisch && { automatisch: true, pfad: d.pfad, zeile: d.text.slice(0, c.op.p).split('\n').length }),
       })
     }
@@ -362,8 +387,16 @@ export async function allesAnnehmen(projectId, botId, menschId) {
   return { angenommen }
 }
 
+const offeneChanges = async (projectId, lauf) =>
+  lauf.status === 'offen' || lauf.status === 'fertig' ? await aenderungen(projectId, lauf) : []
+
 export async function laufDaten(projectId, lauf) {
   if (!lauf) return { lauf: null, aenderungen: [] }
-  const liste = lauf.status === 'offen' || lauf.status === 'fertig' ? await aenderungen(projectId, lauf) : []
-  return { lauf: LaufManager.laufFuerClient(lauf), aenderungen: fuerKarte(liste, lauf) }
+  const liste = await offeneChanges(projectId, lauf)
+  return { lauf: { ...LaufManager.laufFuerClient(lauf), stand: laufStand(lauf, liste).aenderungen }, aenderungen: fuerKarte(liste, lauf) }
+}
+
+// Für run_status und run_finish: Zahlen und ein Satz, was angenommen ist und was offen steht.
+export async function stand(projectId, lauf) {
+  return laufStand(lauf, lauf ? await offeneChanges(projectId, lauf) : [])
 }

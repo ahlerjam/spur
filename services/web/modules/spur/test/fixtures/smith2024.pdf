@@ -57,13 +57,17 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 9 0 R >>
 endobj
 11 0 obj
-<< /Length 231 >>
+<< /Length 404 >>
 stream
 BT /F1 12 Tf
 1 0 0 1 72 720 Tm (Journal of Sleep Research, page 348.) Tj
 1 0 0 1 72 704 Tm (Participants completed the task over two consecutive nights.) Tj
 1 0 0 1 72 688 Tm (Results were analysed with mixed-effects models.) Tj
 ET
+0 0 0 RG 1.5 w 120 300 m 480 300 l S 120 300 m 120 600 l S
+0.20 0.40 0.75 rg 150 300 70 120 re f
+0.85 0.45 0.15 rg 260 300 70 260 re f
+0.25 0.60 0.30 rg 370 300 70 190 re f
 endstream
 endobj
 12 0 obj
@@ -137,17 +141,17 @@ xref
 0000001265 00000 n 
 0000001771 00000 n 
 0000001898 00000 n 
-0000002181 00000 n 
-0000002309 00000 n 
-0000002695 00000 n 
-0000002823 00000 n 
-0000003106 00000 n 
-0000003234 00000 n 
-0000003517 00000 n 
-0000003645 00000 n 
-0000003928 00000 n 
+0000002354 00000 n 
+0000002482 00000 n 
+0000002868 00000 n 
+0000002996 00000 n 
+0000003279 00000 n 
+0000003407 00000 n 
+0000003690 00000 n 
+0000003818 00000 n 
+0000004101 00000 n 
 trailer
 << /Size 21 /Root 1 0 R /Info 4 0 R >>
 startxref
-4056
+4229
 %%EOF

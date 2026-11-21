@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { istProblem, quelleZu, referenzStatus, stelleEinordnen, zeileBewerten } from '../../app/src/pruefung/bewertung.mjs'
+import { istProblem, quelleZu, referenzStatus, stelleEinordnen, zeileBewerten, zeilenBewerten } from '../../app/src/pruefung/bewertung.mjs'
 
 const SEITEN = [
-  { label: '345', text: 'Anfang der Studie.' },
-  { label: '346', text: 'Sleep supports the consolidation of declarative memory.' },
+  { seite: 1, label: '345', text: 'Anfang der Studie.' },
+  { seite: 2, label: '346', text: 'Sleep supports the consolidation of declarative memory.' },
 ]
 const QUELLE = { _id: 'q1', key: 'smith2024', dateiname: 'smith2024.pdf', doi: '10.5555/SPUR.1', versatz: 344, versatzQuelle: 'pagelabels' }
 
@@ -62,9 +62,33 @@ describe('zeileBewerten', () => {
     expect(zeileBewerten(fund(), kontext({ quellen: [quelle] })).seite).toBe('bestaetigt')
   })
 
-  it('kann die Seite ohne Versatz oder ohne Seitenangabe nicht prüfen', () => {
-    expect(zeileBewerten(fund(), kontext({ quellen: [{ ...QUELLE, versatz: null }] })).seite).toBe('nicht_pruefbar')
+  it('kann die Seite ohne Seitenangabe oder ohne gefundenen Wortlaut nicht prüfen', () => {
     expect(zeileBewerten(fund({ belege: [{ key: 'smith2024' }] }), kontext()).seite).toBe('nicht_pruefbar')
+    expect(zeileBewerten(fund({ roh: 'Gibt es nicht.' }), kontext({ quellen: [{ ...QUELLE, versatz: null }] })).seite).toBe('nicht_pruefbar')
+  })
+
+  it('prüft gegen die gedruckte Seite, wenn die Quelle einen Versatz hat', () => {
+    expect(zeileBewerten(fund(), kontext())).toMatchObject({ seite: 'stimmt', seitenbasis: 'gedruckt' })
+    expect(zeileBewerten(fund({ belege: [{ key: 'smith2024', seite: '2' }] }), kontext())).toMatchObject({ seite: 'gefunden', gefundenAuf: '346', seitenbasis: 'gedruckt' })
+  })
+
+  it('prüft ohne Versatz gegen die PDF-Seite (Preprints)', () => {
+    const preprint = kontext({ quellen: [{ ...QUELLE, versatz: null, versatzQuelle: null }] })
+    expect(zeileBewerten(fund({ belege: [{ key: 'smith2024', seite: 'S.~2' }] }), preprint)).toMatchObject({ seite: 'stimmt', seitenbasis: 'pdf' })
+    const falsch = zeileBewerten(fund({ belege: [{ key: 'smith2024', seite: 'S.~9' }] }), preprint)
+    expect(falsch).toMatchObject({ seite: 'gefunden', gefundenAuf: '2', seitenbasis: 'pdf' })
+    expect(istProblem(falsch)).toBe(true)
+  })
+
+  it('nennt einen aus dem Seitentext erkannten Versatz', () => {
+    const quelle = { ...QUELLE, versatzQuelle: 'seitentext' }
+    expect(zeileBewerten(fund(), kontext({ quellen: [quelle] }))).toMatchObject({ seite: 'stimmt', seitenbasis: 'gedruckt', versatzQuelle: 'seitentext' })
+    expect(zeileBewerten(fund(), kontext())).not.toHaveProperty('versatzQuelle')
+  })
+
+  it('prüft Transkripte ohne Versatz weiter nicht gegen Seiten', () => {
+    const vtt = kontext({ quellen: [{ ...QUELLE, art: 'vtt', versatz: null }] })
+    expect(zeileBewerten(fund(), vtt).seite).toBe('nicht_pruefbar')
   })
 
   it('meldet abweichenden Wortlaut', () => {
@@ -74,6 +98,18 @@ describe('zeileBewerten', () => {
   it('meldet quelle_fehlt, wenn es zum Schlüssel keine Quelle gibt', () => {
     const zeile = zeileBewerten(fund({ belege: [{ key: 'unbekannt', seite: '1' }] }), kontext())
     expect(zeile).toMatchObject({ wortlaut: 'quelle_fehlt', quelleId: null, seite: null })
+  })
+
+  it('hängt Abweichungen von Crossref an die Zeile, ohne sie zum Problem zu machen (P13)', () => {
+    const werke = new Map([['10.5555/spur.1', { gefunden: true, registrierstelle: 'crossref', retraction: 'keine_meldung', band: '35', jahr: 2025 }]])
+    const bibEintraege = new Map([['smith2024', { key: 'smith2024', typ: 'article', doi: '10.5555/spur.1', year: '2024' }]])
+    const zeile = zeileBewerten(fund({ roh: '', belege: [{ key: 'smith2024' }] }), kontext({ werke, bibEintraege }))
+    expect(zeile.abweichungen).toEqual([
+      { feld: 'volume', eintrag: null, erwartet: '35' },
+      { feld: 'year', eintrag: '2024', erwartet: '2025' },
+    ])
+    expect(istProblem(zeile)).toBe(false)
+    expect(zeileBewerten(fund(), kontext())).not.toHaveProperty('abweichungen')
   })
 
   it('lässt den Wortlaut offen, wenn nur zitiert wird (ohne Anführung)', () => {
@@ -105,6 +141,56 @@ describe('zeileBewerten', () => {
     })
     const zurueck = kontext({ werke: new Map([['10.5555/spur.1', { gefunden: true, retraction: 'zurueckgezogen' }]]) })
     expect(zeileBewerten(fund(), zurueck).retraction).toBe('zurueckgezogen')
+  })
+})
+
+describe('zeilenBewerten (mehrere Keys)', () => {
+  const JONES = { _id: 'q2', key: 'jones2023', dateiname: 'jones2023.pdf', versatz: null, art: 'pdf' }
+  const mehr = (extra = {}) =>
+    kontext({
+      bibEintraege: new Map([
+        ['smith2024', { key: 'smith2024', doi: '10.5555/spur.1' }],
+        ['jones2023', { key: 'jones2023', doi: '10.5555/jones' }],
+        ['fake2020', { key: 'fake2020', doi: '10.9999/nirgends.1' }],
+      ]),
+      werke: new Map([
+        ['10.5555/spur.1', { gefunden: true, retraction: 'keine_meldung' }],
+        ['10.5555/jones', { gefunden: true, retraction: 'keine_meldung' }],
+        ['10.9999/nirgends.1', { gefunden: false }],
+      ]),
+      ...extra,
+    })
+  const belege = (...keys) => keys.map(key => ({ befehl: 'parencite', key, seite: '346' }))
+
+  it('macht aus einer Stelle ohne Wortlaut je Key eine Zeile mit eigener Referenzprüfung', () => {
+    const zeilen = zeilenBewerten(fund({ roh: '', belege: belege('smith2024', 'jones2023', 'fake2020') }), mehr())
+    expect(zeilen.map(z => [z.key, z.wortlaut, z.referenz, stelleEinordnen(z).status])).toEqual([
+      ['smith2024', null, 'gefunden', 'beleg_ohne_wortlaut'],
+      ['jones2023', null, 'gefunden', 'ohne_quelle'],
+      ['fake2020', null, 'nicht_gefunden', 'ohne_quelle'],
+    ])
+    // Vorher zählte nur der erste Key: fake2020 fiel nicht auf.
+    expect(zeilen.filter(istProblem).map(z => z.key)).toEqual(['fake2020'])
+  })
+
+  it('nennt bei Wortlaut die Quelle, in der er steht, und die übrigen Keys ohne Wortlaut', () => {
+    const zeilen = zeilenBewerten(fund({ belege: belege('jones2023', 'smith2024') }), mehr({ quellen: [QUELLE, JONES], seitenJeQuelle: new Map([['q1', SEITEN], ['q2', []]]) }))
+    expect(zeilen.map(z => [z.key, z.wortlaut])).toEqual([
+      ['jones2023', null],
+      ['smith2024', 'exakt'],
+    ])
+  })
+
+  it('meldet abweichenden Wortlaut an der ersten Quelle, wenn er in keiner steht', () => {
+    const zeilen = zeilenBewerten(fund({ roh: 'Erfunden.', belege: belege('jones2023', 'smith2024') }), mehr())
+    expect(zeilen.map(z => [z.key, z.wortlaut])).toEqual([
+      ['jones2023', null],
+      ['smith2024', 'abweichend'],
+    ])
+  })
+
+  it('lässt eine Stelle mit einem Key unverändert', () => {
+    expect(zeilenBewerten(fund(), kontext())).toEqual([zeileBewerten(fund(), kontext())])
   })
 })
 

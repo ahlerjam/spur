@@ -96,7 +96,17 @@ Projects count when the user owns them, including archived ones and those in the
 
 ### TeX packages
 
-The image contains TeX Live with a fixed list of packages. If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. By default a package may have 100 MB unpacked, all packages of a project together 300 MB, and each person can add 60 packages per hour; only successful installations count. Admins change these values under Admin → Grenzen. The storage limit of the project and Overleaf's 2000 files per project still apply. On a server error or a network problem spur tries three times, then the second mirror `https://mirror.ctan.org/systems/texlive/tlnet`. If an installation breaks off, spur removes what it had created, and the next call starts clean. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
+The image contains TeX Live `scheme-basic` and a curated list in `server-ce/Dockerfile-base`, enough for a usual thesis without downloads: the class `apa7` with `biblatex-apa` and `biber`, `babel` for German and English, `csquotes`, tables (`booktabs`, `threeparttable`, `tabularx`, `longtable`, `multirow`, `makecell`), figures and diagrams (`float`, `caption`, `subcaption`, `wrapfig`, `pgfplots`, TikZ), `lineno`, `setspace`, `geometry`, `fancyhdr`, `titlesec`, `enumitem`, `microtype`, `hyperref`, `cleveref`, `mathtools`, `siunitx`, `mhchem`, `listings`, `minted`, `algorithms`, `glossaries`, `acronym`, `todonotes`, KOMA-Script, `fontspec` and Beamer with `metropolis`. Everything else comes into the project with `tex_package_add`. After a failed compile, `compile_log` names each missing file and its TeX Live package in `fehlende_pakete`, and the log pane in the editor shows it above the log.
+
+Code listings with `minted` work without `-shell-escape`, because TeX Live trusts its helper `latexminted` ([ADR 0007](docs/adr/0007-minted-ohne-shell-escape.md)). With `\usepackage{minted}` in the preamble:
+
+```latex
+\begin{minted}{python}
+def mittel(xs): return sum(xs)/len(xs)
+\end{minted}
+```
+
+If a document needs another package or Beamer theme, Claude can add it to the project with `tex_package_add`: spur downloads the package from the TeX Live archive of the mirror the image uses and puts its runtime files under `tex-pakete/` in the project. Nothing changes on the server. By default a package may have 100 MB unpacked, all packages of a project together 300 MB, and each person can add 60 packages per hour; only successful installations count. Admins change these values under Admin → Grenzen. The storage limit of the project and Overleaf's 2000 files per project still apply. On a server error or a network problem spur tries three times, then the second mirror `https://mirror.ctan.org/systems/texlive/tlnet`. If an installation breaks off, spur removes what it had created, and the next call starts clean. `SPUR_TEX_PAKETE=aus` in `.env` turns the tool off.
 
 ### Research services
 
@@ -180,11 +190,15 @@ CI skips what a change cannot affect: `upstream` runs only for changes under `se
 
 Under Settings, "Connect Claude" ("Claude verbinden" in the German interface), spur creates a token and shows three steps that set up the `spur` plugin from this repository in Claude Code.
 
-1. Add spur to Claude Code. You only need this once per computer.
+1. Add spur to Claude Code. You only need this once per computer. The plugin needs `humanizer` and `humanizer-de` from the marketplace `cflow` and `playwright` from the official marketplace, so add those two marketplaces first, then spur's:
 
    ```sh
+   claude plugin marketplace add ahlerjam/cflow
+   claude plugin marketplace add anthropics/claude-plugins-official
    claude plugin marketplace add ahlerjam/spur
    ```
+
+   Without the two marketplaces the plugin does not load: the install finishes without the three dependencies, and `claude plugin list` shows spur as disabled with `Dependency "humanizer" is not installed` (or the same for `humanizer-de` or `playwright`). Add the missing marketplace and run `/reload-plugins` in Claude Code; it installs the dependencies it can now resolve.
 
 2. Connect spur to your account. This command contains your personal token from the account settings. Keep it to yourself.
 
@@ -210,6 +224,22 @@ You start the four ready-made workflows in the Claude panel under "Workflows", o
 | `/plugin:spur:spur:quellen_sammeln` | Collect sources (arguments: `thema`, `anzahl`) |
 
 An admin adjusts the texts under `/spur/admin/workflows`.
+
+#### Review chain
+
+The plugin brings three agents and the skills they follow: `spur:auswertung` reads each source with its abstract before Claude quotes it, `spur:gegenpruefung` checks every claim against the source without seeing the writer's notes, and `spur:endpruefung` compiles, looks at every figure and table and checks report, references and LaTeX source. After writing, Claude runs: claim check, corrections, final check, corrections, the humanizer skill (`humanizer-de:humanizer-de` or `humanizer:humanizer`), `check_report`, `run_finish`, with at most one re-check per stage. A hook in Claude Code holds `run_finish` after text changes until these steps have run; `spur-pruefkette stand` shows what is missing. The skill `spur-abbildungen` holds the rules for figures and tables, `spur-pdf-holen` fetches free PDFs that the server could not load in a headless browser. The browser shows none of this; clients without the plugin get the chain as a recommendation in the workflow texts.
+
+#### Check after installation
+
+The tests cover the plugin's files and scripts, but a real Claude Code session with the plugin can only be checked by hand. After installing or updating, go through these seven steps once:
+
+1. Dependencies: `claude plugin list` shows `spur`, `humanizer`, `humanizer-de` and `playwright` as enabled, without an error.
+2. Agents: `/agents` in Claude Code lists `spur:auswertung`, `spur:gegenpruefung` and `spur:endpruefung`.
+3. Hook: in a test project, let Claude change `main.tex` with `doc_edit` and call `run_finish` right away. Claude Code refuses it with a reason that names the claim check ("Gegenprüfung") as the next step. This shows that the hooks fire for the plugin's own MCP tools.
+4. Chain: give Claude a small writing job. The summary on the run card names, per stage, what the claim check, the final check and the humanizer found and changed, and `run_finish` goes through without `spur-pruefkette aus`.
+5. Humanizer: the session shows the skill `humanizer-de:humanizer-de` (German text) or `humanizer:humanizer` (English text); quotes, citation commands with pages and numbers are unchanged, and `check_report` ran afterwards.
+6. Figure rules: ask for a TikZ diagram with two arrows. Claude compiles, looks at the page with `page_image` and lists the rules of `spur-abbildungen`; the figure is grey, at most 0.7 of the text width, and no arrow crosses a label.
+7. Browser download: with a DOI that `source_add` answers with `bot_schutz`, `spur-pdf-holen` ends with "keine PDF-Datei" (exit 3); with `PLAYWRIGHT_MCP_HEADLESS=true` Claude opens the free address in the headless browser, saves the PDF, checks that it starts with `%PDF-` and uploads it with `spur-hochladen --doi`.
 
 #### Accepting changes
 

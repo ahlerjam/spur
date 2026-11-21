@@ -158,11 +158,69 @@ describe('Prüfbericht-Panel', function () {
     expect(document.querySelectorAll('.spur-zeile')).to.have.length(6)
   })
 
+  it('nennt die Seitenbasis: PDF-Seite bei Preprints, Herkunft der gedruckten Seitenzahl (P14)', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, {
+      zeilen: [
+        { ...zeile('gruen', false), auszug: 'PDF stimmt', seite: 'stimmt', seitenbasis: 'pdf' },
+        { ...zeile('rot', true), auszug: 'PDF woanders', wortlaut: 'exakt', seite: 'gefunden', gefundenAuf: '6', seitenbasis: 'pdf' },
+        { ...zeile('text', false), auszug: 'Aus dem Text', seite: 'stimmt', seitenbasis: 'gedruckt', versatzQuelle: 'seitentext' },
+        { ...zeile('druck', true), auszug: 'Gedruckt', wortlaut: 'exakt', seite: 'gefunden', gefundenAuf: '347', seitenbasis: 'gedruckt' },
+      ],
+      zaehlung: { geprueft: 4, markiert: 2, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 },
+    })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    const badges = (auszug: string) =>
+      [...(screen.getByText(auszug).closest('.spur-zeile')?.querySelectorAll('.badge') ?? [])].map(b => b.textContent)
+    await screen.findByText('PDF stimmt')
+    expect(badges('PDF stimmt')).to.deep.equal(['Wortlaut: exakt', 'PDF-Seite: stimmt'])
+    expect(badges('PDF woanders')).to.deep.equal(['Wortlaut: exakt', 'Wortlaut auf PDF-Seite 6 gefunden'])
+    expect(badges('Aus dem Text')).to.deep.equal(['Wortlaut: exakt', 'Seite: stimmt', 'Seitenzahl aus dem Seitentext erkannt'])
+    expect(badges('Gedruckt')).to.deep.equal(['Wortlaut: exakt', 'gefunden auf S. 347'])
+  })
+
   it('lässt Status mit null Stellen in der Zählung weg', async function () {
     fetchMock.removeRoutes()
     fetchMock.get(BERICHT, { zeilen: [zeile('gruen', false)], zaehlung: { geprueft: 1, markiert: 0, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 0, nicht_pruefbar: 0 } })
     await pruefen()
     render(<PruefberichtPanel />, { wrapper: EditorProviders })
     await screen.findByText('1 Stelle, keine markiert')
+  })
+
+  it('zeigt Abweichungen von Crossref als neutrales Abzeichen, das die Felder aufklappt (P13)', async function () {
+    fetchMock.removeRoutes()
+    fetchMock.get(BERICHT, {
+      zeilen: [
+        {
+          ...zeile('gruen', false),
+          key: 'alt2024',
+          auszug: 'Alter Eintrag',
+          wortlaut: null,
+          status: 'beleg_ohne_wortlaut',
+          abweichungen: [
+            { feld: 'volume', eintrag: null, erwartet: '35' },
+            { feld: 'year', eintrag: '2024', erwartet: '2025' },
+            { feld: 'eintragstyp', eintrag: 'article', erwartet: 'online' },
+          ],
+        },
+        zeile('rot', true),
+      ],
+      zaehlung: { geprueft: 1, markiert: 1, ohne_quelle: 0, ohne_seitenangabe: 0, beleg_ohne_wortlaut: 1, nicht_pruefbar: 0 },
+    })
+    await pruefen()
+    render(<PruefberichtPanel />, { wrapper: EditorProviders })
+    const knopf = await screen.findByRole('button', { name: /Literaturdaten unvollständig/ })
+    expect(knopf.className).to.include('bg-info')
+    expect(knopf.getAttribute('aria-expanded')).to.equal('false')
+    expect(screen.queryByText(/volume:/)).to.not.exist
+    fireEvent.click(knopf)
+    expect(knopf.getAttribute('aria-expanded')).to.equal('true')
+    screen.getByText('volume: fehlt (Crossref: 35)')
+    screen.getByText('year: 2024 (Crossref: 2025)')
+    screen.getByText('Eintragstyp: @article (Crossref: @online)')
+    fireEvent.click(screen.getByRole('radio', { name: /^Markiert/ }))
+    expect(screen.queryByText('Alter Eintrag')).to.not.exist
+    expect(screen.queryByRole('button', { name: /Literaturdaten unvollständig/ })).to.not.exist
   })
 })

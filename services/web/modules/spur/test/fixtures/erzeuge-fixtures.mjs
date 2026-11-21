@@ -20,7 +20,7 @@ function pageContent(lines, size = 12) {
   return `BT /F1 ${size} Tf\n${body}\nET`
 }
 
-function buildPdf({ pages, firstLabel, title, size, images = [] }) {
+function buildPdf({ pages, firstLabel, title, size, images = [], grafiken = [] }) {
   const objects = []
   const add = body => {
     objects.push(body)
@@ -41,7 +41,7 @@ function buildPdf({ pages, firstLabel, title, size, images = [] }) {
           `/DecodeParms << /Predictor 15 /Colors 1 /BitsPerComponent 8 /Columns ${bild.breite} >> ` +
           `/Length ${bild.daten.length} >>\nstream\n${bild.daten.toString('latin1')}\nendstream`
       )
-    const content = bild ? 'q 612 0 0 792 0 0 cm /Im1 Do Q' : pageContent(lines, size)
+    const content = bild ? 'q 612 0 0 792 0 0 cm /Im1 Do Q' : [pageContent(lines, size), grafiken[i]].filter(Boolean).join('\n')
     const contentId = add(
       `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`
     )
@@ -103,6 +103,14 @@ const smith = [
   filler(352),
 ]
 
+// P15: Ein Balkendiagramm auf PDF-Seite 4 (nur Vektorgrafik, der Text der Seite bleibt gleich).
+const BALKEN = [
+  '0 0 0 RG 1.5 w 120 300 m 480 300 l S 120 300 m 120 600 l S',
+  '0.20 0.40 0.75 rg 150 300 70 120 re f',
+  '0.85 0.45 0.15 rg 260 300 70 260 re f',
+  '0.25 0.60 0.30 rg 370 300 70 190 re f',
+].join('\n')
+
 const retracted = [
   ['Retracted Findings on Sleep', 'B. Jones', 'DOI 10.5555/spur.retracted'],
   ['Naps improve every kind of memory equally.', ...filler(2)],
@@ -110,12 +118,67 @@ const retracted = [
 
 writeFileSync(
   join(here, 'smith2024.pdf'),
-  buildPdf({ pages: smith, firstLabel: 345, title: 'Sleep and Memory' })
+  buildPdf({ pages: smith, firstLabel: 345, title: 'Sleep and Memory', grafiken: { 3: BALKEN } })
 )
 writeFileSync(
   join(here, 'retracted.pdf'),
   buildPdf({ pages: retracted, title: 'Retracted Findings on Sleep' })
 )
+// P12: Volltexte für Ausweichwege, falsche PDFs, Deckblätter und Quellen ohne DOI.
+const einfach = (datei, titel, autor, saetze) =>
+  writeFileSync(join(here, datei), buildPdf({ pages: [[titel, autor], saetze], title: titel }))
+einfach('oa001.pdf', 'Green open access in institutional repositories', 'N. Lind', ['Repositories keep accepted manuscripts available.'])
+einfach('oa002.pdf', 'Full text mirrors for biomedical literature', 'O. Haddad', ['Mirrors serve the same article from a second host.'])
+einfach('oa003.pdf', 'Rate limits on scholarly infrastructure', 'I. Probst', ['A second request after a short pause usually succeeds.'])
+einfach('oa004.pdf', 'Sleep and memory consolidation in adolescents', 'T. Novak', ['Adolescents retained more word pairs after a full night of sleep.'])
+einfach('bot001.pdf', 'Publisher walls around open articles', 'R. Stein', ['The article is open, the server still refuses automated requests.'])
+einfach('soil.pdf', 'Soil microbes in alpine meadows', 'B. Jones', ['Microbial communities differ with altitude.'])
+einfach('p12a.pdf', 'Slow-wave sleep and declarative recall in adults', 'A. Rivers', ['Recall of word pairs rose with the share of slow-wave sleep.'])
+einfach('p12b.pdf', 'Sleep deprivation and working memory in nurses', 'B. Lindqvist', ['After night shifts the nurses made more errors in the n-back task.'])
+// Volltext zur gedrosselten Crossref-DOI (P6). Seit P12 gleicht spur den Titel ab, ein fremdes PDF fiele durch.
+einfach('foods2022.pdf', 'Testwerk fuer gedrosseltes Crossref', 'F. Drossel', ['Households discard a share of the food they buy.'])
+einfach('report.pdf', 'AI at Work', 'J. Meyer, C. Okafor', ['Firms adopt generative tools unevenly across occupations.'])
+// P13: Volltexte zu den Werken mit Band, Heft, Kapitel, Artikelnummer, Entities und Preprints; die Autoren stehen auf
+// Seite 1, wie spur sie für den Abgleich liest.
+einfach('mikalef.pdf', 'Dynamic capabilities for digital transformation in public agencies', 'Lena Oldemeyer, Patrick Mikalef', ['Agencies that sensed change early adapted their services faster.'])
+einfach('morley2021.pdf', 'Ethics as a service: a pragmatic operationalisation of AI ethics', 'Jessica Morley', ['Ethics boards rarely see the systems they approve.'])
+einfach('berg2019.pdf', 'Circadian rhythms in shift work', 'Hanna Berg', ['Rotating shifts delay the circadian phase.'])
+einfach('reyes2019.pdf', 'Napping habits of university students', 'Tomas Reyes', ['Most students napped twice a week.'])
+einfach('asplund2023.pdf', 'Artificial intelligence & firm performance: A review of H2O - 50% more', 'Ida Asplund', ['Firms with AI reported higher margins.'])
+einfach('lindgren2022.pdf', 'Mind wandering during online lectures', 'Sofia Lindgren', ['Attention dropped after twenty minutes.'])
+einfach('arxiv2402.05555.pdf', 'Replay order in hippocampal place cell sequences', 'Mira Joshi, Kiran Gandhi', ['Sequences replayed in reverse after reward.'])
+einfach('arxiv2402.06666.pdf', 'Offline consolidation in recurrent networks', 'Kiran Gandhi and the replay lab', ['Offline phases stabilised earlier tasks.'])
+einfach('arxiv2402.07777.pdf', 'Spindle coupling across cortical regions', 'Jonas Muller, Ana Silva', ['Spindles coupled more tightly in frontal regions.'])
+einfach('unbekannt.pdf', 'Notes on an unregistered working paper', 'Anonymous', ['The DOI on this paper was never registered.'])
+writeFileSync(
+  join(here, 'notizen.pdf'),
+  buildPdf({ pages: [['Observations from the sleep lab', 'Week 12'], ['Two participants left early.']], title: 'Field notes 2023' })
+)
+writeFileSync(
+  join(here, 'deckblatt.pdf'),
+  buildPdf({
+    pages: [
+      ['University Repository', 'This version is made available under the terms of the archive.', 'Downloaded on 3 March 2025'],
+      ['Napping and attention in shift workers', 'L. Brandt'],
+      ['Short naps restored attention for about two hours.'],
+    ],
+    title: 'Repository cover sheet',
+  })
+)
+writeFileSync(
+  join(here, 'tampere.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 14 }, (_, i) =>
+      i === 0
+        ? ['Generative AI adoption in a large enterprise', 'Aino Virtanen', "Master's thesis", 'Tampere University, 2024']
+        : i === 11
+          ? ['Employees used the assistant mainly for drafting and summarising.', `Thesis page ${i + 1}.`]
+          : [`Thesis page ${i + 1}.`, 'Interviews were coded in two rounds.']
+    ),
+    title: 'Generative AI adoption in a large enterprise',
+  })
+)
+
 // Ein Scan: Seite 1 ist nur ein Bild mit dem bekannten Satz (keine Textebene), Seite 2 ist leer.
 // Das Bild entsteht, indem pdftocairo eine Textseite in Graustufen rastert; die IDAT-Daten der PNG
 // gehen mit PNG-Prädiktor unverändert als FlateDecode-Bild ins PDF.
@@ -168,7 +231,7 @@ writeFileSync(
   join(here, 'arxiv2401.01234.pdf'),
   buildPdf({
     pages: [
-      ['Sleep-like replay improves memory consolidation', 'in artificial neural networks', 'arXiv:2401.01234'],
+      ['Sleep-like replay improves memory consolidation', 'in artificial neural networks', 'Kiran Gandhi, Mira Joshi', 'arXiv:2401.01234'],
       ['Offline replay reduced catastrophic forgetting.'],
     ],
     title: 'Sleep-like replay improves memory consolidation in artificial neural networks',
@@ -188,3 +251,64 @@ Teilnehmerin: After three weeks I could no longer remember the routines.
 Interviewer: Did declarative memory come back on free days?
 `
 )
+// P14: Seitenangaben ohne PageLabels. gandhi2024 trägt auch im Text keine Seitenzahlen (Preprint), weber2018 unten
+// allein die gedruckte Zahl 41 bis 52, klein2020 nur vier einzelne Zahlen mit zwei verschiedenen Versätzen.
+const absatz = (thema, n) => [`${thema}, part ${String.fromCharCode(64 + n)}.`, 'The analysis follows the same protocol throughout.']
+writeFileSync(
+  join(here, 'gandhi2024.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 8 }, (_, i) =>
+      i === 5 ? ['Replay strengthens memory traces.', ...absatz('Replay', i + 1)] : absatz('Replay', i + 1)
+    ),
+    title: 'Replay in artificial neural networks',
+  })
+)
+writeFileSync(
+  join(here, 'weber2018.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 12 }, (_, i) => [
+      ...(i === 2 ? ['Bureaucracies codify routines in written rules.'] : []),
+      ...absatz('Administration', i + 1),
+      String(41 + i),
+    ]),
+    title: 'Verwaltung und Routinen',
+  })
+)
+writeFileSync(
+  join(here, 'klein2020.pdf'),
+  buildPdf({
+    pages: Array.from({ length: 10 }, (_, i) => [
+      ...(i === 3 ? ['Small teams share knowledge informally.'] : []),
+      ...absatz('Teams', i + 1),
+      ...({ 1: ['12'], 2: ['13'], 5: ['100'], 6: ['101'] }[i] ?? []),
+    ]),
+    title: 'Teams and knowledge',
+  })
+)
+// P15: Seite 2 hat 9.500 Zeichen (jede Zeile mit Zeilenumbruch, wie pdftotext -raw im Image sie liefert); der
+// Suchbegriff „persisted after twelve weeks“ steht bei Zeichen 6.037, hinter der Grenze von 4.000 Zeichen je source_read.
+const ZEILE = 150
+const fuellzeile = (n, laenge = ZEILE) => `Methods line ${n}: the cohort was followed with weekly sessions and structured interviews. `.repeat(3).slice(0, laenge - 1) + '.'
+const SATZ = 'The effect persisted after twelve weeks.'
+const satzAnfang = 6037 - SATZ.indexOf('persisted')
+const vorher = Math.floor(satzAnfang / (ZEILE + 1))
+const rest = 9500 - (satzAnfang + SATZ.length + 1)
+const langSeite2 = [
+  ...Array.from({ length: vorher }, (_, i) => fuellzeile(i + 1)),
+  `${fuellzeile(vorher + 1, satzAnfang % (ZEILE + 1))}${SATZ}`,
+  ...Array.from({ length: Math.floor(rest / (ZEILE + 1)) }, (_, i) => fuellzeile(vorher + 2 + i)),
+  fuellzeile(99, (rest % (ZEILE + 1)) - 1),
+]
+writeFileSync(
+  join(here, 'lang2024.pdf'),
+  buildPdf({ pages: [['Long-term effects of sleep training', 'K. Lang'], langSeite2], title: 'Long-term effects of sleep training', size: 5 })
+)
+// P15: Quellen mit einer Abbildung auf PDF-Seite 3; die Lizenz setzt vorbereiten.mjs beim Aufnehmen.
+const mitAbbildung = (datei, titel, autor) =>
+  writeFileSync(
+    join(here, datei),
+    buildPdf({ pages: [[titel, autor], filler(2), ['Figure 2 shows the effect per group.', ...filler(3)]], title: titel, grafiken: { 2: BALKEN } })
+  )
+mitAbbildung('offen2023.pdf', 'Open data on sleep and recall', 'L. Offen')
+mitAbbildung('verlag2022.pdf', 'Proprietary sleep metrics', 'V. Verlag')
+mitAbbildung('nd2021.pdf', 'Sleep stages without derivatives', 'N. Dee')

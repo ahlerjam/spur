@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+# Prüfkette des spur-Plugins. Als Hook liest es die Eingabe von Claude Code auf stdin; mit
+# „befehl aus|stand“ arbeitet es für bin/spur-pruefkette. Zustand je Session in
+# $CLAUDE_PLUGIN_DATA/pruefkette/<session>.json. Fehler blockieren nie: durchlassen, eine Zeile auf stderr.
+set -u
+
+MCP=mcp__plugin_spur_spur__
+ZAHLEN="n erste_text letzte_text gegen end human check"
+
+warnung() { printf 'spur-pruefkette: %s\n' "$1" >&2; }
+
+# Setzt $wert auf den Zeichenkettenwert des ersten Schlüssels $2 in $1 (leer, wenn es ihn nicht gibt).
+# Vor einem echten Schlüssel steht kein \, so zählt ein "pfad" im geänderten Text (dort \"pfad\") nicht.
+# Ohne Unterprozesse: Der Hook läuft bei jedem passenden Werkzeugaufruf.
+feld() {
+  local muster="(^|[^\\])\"$2\" *: *\"([^\"\\]*)\""
+  wert=
+  if [[ $1 =~ $muster ]]; then wert=${BASH_REMATCH[2]}; fi
+}
+
+datei=
+sperre=
+ordner_fuer() {
+  local sid=${2//[^A-Za-z0-9_-]/_}
+  [ -n "$1" ] || { warnung "kein Datenordner (CLAUDE_PLUGIN_DATA), die Prüfkette ist aus"; return 1; }
+  [ -n "$sid" ] || { warnung "keine session_id in der Eingabe"; return 1; }
+  mkdir -p "$1/pruefkette" 2>/dev/null || { warnung "Datenordner nicht anlegbar: $1/pruefkette"; return 1; }
+  datei="$1/pruefkette/$sid.json"
+  sperre="$1/pruefkette/.$sid.sperre"
+}
+
+# Hooks einer Session können gleichzeitig laufen (parallele Werkzeugaufrufe). Nach 2 s gilt die Sperre als verwaist.
+sperren() {
+  local i
+  for ((i = 0; i < 40; i++)); do
+    mkdir "$sperre" 2>/dev/null && break
+    sleep 0.05
+  done
+  [ "$i" -lt 40 ] || { warnung "Sperre $sperre hing, übernommen"; mkdir -p "$sperre"; }
+  trap 'rmdir "$sperre" 2>/dev/null' EXIT
+}
+
+# Liest den Zustand in Variablen; ohne Datei ist alles 0. Eine kaputte Datei wird gelöscht (Rückgabe 1).
+laden() {
+  local inhalt= k muster
+  for k in $ZAHLEN; do printf -v "$k" 0; done
+  aus=
+  [ -f "$datei" ] || return 0
+  IFS= read -r -d '' inhalt < "$datei"
+  if [[ ! $inhalt =~ ^\{.*\"n\":\ *[0-9]+.*\} ]]; then
+    warnung "Zustandsdatei kaputt, wird verworfen: $datei"
+    rm -f "$datei"
+    return 1
+  fi
+  for k in $ZAHLEN; do
+    muster="\"$k\": *([0-9]+)"
+    [[ $inhalt =~ $muster ]] && printf -v "$k" '%s' "${BASH_REMATCH[1]}"
+  done
+  feld "$inhalt" aus
+  aus=$wert
+}
+
+speichern() {
+  local tmp k json='{'
+  for k in $ZAHLEN; do json+="\"$k\": ${!k}, "; done
+  json+="\"aus\": \"$aus\"}"
+  tmp=$(mktemp "$datei.XXXXXX") || { warnung "Zustand nicht speicherbar: $datei"; return 0; }
+  printf '%s\n' "$json" > "$tmp" && mv "$tmp" "$datei" || { rm -f "$tmp"; warnung "Zustand nicht speicherbar: $datei"; }
+}
+
+# Merkt eine Stufe mit dem nächsten Zählerstand; Zähler statt Uhrzeit, damit Ereignisse derselben Sekunde ihre Reihenfolge behalten.
+merken() {
+  sperren
+  laden
+  n=$((n + 1))
+  case "$1" in
+    text) [ "$erste_text" -gt 0 ] || erste_text=$n; letzte_text=$n ;;
+    *) printf -v "$1" '%s' "$n" ;;
+  esac
+  speichern
+}
+
+# Fehlende Stufen in Kettenreihenfolge. Fehlt eine, gelten auch alle späteren als offen.
+fehlend=()
+pruefen() {
+  fehlend=()
+  [ "$gegen" -gt "$erste_text" ] || fehlend+=("Gegenprüfung")
+  [ ${#fehlend[@]} -eq 0 ] && [ "$end" -gt "$gegen" ] || fehlend+=("Endprüfung")
+  [ ${#fehlend[@]} -eq 0 ] && [ "$human" -gt "$end" ] || fehlend+=("Humanizer")
+  [ ${#fehlend[@]} -eq 0 ] && [ "$check" -gt "$letzte_text" ] || fehlend+=("check_report")
+}
+
+naechster() {
+  case "$1" in
+    Gegenprüfung) echo "Gegenprüfung mit dem Agenten spur:gegenpruefung, nur mit Projekt-ID und Bereich." ;;
+    Endprüfung) echo "Endprüfung mit dem Agenten spur:endpruefung." ;;
+    Humanizer) echo "Humanizer auf die im Lauf geschriebenen Abschnitte, Skill humanizer-de:humanizer-de für deutschen und humanizer:humanizer für englischen Text." ;;
+    check_report) echo "check_report aufrufen." ;;
+  esac
+}
+
+liste() { local IFS=,; printf '%s' "$*" | sed 's/,/, /g'; }
+
+hook() {
+  local eingabe ereignis werkzeug session grund
+  eingabe=$(tr -d '\n')
+  feld "$eingabe" hook_event_name; ereignis=$wert
+  feld "$eingabe" session_id; session=$wert
+  feld "$eingabe" tool_name; werkzeug=$wert
+  [ -n "$ereignis" ] || exit 0
+
+  if [ "$ereignis" = SessionStart ]; then
+    ordner_fuer "${CLAUDE_PLUGIN_DATA:-}" "$session" || exit 0
+    if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+      local q=\'\\\'\'
+      {
+        printf "export SPUR_PRUEFKETTE_SESSION='%s'\n" "$(basename "$datei" .json)"
+        printf "export SPUR_PRUEFKETTE_DATA='%s'\n" "${CLAUDE_PLUGIN_DATA//\'/$q}"
+      } >> "$CLAUDE_ENV_FILE" || warnung "CLAUDE_ENV_FILE nicht beschreibbar"
+    fi
+    printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "spur: Nach Textarbeit in einem spur-Projekt folgt die Prüfkette aus dem Skill spur, also Agent spur:gegenpruefung, Korrekturen, Agent spur:endpruefung, Korrekturen, humanizer und check_report. Erst danach lässt ein Hook run_finish durch, Läufe ohne Textänderung gehen sofort durch. Den Stand zeigt der Befehl spur-pruefkette stand."}}'
+    exit 0
+  fi
+
+  # Ein gescheiterter Aufruf hat nichts geändert und nichts geprüft.
+  local fehler='(^|[^\\])"isError" *: *true'
+  [ "$ereignis" = PostToolUse ] && [[ $eingabe =~ $fehler ]] && exit 0
+
+  # Erst entscheiden, ob das Ereignis zählt; nur dann Datenordner, Sperre und Zustand.
+  local stufe=
+  case "$ereignis:$werkzeug" in
+    PostToolUse:${MCP}doc_edit|PostToolUse:${MCP}doc_create)
+      feld "$eingabe" pfad
+      case "$wert" in
+        ""|*.tex) stufe=text ;;
+      esac ;;
+    PostToolUse:${MCP}check_report) stufe=check ;;
+    PostToolUse:Skill)
+      feld "$eingabe" skill
+      case "$wert" in
+        humanizer:humanizer|humanizer-de:humanizer-de|humanizer|humanizer-de) stufe=human ;;
+      esac ;;
+    SubagentStop:*)
+      feld "$eingabe" agent_type
+      case "${wert#spur:}" in
+        gegenpruefung) stufe=gegen ;;
+        endpruefung) stufe=end ;;
+      esac ;;
+    PostToolUse:${MCP}run_finish)
+      ordner_fuer "${CLAUDE_PLUGIN_DATA:-}" "$session" || exit 0
+      rm -f "$datei"
+      exit 0 ;;
+    PreToolUse:${MCP}run_finish)
+      # Nur lesen: speichern ersetzt die Datei atomar, eine Sperre ist nicht nötig.
+      ordner_fuer "${CLAUDE_PLUGIN_DATA:-}" "$session" || exit 0
+      laden || exit 0
+      [ "$erste_text" -gt 0 ] && [ -z "$aus" ] || exit 0
+      pruefen
+      [ ${#fehlend[@]} -gt 0 ] || exit 0
+      grund="spur: run_finish wartet auf die Prüfkette nach der Textarbeit. Es fehlen: $(liste "${fehlend[@]}"). Nächster Schritt: $(naechster "${fehlend[0]}") Den Stand zeigt spur-pruefkette stand."
+      printf '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "%s"}}\n' "$grund"
+      exit 0 ;;
+  esac
+  [ -n "$stufe" ] || exit 0
+  ordner_fuer "${CLAUDE_PLUGIN_DATA:-}" "$session" || exit 0
+  merken "$stufe"
+}
+
+befehl() {
+  local grund
+  case "${1:-}" in
+    aus)
+      grund=$(printf '%s' "${2:-}" | tr -d '\000-\037"\\' | sed -E 's/^ +//; s/ +$//')
+      [ -n "$grund" ] || { echo "spur-pruefkette aus braucht einen Grund, etwa: spur-pruefkette aus \"Owner will nur einen Tippfehler\"" >&2; exit 2; } ;;
+    stand) ;;
+    *) echo "Unbekannter Befehl: ${1:-}. Aufruf: spur-pruefkette stand | aus \"<grund>\"" >&2; exit 2 ;;
+  esac
+  [ -n "${SPUR_PRUEFKETTE_SESSION:-}" ] || { echo "Keine Session: SPUR_PRUEFKETTE_SESSION fehlt. Der Befehl wirkt nur in Claude Code mit dem spur-Plugin (der SessionStart-Hook setzt sie)." >&2; exit 2; }
+  ordner_fuer "${SPUR_PRUEFKETTE_DATA:-}" "$SPUR_PRUEFKETTE_SESSION" || exit 2
+  if [ "$1" = aus ]; then
+    sperren
+    laden
+    aus=$grund
+    speichern
+    echo "Prüfkette für diese Session aus. Grund: $aus. Nenne ihn in der Zusammenfassung."
+    exit 0
+  fi
+  laden
+  echo "Session: $SPUR_PRUEFKETTE_SESSION"
+  if [ "$erste_text" -eq 0 ]; then echo "Textarbeit: nein"; else echo "Textarbeit: ja"; fi
+  if [ -n "$aus" ]; then
+    echo "Sperre aus. Grund: $aus"
+  elif [ "$erste_text" -eq 0 ]; then
+    echo "run_finish geht ohne Prüfkette durch."
+  else
+    pruefen
+    if [ ${#fehlend[@]} -gt 0 ]; then echo "Es fehlen: $(liste "${fehlend[@]}")"; else echo "Prüfkette vollständig, run_finish geht durch."; fi
+  fi
+}
+
+if [ "${1:-}" = befehl ]; then
+  shift
+  befehl "$@"
+else
+  hook
+fi

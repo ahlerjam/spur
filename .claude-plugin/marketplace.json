@@ -3,10 +3,16 @@
   "owner": {
     "name": "ahlerjam"
   },
+  "description": "spur: Overleaf mit Claude, Quellen und Zitatprüfung.",
+  "allowCrossMarketplaceDependenciesOn": [
+    "cflow",
+    "claude-plugins-official"
+  ],
   "plugins": [
     {
       "name": "spur",
       "source": "./plugins/spur",
+      "version": "0.2.0",
       "description": "Verbindet Claude Code mit einer spur-Installation."
     }
   ]

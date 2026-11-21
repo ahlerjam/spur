@@ -36,6 +36,12 @@ describe('spurUpdate', () => {
     expect(a).not.toBe(b)
   })
 
+  it('liefert die Kennung zurück, damit der Lauf seine Changes wiedererkennt (P15)', async () => {
+    const seed = await spurUpdate('p1', 'd1', [], 1, { userId: 'u1', tracked: true })
+    expect(seed).toBe(fetchNothing.mock.calls[0][1].json.meta.tc)
+    expect(await spurUpdate('p1', 'd1', [], 1, { userId: 'u1' })).toBe(null)
+  })
+
   it('meldet 409 des document-updater als konflikt', async () => {
     fetchNothing.mockRejectedValueOnce(new RequestFailedError(409))
     expect(await fehlerVon(spurUpdate('p1', 'd1', [], 1, {}))).toMatchObject({ status: 409, typ: 'konflikt' })

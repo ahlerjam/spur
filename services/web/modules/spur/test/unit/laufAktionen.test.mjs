@@ -13,6 +13,8 @@ let geloeschteDocs
 let spurUpdate
 let acceptChanges
 let emitToRoom
+let restPfade
+let restOrdner
 let geloeschtePfade
 let paketEntfernt
 let quelleGeloescht
@@ -44,6 +46,11 @@ beforeEach(async () => {
     default: { promises: { deleteEntityWithPath: async (_p, pfad) => geloeschtePfade.push(pfad) } },
   }))
   vi.doMock('../../app/src/kompilieren/TexPakete.mjs', () => ({ paketEntfernt }))
+  restPfade = []
+  restOrdner = ['/']
+  vi.doMock('../../../../app/src/Features/Project/ProjectEntityHandler.mjs', () => ({
+    default: { promises: { getAllEntities: async () => ({ docs: [], files: restPfade.map(path => ({ path })), folders: restOrdner.map(path => ({ path })) }) } },
+  }))
   quelleGeloescht = vi.fn(async () => {})
   vi.doMock('../../app/src/QuellenManager.mjs', () => ({ loeschen: quelleGeloescht }))
   vi.doMock('../../../../app/src/infrastructure/mongodb.mjs', () => datenbank.mongodbModul)
@@ -162,7 +169,19 @@ describe('fuerKarte und laufDaten', () => {
   it('laufDaten ist ohne Lauf leer und lädt bei abgeschlossenen Läufen keine Changes', async () => {
     expect(await LaufAktionen.laufDaten(projekt, null)).toEqual({ lauf: null, aenderungen: [] })
     const fertig = await lauf({ status: 'angenommen' })
-    expect(await LaufAktionen.laufDaten(projekt, fertig)).toEqual({ lauf: { id: fertig._id, status: 'angenommen' }, aenderungen: [] })
+    expect(await LaufAktionen.laufDaten(projekt, fertig)).toEqual({
+      lauf: { id: fertig._id, status: 'angenommen', stand: { gesamt: 1, automatisch_angenommen: 0, offen: 0, rot: 0 } },
+      aenderungen: [],
+    })
+  })
+
+  it('laufDaten und stand zählen offene Bearbeitungen über die Kennung ihrer Changes (P15)', async () => {
+    const seed = 'e'.repeat(18)
+    docSetzen('Text', [change(`${seed}000001`, { p: 0, i: 'neu' })])
+    const l = await lauf({ aenderungen: 1, bearbeitungen: [{ seed, anzahl: 1, rot: false }] })
+    expect((await LaufAktionen.laufDaten(projekt, l)).lauf.stand).toEqual({ gesamt: 1, automatisch_angenommen: 0, offen: 1, rot: 0 })
+    expect(await LaufAktionen.stand(projekt, l)).toMatchObject({ aenderungen: { offen: 1 }, hinweis: expect.stringContaining(meldung('spur_lauf_hinweis_offen_1')) })
+    expect(await LaufAktionen.stand(projekt, null)).toMatchObject({ aenderungen: { gesamt: 0 } })
   })
 
   it('laufDaten zeigt bei offenen und fertigen Läufen die Changes', async () => {
@@ -202,7 +221,7 @@ describe('annehmen', () => {
     const danach = await gespeichert(l)
     expect(danach.status).toBe('angenommen')
     expect(danach.angenommen).toEqual([
-      { docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }), stapel: expect.any(String) },
+      { docId: doc, op: { p: 8, i: 'neu' }, ...kontextUm('Alt und neu.', { p: 8, i: 'neu' }), stapel: expect.any(String), seed: 'a' },
     ])
   })
 
@@ -368,6 +387,36 @@ describe('zuruecknehmen', () => {
     expect(await gespeichert(l)).toMatchObject({ status: 'zurueckgenommen', angelegt: [] })
   })
 
+  it('entfernt einen vom Lauf angelegten Ordner nur, wenn er danach leer ist (P15)', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'owner' })
+    const angelegt = [
+      { art: 'datei', pfad: 'abbildungen/a.png', ordner: 'abbildungen' },
+      { art: 'datei', pfad: 'abbildungen/b.pdf' },
+    ]
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf', '/abbildungen'])
+
+    geloeschtePfade = []
+    restPfade = ['/abbildungen/eigenes.png']
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf'])
+
+    // Auch ein leerer Unterordner, den die Person angelegt hat, bleibt.
+    geloeschtePfade = []
+    restPfade = []
+    restOrdner = ['/', '/abbildungen', '/abbildungen/skizzen']
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/a.png', '/abbildungen/b.pdf'])
+  })
+
+  it('entfernt auch verschachtelte neue Ordner, von innen nach außen (Code-Review)', async () => {
+    recht.vergeben(anna, projekt, { stufe: 'owner' })
+    restOrdner = ['/', '/abbildungen', '/abbildungen/kap1']
+    const angelegt = [{ art: 'datei', pfad: 'abbildungen/kap1/bild.png', ordner: 'abbildungen' }]
+    await LaufAktionen.zuruecknehmen(projekt, await lauf({ docs: [], angelegt }), anna)
+    expect(geloeschtePfade).toEqual(['/abbildungen/kap1/bild.png', '/abbildungen/kap1', '/abbildungen'])
+  })
+
   it('übergeht schon gelöschte Dateien', async () => {
     recht.vergeben(anna, projekt, { stufe: 'owner' })
     vi.resetModules()
@@ -460,7 +509,7 @@ describe('Sofort annehmen (Schalter „Alles von Claude automatisch annehmen“)
     const danach = await gespeichert(l)
     expect(danach.status).toBe('offen')
     expect(danach.angenommen).toEqual([
-      expect.objectContaining({ docId: doc, op: { p: 9, i: 'neu' }, automatisch: true, pfad: 'kapitel.tex', zeile: 1 }),
+      expect.objectContaining({ docId: doc, op: { p: 9, i: 'neu' }, automatisch: true, pfad: 'kapitel.tex', zeile: 1, seed: 'a' }),
     ])
   })
 

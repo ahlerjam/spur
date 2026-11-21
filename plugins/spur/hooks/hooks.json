@@ -1,0 +1,23 @@
+{
+  "description": "Prüfkette: erinnert an Gegenprüfung, Endprüfung und Humanizer und hält run_finish nach Textarbeit auf, bis sie gelaufen sind.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pruefkette", "args": [] }] }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__plugin_spur_spur__doc_edit|mcp__plugin_spur_spur__doc_create|mcp__plugin_spur_spur__check_report|mcp__plugin_spur_spur__run_finish|Skill",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pruefkette", "args": [] }]
+      }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pruefkette", "args": [] }] }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_spur_spur__run_finish",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pruefkette", "args": [] }]
+      }
+    ]
+  }
+}

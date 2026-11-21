@@ -78,6 +78,21 @@ describe('aufnehmen', () => {
     expect((await Quellen.seite(quelle, 1)).label).toBeNull()
   })
 
+  it('liest den Versatz ohne PageLabels aus den Seitenzahlen im Seitentext (P14)', async () => {
+    const quelle = await aufnehmen('weber2018.pdf', 'weber2018.pdf')
+    expect(quelle).toMatchObject({ versatz: 40, versatzQuelle: 'seitentext', doi: null })
+    expect((await Quellen.seite(quelle, 1)).label).toBe('41')
+    expect((await Quellen.seite(quelle, 3)).label).toBe('43')
+  })
+
+  it('lässt den Versatz leer, wenn der Seitentext zu wenige oder widersprüchliche Zahlen hat (P14)', async () => {
+    for (const datei of ['klein2020.pdf', 'gandhi2024.pdf']) {
+      const quelle = await aufnehmen(datei, datei)
+      expect(quelle).toMatchObject({ versatz: null, versatzQuelle: null })
+      expect((await Quellen.seite(quelle, 2)).label).toBeNull()
+    }
+  })
+
   it('markiert einen Scan ohne Text als kein_text und fragt Crossref nicht', async () => {
     const quelle = await aufnehmen('scan.pdf', 'scan.pdf')
     expect(quelle).toMatchObject({ status: 'kein_text', doi: null, meta: null, seitenzahl: 2 })
@@ -111,6 +126,88 @@ describe('aufnehmen', () => {
   it('bildet den Schlüssel aus dem Dateinamen und ersetzt Sonderzeichen', async () => {
     const quelle = await aufnehmen('Müller & Co (2020).pdf', 'scan.pdf')
     expect(quelle.key).toBe('Müller---Co--2020-')
+  })
+})
+
+describe('Titelabgleich beim Aufnehmen', () => {
+  const SCHLAF = { titel: 'Sleep and memory consolidation in adolescents' }
+  const mitTitel = (datei, meta, extra = {}) => aufnehmen(datei, datei, { meta, ...extra })
+
+  it('hält fest, dass der Titel der Metadaten im PDF steht', async () => {
+    expect((await mitTitel('oa004.pdf', SCHLAF, { lizenz: 'cc-by' }))).toMatchObject({ titelabgleich: 'passt', lizenz: 'cc-by' })
+  })
+
+  it('nimmt ein PDF mit anderem Titel auf und vermerkt die Abweichung', async () => {
+    expect((await mitTitel('soil.pdf', SCHLAF)).titelabgleich).toBe('abweichend')
+  })
+
+  it('weist ein PDF mit anderem Titel bei titelStreng ab und legt nichts an', async () => {
+    const fehler = await fehlerVon(mitTitel('soil.pdf', SCHLAF, { titelStreng: true }))
+    expect(fehler).toMatchObject({ status: 422, typ: 'falsches_pdf' })
+    expect(await datenbank.db.collection('spurSources').countDocuments()).toBe(0)
+  })
+
+  it('findet den Titel hinter einem Deckblatt auf Seite 2', async () => {
+    expect((await mitTitel('deckblatt.pdf', { titel: 'Napping and attention in shift workers' }, { titelStreng: true })).titelabgleich).toBe('passt')
+  })
+
+  it('kann einen Scan ohne Textebene nicht prüfen und nimmt ihn trotzdem auf', async () => {
+    expect((await mitTitel('scan.pdf', { titel: 'Scanned field notes on night shifts' }, { titelStreng: true })).titelabgleich).toBe('nicht_pruefbar')
+  })
+
+  it('gleicht ohne vorgegebenen Titel nichts ab', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf')
+    expect(quelle).not.toHaveProperty('titelabgleich')
+    expect(quelle.lizenz).toBeNull()
+  })
+})
+
+describe('Autorenabgleich beim Aufnehmen', () => {
+  const GANDHI_JOSHI = [{ family: 'Gandhi', given: 'Kiran' }, { family: 'Joshi', given: 'Mira' }]
+  const mitAutoren = (datei, autoren) => aufnehmen(datei, datei, { meta: { gefunden: true, titel: 'Egal', autoren } })
+
+  it('übernimmt die Reihenfolge der ersten PDF-Seite in die Metadaten (Gandhi/Joshi)', async () => {
+    const quelle = await mitAutoren('arxiv2402.05555.pdf', GANDHI_JOSHI)
+    expect(quelle.autoren).toBe('aus_pdf')
+    expect(quelle.meta.autoren.map(a => a.family)).toEqual(['Joshi', 'Gandhi'])
+    const gespeichert = await datenbank.db.collection('spurSources').findOne({ _id: quelle._id })
+    expect(gespeichert).toMatchObject({ autoren: 'aus_pdf', meta: { autoren: [{ family: 'Joshi' }, { family: 'Gandhi' }] } })
+  })
+
+  it('meldet abweichend, wenn ein Nachname auf der ersten Seite fehlt, und lässt die Reihenfolge', async () => {
+    const quelle = await mitAutoren('arxiv2402.06666.pdf', GANDHI_JOSHI)
+    expect(quelle.autoren).toBe('abweichend')
+    expect(quelle.meta.autoren).toEqual(GANDHI_JOSHI)
+  })
+
+  it('bestätigt Müller gegen Muller im PDF', async () => {
+    expect((await mitAutoren('arxiv2402.07777.pdf', [{ family: 'Müller', given: 'Jonas' }, { family: 'Silva', given: 'Ana' }])).autoren).toBe('bestaetigt')
+  })
+
+  it('gleicht einen Scan ohne Text nicht ab', async () => {
+    expect(await mitAutoren('scan.pdf', GANDHI_JOSHI)).not.toHaveProperty('autoren')
+  })
+})
+
+describe('Ersatzangaben beim Upload (P13)', () => {
+  const ERSATZ = { titel: 'notizen', art: 'misc' }
+
+  it('nimmt die Ersatzangaben ohne Metadaten und gleicht sie nicht mit dem PDF ab', async () => {
+    const quelle = await aufnehmen('notizen.pdf', 'notizen.pdf', { ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ meta: ERSATZ, metadaten: 'unvollstaendig' })
+    expect(quelle).not.toHaveProperty('titelabgleich')
+    expect(quelle).not.toHaveProperty('autoren')
+  })
+
+  it('bevorzugt die Metadaten einer DOI im PDF-Text, wenn keine DOI vorgegeben ist', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf', { ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ doi: '10.5555/spur.2024.001', meta: { titel: 'Sleep and Memory' }, autoren: 'bestaetigt' })
+    expect(quelle).not.toHaveProperty('metadaten')
+  })
+
+  it('nimmt bei vorgegebener, unbekannter DOI die Ersatzangaben, nicht die DOI im PDF', async () => {
+    const quelle = await aufnehmen('smith2024.pdf', 'smith2024.pdf', { doi: '10.9999/nirgends.1', ersatz: ERSATZ })
+    expect(quelle).toMatchObject({ doi: '10.9999/nirgends.1', meta: ERSATZ, metadaten: 'unvollstaendig' })
   })
 })
 
@@ -181,6 +278,23 @@ describe('Abfragen', () => {
     const breit = await Quellen.bild(smith, 2, 1600)
     expect(breit).not.toBe(schmal)
     expect(breit).toMatch(/-w1600\.png$/)
+  })
+
+  it('seitenBildFuerClaude rendert die Seite mit höchstens 1600 px an der längsten Kante', async () => {
+    const png = await Quellen.seitenBildFuerClaude(smith, 4)
+    expect(Math.max(png.readUInt32BE(16), png.readUInt32BE(20))).toBe(1600)
+  })
+
+  it('seitenBildFuerClaude nennt bei einer Seite außerhalb die Seitenzahl der Quelle', async () => {
+    const fehler = await fehlerVon(Quellen.seitenBildFuerClaude(smith, 99))
+    expect(fehler).toMatchObject({ status: 404, typ: 'seite_nicht_gefunden', zusatz: { seiten: 8 } })
+    expect(fehler.message).toContain('8')
+  })
+
+  it('seitenBildFuerClaude lehnt Quellen ohne Seiten ab', async () => {
+    for (const art of ['web', 'vtt']) {
+      expect(await fehlerVon(Quellen.seitenBildFuerClaude({ ...smith, art }, 1))).toMatchObject({ status: 409, typ: 'quelle_ohne_seiten' })
+    }
   })
 
   it('textEbene gibt es nur bei erkanntem Text', async () => {
