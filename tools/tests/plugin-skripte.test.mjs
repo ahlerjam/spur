@@ -51,7 +51,39 @@ before(async () => {
         if (doi === '10.1234/fake.zu') {
           return json(res, 200, { best_oa_location: null, oa_locations: [] })
         }
+        // P17: Der Verlag liefert HTML (Bot-Schutz), das Repositorium das PDF; Unpaywall nennt den Verlag zuerst.
+        if (doi === '10.1234/fake.repo') {
+          const verlag = { host_type: 'publisher', url_for_pdf: `${basis}/verlag/seite.html`, license: null }
+          const repo = { host_type: 'repository', url_for_pdf: `${basis}/repo/b.pdf`, license: 'cc-by' }
+          return json(res, 200, { best_oa_location: verlag, oa_locations: [verlag, repo] })
+        }
+        if (doi === '10.1234/fake.allehtml') {
+          const verlag = { host_type: 'publisher', url_for_pdf: `${basis}/verlag/seite.html`, license: null }
+          const repo = { host_type: 'repository', url_for_pdf: `${basis}/repo/seite.html`, license: null }
+          return json(res, 200, { best_oa_location: verlag, oa_locations: [verlag, repo] })
+        }
         return json(res, 404, { error: true })
+      }
+      if (url.pathname === '/europepmc/webservices/rest/search') {
+        const doi = url.searchParams.get('query')?.replace(/^DOI:/, '')
+        if (doi === '10.1234/fake.pmc' || doi === '10.1234/fake.allehtml') {
+          return json(res, 200, {
+            hitCount: 1,
+            resultList: { result: [{ doi, pmcid: 'PMC123', fullTextUrlList: { fullTextUrl: [
+              { availability: 'Open access', availabilityCode: 'OA', documentStyle: 'html', site: 'Europe_PMC', url: `${basis}/pmc/seite.html` },
+              { availability: 'Open access', availabilityCode: 'OA', documentStyle: 'pdf', site: 'Europe_PMC', url: doi === '10.1234/fake.pmc' ? `${basis}/pmc/c.pdf` : `${basis}/pmc/seite.html` },
+            ] } }] },
+          })
+        }
+        return json(res, 200, { hitCount: 0, resultList: { result: [] } })
+      }
+      if (url.pathname === '/repo/b.pdf' || url.pathname === '/pmc/c.pdf') {
+        res.writeHead(200, { 'content-type': 'application/pdf' })
+        return res.end(PDF)
+      }
+      if (url.pathname === '/repo/seite.html' || url.pathname === '/pmc/seite.html') {
+        res.writeHead(200, { 'content-type': 'text/html' })
+        return res.end('<html><body>Checking your browser</body></html>')
       }
       if (url.pathname === '/verlag/a.pdf') {
         res.writeHead(200, { 'content-type': 'application/pdf' })
@@ -114,6 +146,7 @@ const umgebung = extra => ({
   GIT_CONFIG_SYSTEM: '/dev/null',
   SPUR_UNPAYWALL_BASE: `${basis}/unpaywall`,
   SPUR_ARXIV_BASE: `${basis}/arxiv`,
+  SPUR_EUROPEPMC_BASE: `${basis}/europepmc`,
   UNPAYWALL_EMAIL: 'test@example.org',
   ...extra,
 })
@@ -152,20 +185,47 @@ test('spur-pdf-holen nimmt die erste oa_location mit PDF-Link, wenn best_oa_loca
   assert.ok(existsSync(join(arbeit, r.stdout.trim())))
 })
 
-test('spur-pdf-holen meldet fehlende freie Version', async () => {
+test('spur-pdf-holen meldet fehlende freie Version mit Exit-Code 1, auch nach Europe PMC', async () => {
   for (const doi of ['10.1234/fake.zu', '10.1234/unbekannt']) {
+    anfragen = []
     const r = await laufAsync('spur-pdf-holen', [doi, 'ziel'])
-    assert.notEqual(r.status, 0)
+    assert.equal(r.status, 1)
     assert.match(r.stderr, /keine freie Version gefunden/)
     assert.equal(r.stdout, '')
     assert.deepEqual(readdirSync(join(arbeit, 'ziel')), [])
+    assert.ok(anfragen.includes('GET /europepmc/webservices/rest/search'), anfragen.join(', '))
   }
 })
 
-test('spur-pdf-holen verwirft HTML statt PDF', async () => {
+test('spur-pdf-holen verwirft HTML statt PDF mit Exit-Code 3', async () => {
   const r = await laufAsync('spur-pdf-holen', ['10.1234/fake.html', 'ziel'])
-  assert.notEqual(r.status, 0)
+  assert.equal(r.status, 3)
   assert.match(r.stderr, /keine PDF-Datei/)
+  assert.equal(r.stdout, '')
+  assert.deepEqual(readdirSync(join(arbeit, 'ziel')), [])
+})
+
+test('spur-pdf-holen nimmt das Repositorium vor dem Verlag, wenn der Verlag HTML liefert (P17)', async () => {
+  const r = await laufAsync('spur-pdf-holen', ['10.1234/fake.repo', 'ziel'])
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(r.stdout, 'ziel/10.1234_fake.repo.pdf\n')
+  assert.ok(existsSync(join(arbeit, 'ziel/10.1234_fake.repo.pdf')))
+  assert.deepEqual(anfragen.filter(a => !a.includes('unpaywall')), ['GET /repo/b.pdf'])
+})
+
+test('spur-pdf-holen holt das PDF aus Europe PMC, wenn Unpaywall keinen Fundort kennt (P17)', async () => {
+  const r = await laufAsync('spur-pdf-holen', ['10.1234/fake.pmc', 'ziel'])
+  assert.equal(r.status, 0, r.stderr)
+  assert.equal(r.stdout, 'ziel/10.1234_fake.pmc.pdf\n')
+  assert.ok(anfragen.includes('GET /pmc/c.pdf'), anfragen.join(', '))
+})
+
+test('spur-pdf-holen endet mit „keine PDF-Datei“ und Exit-Code 3, wenn jede Adresse HTML liefert (P17)', async () => {
+  const r = await laufAsync('spur-pdf-holen', ['10.1234/fake.allehtml', 'ziel'])
+  assert.equal(r.status, 3)
+  assert.match(r.stderr, /keine PDF-Datei/)
+  assert.deepEqual(['/repo/seite.html', '/verlag/seite.html', '/pmc/seite.html'].map(p => r.stderr.includes(p)), [true, true, true], r.stderr)
+  assert.ok(r.stderr.indexOf('/repo/') < r.stderr.indexOf('/verlag/'), r.stderr)
   assert.equal(r.stdout, '')
   assert.deepEqual(readdirSync(join(arbeit, 'ziel')), [])
 })

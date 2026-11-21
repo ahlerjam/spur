@@ -77,7 +77,7 @@
         "`bin/spur-pdf-holen` versucht jetzt alle freien Unpaywall-Fundorte, Repositorien zuerst, und danach Europe PMC; gegen den lokalen Fake (`SPUR_UNPAYWALL_BASE`) liefert es für eine DOI, deren Verlagsadresse HTML liefert, das PDF aus dem Repositorium und gibt nur den Pfad aus; ohne freien Fundort endet es mit „keine freie Version gefunden“ und Exit-Code 1; liefert jede Adresse HTML, mit „keine PDF-Datei“ und Exit-Code 3",
         "`tools/tests/plugin-skripte.test.mjs` deckt diese drei Fälle ab; der Abschnitt „PDFs from your computer“ im Hauptskill verweist auf den neuen Skill statt ihn zu doppeln"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "f7",
