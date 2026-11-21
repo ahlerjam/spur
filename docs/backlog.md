@@ -43,7 +43,6 @@ Deferred, not discarded. Check here before new plans.
 - Check `https://doi.org/doiRA/…` and `https://api.datacite.org/dois/…` against the real hosts (answer format, slash in the path); the tests use fakes
 - Retractions for DataCite DOIs; DataCite does not report them today
 - A DataCite DOI that `doi.org` knows but `api.datacite.org` answers with 404 shows "nicht prüfbar" on every report; decide on a cached state such as "registered, metadata missing"
-- `tex_package_add`: try the second mirror on a 404 as well, in case the image's mirror lacks a package that mirror.ctan.org has
 - Semantic search over Postgres with pgvector, if brute force is no longer enough
 - Short-lived tokens with OAuth
 - Rate limits for web page capture and comments; OCR limit per project and page cap
@@ -65,6 +64,6 @@ Deferred, not discarded. Check here before new plans.
 - Overleaf's German language file still lacks 1182 keys that the English one has (`services/web/locales/de.json` against `en.json`); P9 added about 200 for the menu bar, rail, review panel, PDF area, editor settings, project list and account menu, P10 added the chat, word count, command palette, editor alerts, log hints and theme names. What is left is mostly source-editor tooltips, group management, subscription and upgrade texts
 
 ## Ideas for P10 (owner, 2026-11-12)
-- Claim check: also check paraphrased statements against the source. For every sentence with a citation, find the passage in the source and show "supported (p. 347)", "passage not found" or "source says something else", with a jump to the passage. Always show the passage found, never a verdict without evidence, because a language model judges this and can be wrong. Extends the "paraphrases" switch under Proactivity.
+- Claim check: in Claude Code the plugin agent `spur:gegenpruefung` (P17) now checks every paraphrased statement against the source and returns "gedeckt", "abweichend", "nicht_gefunden" or "nicht_pruefbar" with the passage found. Still open for the browser: show these verdicts per citation in the check report with a jump to the passage, so people without Claude Code see them too; always show the passage, never a verdict without evidence, because a language model judges this and can be wrong. Extends the "paraphrases" switch under Proactivity.
 - Claude without a terminal: the connector for claude.ai, desktop and mobile instead of the start command in the terminal. Biggest hurdle for people who do not use Claude Code. Needs OAuth and a publicly reachable server; a plan of its own because it concerns operations and security. Same item as "Connector" under Claude integration.
 - Click a citation in the PDF: a click on a citation in the compiled PDF opens the source on the right page with the passage highlighted. Makes the check visible to readers and supervisors. Related: "Also highlight markings in the page text of the source preview" under Interface.

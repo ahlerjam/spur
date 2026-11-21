@@ -107,7 +107,7 @@
         "`docs/mcp-contract.md` nennt im Abschnitt zum Plugin die Agenten, Skills und Hooks; `docs/adr/0007` hält die Entscheidung zur Prüfkette im Client fest",
         "`docs/backlog.md`: Der Punkt „Claim check“ verweist auf die Gegenprüfung im Plugin und nennt, was für die Browser-Ansicht offen bleibt; der Punkt zum zweiten Spiegel bei 404 ist entfernt"
       ],
-      "passes": false
+      "passes": true
     }
   ]
 }

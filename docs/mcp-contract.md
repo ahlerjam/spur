@@ -198,3 +198,25 @@ A source counts as `aufgenommen` even if the hit was excluded before; an exclude
 | `suggest_trigger` | `art` (`compile_fehler` with `fehler`, `belegloses_argument` with `doc_id`) |
 
 A chat text from the panel arrives as `task_created`. `suggest_trigger` only arises with the "Vorschlag" switch on and below the daily limit (default 50 per person).
+
+## The plugin `plugins/spur` (P17)
+
+Version 0.2.0. It depends on `humanizer` and `humanizer-de` (marketplace `cflow`) and `playwright` (marketplace `claude-plugins-official`); the marketplace `spur` lists both under `allowCrossMarketplaceDependenciesOn`. Everything below works only in Claude Code and does not change the server: the server judges no paraphrases (ADR 0004, ADR 0008).
+
+| Part | Name | Purpose |
+|---|---|---|
+| Agent | `spur:auswertung` | Reads abstract and introduction of each source, then the passages, and returns question, method, sample, findings, limits and each passage with PDF page, printed page and its meaning. Read-only tools, skill `spur-auswertung` |
+| Agent | `spur:gegenpruefung` | Gets only project ID and range; one verdict per citation (`gedeckt`, `abweichend`, `nicht_gefunden`, `nicht_pruefbar`), always with source, PDF page and wording, plus `uebersehen`. Read-only tools, skill `spur-gegenpruefung` |
+| Agent | `spur:endpruefung` | Compiles and checks report, figures and tables (`page_image`), `bib_list`, `run_status`, the LaTeX source and the draft summary; returns findings with place and suggestion. Skills `spur-endpruefung`, `spur-abbildungen` |
+| Skill | `spur` | Main skill: jobs, the review chain, the tools of P12 to P16 |
+| Skill | `spur-auswertung`, `spur-gegenpruefung`, `spur-endpruefung` | How each agent works and its output format |
+| Skill | `spur-abbildungen` | Rules for figures and tables, checked after every compile |
+| Skill | `spur-pdf-holen` | Fetches free PDFs after `bot_schutz` with `spur-pdf-holen`, then with the Playwright browser, and uploads them |
+| Hook | `SessionStart` | Adds a short reminder of the chain; writes `SPUR_PRUEFKETTE_SESSION` and `SPUR_PRUEFKETTE_DATA` to `CLAUDE_ENV_FILE` for `spur-pruefkette` |
+| Hook | `PostToolUse` | Notes a text change after `doc_edit` or `doc_create` on a `.tex` path or without `pfad` (not `.bib`, `.txt`, `.md`), the humanizer after the skill `humanizer:humanizer` or `humanizer-de:humanizer-de`, and `check_report`; clears the session after a successful `run_finish` |
+| Hook | `SubagentStop` | Notes `spur:gegenpruefung` and `spur:endpruefung` (also without the prefix) |
+| Hook | `PreToolUse` on `run_finish` | After a text change, refuses with `permissionDecision: "deny"` until the claim check after the first change, the final check after the claim check, the humanizer after the final check and `check_report` after the last change have run. The reason names exactly the missing stages ("Gegenprüfung", "Endprüfung", "Humanizer", `check_report`) and the next step |
+
+State per `session_id` lives in `${CLAUDE_PLUGIN_DATA}/pruefkette/<session>.json`. `spur-pruefkette stand` shows it; `spur-pruefkette aus "<reason>"` lifts the lock for the session (exit 2 without a reason or without a session). A damaged state file or a missing data folder never blocks: the hook lets the call through and writes one line to stderr.
+
+The four workflow texts end with the same paragraph on the chain, as a recommendation for clients without the plugin; `quellen_sammeln` also names `search_log`, `paper_exclude` and `bot_schutz`.
